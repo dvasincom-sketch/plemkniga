@@ -1,0 +1,309 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/onest';
+
+@theme {
+  --font-sans: 'Onest Variable', 'Onest', ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
+    Roboto, sans-serif;
+
+  /* Фирменная палитра Ассоциации */
+  --color-brand-50: #f1f8ec;
+  --color-brand-100: #e0f0d5;
+  --color-brand-300: #a9d182;
+  --color-brand-400: #8fc45f;
+  --color-brand-500: #7cb342; /* яркий зелёный: hero, активные вкладки, кнопки */
+  --color-brand-600: #6aa036;
+
+  --color-forest-400: #3f9c69;
+  --color-forest-500: #2e8757; /* глубокий зелёный: панель поиска, шапка таблицы */
+  --color-forest-600: #27714a;
+  --color-forest-700: #1f5b3b;
+
+  --color-accent-400: #ffb733;
+  --color-accent-500: #f5a623; /* оранжевый: кнопка «Искать», маркеры */
+  --color-accent-600: #e08f0d;
+
+  --color-ink-900: #17181a;
+  --color-ink-700: #3a3d42;
+  --color-ink-500: #6b7280;
+  --color-ink-300: #9ca3af;
+  --color-ink-100: #e5e7eb;
+
+  --color-canvas: #f2f2f2;
+
+  --radius-card: 1.5rem;
+}
+
+@layer base {
+  html {
+    background: var(--color-canvas);
+  }
+
+  body {
+    font-family: var(--font-sans);
+    color: var(--color-ink-900);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer components {
+  /* ---------- Контейнер страницы ---------- */
+  .container-page {
+    width: 100%;
+    max-width: 1200px;
+    margin-inline: auto;
+    padding-inline: 1.25rem;
+  }
+
+  /* ---------- Заголовок раздела с оранжевым маркером ---------- */
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    font-size: 1.75rem;
+    font-weight: 600;
+  }
+  .section-title::before {
+    content: '';
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: 9999px;
+    background: var(--color-accent-500);
+    flex: none;
+  }
+
+  /* ---------- Поля ввода ---------- */
+  .field {
+    width: 100%;
+    height: 2.875rem;
+    border-radius: 0.5rem;
+    border: 1px solid transparent;
+    background: #fff;
+    padding-inline: 1rem;
+    font-size: 0.875rem;
+    color: var(--color-ink-900);
+    outline: none;
+    transition: box-shadow 0.15s ease;
+  }
+  .field::placeholder {
+    color: var(--color-ink-300);
+  }
+  .field:focus {
+    box-shadow: 0 0 0 3px rgb(255 255 255 / 0.45);
+  }
+
+  .field-on-light {
+    border-color: var(--color-ink-100);
+  }
+  .field-on-light:focus {
+    box-shadow: 0 0 0 3px var(--color-brand-100);
+    border-color: var(--color-brand-400);
+  }
+
+  select.field {
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2317181a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 0.9rem center;
+    padding-right: 2.5rem;
+  }
+
+  /* ---------- Кнопки ---------- */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    height: 2.875rem;
+    padding-inline: 1.5rem;
+    border-radius: 0.5rem;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition:
+      background-color 0.15s ease,
+      opacity 0.15s ease;
+    white-space: nowrap;
+  }
+  .btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+  .btn-accent {
+    background: var(--color-accent-500);
+    color: #fff;
+  }
+  .btn-accent:hover:not(:disabled) {
+    background: var(--color-accent-600);
+  }
+  .btn-brand {
+    background: var(--color-brand-500);
+    color: #fff;
+  }
+  .btn-brand:hover:not(:disabled) {
+    background: var(--color-brand-600);
+  }
+  .btn-forest {
+    background: var(--color-forest-500);
+    color: #fff;
+  }
+  .btn-forest:hover:not(:disabled) {
+    background: var(--color-forest-600);
+  }
+  .btn-ghost {
+    background: #fff;
+    color: var(--color-ink-900);
+    border: 1px solid var(--color-ink-100);
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background: var(--color-canvas);
+  }
+
+  /* ---------- Карточки ---------- */
+  .card {
+    background: #fff;
+    border-radius: var(--radius-card);
+    padding: 1.75rem;
+  }
+
+  /* ---------- Вкладки ---------- */
+  .tab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 5rem;
+    border-radius: 1rem;
+    background: #fff;
+    color: var(--color-ink-500);
+    font-size: 1.0625rem;
+    text-align: center;
+    padding-inline: 0.75rem;
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
+  }
+  .tab:hover {
+    color: var(--color-ink-900);
+  }
+  .tab-active {
+    background: var(--color-brand-500);
+    color: #fff;
+    font-weight: 500;
+  }
+  .tab-active:hover {
+    color: #fff;
+  }
+
+  /* ---------- Таблица животных ---------- */
+  .data-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.8125rem;
+    white-space: nowrap;
+  }
+  .data-table thead th {
+    background: var(--color-forest-500);
+    color: #fff;
+    font-weight: 500;
+    text-align: left;
+    padding: 0.875rem 0.75rem;
+    position: sticky;
+    top: 0;
+  }
+  .data-table thead th:first-child {
+    border-top-left-radius: 1rem;
+    padding-left: 1.25rem;
+  }
+  .data-table thead th:last-child {
+    border-top-right-radius: 1rem;
+    padding-right: 1.25rem;
+  }
+  .data-table tbody td {
+    padding: 0.8125rem 0.75rem;
+    border-bottom: 1px solid var(--color-ink-100);
+    background: #fff;
+  }
+  .data-table tbody td:first-child {
+    padding-left: 1.25rem;
+  }
+  .data-table tbody td:last-child {
+    padding-right: 1.25rem;
+  }
+  .data-table tbody tr:hover td {
+    background: var(--color-brand-500);
+    color: #fff;
+    border-bottom-color: var(--color-brand-500);
+  }
+  .data-table tbody tr:hover td .ipc-positive,
+  .data-table tbody tr:hover td .ipc-negative {
+    color: #fff;
+  }
+
+  .ipc-positive {
+    color: var(--color-forest-500);
+    font-weight: 500;
+  }
+  .ipc-negative {
+    color: #c0392b;
+    font-weight: 500;
+  }
+
+  /* ---------- Скроллбар таблицы ---------- */
+  .table-scroll {
+    overflow-x: auto;
+    padding-bottom: 0.75rem;
+  }
+  .table-scroll::-webkit-scrollbar {
+    height: 8px;
+  }
+  .table-scroll::-webkit-scrollbar-track {
+    background: #fff;
+    border-radius: 999px;
+  }
+  .table-scroll::-webkit-scrollbar-thumb {
+    background: var(--color-forest-500);
+    border-radius: 999px;
+  }
+
+  /* ---------- Панель показателей карточки животного ---------- */
+  .metric-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+  .metric-table thead th {
+    background: #f0f0f0;
+    color: var(--color-ink-700);
+    font-weight: 400;
+    text-align: left;
+    padding: 0.625rem 0.875rem;
+  }
+  .metric-table thead th:first-child {
+    border-top-left-radius: 0.5rem;
+    border-bottom-left-radius: 0.5rem;
+  }
+  .metric-table thead th:last-child {
+    border-top-right-radius: 0.5rem;
+    border-bottom-right-radius: 0.5rem;
+  }
+  .metric-table tbody td {
+    padding: 0.6875rem 0.875rem;
+    border-bottom: 1px solid #ededed;
+  }
+  .metric-table tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .panel-heading {
+    color: var(--color-forest-500);
+    font-size: 1.0625rem;
+    font-weight: 500;
+    margin-bottom: 1rem;
+  }
+}
