@@ -18,6 +18,7 @@ export async function GET() {
 
   const env = {
     connectionString: db.uri ? maskUri(db.uri) : 'НЕ НАЙДЕНА',
+    connectionStringForDriver: db.driverUri ? maskUri(db.driverUri) : '—',
     takenFrom: db.source ?? '—',
     tls: db.sslMode,
     caCertificate: process.env.DATABASE_CA_CERT ? 'задан' : 'не задан',
@@ -64,10 +65,10 @@ export async function GET() {
     }
     if (/self[- ]signed|certificate|unable to verify|CERT_/i.test(message)) {
       hints.push(
-        'База отдаёт самоподписанный сертификат. Правильное решение: скачайте CA-сертификат провайдера и положите его содержимое (PEM целиком или в base64) в переменную DATABASE_CA_CERT — проверка сертификата сохранится',
+        'Сертификат базы не проходит проверку. Посмотрите поле connectionStringForDriver: в нём не должно быть sslmode — иначе драйвер игнорирует настройки TLS приложения и включает полную проверку',
       )
       hints.push(
-        'Быстрая альтернатива на время отладки: DATABASE_SSL_REJECT_UNAUTHORIZED=false. Шифрование останется, проверка подлинности сервера — нет',
+        'Если проверка нужна, положите CA-сертификат провайдера (PEM или base64) в DATABASE_CA_CERT. Если не нужна — достаточно sslmode=require в исходной строке подключения',
       )
     }
     if (/no pg_hba|SSL off|sslmode/i.test(message)) {

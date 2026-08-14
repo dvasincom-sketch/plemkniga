@@ -41,8 +41,24 @@ const pick = (env: Env, keys: readonly string[]): { value: string; key: string }
 export type SslConfig = { ca?: string; rejectUnauthorized: boolean }
 
 export type ResolvedDatabase = {
-  /** Готовая строка подключения либо пустая строка, если ничего не нашлось. */
+  /** Строка подключения как её задал человек — для показа и логов. */
   uri: string
+  /**
+   * Строка для драйвера: без `sslmode`.
+   *
+   * node-postgres, увидев `sslmode` в строке подключения, **игнорирует**
+   * переданный отдельно объект настроек TLS и берёт настройки из строки.
+   * При этом `sslmode=require` он трактует как `verify-full` — то есть
+   * включает полную проверку сертификата, хотя в PostgreSQL этот режим
+   * означает «шифруй, но не проверяй». Из-за такой пары решений строка
+   * подключения, работающая в psql и в других проектах, здесь падала
+   * с «self-signed certificate in certificate chain», и никакие переменные
+   * окружения на это не влияли — их просто не читали.
+   *
+   * Поэтому `sslmode` из строки убирается, а режим TLS задаётся объектом
+   * `sslConfig`: тогда решение принимаем мы, а не разбор строки.
+   */
+  driverUri: string
   /** Имя переменной (или «части»), откуда взята строка. */
   source: string | null
   /** Нужен ли TLS. */
@@ -107,7 +123,13 @@ export function resolveDatabase(env: Env = process.env as Env): ResolvedDatabase
     sslmode === 'verify-full' ||
     env.DATABASE_SSL === 'true'
 
-  if (!ssl) return { uri, source, ssl, sslMode: 'выключен' }
+  // Убираем sslmode (и совместимый флаг libpq) — режим задаём объектом
+  const driverUri = uri
+    .replace(/([?&])sslmode=[^&]*&?/gi, '$1')
+    .replace(/([?&])uselibpqcompat=[^&]*&?/gi, '$1')
+    .replace(/[?&]$/, '')
+
+  if (!ssl) return { uri, driverUri, source, ssl, sslMode: 'выключен' }
 
   const ca = readCaCert(env)
 
@@ -132,6 +154,7 @@ export function resolveDatabase(env: Env = process.env as Env): ResolvedDatabase
 
   return {
     uri,
+    driverUri,
     source,
     ssl,
     sslConfig: ca && rejectUnauthorized ? { ca, rejectUnauthorized } : { rejectUnauthorized },

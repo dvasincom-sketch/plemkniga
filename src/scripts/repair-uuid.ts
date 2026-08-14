@@ -30,7 +30,7 @@ const run = async () => {
   }
 
   console.info(`[plemkniga] Подключаюсь: ${maskUri(db.uri)}`)
-  const client = new pg.Client({ connectionString: db.uri, ssl: db.sslConfig })
+  const client = new pg.Client({ connectionString: db.driverUri, ssl: db.sslConfig })
   await client.connect()
 
   try {
