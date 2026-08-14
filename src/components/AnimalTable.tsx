@@ -3,8 +3,15 @@ import type { Animal } from '@/payload-types'
 import { AGE_GROUPS, SEXES, STATES } from '@/lib/dictionaries'
 import { nf, signed } from '@/lib/format'
 
-const short = (arr: readonly { value: string; label: string }[], v?: string | null) =>
-  arr.find((o) => o.value === v)?.label ?? '—'
+/**
+ * Таблица книги.
+ *
+ * Колонок четырнадцать, и при узкой области они превращаются в горизонтальный
+ * скролл, по которому невозможно сравнивать животных. Поэтому у каждой колонки
+ * есть приоритет: основные видны всегда, вспомогательные показываются, когда
+ * для них есть место. Ничего не теряется — полный набор всегда в карточке
+ * животного, а на широком экране видна и вся таблица.
+ */
 
 const ageShort = (v?: string | null) => AGE_GROUPS.find((o) => o.value === v)?.short ?? '—'
 
@@ -26,22 +33,25 @@ const LockBadge = () => (
   </span>
 )
 
-const COLUMNS = [
-  '№',
-  'Инд.№',
-  'Кличка',
-  'Состо­яние',
-  'Пол',
-  'Возраст',
-  'Удой (л)',
-  'Жир (%)',
-  'Белок (%)',
-  'Жир (кг)',
-  'Белок (кг)',
-  'СБП (кг)',
-  'ИПЦ',
-  'Владелец',
+/** `hide` — класс, скрывающий колонку на тесных ширинах. */
+const COLUMNS: { key: string; label: string; hide?: string }[] = [
+  { key: 'num', label: '№' },
+  { key: 'ident', label: 'Инд.№' },
+  { key: 'name', label: 'Кличка' },
+  { key: 'state', label: 'Состояние', hide: 'hidden 2xl:table-cell' },
+  { key: 'sex', label: 'Пол' },
+  { key: 'age', label: 'Возраст' },
+  { key: 'milk', label: 'Удой (л)' },
+  { key: 'fatPercent', label: 'Жир (%)', hide: 'hidden xl:table-cell' },
+  { key: 'proteinPercent', label: 'Белок (%)', hide: 'hidden xl:table-cell' },
+  { key: 'fatKg', label: 'Жир (кг)', hide: 'hidden 2xl:table-cell' },
+  { key: 'proteinKg', label: 'Белок (кг)', hide: 'hidden 2xl:table-cell' },
+  { key: 'sum', label: 'СБП (кг)', hide: 'hidden 2xl:table-cell' },
+  { key: 'ipc', label: 'ИПЦ' },
+  { key: 'owner', label: 'Владелец' },
 ]
+
+const cls = (key: string) => COLUMNS.find((c) => c.key === key)?.hide ?? ''
 
 export function AnimalTable({
   animals,
@@ -57,12 +67,12 @@ export function AnimalTable({
 }) {
   return (
     <div className="table-scroll">
-      <table className="data-table min-w-[1120px]">
+      <table className="data-table w-full">
         <thead>
           <tr>
             {COLUMNS.map((c) => (
-              <th key={c} className="whitespace-normal">
-                {c}
+              <th key={c.key} className={`whitespace-normal ${c.hide ?? ''}`}>
+                {c.label}
               </th>
             ))}
           </tr>
@@ -77,15 +87,16 @@ export function AnimalTable({
           )}
 
           {animals.map((a, i) => {
-            const owner = typeof a.owner === 'object' && a.owner ? a.owner.shortName || a.owner.name : '—'
+            const owner =
+              typeof a.owner === 'object' && a.owner ? a.owner.shortName || a.owner.name : '—'
             const locked = !canOpenAll && !a.publicDetails
             const s = a.summary
             const ipc = a.ipc ?? null
 
             return (
               <tr key={a.id}>
-                <td>{startIndex + i + 1}</td>
-                <td>
+                <td className="tabular-nums">{startIndex + i + 1}</td>
+                <td className="tabular-nums">
                   {locked ? (
                     <span>{a.identNumber}</span>
                   ) : (
@@ -94,32 +105,37 @@ export function AnimalTable({
                     </Link>
                   )}
                 </td>
-                <td>
+                <td className="cell-truncate" title={a.name ?? undefined}>
                   {locked ? (
                     (a.name ?? '—')
                   ) : (
-                    <Link href={`/animals/${a.id}`} className="hover:underline">
+                    <Link href={`/animals/${a.id}`} className="font-medium hover:underline">
                       {a.name ?? '—'}
                     </Link>
                   )}
                 </td>
-                <td>{short(STATES, a.state)}</td>
-                <td>{short(SEXES, a.sex)}</td>
+                {/* Полное название состояния: сокращения «Ж» у пола и у состояния означали разное */}
+                <td className={cls('state')}>
+                  {STATES.find((o) => o.value === a.state)?.full ?? '—'}
+                </td>
+                <td>{SEXES.find((o) => o.value === a.sex)?.label ?? '—'}</td>
                 <td title={AGE_GROUPS.find((o) => o.value === a.ageGroup)?.label}>
                   {ageShort(a.ageGroup)}
                 </td>
-                <td>{nf(s?.milkYield)}</td>
-                <td>{nf(s?.fatPercent, 2)}</td>
-                <td>{nf(s?.proteinPercent, 2)}</td>
-                <td>{nf(s?.fatKg)}</td>
-                <td>{nf(s?.proteinKg)}</td>
-                <td>{nf(s?.fatProteinSum)}</td>
-                <td>
+                <td className="tabular-nums">{nf(s?.milkYield)}</td>
+                <td className={`tabular-nums ${cls('fatPercent')}`}>{nf(s?.fatPercent, 2)}</td>
+                <td className={`tabular-nums ${cls('proteinPercent')}`}>
+                  {nf(s?.proteinPercent, 2)}
+                </td>
+                <td className={`tabular-nums ${cls('fatKg')}`}>{nf(s?.fatKg)}</td>
+                <td className={`tabular-nums ${cls('proteinKg')}`}>{nf(s?.proteinKg)}</td>
+                <td className={`tabular-nums ${cls('sum')}`}>{nf(s?.fatProteinSum)}</td>
+                <td className="tabular-nums">
                   <span className={ipc !== null && ipc < 0 ? 'ipc-negative' : 'ipc-positive'}>
                     {signed(ipc)}
                   </span>
                 </td>
-                <td>
+                <td className="cell-truncate" title={owner}>
                   {owner}
                   {locked && <LockBadge />}
                 </td>

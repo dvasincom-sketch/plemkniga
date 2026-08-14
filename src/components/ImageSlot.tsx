@@ -17,18 +17,35 @@ export function ImageSlot({
   alt,
   className = '',
   priority = false,
+  ratio,
+  minHeight,
   sizes = '(max-width: 1024px) 100vw, 50vw',
 }: {
   name: string
   alt: string
   className?: string
   priority?: boolean
+  /** Пропорции слота, например `1440 / 260`. */
+  ratio?: string
+  /** Минимальная высота в пикселях. */
+  minHeight?: number
   sizes?: string
 }) {
   const src = findPublicAsset(name)
 
+  /*
+   * Высота задаётся инлайновым стилем, а не служебным классом.
+   * `next/image` в режиме `fill` растягивается по родителю, и если у того
+   * высота вычислилась в ноль — картинка не появляется, а в консоль уходит
+   * предупреждение «has fill and a height value of 0». Пропорции надёжнее
+   * фиксированной высоты: слот подстраивается под ширину колонки.
+   */
+  const style: React.CSSProperties = {}
+  if (ratio) style.aspectRatio = ratio
+  if (minHeight) style.minHeight = minHeight
+
   return (
-    <div className={`relative overflow-hidden rounded-card ${className}`}>
+    <div className={`relative overflow-hidden rounded-card ${className}`} style={style}>
       {src ? (
         <Image src={src} alt={alt} fill sizes={sizes} priority={priority} className="object-cover" />
       ) : (

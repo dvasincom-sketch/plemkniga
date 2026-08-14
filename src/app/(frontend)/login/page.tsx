@@ -33,7 +33,9 @@ export default async function LoginPage() {
               name="images/login"
               alt="Голштинская порода"
               sizes="(max-width: 1024px) 100vw, 40vw"
-              className="mt-8 h-[240px] w-full rounded-2xl"
+              ratio="16 / 9"
+              minHeight={200}
+              className="mt-8 w-full rounded-2xl"
             />
           </div>
 

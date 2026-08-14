@@ -12,7 +12,8 @@
     "start": "next start",
     "lint": "next lint",
     "seed": "cross-env NODE_OPTIONS=--no-deprecation tsx src/seed/index.ts",
-    "backfill:ipc-rank": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/backfill-ipc-rank.ts",
+    "backfill:sort-ranks": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/backfill-sort-ranks.ts",
+    "repair:uuid": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/repair-uuid.ts",
     "payload": "cross-env NODE_OPTIONS=--no-deprecation payload",
     "generate:types": "cross-env NODE_OPTIONS=--no-deprecation payload generate:types",
     "generate:importmap": "cross-env NODE_OPTIONS=--no-deprecation payload generate:importmap"

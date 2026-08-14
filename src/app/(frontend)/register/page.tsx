@@ -78,7 +78,8 @@ export default async function RegisterPage() {
           <ImageSlot
             name="images/contacts"
             alt="Голштинская порода"
-            className="min-h-[420px] w-full"
+            minHeight={420}
+            className="h-full w-full"
           />
 
           <div>

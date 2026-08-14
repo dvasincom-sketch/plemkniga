@@ -86,3 +86,84 @@ export const currentPage = (sp: SearchParams): number => {
   const p = Number(one(sp.page) || '1')
   return Number.isFinite(p) && p > 0 ? Math.floor(p) : 1
 }
+
+/* ------------------------------------------------------------------ *
+ *                        Сортировка результатов                       *
+ * ------------------------------------------------------------------ */
+
+/**
+ * Варианты сортировки видимы пользователю, поэтому список намеренно короткий.
+ *
+ * Порядок по убыванию возможен только через служебные поля `*Rank`:
+ * PostgreSQL при `ORDER BY … DESC` ставит NULL первыми, и записи без значения
+ * вытеснили бы из начала списка те, у которых значение есть. По возрастанию
+ * NULL и так уходят в конец, поэтому текстовым полям служебная пара не нужна.
+ */
+export const SORT_OPTIONS = [
+  { value: 'ipc', label: 'Сначала лучшие по ИПЦ', payload: '-ipcRank' },
+  { value: 'milk', label: 'Сначала высокоудойные', payload: '-summary.milkRank' },
+  { value: 'name', label: 'По кличке, А→Я', payload: 'name' },
+  { value: 'id', label: 'По индивидуальному №', payload: 'identNumber' },
+] as const
+
+export type SortValue = (typeof SORT_OPTIONS)[number]['value']
+
+export const resolveSort = (sp: SearchParams): { value: SortValue; payload: string } => {
+  const raw = one(sp.sort)
+  const found = SORT_OPTIONS.find((o) => o.value === raw)
+  const chosen = found ?? SORT_OPTIONS[0]
+  return { value: chosen.value, payload: chosen.payload }
+}
+
+/* ------------------------------------------------------------------ *
+ *                          Активные условия                           *
+ * ------------------------------------------------------------------ */
+
+/** Параметры, которые не являются условиями отбора. */
+const NON_FILTER_KEYS = new Set(['page', 'sort', 'tab'])
+
+/** Ключи всех условий отбора в порядке показа. */
+export const FILTER_KEYS = [
+  'id',
+  'idFormat',
+  'name',
+  'sex',
+  'ageGroup',
+  'state',
+  'relation',
+  'owner',
+  'herd',
+  'author',
+  ...ADVANCED_FIELDS.map((f) => f.name),
+  'ipcFrom',
+  'ipcTo',
+] as const
+
+/** true, если задано хотя бы одно условие отбора. */
+export const hasActiveFilters = (sp: SearchParams): boolean =>
+  Object.entries(sp).some(([k, v]) => !NON_FILTER_KEYS.has(k) && Boolean(one(v)))
+
+/** Строка запроса без указанного условия — для крестика на «фишке» фильтра. */
+export const queryWithout = (sp: SearchParams, drop: string): string => {
+  const params = new URLSearchParams()
+  for (const [k, v] of Object.entries(sp)) {
+    if (k === drop || k === 'page') continue
+    const value = one(v)
+    if (value) params.set(k, value)
+  }
+  const qs = params.toString()
+  return qs ? `/?${qs}` : '/'
+}
+
+/** Строка запроса с изменённой сортировкой, отбор сохраняется. */
+export const queryWithSort = (sp: SearchParams, sort: SortValue): string => {
+  const params = new URLSearchParams()
+  for (const [k, v] of Object.entries(sp)) {
+    if (k === 'page' || k === 'sort') continue
+    const value = one(v)
+    if (value) params.set(k, value)
+  }
+  if (sort !== SORT_OPTIONS[0].value) params.set('sort', sort)
+  const qs = params.toString()
+  return qs ? `/?${qs}` : '/'
+}

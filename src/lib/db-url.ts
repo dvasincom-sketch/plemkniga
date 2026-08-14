@@ -38,6 +38,8 @@ const pick = (env: Env, keys: readonly string[]): { value: string; key: string }
   return null
 }
 
+export type SslConfig = { ca?: string; rejectUnauthorized: boolean }
+
 export type ResolvedDatabase = {
   /** Готовая строка подключения либо пустая строка, если ничего не нашлось. */
   uri: string
@@ -45,6 +47,32 @@ export type ResolvedDatabase = {
   source: string | null
   /** Нужен ли TLS. */
   ssl: boolean
+  /** Готовые настройки TLS для драйвера pg (undefined, если TLS не нужен). */
+  sslConfig?: SslConfig
+  /** Как описать режим TLS человеку. */
+  sslMode: string
+}
+
+/**
+ * Сертификат удостоверяющего центра базы.
+ *
+ * Управляемый PostgreSQL обычно выдаётся с самоподписанным сертификатом,
+ * и драйвер отвергает соединение с ошибкой «self-signed certificate in
+ * certificate chain». Правильное решение — положить CA-сертификат провайдера
+ * в переменную окружения: соединение остаётся проверяемым. Значение можно
+ * передать как PEM целиком или в base64 — второе удобнее для панелей,
+ * которые не любят многострочные значения.
+ */
+const readCaCert = (env: Env): string | undefined => {
+  const raw = env.DATABASE_CA_CERT?.trim()
+  if (!raw) return undefined
+  if (raw.includes('BEGIN CERTIFICATE')) return raw
+  try {
+    const decoded = Buffer.from(raw, 'base64').toString('utf8')
+    return decoded.includes('BEGIN CERTIFICATE') ? decoded : undefined
+  } catch {
+    return undefined
+  }
 }
 
 export function resolveDatabase(env: Env = process.env as Env): ResolvedDatabase {
@@ -72,10 +100,47 @@ export function resolveDatabase(env: Env = process.env as Env): ResolvedDatabase
     }
   }
 
+  const sslmode = /[?&]sslmode=([a-z-]+)/i.exec(uri)?.[1]?.toLowerCase()
   const ssl =
-    /[?&]sslmode=(require|verify-ca|verify-full)/i.test(uri) || env.DATABASE_SSL === 'true'
+    sslmode === 'require' ||
+    sslmode === 'verify-ca' ||
+    sslmode === 'verify-full' ||
+    env.DATABASE_SSL === 'true'
 
-  return { uri, source, ssl }
+  if (!ssl) return { uri, source, ssl, sslMode: 'выключен' }
+
+  const ca = readCaCert(env)
+
+  /*
+   * Проверять ли сертификат — решаем по sslmode, как это делает libpq.
+   *
+   * Это важная тонкость: `sslmode=require` в PostgreSQL означает «шифруй,
+   * но сертификат не проверяй». Проверку включают только `verify-ca`
+   * и `verify-full`. Драйвер node-postgres таких правил не знает и проверяет
+   * всегда, когда ему передали объект настроек, — поэтому строка подключения,
+   * с которой прекрасно работают psql и другие клиенты, здесь падала
+   * с «self-signed certificate in certificate chain».
+   *
+   * Теперь поведение совпадает с общепринятым: та же строка подключения
+   * работает так же, как везде. Проверку можно включить явно —
+   * поставив в строке verify-full или задав DATABASE_CA_CERT.
+   */
+  const verifyByMode = sslmode === 'verify-ca' || sslmode === 'verify-full'
+  const explicit = env.DATABASE_SSL_REJECT_UNAUTHORIZED
+  const rejectUnauthorized =
+    explicit === 'false' ? false : explicit === 'true' ? true : verifyByMode || Boolean(ca)
+
+  return {
+    uri,
+    source,
+    ssl,
+    sslConfig: ca && rejectUnauthorized ? { ca, rejectUnauthorized } : { rejectUnauthorized },
+    sslMode: !rejectUnauthorized
+      ? `шифрование без проверки сертификата (sslmode=${sslmode ?? 'не задан'})`
+      : ca
+        ? 'с проверкой по своему сертификату'
+        : 'с проверкой по системным корневым сертификатам',
+  }
 }
 
 /** Строка подключения без пароля — можно показывать и писать в лог. */

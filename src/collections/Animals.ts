@@ -434,6 +434,16 @@ export const Animals: CollectionConfig = {
                     { name: 'fatKg', type: 'number', label: 'Жир, кг' },
                     { name: 'proteinKg', type: 'number', label: 'Белок, кг' },
                     { name: 'fatProteinSum', type: 'number', label: 'СБП, кг' },
+                    {
+                      // Пара к summary.milkYield для сортировки по убыванию:
+                      // пустое значение уходит в конец списка, а не в начало.
+                      name: 'milkRank',
+                      type: 'number',
+                      label: 'Ранг по удою (служебное)',
+                      index: true,
+                      defaultValue: -1_000_000,
+                      admin: { hidden: true },
+                    },
                   ],
                 },
               ],
@@ -803,9 +813,13 @@ export const Animals: CollectionConfig = {
         if (req.user) data.lastEditUser = req.user.id
         data.lastEditTime = new Date().toISOString()
 
-        // Ранг сортировки: пустой ИПЦ уходит в конец списка, а не в начало
+        // Ранги сортировки: пустые значения уходят в конец списка, а не в начало
         const ipcValue = data.ipc ?? originalDoc?.ipc
         data.ipcRank = typeof ipcValue === 'number' ? ipcValue : -1_000_000
+
+        const milkValue = data.summary?.milkYield ?? originalDoc?.summary?.milkYield
+        if (!data.summary || typeof data.summary !== 'object') data.summary = {}
+        data.summary.milkRank = typeof milkValue === 'number' ? milkValue : -1_000_000
 
         // СБП = жир, кг + белок, кг
         const s = data?.summary
@@ -823,8 +837,21 @@ export const Animals: CollectionConfig = {
           data.nameLatin = transliterate(data.name)
         }
 
-        // Проверка родословной: потомок не может родиться раньше родителей
-        if (data.birthDate && (data.father || data.mother)) {
+        /*
+         * Проверка родословной: потомок не может родиться раньше родителей.
+         *
+         * Проверяем только когда меняются сами даты или связи с родителями.
+         * Иначе запись с уже накопленным противоречием становится нередактируемой
+         * целиком: нельзя поправить даже кличку, пока не исправлены даты предка,
+         * — а исправить их через ту же карточку тоже не выходит.
+         */
+        const pedigreeTouched =
+          operation === 'create' ||
+          (data.birthDate !== undefined && data.birthDate !== originalDoc?.birthDate) ||
+          (data.father !== undefined && data.father !== originalDoc?.father) ||
+          (data.mother !== undefined && data.mother !== originalDoc?.mother)
+
+        if (pedigreeTouched && data.birthDate && (data.father || data.mother)) {
           const parentIds = [data.father, data.mother].filter(Boolean)
           for (const pid of parentIds) {
             try {

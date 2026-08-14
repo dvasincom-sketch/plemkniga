@@ -401,6 +401,7 @@ export interface Animal {
     fatKg?: number | null;
     proteinKg?: number | null;
     fatProteinSum?: number | null;
+    milkRank?: number | null;
   };
   lactations?:
     | {
@@ -1471,6 +1472,7 @@ export interface AnimalsSelect<T extends boolean = true> {
         fatKg?: T;
         proteinKg?: T;
         fatProteinSum?: T;
+        milkRank?: T;
       };
   lactations?:
     | T

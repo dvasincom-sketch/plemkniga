@@ -24,11 +24,11 @@ import { databaseEnvKeys, maskUri, resolveDatabase } from '@/lib/db-url'
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 
-const { uri: databaseUri, source: databaseSource, ssl: needsSsl } = resolveDatabase()
+const { uri: databaseUri, source: databaseSource, sslConfig, sslMode } = resolveDatabase()
 
 if (databaseUri) {
   console.info(
-    `[plemkniga] Строка подключения взята из ${databaseSource}: ${maskUri(databaseUri)} (TLS: ${needsSsl ? 'да' : 'нет'})`,
+    `[plemkniga] Строка подключения взята из ${databaseSource}: ${maskUri(databaseUri)} (TLS: ${sslMode})`,
   )
 } else {
   console.warn(
@@ -68,11 +68,11 @@ export default buildConfig({
   db: postgresAdapter({
     pool: {
       connectionString: databaseUri,
-      // Управляемый PostgreSQL (в т.ч. Timeweb Cloud) требует TLS.
-      // Если сертификат самоподписанный — DATABASE_SSL_REJECT_UNAUTHORIZED=false
-      ssl: needsSsl
-        ? { rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== 'false' }
-        : undefined,
+      // Управляемый PostgreSQL (в т.ч. Timeweb Cloud) требует TLS и обычно
+      // отдаёт самоподписанный сертификат. Положите CA провайдера
+      // в DATABASE_CA_CERT — тогда проверка сохранится. Быстрая альтернатива
+      // на время отладки: DATABASE_SSL_REJECT_UNAUTHORIZED=false
+      ssl: sslConfig,
     },
     // На проде выключите (PAYLOAD_DB_PUSH=false) и работайте через миграции:
     // npm run payload migrate:create && npm run payload migrate
