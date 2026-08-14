@@ -1,9 +1,9 @@
 import Link from 'next/link'
 import { getClient } from '@/lib/payload'
-import { buildPedigree, wrightInbreeding } from '@/lib/pedigree'
+import { analyzePedigree, buildPedigree, flattenPedigree, wrightInbreeding } from '@/lib/pedigree'
 import { PedigreeTree } from './PedigreeTree'
 import { dateRu, nf } from '@/lib/format'
-import { TRUST_LEVELS, trustLabel } from '@/lib/dictionaries'
+import { trustLabel } from '@/lib/dictionaries'
 import { INBREEDING_MANUAL_APPROVAL, INBREEDING_WARNING } from '@/lib/animal-id'
 import type { Animal } from '@/payload-types'
 
@@ -14,22 +14,6 @@ const relName = (v: unknown): string => {
     if (typeof n === 'string' && n) return n
   }
   return '—'
-}
-
-function TrustBadge({ level }: { level?: number | null }) {
-  const value = level ?? 0
-  const hint = TRUST_LEVELS.find((t) => t.value === String(value))?.hint ?? ''
-  return (
-    <span className="flex items-center gap-2 text-[15px] text-ink-700">
-      Уровень достоверности данных: <span className="font-medium text-ink-900">{value}</span>
-      <span
-        title={`${trustLabel(value)} — ${hint}`}
-        className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-ink-900 text-[10px] font-bold text-white"
-      >
-        i
-      </span>
-    </span>
-  )
 }
 
 export async function AnimalOriginTab({ animal }: { animal: Animal }) {
@@ -65,6 +49,25 @@ export async function AnimalOriginTab({ animal }: { animal: Animal }) {
     }),
   ])
 
+  // Уровни достоверности предков — для пометки неподтверждённых узлов
+  const ancestorIds = flattenPedigree(roots)
+    .map((n) => n.animal?.id)
+    .filter((v): v is number => typeof v === 'number')
+
+  const trustByAnimal: Record<number, number | null | undefined> = {}
+  if (ancestorIds.length) {
+    const ancestors = await payload.find({
+      collection: 'animals',
+      where: { id: { in: ancestorIds } },
+      limit: ancestorIds.length,
+      depth: 0,
+      overrideAccess: true,
+    })
+    for (const a of ancestors.docs) trustByAnimal[a.id as number] = a.trustLevel
+  }
+
+  const analysis = analyzePedigree(roots, trustByAnimal)
+
   const dnaTests = animal.dnaTests ?? []
   // Если родители связаны карточками — показываем расчёт по древу,
   // иначе берём значение, пришедшее из импорта.
@@ -95,13 +98,10 @@ export async function AnimalOriginTab({ animal }: { animal: Animal }) {
 
   return (
     <>
-      <div className="mt-8 flex flex-wrap items-center justify-between gap-4">
-        <h2 className="section-title">Генеалогическое древо</h2>
-        <TrustBadge level={animal.trustLevel} />
-      </div>
+      <h2 className="section-title mt-8">Генеалогическое древо</h2>
 
       <section className="mt-6">
-        <PedigreeTree roots={roots} coi={coi} />
+        <PedigreeTree roots={roots} coi={coi} analysis={analysis} />
       </section>
 
       {typeof coi === 'number' && coi > INBREEDING_WARNING && (

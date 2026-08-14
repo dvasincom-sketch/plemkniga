@@ -441,29 +441,36 @@ const run = async () => {
   type Anc = { code: string; name: string; num: string; sex: 'male' | 'female'; year: number }
 
   // Ряды: О/М → ОО/МО/ОМ/ММ → восемь предков третьего ряда
-  const ancestors: Anc[] = [
-    { code: 'OOO', name: 'Г.Энханкер', num: '343514', sex: 'male', year: 2000 },
-    { code: 'MOO', name: 'Пинкей', num: '3243815', sex: 'female', year: 2000 },
-    { code: 'OMO', name: 'Фагин', num: '168939', sex: 'male', year: 2000 },
-    { code: 'MMO', name: 'Шарлет', num: '11206193', sex: 'female', year: 2000 },
-    { code: 'OOM', name: 'С.М.Юпитер', num: '1666290', sex: 'male', year: 2000 },
-    { code: 'MOM', name: 'Клай Эрдел', num: '8989355', sex: 'female', year: 2000 },
-    { code: 'OO', name: 'Дубрас', num: '376602', sex: 'male', year: 2005 },
-    { code: 'MO', name: 'Ш.Ф.Шарлет', num: '11681841', sex: 'female', year: 2005 },
-    { code: 'OM', name: 'Ральф', num: '1748622', sex: 'male', year: 2005 },
-    { code: 'MM', name: 'Прелесть', num: '28151', sex: 'female', year: 2005 },
-    { code: 'O', name: 'Палаш', num: '5', sex: 'male', year: 2010 },
-    { code: 'M', name: 'Пастила', num: '20197', sex: 'female', year: 2010 },
+  // Ключи — условные, не коды позиций: одно животное может стоять в двух местах древа
+  const ancestors: (Anc & { trust?: number })[] = [
+    { code: 'enhancer', name: 'Г.Энханкер', num: '343514', sex: 'male', year: 2000, trust: 3 },
+    { code: 'pinkey', name: 'Пинкей', num: '3243815', sex: 'female', year: 2000, trust: 1 },
+    { code: 'sharlet', name: 'Шарлет', num: '11206193', sex: 'female', year: 2000, trust: 3 },
+    { code: 'jupiter', name: 'С.М.Юпитер', num: '1666290', sex: 'male', year: 2000, trust: 3 },
+    { code: 'klay', name: 'Клай Эрдел', num: '8989355', sex: 'female', year: 2000, trust: 1 },
+    { code: 'fagin', name: 'Фагин', num: '168939', sex: 'male', year: 2000, trust: 3 },
+    { code: 'dubras', name: 'Дубрас', num: '376602', sex: 'male', year: 2005, trust: 3 },
+    { code: 'shfsharlet', name: 'Ш.Ф.Шарлет', num: '11681841', sex: 'female', year: 2005, trust: 3 },
+    { code: 'ralf', name: 'Ральф', num: '1748622', sex: 'male', year: 2005, trust: 3 },
+    { code: 'prelest', name: 'Прелесть', num: '28151', sex: 'female', year: 2005, trust: 3 },
+    { code: 'palash', name: 'Палаш', num: '5', sex: 'male', year: 2010, trust: 3 },
+    { code: 'pastila', name: 'Пастила', num: '20197', sex: 'female', year: 2010, trust: 3 },
   ]
 
-  // Кто чей родитель: код потомка → [код отца, код матери]
+  /**
+   * Связи подобраны так, чтобы древо демонстрировало обе ситуации:
+   *  — Шарлет стоит и у отца (ММО), и у матери (МММ) — общий предок,
+   *    даёт вклад в коэффициент инбридинга животного: (1/2)^5 = 3,125%;
+   *  — Г.Энханкер дважды встречается только со стороны отца (ООО и ОМО) —
+   *    инбредным оказывается сам отец, на COI потомка это не влияет.
+   */
   const parentsOf: Record<string, [string | null, string | null]> = {
-    O: ['OO', 'MO'],
-    M: ['OM', 'MM'],
-    OO: ['OOO', 'MOO'],
-    MO: ['OMO', 'MMO'],
-    OM: ['OOM', 'MOM'],
-    MM: [null, null],
+    palash: ['dubras', 'shfsharlet'],
+    pastila: ['ralf', 'prelest'],
+    dubras: ['enhancer', 'pinkey'],
+    shfsharlet: ['enhancer', 'sharlet'],
+    ralf: ['jupiter', 'klay'],
+    prelest: ['fagin', 'sharlet'],
   }
 
   const ancIds: Record<string, number> = {}
@@ -486,7 +493,7 @@ const run = async () => {
         author: farmer.id,
         publicVisible: true,
         publicDetails: true,
-        trustLevel: 3,
+        trustLevel: a.trust ?? 3,
         father: fCode ? ancIds[fCode] : undefined,
         mother: mCode ? ancIds[mCode] : undefined,
         archived: true,
@@ -564,8 +571,8 @@ const run = async () => {
       publicDetails: true,
       trustLevel: 3,
       trustCheckedAt: new Date(2025, 2, 12).toISOString(),
-      father: ancIds.O,
-      mother: ancIds.M,
+      father: ancIds.palash,
+      mother: ancIds.pastila,
       pedigreeText: {
         fatherId: '5',
         fatherName: 'Палаш',
@@ -574,7 +581,7 @@ const run = async () => {
         fatherFatherId: '376602',
         motherFatherId: '1748622',
       },
-      inbreeding: 0,
+      inbreeding: 3.13,
       ipc: 1284.5,
       ipcDetails: { forecast: 1284.5, r: 71.4, percentile: 88 },
       evaluationDate: new Date(2025, 2, 12).toISOString(),
@@ -831,6 +838,19 @@ const run = async () => {
       withProtocol: false,
     },
     {
+      number: '121678',
+      kind: 'events' as const,
+      status: 'rejected' as const,
+      submittedAt: new Date(2025, 0, 8, 10, 15),
+      checkedAt: new Date(2025, 0, 8, 18, 40),
+      comment:
+        'Возможная причина отказа в рассмотрении данных: в файле не заполнены индивидуальные номера у 34 записей, формат дат не соответствует ISO 8601.',
+      total: 210,
+      accepted: 0,
+      rejected: 210,
+      withProtocol: true,
+    },
+    {
       number: '123402',
       kind: 'animals' as const,
       status: 'checking' as const,
@@ -872,10 +892,22 @@ const run = async () => {
               }
             : { agreed: false },
         history: [
-          { at: sp.submittedAt.toISOString(), status: 'uploaded', actor: farmer.id },
+          { at: sp.submittedAt.toISOString(), status: 'uploaded' as const, actor: farmer.id },
           ...(sp.checkedAt
-            ? [{ at: sp.checkedAt.toISOString(), status: 'checked' as const, actor: farmer.id }]
-            : [{ at: sp.submittedAt.toISOString(), status: 'checking' as const, actor: farmer.id }]),
+            ? [
+                {
+                  at: sp.checkedAt.toISOString(),
+                  status: sp.status === 'rejected' ? ('rejected' as const) : ('checked' as const),
+                  actor: farmer.id,
+                },
+              ]
+            : [
+                {
+                  at: new Date(sp.submittedAt.getTime() + 36e5).toISOString(),
+                  status: 'checking' as const,
+                  actor: farmer.id,
+                },
+              ]),
           ...(sp.status === 'accepted'
             ? [
                 {

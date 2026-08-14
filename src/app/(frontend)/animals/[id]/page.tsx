@@ -6,6 +6,7 @@ import { SiteFooter } from '@/components/SiteFooter'
 import { ExteriorChart } from '@/components/ExteriorChart'
 import { AnimalEventsTab } from '@/components/AnimalEventsTab'
 import { AnimalOriginTab } from '@/components/AnimalOriginTab'
+import { TrustBadge } from '@/components/TrustBadge'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import {
   AGE_GROUPS,
@@ -171,7 +172,10 @@ export default async function AnimalPage({
             </div>
           </div>
 
-          <p className="text-sm text-ink-700">Обновлено: {dateRu(animal.updatedAt)}</p>
+          <div className="flex flex-col items-end gap-3">
+            <p className="text-sm text-ink-700">Обновлено: {dateRu(animal.updatedAt)}</p>
+            <TrustBadge level={animal.trustLevel} />
+          </div>
         </section>
 
         {/* ------------------------------ Вкладки ---------------------------- */}

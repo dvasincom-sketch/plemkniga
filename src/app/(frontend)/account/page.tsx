@@ -14,7 +14,7 @@ import { VisibilityForm } from '@/components/VisibilityForm'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { buildAnimalWhere, currentPage, hasAdvancedValues, one, type SearchParams } from '@/lib/animal-query'
 import { DOCUMENT_TYPES, EVENT_TYPES, ROLES, labelOf } from '@/lib/dictionaries'
-import { SUBMISSION_KINDS, SUBMISSION_STATUSES } from '@/collections/DataSubmissions'
+import { SubmissionHistory } from '@/components/SubmissionHistory'
 import { dateRu } from '@/lib/format'
 import type { Where } from 'payload'
 import type { Animal, Organization } from '@/payload-types'
@@ -211,63 +211,11 @@ async function EventsTab({ orgId }: { orgId?: number }) {
     }),
   ])
 
-  const statusTone = (s?: string | null) => {
-    if (s === 'accepted') return 'bg-brand-50 text-forest-600'
-    if (s === 'rejected') return 'bg-red-50 text-red-700'
-    if (s === 'checked') return 'bg-amber-50 text-amber-900'
-    return 'bg-[#f0f0f0] text-ink-700'
-  }
-
   return (
     <>
       <section className="mt-10">
-        <h2 className="section-title mb-7">Пакеты загрузки данных</h2>
-        <div className="card overflow-x-auto">
-          <table className="metric-table min-w-[760px]">
-            <thead>
-              <tr>
-                <th>№</th>
-                <th>Что загружали</th>
-                <th>Дата загрузки</th>
-                <th>Статус</th>
-                <th>Записей</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {submissions.docs.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="py-8 text-center text-ink-500">
-                    Пакетов загрузки пока нет. Загрузите файл через «Мои животные → Импорт данных».
-                  </td>
-                </tr>
-              )}
-              {submissions.docs.map((sub) => (
-                <tr key={sub.id}>
-                  <td className="font-medium tabular-nums">{sub.number}</td>
-                  <td>{labelOf(SUBMISSION_KINDS, sub.kind)}</td>
-                  <td>{dateRu(sub.submittedAt)}</td>
-                  <td>
-                    <span className={`rounded-md px-2 py-1 text-xs ${statusTone(sub.status)}`}>
-                      {labelOf(SUBMISSION_STATUSES, sub.status)}
-                    </span>
-                  </td>
-                  <td className="tabular-nums">
-                    {sub.review?.acceptedRows ?? 0} / {sub.review?.totalRows ?? 0}
-                  </td>
-                  <td className="text-right">
-                    <Link
-                      href={`/account/submissions/${sub.id}`}
-                      className="text-forest-500 underline underline-offset-4"
-                    >
-                      Открыть
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <h2 className="section-title mb-7">История</h2>
+        <SubmissionHistory submissions={submissions.docs} />
       </section>
 
       <section className="mt-10">

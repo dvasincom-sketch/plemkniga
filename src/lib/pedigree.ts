@@ -215,6 +215,126 @@ export async function wrightInbreeding(
   return Math.round(f * 100 * 100) / 100
 }
 
-/** Плоский список кодов третьего ряда — для проверок и выгрузок. */
+/** Плоский список узлов — для проверок и выгрузок. */
 export const flattenPedigree = (nodes: PedigreeNode[]): PedigreeNode[] =>
   nodes.flatMap((n) => [n, ...flattenPedigree(n.children)])
+
+/* ------------------------------------------------------------------ */
+/*                     Разметка древа для визуализации                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Состояние узла родословной. Порядок важен: чем выше в списке,
+ * тем приоритетнее при отображении.
+ *
+ *  common     — предок встречается и со стороны отца, и со стороны матери.
+ *               Именно такие предки дают вклад в коэффициент инбридинга животного.
+ *  repeated   — предок повторяется внутри одной стороны. На инбридинг самого
+ *               животного не влияет, но говорит, что инбредным является родитель.
+ *  unverified — карточка предка есть, но данные не подтверждены (уровень < 2).
+ *  missing    — предка нет ни карточкой, ни в текстовой родословной: обрыв ветви.
+ *  normal     — обычный узел.
+ */
+export type NodeState = 'common' | 'repeated' | 'unverified' | 'missing' | 'normal'
+
+export type NodeMark = {
+  state: NodeState
+  /** Индекс цвета для повторяющегося предка (0…N). */
+  group?: number
+  /** Узел лежит на пути от родителя к повторяющемуся предку. */
+  onPath?: boolean
+  /** Идентификатор животного — по нему подсвечиваются все вхождения при наведении. */
+  animalId?: number
+}
+
+export type PedigreeAnalysis = {
+  marks: Record<string, NodeMark>
+  /** Повторяющиеся предки: id → цвет, стороны, коды вхождений. */
+  groups: {
+    animalId: number
+    identNumber: string
+    name?: string | null
+    group: number
+    kind: 'common' | 'repeated'
+    codes: string[]
+  }[]
+}
+
+/** Сторона родословной: код читается справа налево, последняя буква — корень. */
+const sideOf = (code: string): 'O' | 'M' => (code.endsWith('О') ? 'O' : 'M')
+
+/** Все узлы пути от корня к данному коду: ООО → [О, ОО, ООО]. */
+const pathCodes = (code: string): string[] => {
+  const out: string[] = []
+  for (let i = code.length - 1; i >= 0; i--) out.push(code.slice(i))
+  return out
+}
+
+export function analyzePedigree(
+  roots: PedigreeNode[],
+  trustByAnimal: Record<number, number | null | undefined> = {},
+): PedigreeAnalysis {
+  const nodes = flattenPedigree(roots)
+  const marks: Record<string, NodeMark> = {}
+
+  // Собираем вхождения каждого животного
+  const occurrences = new Map<number, { codes: string[]; sides: Set<'O' | 'M'> }>()
+  for (const n of nodes) {
+    if (!n.animal) continue
+    const rec = occurrences.get(n.animal.id) ?? { codes: [], sides: new Set<'O' | 'M'>() }
+    rec.codes.push(n.code)
+    rec.sides.add(sideOf(n.code))
+    occurrences.set(n.animal.id, rec)
+  }
+
+  const groups: PedigreeAnalysis['groups'] = []
+  const groupByAnimal = new Map<number, { group: number; kind: 'common' | 'repeated' }>()
+  const onPath = new Set<string>()
+
+  let groupIndex = 0
+  for (const [animalId, rec] of occurrences) {
+    if (rec.codes.length < 2) continue
+
+    const kind: 'common' | 'repeated' = rec.sides.size > 1 ? 'common' : 'repeated'
+    groupByAnimal.set(animalId, { group: groupIndex, kind })
+
+    const sample = nodes.find((n) => n.animal?.id === animalId)!
+    groups.push({
+      animalId,
+      identNumber: sample.animal!.identNumber,
+      name: sample.animal!.name,
+      group: groupIndex,
+      kind,
+      codes: rec.codes,
+    })
+
+    for (const c of rec.codes) for (const pc of pathCodes(c)) onPath.add(pc)
+    groupIndex++
+  }
+
+  // Общие предки идут первыми — им достаются первые цвета палитры
+  groups.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'common' ? -1 : 1))
+  groups.forEach((g, i) => {
+    g.group = i
+    groupByAnimal.set(g.animalId, { group: i, kind: g.kind })
+  })
+
+  for (const n of nodes) {
+    const id = n.animal?.id
+    const dup = id !== undefined ? groupByAnimal.get(id) : undefined
+
+    let state: NodeState = 'normal'
+    if (dup) state = dup.kind
+    else if (!n.animal && !n.text) state = 'missing'
+    else if (n.animal && (trustByAnimal[n.animal.id] ?? 0) < 2) state = 'unverified'
+
+    marks[n.code] = {
+      state,
+      group: dup?.group,
+      onPath: onPath.has(n.code),
+      animalId: id,
+    }
+  }
+
+  return { marks, groups }
+}
