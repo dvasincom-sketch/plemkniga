@@ -84,11 +84,26 @@ export default async function HerdbookPage({
       <SiteHeader active="/" />
 
       <main className="container-page pb-4">
-        {/* ------------------------------- Шапка ------------------------------ */}
-        <section>
-          <div className="grid grid-cols-1 gap-6 rounded-card bg-brand-500 p-8 text-white sm:p-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-end lg:gap-12">
+        {/*
+          Шапка и заставка стоят в две колонки: так они занимают одну высоту
+          вместо двух и каталог оказывается ближе к верху экрана. Как только
+          задан отбор, заставка убирается — страница переходит в рабочий режим,
+          и между условиями и результатами не должно стоять ничего
+          декоративного. Текст в этом случае перестраивается в две колонки
+          внутри плашки, чтобы она не растягивалась во всю ширину пустотой.
+        */}
+        <section
+          className={`grid grid-cols-1 gap-5 ${hasActive ? '' : 'lg:grid-cols-[1.05fr_1fr]'}`}
+        >
+          <div
+            className={`rounded-card bg-brand-500 p-8 text-white sm:p-10 ${
+              hasActive
+                ? 'grid gap-6 lg:grid-cols-2 lg:items-end lg:gap-12'
+                : 'flex flex-col justify-between gap-8'
+            }`}
+          >
             <div>
-              <h1 className="text-[40px] font-medium leading-[1.05] sm:text-[52px]">
+              <h1 className="text-[40px] font-medium leading-[1.05] sm:text-[48px]">
                 Племенная книга
               </h1>
               <p className="mt-4 text-[15px] text-white/85">
@@ -96,7 +111,7 @@ export default async function HerdbookPage({
               </p>
             </div>
 
-            <p className="text-[15px] leading-[1.55] text-white/95">
+            <p className="max-w-[58ch] text-[15px] leading-[1.55] text-white/95">
               Информационная система для сбора, хранения и анализа данных о крупном рогатом скоте
               (КРС) с целью определения наиболее перспективных быков-производителей для селекции. На
               основе статистики продуктивности, здоровья и других параметров система должна помогать
@@ -104,26 +119,18 @@ export default async function HerdbookPage({
               отправка на мясо).
             </p>
           </div>
-        </section>
 
-        {/*
-          Заставка показывается только на чистой книге. Как только задан отбор,
-          страница переходит в рабочий режим: между условиями и результатами
-          не должно стоять ничего декоративного.
-        */}
-        {!hasActive && (
-          <section className="mt-5">
+          {!hasActive && (
             <ImageSlot
               name="images/hero-plemkniga"
               alt="Голштинская порода"
               priority
-              sizes="100vw"
-              ratio="1440 / 260"
-              minHeight={180}
-              className="w-full"
+              sizes="(max-width: 1024px) 100vw, 50vw"
+              minHeight={260}
+              className="h-full w-full"
             />
-          </section>
-        )}
+          )}
+        </section>
 
         {/* ------------------------------ Каталог ----------------------------- */}
         <section id="results" className="mt-10 scroll-mt-6">
