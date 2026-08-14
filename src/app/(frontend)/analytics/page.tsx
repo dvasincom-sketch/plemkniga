@@ -56,7 +56,7 @@ export default async function AnalyticsPage() {
           {stats.map((s) => (
             <div key={s.label} className="card">
               <p className="text-sm text-ink-500">{s.label}</p>
-              <p className="mt-3 text-[34px] font-medium tabular-nums text-forest-500">{s.value}</p>
+              <p className="stat-value mt-3 text-[34px] text-forest-500">{s.value}</p>
             </div>
           ))}
         </section>

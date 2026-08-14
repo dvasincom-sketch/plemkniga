@@ -3,6 +3,7 @@
 import { useActionState, useState } from 'react'
 import { registerAction, type AuthState } from '@/actions/auth'
 import { REGIONS, ROLES } from '@/lib/dictionaries'
+import { Select } from './Select'
 
 const STEPS = ['Роль', 'Организация', 'Контактное лицо', 'Доступ'] as const
 
@@ -123,14 +124,13 @@ export function RegisterWizard() {
             </label>
             <label>
               <span className={label}>Регион</span>
-              <select name="region" className="field field-on-light" defaultValue="">
-                <option value="">Выберите регион</option>
-                {REGIONS.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
+              <Select
+                name="region"
+                ariaLabel="Регион"
+                placeholder="Выберите регион"
+                onLight
+                options={REGIONS.map((r) => ({ value: r, label: r }))}
+              />
             </label>
             <label className="sm:col-span-2">
               <span className={label}>Адрес</span>
@@ -224,7 +224,7 @@ export function RegisterWizard() {
               type="checkbox"
               name="acceptedPolicy"
               required
-              className="mt-0.5 h-4 w-4 accent-[#7cb342]"
+              className="checkbox mt-0.5"
             />
             <span>
               Согласен на обработку персональных данных и принимаю условия{' '}

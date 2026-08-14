@@ -1,0 +1,91 @@
+import type { CollectionConfig } from 'payload'
+import { isAdmin, isAuthenticated } from '@/access'
+
+/** Результат отёла — колонка «Результат» в таблице межотельного цикла. */
+export const CALVING_RESULTS = [
+  { value: 'heifer', label: 'Тёлка' },
+  { value: 'bull', label: 'Бычок' },
+  { value: 'twins', label: 'Двойня' },
+  { value: 'stillborn', label: 'Мертворождение' },
+  { value: 'abortion', label: 'Аборт' },
+] as const
+
+/**
+ * Отёлы — «Таблица межотельного цикла».
+ *
+ * ТЗ, п. 5.2: каждое событие воспроизводства привязано к уникальному номеру
+ * отёла (`ld_cow_n_otel`), что даёт непрерывную хронологию: осеменение →
+ * стельность → отёл → лактация → запуск.
+ */
+export const Calvings: CollectionConfig = {
+  slug: 'calvings',
+  labels: { singular: 'Отёл', plural: 'Отёлы' },
+  admin: {
+    useAsTitle: 'date',
+    defaultColumns: ['date', 'animal', 'number', 'result'],
+    group: 'Воспроизводство',
+  },
+  access: {
+    read: isAuthenticated,
+    create: isAuthenticated,
+    update: isAuthenticated,
+    delete: isAdmin,
+  },
+  indexes: [{ fields: ['animal', 'number'] }],
+  defaultSort: 'number',
+  fields: [
+    {
+      type: 'row',
+      fields: [
+        {
+          name: 'animal',
+          type: 'relationship',
+          relationTo: 'animals',
+          label: 'Корова',
+          required: true,
+          index: true,
+          filterOptions: { sex: { equals: 'female' } },
+        },
+        { name: 'number', type: 'number', label: 'Номер отёла', required: true },
+        { name: 'date', type: 'date', label: 'Дата отёла', required: true },
+      ],
+    },
+    {
+      type: 'row',
+      fields: [
+        {
+          name: 'result',
+          type: 'select',
+          label: 'Результат',
+          options: [...CALVING_RESULTS],
+        },
+        { name: 'milkingDays', type: 'number', label: 'Количество дойных дней' },
+        { name: 'dryOffDate', type: 'date', label: 'Дата запуска' },
+      ],
+    },
+    {
+      type: 'row',
+      fields: [
+        {
+          name: 'ease',
+          type: 'select',
+          label: 'Лёгкость отёла',
+          options: [
+            { value: 'easy', label: 'Лёгкий' },
+            { value: 'assisted', label: 'С помощью' },
+            { value: 'hard', label: 'Тяжёлый' },
+          ],
+        },
+        { name: 'calfWeight', type: 'number', label: 'Вес телёнка, кг' },
+      ],
+    },
+    {
+      name: 'calves',
+      type: 'relationship',
+      relationTo: 'animals',
+      hasMany: true,
+      label: 'Полученный приплод',
+    },
+    { name: 'comment', type: 'textarea', label: 'Комментарий' },
+  ],
+}

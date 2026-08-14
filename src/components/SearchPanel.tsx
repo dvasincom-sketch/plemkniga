@@ -9,6 +9,7 @@ import {
   STATES,
 } from '@/lib/dictionaries'
 import { ADVANCED_FIELDS } from '@/lib/animal-query'
+import { Select } from './Select'
 
 type Herd = { id: number; name: string }
 
@@ -86,14 +87,14 @@ export function SearchPanel({
           placeholder="Поиск по ID"
           className="field md:col-span-5"
         />
-        <select name="idFormat" defaultValue={d('idFormat')} className="field md:col-span-3">
-          <option value="">ID-формат</option>
-          {ID_FORMATS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+        <Select
+          name="idFormat"
+          ariaLabel="ID-формат"
+          placeholder="ID-формат"
+          defaultValue={d('idFormat')}
+          options={ID_FORMATS.map((o) => ({ value: o.value, label: o.label }))}
+          className="md:col-span-3"
+        />
         <input
           name="name"
           defaultValue={d('name')}
@@ -101,38 +102,41 @@ export function SearchPanel({
           className="field md:col-span-4"
         />
 
-        <select name="sex" defaultValue={d('sex')} className="field md:col-span-3">
-          <option value="">Пол</option>
-          {SEXES.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.full}
-            </option>
-          ))}
-        </select>
-        <select name="ageGroup" defaultValue={d('ageGroup')} className="field md:col-span-3">
-          <option value="">Возраст</option>
-          {AGE_GROUPS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-        <select name="state" defaultValue={d('state')} className="field md:col-span-3">
-          <option value="">Статус</option>
-          {STATES.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.full}
-            </option>
-          ))}
-        </select>
-        <select name="relation" defaultValue={d('relation')} className="field md:col-span-3">
-          <option value="">Родственная связь</option>
-          {RELATIONS.filter((r) => r.value !== 'any').map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+        <Select
+          name="sex"
+          ariaLabel="Пол"
+          placeholder="Пол"
+          defaultValue={d('sex')}
+          options={SEXES.map((o) => ({ value: o.value, label: o.full }))}
+          className="md:col-span-3"
+        />
+        <Select
+          name="ageGroup"
+          ariaLabel="Возраст"
+          placeholder="Возраст"
+          defaultValue={d('ageGroup')}
+          options={AGE_GROUPS.map((o) => ({ value: o.value, label: o.label }))}
+          className="md:col-span-3"
+        />
+        <Select
+          name="state"
+          ariaLabel="Статус"
+          placeholder="Статус"
+          defaultValue={d('state')}
+          options={STATES.map((o) => ({ value: o.value, label: o.full }))}
+          className="md:col-span-3"
+        />
+        <Select
+          name="relation"
+          ariaLabel="Родственная связь"
+          placeholder="Родственная связь"
+          defaultValue={d('relation')}
+          options={RELATIONS.filter((r) => r.value !== 'any').map((o) => ({
+            value: o.value,
+            label: o.label,
+          }))}
+          className="md:col-span-3"
+        />
 
         {withOwner && (
           <input
@@ -142,18 +146,14 @@ export function SearchPanel({
             className="field md:col-span-3"
           />
         )}
-        <select
+        <Select
           name="herd"
+          ariaLabel="Стадо"
+          placeholder="Стадо"
           defaultValue={d('herd')}
-          className={`field ${withOwner ? 'md:col-span-3' : 'md:col-span-6'}`}
-        >
-          <option value="">Стадо</option>
-          {herds.map((h) => (
-            <option key={h.id} value={h.id}>
-              {h.name}
-            </option>
-          ))}
-        </select>
+          options={herds.map((h) => ({ value: String(h.id), label: h.name }))}
+          className={withOwner ? 'md:col-span-3' : 'md:col-span-6'}
+        />
         <input
           name="author"
           defaultValue={d('author')}

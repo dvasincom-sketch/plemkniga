@@ -71,9 +71,29 @@ export interface Config {
     organizations: Organization;
     herds: Herd;
     animals: Animal;
+    calvings: Calving;
+    inseminations: Insemination;
+    'milk-tests': MilkTest;
+    'health-events': HealthEvent;
+    'data-submissions': DataSubmission;
     events: Event;
     documents: Document;
     media: Media;
+    breeds: Breed;
+    lines: Line;
+    'breeding-categories': BreedingCategory;
+    'breeding-classes': BreedingClass;
+    'animal-purposes': AnimalPurpose;
+    'disposal-reasons': DisposalReason;
+    'coat-colors': CoatColor;
+    'blood-groups': BloodGroup;
+    'reproduction-methods': ReproductionMethod;
+    'semen-types': SemenType;
+    'insemination-results': InseminationResult;
+    'dna-test-types': DnaTestType;
+    'haplotype-types': HaplotypeType;
+    'health-event-types': HealthEventType;
+    technicians: Technician;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -85,9 +105,29 @@ export interface Config {
     organizations: OrganizationsSelect<false> | OrganizationsSelect<true>;
     herds: HerdsSelect<false> | HerdsSelect<true>;
     animals: AnimalsSelect<false> | AnimalsSelect<true>;
+    calvings: CalvingsSelect<false> | CalvingsSelect<true>;
+    inseminations: InseminationsSelect<false> | InseminationsSelect<true>;
+    'milk-tests': MilkTestsSelect<false> | MilkTestsSelect<true>;
+    'health-events': HealthEventsSelect<false> | HealthEventsSelect<true>;
+    'data-submissions': DataSubmissionsSelect<false> | DataSubmissionsSelect<true>;
     events: EventsSelect<false> | EventsSelect<true>;
     documents: DocumentsSelect<false> | DocumentsSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
+    breeds: BreedsSelect<false> | BreedsSelect<true>;
+    lines: LinesSelect<false> | LinesSelect<true>;
+    'breeding-categories': BreedingCategoriesSelect<false> | BreedingCategoriesSelect<true>;
+    'breeding-classes': BreedingClassesSelect<false> | BreedingClassesSelect<true>;
+    'animal-purposes': AnimalPurposesSelect<false> | AnimalPurposesSelect<true>;
+    'disposal-reasons': DisposalReasonsSelect<false> | DisposalReasonsSelect<true>;
+    'coat-colors': CoatColorsSelect<false> | CoatColorsSelect<true>;
+    'blood-groups': BloodGroupsSelect<false> | BloodGroupsSelect<true>;
+    'reproduction-methods': ReproductionMethodsSelect<false> | ReproductionMethodsSelect<true>;
+    'semen-types': SemenTypesSelect<false> | SemenTypesSelect<true>;
+    'insemination-results': InseminationResultsSelect<false> | InseminationResultsSelect<true>;
+    'dna-test-types': DnaTestTypesSelect<false> | DnaTestTypesSelect<true>;
+    'haplotype-types': HaplotypeTypesSelect<false> | HaplotypeTypesSelect<true>;
+    'health-event-types': HealthEventTypesSelect<false> | HealthEventTypesSelect<true>;
+    technicians: TechniciansSelect<false> | TechniciansSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -216,19 +256,51 @@ export interface Herd {
  */
 export interface Animal {
   id: number;
+  /**
+   * Присваивается автоматически при создании и никогда не меняется
+   */
+  uuid?: string | null;
   identNumber: string;
   idFormat?: ('rf' | 'icar' | 'usa' | 'can' | 'deu' | 'internal') | null;
   name?: string | null;
+  /**
+   * Транслитерация по ГОСТ 7.79-2000 (ISO-9), заполняется автоматически
+   */
+  nameLatin?: string | null;
+  altIds?: {
+    isoId?: string | null;
+    internationalId?: string | null;
+    earTag?: string | null;
+    inventoryNumber?: string | null;
+    chipNumber?: string | null;
+    chipDate?: string | null;
+    gpkMark?: string | null;
+    gpkNumber?: string | null;
+  };
   kind?: ('cow' | 'bull' | 'heifer' | 'calf') | null;
   sex: 'female' | 'male';
   state?: ('alive' | 'sold' | 'culled' | 'dead') | null;
   ageGroup?: ('calf' | 'heifer' | 'firstCalf' | 'cow2' | 'cow3' | 'bull') | null;
   birthDate?: string | null;
-  breed?: string | null;
+  breed?: (number | null) | Breed;
   bloodPercent?: number | null;
+  improvers?: {
+    breed1?: (number | null) | Breed;
+    share1?: number | null;
+    breed2?: (number | null) | Breed;
+    share2?: number | null;
+  };
+  coatColor?: (number | null) | CoatColor;
+  bloodGroup?: (number | null) | BloodGroup;
+  purpose?: (number | null) | AnimalPurpose;
   owner: number | Organization;
   herd?: (number | null) | Herd;
   author?: (number | null) | User;
+  /**
+   * ТЗ, Таблица №4: −1 отклонено, 0 черновик, 1 проверено собственником, 2 подтверждено лабораторией, 3 верифицировано ассоциацией
+   */
+  trustLevel?: number | null;
+  trustCheckedAt?: string | null;
   publicVisible?: boolean | null;
   publicDetails?: boolean | null;
   photo?: (number | null) | Media;
@@ -342,11 +414,22 @@ export interface Animal {
         protein305?: number | null;
         scc?: number | null;
         dryOffDate?: string | null;
+        fatKg?: number | null;
+        proteinKg?: number | null;
+        endDate?: string | null;
         id?: string | null;
       }[]
     | null;
+  category?: (number | null) | BreedingCategory;
+  /**
+   * ТЗ, п. 1.5. Печатается в свидетельстве: «Племенная книга, категория II: внесено по продуктивности»
+   */
+  registrationBasis?: ('origin' | 'productivity') | null;
+  breedingClass?: (number | null) | BreedingClass;
   father?: (number | null) | Animal;
   mother?: (number | null) | Animal;
+  line?: (number | null) | Line;
+  family?: (number | null) | Line;
   pedigreeText?: {
     fatherId?: string | null;
     fatherName?: string | null;
@@ -356,6 +439,156 @@ export interface Animal {
     motherFatherId?: string | null;
   };
   inbreeding?: number | null;
+  inbreedingNeedsApproval?: boolean | null;
+  genetics?: {
+    /**
+     * Комплексная вертебральная малформация
+     */
+    cvm?: ('unknown' | 'free' | 'carrier') | null;
+    /**
+     * Наследственный иммунодефицит
+     */
+    blad?: ('unknown' | 'free' | 'carrier') | null;
+    dumps?: ('unknown' | 'free' | 'carrier') | null;
+    kappaCasein?: string | null;
+    betaCasein?: string | null;
+    betaLactoglobulin?: string | null;
+  };
+  haplotypes?:
+    | {
+        type?: (number | null) | HaplotypeType;
+        status?: ('unknown' | 'free' | 'carrier') | null;
+        date?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  dnaTests?:
+    | {
+        type?: (number | null) | DnaTestType;
+        date?: string | null;
+        laboratory?: (number | null) | Organization;
+        result?: string | null;
+        file?: (number | null) | Media;
+        id?: string | null;
+      }[]
+    | null;
+  arrivalDate?: string | null;
+  previousOrganization?: (number | null) | Organization;
+  disposalDate?: string | null;
+  disposalReason?: (number | null) | DisposalReason;
+  disposalOrganization?: (number | null) | Organization;
+  /**
+   * ТЗ, стр. 43: данные животных никогда не удаляются — только перевод в архив
+   */
+  archived?: boolean | null;
+  archiveReason?: string | null;
+  lastEditUser?: (number | null) | User;
+  lastEditTime?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Соответствует полю «NPOR» в ИАС «Селэкс»
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "breeds".
+ */
+export interface Breed {
+  id: number;
+  /**
+   * Короткое обозначение или числовой код из «Селэкс»
+   */
+  code: string;
+  name: string;
+  /**
+   * Чем меньше, тем выше в списках
+   */
+  sortOrder?: number | null;
+  description?: string | null;
+  /**
+   * Снимите галочку, чтобы скрыть из выпадающих списков
+   */
+  isActive?: boolean | null;
+  /**
+   * Трёхбуквенный код: HOL — голштинская, JER — джерсейская
+   */
+  whffCode?: string | null;
+  isImprover?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Соответствует полю «NMAST» в ИАС «Селэкс»
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "coat-colors".
+ */
+export interface CoatColor {
+  id: number;
+  /**
+   * Короткое обозначение или числовой код из «Селэкс»
+   */
+  code: string;
+  name: string;
+  /**
+   * Чем меньше, тем выше в списках
+   */
+  sortOrder?: number | null;
+  description?: string | null;
+  /**
+   * Снимите галочку, чтобы скрыть из выпадающих списков
+   */
+  isActive?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Соответствует полю «GRUPPA_KRO» в ИАС «Селэкс»
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "blood-groups".
+ */
+export interface BloodGroup {
+  id: number;
+  /**
+   * Короткое обозначение или числовой код из «Селэкс»
+   */
+  code: string;
+  name: string;
+  /**
+   * Чем меньше, тем выше в списках
+   */
+  sortOrder?: number | null;
+  description?: string | null;
+  /**
+   * Снимите галочку, чтобы скрыть из выпадающих списков
+   */
+  isActive?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Соответствует полю «NNAZNACH» в ИАС «Селэкс»
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "animal-purposes".
+ */
+export interface AnimalPurpose {
+  id: number;
+  /**
+   * Короткое обозначение или числовой код из «Селэкс»
+   */
+  code: string;
+  name: string;
+  /**
+   * Чем меньше, тем выше в списках
+   */
+  sortOrder?: number | null;
+  description?: string | null;
+  /**
+   * Снимите галочку, чтобы скрыть из выпадающих списков
+   */
+  isActive?: boolean | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -395,6 +628,405 @@ export interface Media {
       filename?: string | null;
     };
   };
+}
+/**
+ * Соответствует полю «NKAT» в ИАС «Селэкс»
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "breeding-categories".
+ */
+export interface BreedingCategory {
+  id: number;
+  /**
+   * Короткое обозначение или числовой код из «Селэкс»
+   */
+  code: string;
+  name: string;
+  /**
+   * Чем меньше, тем выше в списках
+   */
+  sortOrder?: number | null;
+  description?: string | null;
+  /**
+   * Снимите галочку, чтобы скрыть из выпадающих списков
+   */
+  isActive?: boolean | null;
+  /**
+   * Отмечается для категории II — животное внесено по продуктивности (ТЗ, п. 1.5)
+   */
+  allowsIncompletePedigree?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Соответствует полю «NKKLASS» в ИАС «Селэкс»
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "breeding-classes".
+ */
+export interface BreedingClass {
+  id: number;
+  /**
+   * Короткое обозначение или числовой код из «Селэкс»
+   */
+  code: string;
+  name: string;
+  /**
+   * Чем меньше, тем выше в списках
+   */
+  sortOrder?: number | null;
+  description?: string | null;
+  /**
+   * Снимите галочку, чтобы скрыть из выпадающих списков
+   */
+  isActive?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Соответствует полю «NLIN / NVETKA / FAMILY» в ИАС «Селэкс»
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "lines".
+ */
+export interface Line {
+  id: number;
+  /**
+   * Короткое обозначение или числовой код из «Селэкс»
+   */
+  code: string;
+  name: string;
+  /**
+   * Чем меньше, тем выше в списках
+   */
+  sortOrder?: number | null;
+  description?: string | null;
+  /**
+   * Снимите галочку, чтобы скрыть из выпадающих списков
+   */
+  isActive?: boolean | null;
+  kind?: ('line' | 'branch' | 'family') | null;
+  parentLine?: (number | null) | Line;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "haplotype-types".
+ */
+export interface HaplotypeType {
+  id: number;
+  /**
+   * Короткое обозначение или числовой код из «Селэкс»
+   */
+  code: string;
+  name: string;
+  /**
+   * Чем меньше, тем выше в списках
+   */
+  sortOrder?: number | null;
+  description?: string | null;
+  /**
+   * Снимите галочку, чтобы скрыть из выпадающих списков
+   */
+  isActive?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "dna-test-types".
+ */
+export interface DnaTestType {
+  id: number;
+  /**
+   * Короткое обозначение или числовой код из «Селэкс»
+   */
+  code: string;
+  name: string;
+  /**
+   * Чем меньше, тем выше в списках
+   */
+  sortOrder?: number | null;
+  description?: string | null;
+  /**
+   * Снимите галочку, чтобы скрыть из выпадающих списков
+   */
+  isActive?: boolean | null;
+  markerKind?: ('genetic-defect' | 'protein' | 'parentage' | 'genomic-evaluation') | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Соответствует полю «NPV» в ИАС «Селэкс»
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "disposal-reasons".
+ */
+export interface DisposalReason {
+  id: number;
+  /**
+   * Короткое обозначение или числовой код из «Селэкс»
+   */
+  code: string;
+  name: string;
+  /**
+   * Чем меньше, тем выше в списках
+   */
+  sortOrder?: number | null;
+  description?: string | null;
+  /**
+   * Снимите галочку, чтобы скрыть из выпадающих списков
+   */
+  isActive?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "calvings".
+ */
+export interface Calving {
+  id: number;
+  animal: number | Animal;
+  number: number;
+  date: string;
+  result?: ('heifer' | 'bull' | 'twins' | 'stillborn' | 'abortion') | null;
+  milkingDays?: number | null;
+  dryOffDate?: string | null;
+  ease?: ('easy' | 'assisted' | 'hard') | null;
+  calfWeight?: number | null;
+  calves?: (number | Animal)[] | null;
+  comment?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "inseminations".
+ */
+export interface Insemination {
+  id: number;
+  animal: number | Animal;
+  /**
+   * К какому отёлу относится осеменение
+   */
+  lactationNumber?: number | null;
+  date: string;
+  bull?: (number | null) | Animal;
+  semenType?: (number | null) | SemenType;
+  method?: (number | null) | ReproductionMethod;
+  doses?: number | null;
+  attemptNumber?: number | null;
+  technician?: (number | null) | Technician;
+  result?: (number | null) | InseminationResult;
+  pregnancyCheckDate?: string | null;
+  comment?: string | null;
+  source?: ('manual' | 'import' | 'api') | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Соответствует полю «NTIP_SPERM» в ИАС «Селэкс»
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "semen-types".
+ */
+export interface SemenType {
+  id: number;
+  /**
+   * Короткое обозначение или числовой код из «Селэкс»
+   */
+  code: string;
+  name: string;
+  /**
+   * Чем меньше, тем выше в списках
+   */
+  sortOrder?: number | null;
+  description?: string | null;
+  /**
+   * Снимите галочку, чтобы скрыть из выпадающих списков
+   */
+  isActive?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Соответствует полю «NRIP» в ИАС «Селэкс»
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "reproduction-methods".
+ */
+export interface ReproductionMethod {
+  id: number;
+  /**
+   * Короткое обозначение или числовой код из «Селэкс»
+   */
+  code: string;
+  name: string;
+  /**
+   * Чем меньше, тем выше в списках
+   */
+  sortOrder?: number | null;
+  description?: string | null;
+  /**
+   * Снимите галочку, чтобы скрыть из выпадающих списков
+   */
+  isActive?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Соответствует полю «NTEXN» в ИАС «Селэкс»
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "technicians".
+ */
+export interface Technician {
+  id: number;
+  fullName: string;
+  certificateNumber?: string | null;
+  organization?: (number | null) | Organization;
+  isActive?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Соответствует полю «NREZOT» в ИАС «Селэкс»
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "insemination-results".
+ */
+export interface InseminationResult {
+  id: number;
+  /**
+   * Короткое обозначение или числовой код из «Селэкс»
+   */
+  code: string;
+  name: string;
+  /**
+   * Чем меньше, тем выше в списках
+   */
+  sortOrder?: number | null;
+  description?: string | null;
+  /**
+   * Снимите галочку, чтобы скрыть из выпадающих списков
+   */
+  isActive?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "milk-tests".
+ */
+export interface MilkTest {
+  id: number;
+  animal: number | Animal;
+  date: string;
+  lactationNumber?: number | null;
+  dailyYield: number;
+  fatPercent?: number | null;
+  proteinPercent?: number | null;
+  somaticCells?: number | null;
+  laboratory?: (number | null) | Organization;
+  source?: ('lab' | 'owner' | 'import' | 'api') | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "health-events".
+ */
+export interface HealthEvent {
+  id: number;
+  animal: number | Animal;
+  type: number | HealthEventType;
+  date: string;
+  title?: string | null;
+  severity?: ('mild' | 'moderate' | 'severe') | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  excludeFromAnalytics?: boolean | null;
+  description?: string | null;
+  reportedBy?: (number | null) | User;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "health-event-types".
+ */
+export interface HealthEventType {
+  id: number;
+  /**
+   * Короткое обозначение или числовой код из «Селэкс»
+   */
+  code: string;
+  name: string;
+  /**
+   * Чем меньше, тем выше в списках
+   */
+  sortOrder?: number | null;
+  description?: string | null;
+  /**
+   * Снимите галочку, чтобы скрыть из выпадающих списков
+   */
+  isActive?: boolean | null;
+  /**
+   * Периоды таких событий могут исключаться из расчётов (ТЗ, п. 5.6, требование №4)
+   */
+  affectsProductivity?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "data-submissions".
+ */
+export interface DataSubmission {
+  id: number;
+  /**
+   * Присваивается автоматически
+   */
+  number?: string | null;
+  kind: 'events' | 'animals' | 'productivity' | 'genomics';
+  status: 'uploaded' | 'checking' | 'checked' | 'accepted' | 'rejected';
+  organization?: (number | null) | Organization;
+  submittedBy?: (number | null) | User;
+  submittedAt?: string | null;
+  sourceFile?: (number | null) | Media;
+  review?: {
+    checkedBy?: (number | null) | User;
+    checkedAt?: string | null;
+    /**
+     * Например: «Все данные прошли успешную проверку» или «Часть данных не прошла проверку»
+     */
+    comment?: string | null;
+    totalRows?: number | null;
+    acceptedRows?: number | null;
+    rejectedRows?: number | null;
+    /**
+     * XLSX-файл со списком строк, не прошедших проверку
+     */
+    errorProtocol?: (number | null) | Media;
+  };
+  consent?: {
+    agreed?: boolean | null;
+    agreedAt?: string | null;
+    publishedAt?: string | null;
+  };
+  history?:
+    | {
+        at?: string | null;
+        status?: ('uploaded' | 'checking' | 'checked' | 'accepted' | 'rejected') | null;
+        actor?: (number | null) | User;
+        note?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -470,6 +1102,26 @@ export interface PayloadLockedDocument {
         value: number | Animal;
       } | null)
     | ({
+        relationTo: 'calvings';
+        value: number | Calving;
+      } | null)
+    | ({
+        relationTo: 'inseminations';
+        value: number | Insemination;
+      } | null)
+    | ({
+        relationTo: 'milk-tests';
+        value: number | MilkTest;
+      } | null)
+    | ({
+        relationTo: 'health-events';
+        value: number | HealthEvent;
+      } | null)
+    | ({
+        relationTo: 'data-submissions';
+        value: number | DataSubmission;
+      } | null)
+    | ({
         relationTo: 'events';
         value: number | Event;
       } | null)
@@ -480,6 +1132,66 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'media';
         value: number | Media;
+      } | null)
+    | ({
+        relationTo: 'breeds';
+        value: number | Breed;
+      } | null)
+    | ({
+        relationTo: 'lines';
+        value: number | Line;
+      } | null)
+    | ({
+        relationTo: 'breeding-categories';
+        value: number | BreedingCategory;
+      } | null)
+    | ({
+        relationTo: 'breeding-classes';
+        value: number | BreedingClass;
+      } | null)
+    | ({
+        relationTo: 'animal-purposes';
+        value: number | AnimalPurpose;
+      } | null)
+    | ({
+        relationTo: 'disposal-reasons';
+        value: number | DisposalReason;
+      } | null)
+    | ({
+        relationTo: 'coat-colors';
+        value: number | CoatColor;
+      } | null)
+    | ({
+        relationTo: 'blood-groups';
+        value: number | BloodGroup;
+      } | null)
+    | ({
+        relationTo: 'reproduction-methods';
+        value: number | ReproductionMethod;
+      } | null)
+    | ({
+        relationTo: 'semen-types';
+        value: number | SemenType;
+      } | null)
+    | ({
+        relationTo: 'insemination-results';
+        value: number | InseminationResult;
+      } | null)
+    | ({
+        relationTo: 'dna-test-types';
+        value: number | DnaTestType;
+      } | null)
+    | ({
+        relationTo: 'haplotype-types';
+        value: number | HaplotypeType;
+      } | null)
+    | ({
+        relationTo: 'health-event-types';
+        value: number | HealthEventType;
+      } | null)
+    | ({
+        relationTo: 'technicians';
+        value: number | Technician;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -590,9 +1302,23 @@ export interface HerdsSelect<T extends boolean = true> {
  * via the `definition` "animals_select".
  */
 export interface AnimalsSelect<T extends boolean = true> {
+  uuid?: T;
   identNumber?: T;
   idFormat?: T;
   name?: T;
+  nameLatin?: T;
+  altIds?:
+    | T
+    | {
+        isoId?: T;
+        internationalId?: T;
+        earTag?: T;
+        inventoryNumber?: T;
+        chipNumber?: T;
+        chipDate?: T;
+        gpkMark?: T;
+        gpkNumber?: T;
+      };
   kind?: T;
   sex?: T;
   state?: T;
@@ -600,9 +1326,22 @@ export interface AnimalsSelect<T extends boolean = true> {
   birthDate?: T;
   breed?: T;
   bloodPercent?: T;
+  improvers?:
+    | T
+    | {
+        breed1?: T;
+        share1?: T;
+        breed2?: T;
+        share2?: T;
+      };
+  coatColor?: T;
+  bloodGroup?: T;
+  purpose?: T;
   owner?: T;
   herd?: T;
   author?: T;
+  trustLevel?: T;
+  trustCheckedAt?: T;
   publicVisible?: T;
   publicDetails?: T;
   photo?: T;
@@ -745,10 +1484,18 @@ export interface AnimalsSelect<T extends boolean = true> {
         protein305?: T;
         scc?: T;
         dryOffDate?: T;
+        fatKg?: T;
+        proteinKg?: T;
+        endDate?: T;
         id?: T;
       };
+  category?: T;
+  registrationBasis?: T;
+  breedingClass?: T;
   father?: T;
   mother?: T;
+  line?: T;
+  family?: T;
   pedigreeText?:
     | T
     | {
@@ -760,6 +1507,160 @@ export interface AnimalsSelect<T extends boolean = true> {
         motherFatherId?: T;
       };
   inbreeding?: T;
+  inbreedingNeedsApproval?: T;
+  genetics?:
+    | T
+    | {
+        cvm?: T;
+        blad?: T;
+        dumps?: T;
+        kappaCasein?: T;
+        betaCasein?: T;
+        betaLactoglobulin?: T;
+      };
+  haplotypes?:
+    | T
+    | {
+        type?: T;
+        status?: T;
+        date?: T;
+        id?: T;
+      };
+  dnaTests?:
+    | T
+    | {
+        type?: T;
+        date?: T;
+        laboratory?: T;
+        result?: T;
+        file?: T;
+        id?: T;
+      };
+  arrivalDate?: T;
+  previousOrganization?: T;
+  disposalDate?: T;
+  disposalReason?: T;
+  disposalOrganization?: T;
+  archived?: T;
+  archiveReason?: T;
+  lastEditUser?: T;
+  lastEditTime?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "calvings_select".
+ */
+export interface CalvingsSelect<T extends boolean = true> {
+  animal?: T;
+  number?: T;
+  date?: T;
+  result?: T;
+  milkingDays?: T;
+  dryOffDate?: T;
+  ease?: T;
+  calfWeight?: T;
+  calves?: T;
+  comment?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "inseminations_select".
+ */
+export interface InseminationsSelect<T extends boolean = true> {
+  animal?: T;
+  lactationNumber?: T;
+  date?: T;
+  bull?: T;
+  semenType?: T;
+  method?: T;
+  doses?: T;
+  attemptNumber?: T;
+  technician?: T;
+  result?: T;
+  pregnancyCheckDate?: T;
+  comment?: T;
+  source?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "milk-tests_select".
+ */
+export interface MilkTestsSelect<T extends boolean = true> {
+  animal?: T;
+  date?: T;
+  lactationNumber?: T;
+  dailyYield?: T;
+  fatPercent?: T;
+  proteinPercent?: T;
+  somaticCells?: T;
+  laboratory?: T;
+  source?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "health-events_select".
+ */
+export interface HealthEventsSelect<T extends boolean = true> {
+  animal?: T;
+  type?: T;
+  date?: T;
+  title?: T;
+  severity?: T;
+  startDate?: T;
+  endDate?: T;
+  excludeFromAnalytics?: T;
+  description?: T;
+  reportedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "data-submissions_select".
+ */
+export interface DataSubmissionsSelect<T extends boolean = true> {
+  number?: T;
+  kind?: T;
+  status?: T;
+  organization?: T;
+  submittedBy?: T;
+  submittedAt?: T;
+  sourceFile?: T;
+  review?:
+    | T
+    | {
+        checkedBy?: T;
+        checkedAt?: T;
+        comment?: T;
+        totalRows?: T;
+        acceptedRows?: T;
+        rejectedRows?: T;
+        errorProtocol?: T;
+      };
+  consent?:
+    | T
+    | {
+        agreed?: T;
+        agreedAt?: T;
+        publishedAt?: T;
+      };
+  history?:
+    | T
+    | {
+        at?: T;
+        status?: T;
+        actor?: T;
+        note?: T;
+        id?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
 }
@@ -835,6 +1736,207 @@ export interface MediaSelect<T extends boolean = true> {
               filename?: T;
             };
       };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "breeds_select".
+ */
+export interface BreedsSelect<T extends boolean = true> {
+  code?: T;
+  name?: T;
+  sortOrder?: T;
+  description?: T;
+  isActive?: T;
+  whffCode?: T;
+  isImprover?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "lines_select".
+ */
+export interface LinesSelect<T extends boolean = true> {
+  code?: T;
+  name?: T;
+  sortOrder?: T;
+  description?: T;
+  isActive?: T;
+  kind?: T;
+  parentLine?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "breeding-categories_select".
+ */
+export interface BreedingCategoriesSelect<T extends boolean = true> {
+  code?: T;
+  name?: T;
+  sortOrder?: T;
+  description?: T;
+  isActive?: T;
+  allowsIncompletePedigree?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "breeding-classes_select".
+ */
+export interface BreedingClassesSelect<T extends boolean = true> {
+  code?: T;
+  name?: T;
+  sortOrder?: T;
+  description?: T;
+  isActive?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "animal-purposes_select".
+ */
+export interface AnimalPurposesSelect<T extends boolean = true> {
+  code?: T;
+  name?: T;
+  sortOrder?: T;
+  description?: T;
+  isActive?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "disposal-reasons_select".
+ */
+export interface DisposalReasonsSelect<T extends boolean = true> {
+  code?: T;
+  name?: T;
+  sortOrder?: T;
+  description?: T;
+  isActive?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "coat-colors_select".
+ */
+export interface CoatColorsSelect<T extends boolean = true> {
+  code?: T;
+  name?: T;
+  sortOrder?: T;
+  description?: T;
+  isActive?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "blood-groups_select".
+ */
+export interface BloodGroupsSelect<T extends boolean = true> {
+  code?: T;
+  name?: T;
+  sortOrder?: T;
+  description?: T;
+  isActive?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "reproduction-methods_select".
+ */
+export interface ReproductionMethodsSelect<T extends boolean = true> {
+  code?: T;
+  name?: T;
+  sortOrder?: T;
+  description?: T;
+  isActive?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "semen-types_select".
+ */
+export interface SemenTypesSelect<T extends boolean = true> {
+  code?: T;
+  name?: T;
+  sortOrder?: T;
+  description?: T;
+  isActive?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "insemination-results_select".
+ */
+export interface InseminationResultsSelect<T extends boolean = true> {
+  code?: T;
+  name?: T;
+  sortOrder?: T;
+  description?: T;
+  isActive?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "dna-test-types_select".
+ */
+export interface DnaTestTypesSelect<T extends boolean = true> {
+  code?: T;
+  name?: T;
+  sortOrder?: T;
+  description?: T;
+  isActive?: T;
+  markerKind?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "haplotype-types_select".
+ */
+export interface HaplotypeTypesSelect<T extends boolean = true> {
+  code?: T;
+  name?: T;
+  sortOrder?: T;
+  description?: T;
+  isActive?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "health-event-types_select".
+ */
+export interface HealthEventTypesSelect<T extends boolean = true> {
+  code?: T;
+  name?: T;
+  sortOrder?: T;
+  description?: T;
+  isActive?: T;
+  affectsProductivity?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "technicians_select".
+ */
+export interface TechniciansSelect<T extends boolean = true> {
+  fullName?: T;
+  certificateNumber?: T;
+  organization?: T;
+  isActive?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

@@ -28,7 +28,7 @@ export function VisibilityForm({
           type="checkbox"
           name="publicVisible"
           defaultChecked={defaultVisible}
-          className="mt-0.5 h-4 w-4 accent-[#7cb342]"
+          className="checkbox mt-0.5"
         />
         <span>
           Показывать животных в публичном списке
@@ -41,7 +41,7 @@ export function VisibilityForm({
           type="checkbox"
           name="publicDetails"
           defaultChecked={defaultDetails}
-          className="mt-0.5 h-4 w-4 accent-[#7cb342]"
+          className="checkbox mt-0.5"
         />
         <span>
           Открывать полную карточку животного

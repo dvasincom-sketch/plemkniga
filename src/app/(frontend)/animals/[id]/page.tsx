@@ -4,6 +4,8 @@ import { notFound, redirect } from 'next/navigation'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { ExteriorChart } from '@/components/ExteriorChart'
+import { AnimalEventsTab } from '@/components/AnimalEventsTab'
+import { AnimalOriginTab } from '@/components/AnimalOriginTab'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import {
   AGE_GROUPS,
@@ -26,6 +28,7 @@ export const dynamic = 'force-dynamic'
 const TABS = [
   { key: 'general', label: 'Общие данные' },
   { key: 'evaluation', label: 'Оценка' },
+  { key: 'events', label: 'События' },
   { key: 'origin', label: 'Происхождение' },
   { key: 'documents', label: 'Документы' },
   { key: 'media', label: 'Фото/Видео' },
@@ -40,6 +43,22 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params
   return { title: `Животное № ${id}` }
+}
+
+/** Имя связанной записи справочника. */
+const relName = (v: unknown): string => {
+  if (v && typeof v === 'object') {
+    const o = v as Record<string, unknown>
+    const n = o.name ?? o.fullName ?? o.title
+    if (typeof n === 'string' && n) return n
+  }
+  return '—'
+}
+
+const CARRIER_LABEL: Record<string, string> = {
+  unknown: 'не тестировано',
+  free: 'свободен',
+  carrier: 'носитель',
 }
 
 const InfoIcon = () => (
@@ -156,7 +175,7 @@ export default async function AnimalPage({
         </section>
 
         {/* ------------------------------ Вкладки ---------------------------- */}
-        <nav className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+        <nav className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
           {TABS.map((t) => (
             <Link
               key={t.key}
@@ -340,8 +359,16 @@ export default async function AnimalPage({
                   ['Состояние', STATES.find((s) => s.value === animal!.state)?.full ?? '—'],
                   ['Возрастная группа', labelOf(AGE_GROUPS, animal.ageGroup)],
                   ['Дата рождения', dateRu(animal.birthDate)],
-                  ['Порода', animal.breed ?? '—'],
+                  ['Порода', relName(animal.breed)],
                   ['Кровность по голштину, %', animal.bloodPercent ?? '—'],
+                  ['Масть', relName(animal.coatColor)],
+                  ['Группа крови', relName(animal.bloodGroup)],
+                  ['Назначение', relName(animal.purpose)],
+                  ['Ушная бирка', animal.altIds?.earTag || '—'],
+                  ['Чип RFID', animal.altIds?.chipNumber || '—'],
+                  ['Номер в ГПК', animal.altIds?.gpkNumber || '—'],
+                  ['Международный ID', animal.altIds?.internationalId || '—'],
+                  ['GUID (ФГИАС ПР)', animal.uuid || '—'],
                 ].map(([k, v]) => (
                   <div key={String(k)} className="flex justify-between gap-6 py-2.5">
                     <dt className="text-ink-500">{k}</dt>
@@ -371,88 +398,73 @@ export default async function AnimalPage({
               </dl>
               {animal.notes && <p className="mt-5 text-sm text-ink-700">{animal.notes}</p>}
             </div>
-          </section>
-        )}
 
-        {/* -------------------------- Происхождение -------------------------- */}
-        {tab === 'origin' && (
-          <section className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div className="card">
-              <h2 className="panel-heading">Родители</h2>
-              <dl className="divide-y divide-[#ededed] text-sm">
-                <div className="flex justify-between gap-6 py-2.5">
-                  <dt className="text-ink-500">Отец</dt>
-                  <dd className="text-right">
-                    {typeof animal.father === 'object' && animal.father ? (
-                      <Link href={`/animals/${animal.father.id}`} className="underline underline-offset-2">
-                        {animal.father.identNumber} {animal.father.name ?? ''}
-                      </Link>
-                    ) : (
-                      [animal.pedigreeText?.fatherId, animal.pedigreeText?.fatherName]
-                        .filter(Boolean)
-                        .join(' ') || '—'
-                    )}
-                  </dd>
-                </div>
-                <div className="flex justify-between gap-6 py-2.5">
-                  <dt className="text-ink-500">Мать</dt>
-                  <dd className="text-right">
-                    {typeof animal.mother === 'object' && animal.mother ? (
-                      <Link href={`/animals/${animal.mother.id}`} className="underline underline-offset-2">
-                        {animal.mother.identNumber} {animal.mother.name ?? ''}
-                      </Link>
-                    ) : (
-                      [animal.pedigreeText?.motherId, animal.pedigreeText?.motherName]
-                        .filter(Boolean)
-                        .join(' ') || '—'
-                    )}
-                  </dd>
-                </div>
-                <div className="flex justify-between gap-6 py-2.5">
-                  <dt className="text-ink-500">Отец отца</dt>
-                  <dd className="text-right">{animal.pedigreeText?.fatherFatherId || '—'}</dd>
-                </div>
-                <div className="flex justify-between gap-6 py-2.5">
-                  <dt className="text-ink-500">Отец матери</dt>
-                  <dd className="text-right">{animal.pedigreeText?.motherFatherId || '—'}</dd>
-                </div>
-                <div className="flex justify-between gap-6 py-2.5">
-                  <dt className="text-ink-500">Коэффициент инбридинга, %</dt>
-                  <dd className="text-right tabular-nums">{nf(animal.inbreeding, 2)}</dd>
-                </div>
-              </dl>
-            </div>
+            <div className="card lg:col-span-2">
+              <h2 className="panel-heading">Генетика</h2>
+              <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
+                <dl className="divide-y divide-[#ededed] text-sm">
+                  {[
+                    ['CVM', CARRIER_LABEL[animal.genetics?.cvm ?? 'unknown']],
+                    ['BLAD', CARRIER_LABEL[animal.genetics?.blad ?? 'unknown']],
+                    ['DUMPS', CARRIER_LABEL[animal.genetics?.dumps ?? 'unknown']],
+                    ['Каппа-казеин', animal.genetics?.kappaCasein || '—'],
+                    ['Бета-казеин', animal.genetics?.betaCasein || '—'],
+                    ['Бета-лактоглобулин', animal.genetics?.betaLactoglobulin || '—'],
+                  ].map(([k, v]) => (
+                    <div key={String(k)} className="flex justify-between gap-6 py-2.5">
+                      <dt className="text-ink-500">{k}</dt>
+                      <dd className="text-right">{v as string}</dd>
+                    </div>
+                  ))}
+                </dl>
 
-            <div className="card">
-              <h2 className="panel-heading">Родословная</h2>
-              <div className="grid grid-cols-3 gap-3 text-[13px]">
-                <div className="flex items-center rounded-lg bg-canvas p-3">
-                  {animal.identNumber}
+                <div>
+                  <h3 className="mb-2 text-[15px] font-medium text-forest-500">Гаплотипы</h3>
+                  {(animal.haplotypes ?? []).length === 0 ? (
+                    <p className="text-sm text-ink-500">Не определялись</p>
+                  ) : (
+                    <ul className="text-sm">
+                      {(animal.haplotypes ?? []).map((h, i) => (
+                        <li
+                          key={h.id ?? i}
+                          className="flex justify-between gap-6 border-b border-[#ededed] py-2 last:border-0"
+                        >
+                          <span>{relName(h.type)}</span>
+                          <span className="text-ink-700">{CARRIER_LABEL[h.status ?? 'unknown']}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
-                <div className="space-y-3">
-                  <div className="rounded-lg bg-canvas p-3">
-                    О: {typeof animal.father === 'object' && animal.father
-                      ? animal.father.identNumber
-                      : animal.pedigreeText?.fatherId || '—'}
-                  </div>
-                  <div className="rounded-lg bg-canvas p-3">
-                    М: {typeof animal.mother === 'object' && animal.mother
-                      ? animal.mother.identNumber
-                      : animal.pedigreeText?.motherId || '—'}
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <div className="rounded-lg bg-canvas p-3">
-                    ОО: {animal.pedigreeText?.fatherFatherId || '—'}
-                  </div>
-                  <div className="rounded-lg bg-canvas p-3">
-                    ОМ: {animal.pedigreeText?.motherFatherId || '—'}
-                  </div>
+
+                <div>
+                  <h3 className="mb-2 text-[15px] font-medium text-forest-500">ДНК-тесты</h3>
+                  {(animal.dnaTests ?? []).length === 0 ? (
+                    <p className="text-sm text-ink-500">Не проводились</p>
+                  ) : (
+                    <ul className="text-sm">
+                      {(animal.dnaTests ?? []).map((t, i) => (
+                        <li key={t.id ?? i} className="border-b border-[#ededed] py-2 last:border-0">
+                          <div className="flex justify-between gap-6">
+                            <span>{relName(t.type)}</span>
+                            <span className="text-ink-500">{dateRu(t.date)}</span>
+                          </div>
+                          {t.result && <p className="mt-1 text-ink-700">{t.result}</p>}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </div>
             </div>
           </section>
         )}
+
+        {/* ------------------------------ События ---------------------------- */}
+        {tab === 'events' && <AnimalEventsTab animal={animal} />}
+
+        {/* -------------------------- Происхождение -------------------------- */}
+        {tab === 'origin' && <AnimalOriginTab animal={animal} />}
 
         {/* ---------------------------- Документы ---------------------------- */}
         {tab === 'documents' && <DocumentsTab animalId={animal.id} />}

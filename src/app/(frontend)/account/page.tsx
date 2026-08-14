@@ -11,10 +11,10 @@ import { AnimalTable } from '@/components/AnimalTable'
 import { Pagination } from '@/components/Pagination'
 import { ProfileForm } from '@/components/ProfileForm'
 import { VisibilityForm } from '@/components/VisibilityForm'
-import { LogoutButton } from '@/components/LogoutButton'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { buildAnimalWhere, currentPage, hasAdvancedValues, one, type SearchParams } from '@/lib/animal-query'
 import { DOCUMENT_TYPES, EVENT_TYPES, ROLES, labelOf } from '@/lib/dictionaries'
+import { SUBMISSION_KINDS, SUBMISSION_STATUSES } from '@/collections/DataSubmissions'
 import { dateRu } from '@/lib/format'
 import type { Where } from 'payload'
 import type { Animal, Organization } from '@/payload-types'
@@ -42,26 +42,12 @@ export default async function AccountPage({
       : null
   const orgId = org?.id
 
-  const fullName = [user.lastName, user.firstName].filter(Boolean).join(' ') || user.email
-
   return (
     <>
-      <SiteHeader />
+      <SiteHeader active="/account" />
 
       <main className="container-page pb-4">
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-          <h1 className="text-[38px] font-medium sm:text-[46px]">Личный кабинет</h1>
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-ink-900 text-white">
-              <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                <circle cx="10" cy="6.5" r="3.5" fill="currentColor" />
-                <path d="M3.5 17c0-3.6 2.9-5.5 6.5-5.5s6.5 1.9 6.5 5.5" fill="currentColor" />
-              </svg>
-            </span>
-            <span className="text-[17px]">{fullName}</span>
-            <LogoutButton compact />
-          </div>
-        </div>
+        <h1 className="mb-8 text-[38px] font-medium sm:text-[46px]">Личный кабинет</h1>
 
         <AccountTabs active={tab} />
 
@@ -205,58 +191,134 @@ async function AnimalsTab({
 
 async function EventsTab({ orgId }: { orgId?: number }) {
   const payload = await getClient()
-  const events = await payload.find({
-    collection: 'events',
-    depth: 1,
-    limit: 40,
-    sort: '-date',
-    overrideAccess: true,
-    where: orgId ? { 'animal.owner': { equals: orgId } } : {},
-  })
+
+  const [submissions, events] = await Promise.all([
+    payload.find({
+      collection: 'data-submissions',
+      where: orgId ? { organization: { equals: orgId } } : {},
+      sort: '-submittedAt',
+      limit: 30,
+      depth: 1,
+      overrideAccess: true,
+    }),
+    payload.find({
+      collection: 'events',
+      depth: 1,
+      limit: 30,
+      sort: '-date',
+      overrideAccess: true,
+      where: orgId ? { 'animal.owner': { equals: orgId } } : {},
+    }),
+  ])
+
+  const statusTone = (s?: string | null) => {
+    if (s === 'accepted') return 'bg-brand-50 text-forest-600'
+    if (s === 'rejected') return 'bg-red-50 text-red-700'
+    if (s === 'checked') return 'bg-amber-50 text-amber-900'
+    return 'bg-[#f0f0f0] text-ink-700'
+  }
 
   return (
-    <section className="mt-10">
-      <h2 className="section-title mb-7">События</h2>
-      <div className="card overflow-x-auto">
-        <table className="metric-table min-w-[720px]">
-          <thead>
-            <tr>
-              <th>Дата</th>
-              <th>Тип</th>
-              <th>Животное</th>
-              <th>Описание</th>
-              <th>Статус</th>
-            </tr>
-          </thead>
-          <tbody>
-            {events.docs.length === 0 && (
+    <>
+      <section className="mt-10">
+        <h2 className="section-title mb-7">Пакеты загрузки данных</h2>
+        <div className="card overflow-x-auto">
+          <table className="metric-table min-w-[760px]">
+            <thead>
               <tr>
-                <td colSpan={5} className="py-8 text-center text-ink-500">
-                  Событий пока нет
-                </td>
+                <th>№</th>
+                <th>Что загружали</th>
+                <th>Дата загрузки</th>
+                <th>Статус</th>
+                <th>Записей</th>
+                <th />
               </tr>
-            )}
-            {events.docs.map((e) => (
-              <tr key={e.id}>
-                <td>{dateRu(e.date)}</td>
-                <td>{labelOf(EVENT_TYPES, e.type)}</td>
-                <td>
-                  {typeof e.animal === 'object' && e.animal ? (
-                    <Link href={`/animals/${e.animal.id}`} className="underline underline-offset-2">
-                      {e.animal.identNumber}
+            </thead>
+            <tbody>
+              {submissions.docs.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-ink-500">
+                    Пакетов загрузки пока нет. Загрузите файл через «Мои животные → Импорт данных».
+                  </td>
+                </tr>
+              )}
+              {submissions.docs.map((sub) => (
+                <tr key={sub.id}>
+                  <td className="font-medium tabular-nums">{sub.number}</td>
+                  <td>{labelOf(SUBMISSION_KINDS, sub.kind)}</td>
+                  <td>{dateRu(sub.submittedAt)}</td>
+                  <td>
+                    <span className={`rounded-md px-2 py-1 text-xs ${statusTone(sub.status)}`}>
+                      {labelOf(SUBMISSION_STATUSES, sub.status)}
+                    </span>
+                  </td>
+                  <td className="tabular-nums">
+                    {sub.review?.acceptedRows ?? 0} / {sub.review?.totalRows ?? 0}
+                  </td>
+                  <td className="text-right">
+                    <Link
+                      href={`/account/submissions/${sub.id}`}
+                      className="text-forest-500 underline underline-offset-4"
+                    >
+                      Открыть
                     </Link>
-                  ) : (
-                    '—'
-                  )}
-                </td>
-                <td>{e.title || '—'}</td>
-                <td>{e.status === 'accepted' ? 'Принято' : e.status === 'sent' ? 'Отправлено' : 'Черновик'}</td>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="mt-10">
+        <h2 className="section-title mb-7">События животных</h2>
+        <div className="card overflow-x-auto">
+          <table className="metric-table min-w-[720px]">
+            <thead>
+              <tr>
+                <th>Дата</th>
+                <th>Тип</th>
+                <th>Животное</th>
+                <th>Описание</th>
+                <th>Статус</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
+            </thead>
+            <tbody>
+              {events.docs.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-ink-500">
+                    Событий пока нет
+                  </td>
+                </tr>
+              )}
+              {events.docs.map((e) => (
+                <tr key={e.id}>
+                  <td>{dateRu(e.date)}</td>
+                  <td>{labelOf(EVENT_TYPES, e.type)}</td>
+                  <td>
+                    {typeof e.animal === 'object' && e.animal ? (
+                      <Link href={`/animals/${e.animal.id}`} className="underline underline-offset-2">
+                        {e.animal.identNumber}
+                      </Link>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                  <td>{e.title || '—'}</td>
+                  <td>
+                    {e.status === 'accepted'
+                      ? 'Принято'
+                      : e.status === 'sent'
+                        ? 'Отправлено'
+                        : 'Черновик'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </>
   )
 }
 

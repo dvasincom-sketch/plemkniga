@@ -5,6 +5,8 @@
  * Скрипт идемпотентен: перед наполнением он удаляет ранее созданные демо-записи.
  */
 import 'dotenv/config'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import { getPayload } from 'payload'
 import config from '../payload.config'
 import {
@@ -12,6 +14,9 @@ import {
   EXTERIOR_TRAITS,
   REGIONS,
 } from '../lib/dictionaries'
+import { DICTIONARY_SEED } from './dictionaries-data'
+
+const seedDir = path.dirname(fileURLToPath(import.meta.url))
 
 /* ----------------------------- ГПСЧ с зерном ----------------------------- */
 let seedState = 20250814
@@ -59,9 +64,45 @@ const run = async () => {
   const log = (...a: unknown[]) => payload.logger.info(a.join(' '))
 
   log('Очистка предыдущих демо-данных…')
-  for (const collection of ['documents', 'events', 'animals', 'herds', 'users', 'organizations'] as const) {
-    await payload.delete({ collection, where: { id: { exists: true } }, overrideAccess: true })
+  const toClear = [
+    'documents',
+    'events',
+    'health-events',
+    'milk-tests',
+    'inseminations',
+    'calvings',
+    'data-submissions',
+    'media',
+    'animals',
+    'herds',
+    'technicians',
+    'users',
+    'organizations',
+    ...DICTIONARY_SEED.map((d) => d.slug),
+  ] as const
+  for (const collection of toClear) {
+    await payload.delete({
+      collection: collection as never,
+      where: { id: { exists: true } },
+      overrideAccess: true,
+    })
   }
+
+  /* ------------------------------ Справочники ----------------------------- */
+  log('Наполнение справочников (НСИ)…')
+  const dict: Record<string, Record<string, number>> = {}
+  for (const { slug, rows } of DICTIONARY_SEED) {
+    dict[slug] = {}
+    for (const row of rows) {
+      const created = await payload.create({
+        collection: slug as never,
+        overrideAccess: true,
+        data: row as never,
+      })
+      dict[slug][row.code] = (created as { id: number }).id
+    }
+  }
+  const ref = (slug: string, code: string) => dict[slug]?.[code]
 
   /* ------------------------------ Организации ----------------------------- */
   log('Создание организаций…')
@@ -212,13 +253,29 @@ const run = async () => {
           sex: 'male',
           state: 'alive',
           ageGroup: 'bull',
-          birthDate: new Date(2016 + (i % 5), i % 12, 1 + (i % 27)).toISOString(),
-          breed: 'Голштинская',
+          birthDate: new Date(2010 + (i % 5), i % 12, 1 + (i % 27)).toISOString(),
+          breed: ref('breeds', '1'),
           bloodPercent: 100,
+          coatColor: ref('coat-colors', '1'),
+          bloodGroup: ref('blood-groups', pick(['A', 'B', 'C', 'F-V'])),
+          purpose: ref('animal-purposes', '1'),
+          category: ref('breeding-categories', 'I'),
+          registrationBasis: 'origin',
+          breedingClass: ref('breeding-classes', pick(['1', '2'])),
+          line: ref('lines', pick(['L-198998', 'L-1013415', 'L-95679', 'L-252803'])),
+          genetics: {
+            cvm: 'free',
+            blad: 'free',
+            dumps: 'free',
+            kappaCasein: pick(['AA', 'AB', 'BB']),
+            betaCasein: pick(['A1A1', 'A1A2', 'A2A2']),
+          },
           owner: orgs[orgIndex].id,
           author: authorFor(orgIndex),
           publicVisible: true,
           publicDetails: true,
+          trustLevel: 3,
+          trustCheckedAt: new Date(2025, 2, 12).toISOString(),
           ipc: between(400, 2600, 1),
           ipcDetails: {
             forecast: between(400, 2600, 1),
@@ -306,13 +363,26 @@ const run = async () => {
         state: rnd() < 0.9 ? 'alive' : pick(['sold', 'culled'] as const),
         ageGroup,
         birthDate: new Date(2018 + (i % 5), i % 12, 1 + (i % 27)).toISOString(),
-        breed: 'Голштинская',
+        breed: ref('breeds', '1'),
         bloodPercent: int(75, 100),
+        coatColor: ref('coat-colors', pick(['1', '2', '4'])),
+        bloodGroup: ref('blood-groups', pick(['A', 'B', 'C', 'F-V', 'J', 'S'])),
+        purpose: ref('animal-purposes', isHeifer ? '1' : pick(['1', '2'])),
+        category: ref('breeding-categories', i % 9 === 0 ? 'II' : 'I'),
+        registrationBasis: i % 9 === 0 ? 'productivity' : 'origin',
+        breedingClass: ref('breeding-classes', pick(['1', '2', '3', '4'])),
+        family: ref('lines', pick(['F-01', 'F-02', 'F-03'])),
+        genetics: {
+          cvm: pick(['unknown', 'free', 'free']),
+          blad: pick(['unknown', 'free', 'free']),
+          dumps: 'unknown',
+        },
         owner: org.id,
         herd: orgHerds[i % orgHerds.length]?.id,
         author: authorFor(orgIndex),
         publicVisible,
         publicDetails,
+        trustLevel: publicVisible ? pick([2, 3, 3]) : pick([0, 1, 2]),
         father: father.id,
         pedigreeText: {
           fatherId: father.identNumber,
@@ -365,6 +435,67 @@ const run = async () => {
     created++
   }
 
+  /* ---------------- Родословная эталонной карточки (3 ряда предков) -------- */
+  log('Создание предков для генеалогического древа…')
+
+  type Anc = { code: string; name: string; num: string; sex: 'male' | 'female'; year: number }
+
+  // Ряды: О/М → ОО/МО/ОМ/ММ → восемь предков третьего ряда
+  const ancestors: Anc[] = [
+    { code: 'OOO', name: 'Г.Энханкер', num: '343514', sex: 'male', year: 2000 },
+    { code: 'MOO', name: 'Пинкей', num: '3243815', sex: 'female', year: 2000 },
+    { code: 'OMO', name: 'Фагин', num: '168939', sex: 'male', year: 2000 },
+    { code: 'MMO', name: 'Шарлет', num: '11206193', sex: 'female', year: 2000 },
+    { code: 'OOM', name: 'С.М.Юпитер', num: '1666290', sex: 'male', year: 2000 },
+    { code: 'MOM', name: 'Клай Эрдел', num: '8989355', sex: 'female', year: 2000 },
+    { code: 'OO', name: 'Дубрас', num: '376602', sex: 'male', year: 2005 },
+    { code: 'MO', name: 'Ш.Ф.Шарлет', num: '11681841', sex: 'female', year: 2005 },
+    { code: 'OM', name: 'Ральф', num: '1748622', sex: 'male', year: 2005 },
+    { code: 'MM', name: 'Прелесть', num: '28151', sex: 'female', year: 2005 },
+    { code: 'O', name: 'Палаш', num: '5', sex: 'male', year: 2010 },
+    { code: 'M', name: 'Пастила', num: '20197', sex: 'female', year: 2010 },
+  ]
+
+  // Кто чей родитель: код потомка → [код отца, код матери]
+  const parentsOf: Record<string, [string | null, string | null]> = {
+    O: ['OO', 'MO'],
+    M: ['OM', 'MM'],
+    OO: ['OOO', 'MOO'],
+    MO: ['OMO', 'MMO'],
+    OM: ['OOM', 'MOM'],
+    MM: [null, null],
+  }
+
+  const ancIds: Record<string, number> = {}
+  for (const a of ancestors) {
+    const [fCode, mCode] = parentsOf[a.code] ?? [null, null]
+    const created = await payload.create({
+      collection: 'animals',
+      overrideAccess: true,
+      data: {
+        identNumber: a.num,
+        idFormat: 'internal',
+        name: a.name,
+        kind: a.sex === 'male' ? 'bull' : 'cow',
+        sex: a.sex,
+        state: 'sold',
+        ageGroup: a.sex === 'male' ? 'bull' : 'cow3',
+        birthDate: new Date(a.year, 0, 1).toISOString(),
+        breed: ref('breeds', '1'),
+        owner: orgs[0].id,
+        author: farmer.id,
+        publicVisible: true,
+        publicDetails: true,
+        trustLevel: 3,
+        father: fCode ? ancIds[fCode] : undefined,
+        mother: mCode ? ancIds[mCode] : undefined,
+        archived: true,
+        archiveReason: 'Запись предка для построения родословной',
+      },
+    })
+    ancIds[a.code] = (created as { id: number }).id
+  }
+
   /* ------------------- Показательная карточка «Поляна» --------------------- */
   log('Создание эталонной карточки животного…')
   const polyana = await payload.create({
@@ -379,23 +510,71 @@ const run = async () => {
       state: 'alive',
       ageGroup: 'cow3',
       birthDate: new Date(2017, 4, 18).toISOString(),
-      breed: 'Голштинская',
+      breed: ref('breeds', '1'),
       bloodPercent: 94,
+      coatColor: ref('coat-colors', '1'),
+      bloodGroup: ref('blood-groups', 'B'),
+      purpose: ref('animal-purposes', '1'),
+      category: ref('breeding-categories', 'I'),
+      registrationBasis: 'origin',
+      breedingClass: ref('breeding-classes', '2'),
+      line: ref('lines', 'L-198998'),
+      family: ref('lines', 'F-01'),
+      altIds: {
+        isoId: 'RU 3662217000196',
+        internationalId: 'HOLRU51275',
+        earTag: '0196',
+        inventoryNumber: '196',
+        chipNumber: '643000012345678',
+        chipDate: new Date(2017, 6, 2).toISOString(),
+        gpkMark: 'ГПК',
+        gpkNumber: '12-0196',
+      },
+      genetics: {
+        cvm: 'free',
+        blad: 'free',
+        dumps: 'free',
+        kappaCasein: 'AB',
+        betaCasein: 'A2A2',
+        betaLactoglobulin: 'AB',
+      },
+      haplotypes: [
+        { type: ref('haplotype-types', 'HH1'), status: 'free', date: new Date(2024, 10, 6).toISOString() },
+        { type: ref('haplotype-types', 'HH3'), status: 'free', date: new Date(2024, 10, 6).toISOString() },
+      ],
+      dnaTests: [
+        {
+          type: ref('dna-test-types', 'SNP60K'),
+          date: new Date(2024, 10, 6).toISOString(),
+          laboratory: serviceOrg.id,
+          result: 'Геномная оценка выполнена, происхождение подтверждено',
+        },
+        {
+          type: ref('dna-test-types', 'PARENT'),
+          date: new Date(2024, 10, 6).toISOString(),
+          laboratory: serviceOrg.id,
+          result: 'Отцовство подтверждено',
+        },
+      ],
+      arrivalDate: new Date(2017, 4, 18).toISOString(),
       owner: orgs[0].id,
       herd: herds.find((h) => h.org === orgs[0].id)?.id,
       author: farmer.id,
       publicVisible: true,
       publicDetails: true,
-      father: bulls[0].id,
+      trustLevel: 3,
+      trustCheckedAt: new Date(2025, 2, 12).toISOString(),
+      father: ancIds.O,
+      mother: ancIds.M,
       pedigreeText: {
-        fatherId: bulls[0].identNumber,
-        fatherName: bulls[0].name,
-        motherId: '3662217000042',
-        motherName: 'Ромашка',
-        fatherFatherId: 'HOUSA0012356',
-        motherFatherId: 'HOCAN0007392',
+        fatherId: '5',
+        fatherName: 'Палаш',
+        motherId: '20197',
+        motherName: 'Пастила',
+        fatherFatherId: '376602',
+        motherFatherId: '1748622',
       },
-      inbreeding: 1.56,
+      inbreeding: 0,
       ipc: 1284.5,
       ipcDetails: { forecast: 1284.5, r: 71.4, percentile: 88 },
       evaluationDate: new Date(2025, 2, 12).toISOString(),
@@ -460,6 +639,9 @@ const run = async () => {
           protein305: 3.21,
           scc: 200,
           dryOffDate: new Date(2019, 8, 1).toISOString(),
+          endDate: new Date(2019, 10, 27).toISOString(),
+          fatKg: 347.6,
+          proteinKg: 287.6,
         },
         {
           number: 2,
@@ -473,6 +655,9 @@ const run = async () => {
           protein305: 3.18,
           scc: 174,
           dryOffDate: new Date(2020, 9, 1).toISOString(),
+          endDate: new Date(2020, 11, 2).toISOString(),
+          fatKg: 364.9,
+          proteinKg: 296.0,
         },
         {
           number: 3,
@@ -486,10 +671,225 @@ const run = async () => {
           protein305: 3.25,
           scc: 156,
           dryOffDate: new Date(2021, 9, 1).toISOString(),
+          endDate: new Date(2021, 11, 14).toISOString(),
+          fatKg: 383.2,
+          proteinKg: 324.4,
         },
       ],
     },
   })
+
+  /* ---------------- Воспроизводство: осеменения, дойки, здоровье ----------- */
+  log('Создание техников, осеменений, контрольных доек и событий здоровья…')
+
+  const technicians: { id: number }[] = []
+  for (const t of [
+    { fullName: 'Смирнов Алексей Викторович', certificateNumber: 'ИО-2019-0142' },
+    { fullName: 'Гусева Марина Олеговна', certificateNumber: 'ИО-2021-0388' },
+    { fullName: 'Неизвестный техник #1', certificateNumber: '' },
+  ]) {
+    technicians.push(
+      (await payload.create({
+        collection: 'technicians',
+        overrideAccess: true,
+        data: { ...t, organization: orgs[0].id, isActive: true },
+      })) as never,
+    )
+  }
+  const techId = (i: number) => (technicians[i] as { id: number }).id
+
+  // Полный репродуктивный цикл эталонной коровы: 3 отёла
+  for (let n = 1; n <= 3; n++) {
+    const year = 2018 + n
+    await payload.create({
+      collection: 'inseminations',
+      overrideAccess: true,
+      data: {
+        animal: polyana.id,
+        lactationNumber: n,
+        date: new Date(year, 2, 1).toISOString(),
+        bull: bulls[n % bulls.length].id,
+        semenType: ref('semen-types', n === 3 ? '2' : '1'),
+        method: ref('reproduction-methods', '1'),
+        doses: 1,
+        attemptNumber: n === 2 ? 2 : 1,
+        technician: techId(n % 2),
+        result: ref('insemination-results', '1'),
+        pregnancyCheckDate: new Date(year, 4, 5).toISOString(),
+        source: 'manual',
+      },
+    })
+  }
+
+  // Отёлы — таблица межотельного цикла
+  const calvingPlan = [
+    { number: 1, year: 2019, result: 'heifer', milkingDays: 300, ease: 'easy' },
+    { number: 2, year: 2020, result: 'bull', milkingDays: 305, ease: 'assisted' },
+    { number: 3, year: 2021, result: 'twins', milkingDays: 298, ease: 'hard' },
+  ] as const
+
+  for (const c of calvingPlan) {
+    await payload.create({
+      collection: 'calvings',
+      overrideAccess: true,
+      data: {
+        animal: polyana.id,
+        number: c.number,
+        date: new Date(c.year, 0, 1).toISOString(),
+        result: c.result,
+        milkingDays: c.milkingDays,
+        dryOffDate: new Date(c.year, 8 + (c.number - 1), 1).toISOString(),
+        ease: c.ease,
+        calfWeight: int(32, 44),
+      },
+    })
+  }
+
+  // Контрольные дойки третьей лактации — помесячно
+  for (let m = 0; m < 10; m++) {
+    await payload.create({
+      collection: 'milk-tests',
+      overrideAccess: true,
+      data: {
+        animal: polyana.id,
+        lactationNumber: 3,
+        date: new Date(2021, m, 15).toISOString(),
+        dailyYield: between(24, 41, 1),
+        fatPercent: between(3.6, 4.1, 2),
+        proteinPercent: between(3.05, 3.4, 2),
+        somaticCells: int(90, 260),
+        laboratory: serviceOrg.id,
+        source: 'lab',
+      },
+    })
+  }
+
+  await payload.create({
+    collection: 'health-events',
+    overrideAccess: true,
+    data: {
+      animal: polyana.id,
+      type: ref('health-event-types', 'HOOF'),
+      date: new Date(2025, 6, 21).toISOString(),
+      title: 'Плановая расчистка копыт',
+      severity: 'mild',
+      reportedBy: farmer.id,
+    },
+  })
+
+  await payload.create({
+    collection: 'health-events',
+    overrideAccess: true,
+    data: {
+      animal: polyana.id,
+      type: ref('health-event-types', 'MAST'),
+      date: new Date(2021, 4, 3).toISOString(),
+      title: 'Субклинический мастит, четверть ЛП',
+      severity: 'moderate',
+      startDate: new Date(2021, 4, 3).toISOString(),
+      endDate: new Date(2021, 4, 19).toISOString(),
+      excludeFromAnalytics: true,
+      description: 'Повышение соматических клеток по контрольной дойке, курс лечения 14 дней',
+      reportedBy: farmer.id,
+    },
+  })
+
+  /* --------------------- Пакеты загрузки данных ---------------------------- */
+  log('Создание пакетов загрузки данных…')
+
+  const errorProtocol = await payload.create({
+    collection: 'media',
+    overrideAccess: true,
+    data: { alt: 'Протокол ошибок проверки пакета данных' },
+    filePath: path.resolve(seedDir, 'assets/protokol-oshibok.xlsx'),
+  })
+
+  const submissionPlan = [
+    {
+      number: '123456',
+      kind: 'events' as const,
+      status: 'checked' as const,
+      submittedAt: new Date(2025, 3, 10, 9, 24),
+      checkedAt: new Date(2025, 3, 12, 16, 53),
+      comment:
+        'Часть данных не прошла проверку. Ознакомьтесь с протоколом ошибок: 7 строк требуют исправления, остальные записи готовы к публикации.',
+      total: 412,
+      accepted: 405,
+      rejected: 7,
+      withProtocol: true,
+    },
+    {
+      number: '123441',
+      kind: 'productivity' as const,
+      status: 'accepted' as const,
+      submittedAt: new Date(2025, 2, 3, 11, 2),
+      checkedAt: new Date(2025, 2, 4, 10, 15),
+      comment: 'Все данные прошли успешную проверку.',
+      total: 1280,
+      accepted: 1280,
+      rejected: 0,
+      withProtocol: false,
+    },
+    {
+      number: '123402',
+      kind: 'animals' as const,
+      status: 'checking' as const,
+      submittedAt: new Date(2025, 4, 22, 15, 40),
+      checkedAt: null,
+      comment: '',
+      total: 96,
+      accepted: 0,
+      rejected: 0,
+      withProtocol: false,
+    },
+  ]
+
+  for (const sp of submissionPlan) {
+    await payload.create({
+      collection: 'data-submissions',
+      overrideAccess: true,
+      data: {
+        number: sp.number,
+        kind: sp.kind,
+        status: sp.status,
+        organization: orgs[0].id,
+        submittedBy: farmer.id,
+        submittedAt: sp.submittedAt.toISOString(),
+        review: {
+          checkedAt: sp.checkedAt ? sp.checkedAt.toISOString() : undefined,
+          comment: sp.comment || undefined,
+          totalRows: sp.total,
+          acceptedRows: sp.accepted,
+          rejectedRows: sp.rejected,
+          errorProtocol: sp.withProtocol ? errorProtocol.id : undefined,
+        },
+        consent:
+          sp.status === 'accepted'
+            ? {
+                agreed: true,
+                agreedAt: new Date(2025, 2, 4, 12, 0).toISOString(),
+                publishedAt: new Date(2025, 2, 4, 12, 0).toISOString(),
+              }
+            : { agreed: false },
+        history: [
+          { at: sp.submittedAt.toISOString(), status: 'uploaded', actor: farmer.id },
+          ...(sp.checkedAt
+            ? [{ at: sp.checkedAt.toISOString(), status: 'checked' as const, actor: farmer.id }]
+            : [{ at: sp.submittedAt.toISOString(), status: 'checking' as const, actor: farmer.id }]),
+          ...(sp.status === 'accepted'
+            ? [
+                {
+                  at: new Date(2025, 2, 4, 12, 0).toISOString(),
+                  status: 'accepted' as const,
+                  actor: farmer.id,
+                  note: 'Владелец подтвердил согласие на публикацию',
+                },
+              ]
+            : []),
+        ],
+      },
+    })
+  }
 
   /* ------------------------------- События -------------------------------- */
   log('Создание событий и документов…')

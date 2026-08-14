@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Select } from './Select'
 
 const DocIcon = () => (
   <svg width="92" height="80" viewBox="0 0 92 80" fill="none" aria-hidden="true">
@@ -44,17 +45,16 @@ export function ExportCard() {
 
           {open && (
             <div className="mt-4 flex flex-wrap items-center gap-3">
-              <select
-                value={format}
-                onChange={(e) => setFormat(e.target.value)}
-                className="field field-on-light w-40"
-              >
-                {FORMATS.map((f) => (
-                  <option key={f.value} value={f.value}>
-                    {f.label}
-                  </option>
-                ))}
-              </select>
+              <Select
+                name="format"
+                ariaLabel="Формат экспорта"
+                placeholder=""
+                onLight
+                defaultValue={format}
+                onChange={setFormat}
+                options={FORMATS}
+                className="w-40"
+              />
               <a href={`/account/export?format=${format}`} className="btn btn-forest">
                 Скачать
               </a>

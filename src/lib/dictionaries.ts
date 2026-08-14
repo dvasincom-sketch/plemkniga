@@ -100,6 +100,18 @@ export const HEALTH_TRAITS = [
   { key: 'calvingEase', label: 'Лёгкость отёла', unit: 'балл' },
 ] as const
 
+/** Уровни достоверности данных (ТЗ, Таблица №4, поле NTRUTH). */
+export const TRUST_LEVELS = [
+  { value: '-1', label: 'Отклонено', hint: 'Ошибки или противоречия, в аналитике не учитывается' },
+  { value: '0', label: 'Черновик', hint: 'Внесено собственником, не проверено' },
+  { value: '1', label: 'Проверено собственником', hint: 'Требует внешней верификации' },
+  { value: '2', label: 'Подтверждено лабораторией', hint: 'Проверены ДНК и продуктивность' },
+  { value: '3', label: 'Верифицировано ассоциацией', hint: 'Можно выпускать сертификат' },
+] as const
+
+export const trustLabel = (v?: number | null): string =>
+  TRUST_LEVELS.find((t) => t.value === String(v ?? 0))?.label ?? '—'
+
 export const EVENT_TYPES = [
   { value: 'calving', label: 'Отёл' },
   { value: 'insemination', label: 'Осеменение' },

@@ -21,6 +21,9 @@ type NavItem = { href: string; label: string; locked?: boolean }
 export async function SiteHeader({ active }: { active?: string }) {
   const user = await getCurrentUser()
 
+  const displayName =
+    [user?.lastName, user?.firstName].filter(Boolean).join(' ') || user?.email || 'Кабинет'
+
   const nav: NavItem[] = [
     { href: '/', label: 'Племенная книга' },
     { href: '/analytics', label: 'Аналитика', locked: !user },
@@ -53,18 +56,36 @@ export async function SiteHeader({ active }: { active?: string }) {
 
         {user ? (
           <div className="flex items-center gap-4">
-            <span className="relative text-ink-900" aria-hidden="true">
-              <svg width="18" height="20" viewBox="0 0 18 20" fill="none">
+            <button
+              type="button"
+              className="relative text-ink-900 transition-colors hover:text-forest-500"
+              aria-label="Уведомления"
+              title="Уведомления"
+            >
+              <svg width="18" height="20" viewBox="0 0 18 20" fill="none" aria-hidden="true">
                 <path
                   d="M9 1.5a5.5 5.5 0 0 0-5.5 5.5v3.2L2 13.5h14l-1.5-3.3V7A5.5 5.5 0 0 0 9 1.5Z"
-                  fill="#E74C3C"
+                  fill="currentColor"
                 />
-                <path d="M7 16a2 2 0 0 0 4 0" stroke="#E74C3C" strokeWidth="1.5" fill="none" />
+                <path d="M7 16a2 2 0 0 0 4 0" stroke="currentColor" strokeWidth="1.5" fill="none" />
               </svg>
-            </span>
-            <Link href="/account" className="text-[15px] hover:text-forest-500">
-              Личный кабинет
+            </button>
+
+            <Link
+              href="/account"
+              className={`flex items-center gap-2.5 text-[15px] transition-colors hover:text-forest-500 ${
+                active?.startsWith('/account') ? 'text-forest-500' : 'text-ink-900'
+              }`}
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-ink-900 text-white">
+                <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <circle cx="10" cy="6.5" r="3.5" fill="currentColor" />
+                  <path d="M3.5 17c0-3.6 2.9-5.5 6.5-5.5s6.5 1.9 6.5 5.5" fill="currentColor" />
+                </svg>
+              </span>
+              <span className="hidden sm:inline">{displayName}</span>
             </Link>
+
             <LogoutButton compact />
           </div>
         ) : (

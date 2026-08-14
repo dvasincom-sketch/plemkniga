@@ -18,7 +18,13 @@ export const Media: CollectionConfig = {
   upload: {
     // В контейнере каталог монтируется как volume — см. docker-compose.yml
     staticDir: process.env.MEDIA_DIR || path.resolve(dirname, '../../media'),
-    mimeTypes: ['image/*', 'application/pdf'],
+    mimeTypes: [
+      'image/*',
+      'application/pdf',
+      'text/csv',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ],
     imageSizes: [
       { name: 'thumbnail', width: 320, height: 320, position: 'centre' },
       { name: 'card', width: 768, height: 512, position: 'centre' },

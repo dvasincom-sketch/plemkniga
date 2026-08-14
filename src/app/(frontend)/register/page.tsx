@@ -75,13 +75,13 @@ export default async function RegisterPage() {
         </section>
 
         {/* --------------------------- Обратная связь -------------------------- */}
-        <section className="mt-16 grid grid-cols-1 gap-10 lg:grid-cols-2 lg:items-center">
+        <section className="mt-16 grid grid-cols-1 gap-10 lg:grid-cols-2 lg:items-stretch">
           <div className="overflow-hidden rounded-card">
             <Picture
               name="images/contacts"
               alt="Корова голштинской породы на пастбище"
-              className="h-full min-h-[300px] w-full"
-              fallback={<CowFullIllustration className="h-full min-h-[300px] w-full object-cover" />}
+              className="h-full min-h-[380px] w-full"
+              fallback={<CowFullIllustration className="h-full min-h-[380px] w-full object-cover" />}
             />
           </div>
 

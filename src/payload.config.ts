@@ -13,9 +13,26 @@ import { Animals } from '@/collections/Animals'
 import { Events } from '@/collections/Events'
 import { Documents } from '@/collections/Documents'
 import { Media } from '@/collections/Media'
+import { Inseminations } from '@/collections/Inseminations'
+import { MilkTests } from '@/collections/MilkTests'
+import { HealthEvents } from '@/collections/HealthEvents'
+import { Calvings } from '@/collections/Calvings'
+import { DataSubmissions } from '@/collections/DataSubmissions'
+import { DICTIONARY_COLLECTIONS } from '@/collections/dictionaries'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
+
+const databaseUri = process.env.DATABASE_URI || ''
+const needsSsl =
+  /[?&]sslmode=(require|verify-ca|verify-full)/i.test(databaseUri) ||
+  process.env.DATABASE_SSL === 'true'
+
+if (!databaseUri) {
+  console.warn(
+    '[plemkniga] Переменная DATABASE_URI не задана — подключение к базе не будет установлено',
+  )
+}
 
 export default buildConfig({
   admin: {
@@ -25,7 +42,21 @@ export default buildConfig({
       titleSuffix: '— Племенная книга',
     },
   },
-  collections: [Users, Organizations, Herds, Animals, Events, Documents, Media],
+  collections: [
+    Users,
+    Organizations,
+    Herds,
+    Animals,
+    Calvings,
+    Inseminations,
+    MilkTests,
+    HealthEvents,
+    DataSubmissions,
+    Events,
+    Documents,
+    Media,
+    ...DICTIONARY_COLLECTIONS,
+  ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || 'dev-secret-change-me',
   typescript: {
@@ -33,7 +64,12 @@ export default buildConfig({
   },
   db: postgresAdapter({
     pool: {
-      connectionString: process.env.DATABASE_URI || '',
+      connectionString: databaseUri,
+      // Управляемый PostgreSQL (в т.ч. Timeweb Cloud) требует TLS.
+      // Если сертификат самоподписанный — DATABASE_SSL_REJECT_UNAUTHORIZED=false
+      ssl: needsSsl
+        ? { rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== 'false' }
+        : undefined,
     },
     // На проде выключите (PAYLOAD_DB_PUSH=false) и работайте через миграции:
     // npm run payload migrate:create && npm run payload migrate
