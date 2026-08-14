@@ -19,18 +19,21 @@ import { HealthEvents } from '@/collections/HealthEvents'
 import { Calvings } from '@/collections/Calvings'
 import { DataSubmissions } from '@/collections/DataSubmissions'
 import { DICTIONARY_COLLECTIONS } from '@/collections/dictionaries'
+import { databaseEnvKeys, maskUri, resolveDatabase } from '@/lib/db-url'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 
-const databaseUri = process.env.DATABASE_URI || ''
-const needsSsl =
-  /[?&]sslmode=(require|verify-ca|verify-full)/i.test(databaseUri) ||
-  process.env.DATABASE_SSL === 'true'
+const { uri: databaseUri, source: databaseSource, ssl: needsSsl } = resolveDatabase()
 
-if (!databaseUri) {
+if (databaseUri) {
+  console.info(
+    `[plemkniga] Строка подключения взята из ${databaseSource}: ${maskUri(databaseUri)} (TLS: ${needsSsl ? 'да' : 'нет'})`,
+  )
+} else {
   console.warn(
-    '[plemkniga] Переменная DATABASE_URI не задана — подключение к базе не будет установлено',
+    '[plemkniga] Строка подключения не найдена. Проверены переменные DATABASE_URI, DATABASE_URL, POSTGRES_URL и др. Видны только: ' +
+      (Object.keys(databaseEnvKeys()).join(', ') || 'ни одной переменной про базу'),
   )
 }
 

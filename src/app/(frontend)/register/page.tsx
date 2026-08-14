@@ -4,8 +4,6 @@ import { redirect } from 'next/navigation'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { RegisterWizard } from '@/components/RegisterWizard'
-import { CowFullIllustration } from '@/components/CowIllustration'
-import { Picture } from '@/components/Picture'
 import { getCurrentUser } from '@/lib/payload'
 
 export const metadata: Metadata = { title: 'Регистрация' }
@@ -18,6 +16,22 @@ const BENEFITS = [
   'Аналитические инструменты для селекции',
   'Обмен данными',
   'Экспорт данных в различные форматы',
+]
+
+/** Что происходит после отправки заявки — чтобы ожидание было предсказуемым. */
+const ONBOARDING_STEPS: { title: string; text: string }[] = [
+  {
+    title: 'Заявка',
+    text: 'Заполняете анкету хозяйства и указываете ответственного зоотехника',
+  },
+  {
+    title: 'Проверка Ассоциацией',
+    text: 'Сотрудник сверяет реквизиты хозяйства и подтверждает учётную запись',
+  },
+  {
+    title: 'Загрузка стада',
+    text: 'Импортируете животных, события и документы — они уходят на верификацию',
+  },
 ]
 
 const Check = () => (
@@ -76,13 +90,34 @@ export default async function RegisterPage() {
 
         {/* --------------------------- Обратная связь -------------------------- */}
         <section className="mt-16 grid grid-cols-1 gap-10 lg:grid-cols-2 lg:items-stretch">
-          <div className="overflow-hidden rounded-card">
-            <Picture
-              name="images/contacts"
-              alt="Корова голштинской породы на пастбище"
-              className="h-full min-h-[380px] w-full"
-              fallback={<CowFullIllustration className="h-full min-h-[380px] w-full object-cover" />}
-            />
+          <div className="flex min-h-[380px] flex-col justify-between rounded-card bg-brand-500 p-8 text-white sm:p-10">
+            <div>
+              <p className="text-[13px] uppercase tracking-[0.09em] text-white/70">
+                Как проходит подключение
+              </p>
+              <p className="mt-4 text-[24px] font-medium leading-[1.2] sm:text-[28px]">
+                Три шага от заявки до первой загрузки данных
+              </p>
+            </div>
+
+            <ol className="mt-10 space-y-7">
+              {ONBOARDING_STEPS.map((step, i) => (
+                <li key={step.title} className="flex gap-4">
+                  <span
+                    aria-hidden="true"
+                    className="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-white/20 text-[15px] font-medium tabular-nums"
+                  >
+                    {i + 1}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-[17px] font-medium leading-snug">{step.title}</span>
+                    <span className="mt-1 block text-[15px] leading-snug text-white/85">
+                      {step.text}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ol>
           </div>
 
           <div>

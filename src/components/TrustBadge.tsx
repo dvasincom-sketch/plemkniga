@@ -19,45 +19,49 @@ export function TrustBadge({
   const value = level ?? 0
 
   const tone =
-    value >= 3
+    value >= 2
       ? 'bg-brand-50 text-forest-600'
-      : value === 2
-        ? 'bg-brand-50 text-forest-600'
-        : value <= -1
-          ? 'bg-red-50 text-red-700'
-          : 'bg-[#f0f0f0] text-ink-700'
+      : value <= -1
+        ? 'bg-red-50 text-red-700'
+        : 'bg-[#f0f0f0] text-ink-700'
 
   return (
-    <span className={`flex items-center gap-2 text-[15px] text-ink-700 ${className}`}>
-      Уровень достоверности данных:
-      <span className={`rounded-md px-2 py-0.5 font-medium tabular-nums ${tone}`}>{value}</span>
-      <span className="text-ink-900">{trustLabel(value)}</span>
+    <span className={`inline-flex items-center gap-2 text-[15px] leading-none ${className}`}>
+      <span className="text-ink-500">Достоверность</span>
+
+      <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-medium ${tone}`}>
+        <span className="tabular-nums">{value}</span>
+        <span>{trustLabel(value)}</span>
+      </span>
+
       <InfoTip label="Что означает уровень достоверности">
-        <span className="mb-2 block font-medium text-ink-900">Уровень достоверности данных</span>
-        <span className="mb-3 block">
-          Показывает, кем проверена запись. Племенное свидетельство выпускается только с уровня 3,
-          в расчёты индексов запись попадает с уровня 2.
-        </span>
-        <span className="block space-y-1.5">
-          {TRUST_LEVELS.map((t) => (
-            <span
-              key={t.value}
-              className={`flex gap-2 ${Number(t.value) === value ? 'text-ink-900' : ''}`}
-            >
-              <span
-                className={`w-4 flex-none text-right font-medium tabular-nums ${
-                  Number(t.value) === value ? 'text-forest-500' : 'text-ink-300'
-                }`}
-              >
-                {t.value}
-              </span>
-              <span>
-                <span className={Number(t.value) === value ? 'font-medium' : ''}>{t.label}</span>
-                {t.hint && <span className="block text-ink-500">{t.hint}</span>}
-              </span>
-            </span>
-          ))}
-        </span>
+        <p className="mb-2 font-medium text-ink-900">Уровень достоверности данных</p>
+        <p className="mb-3">
+          Показывает, кем проверена запись. Племенное свидетельство выпускается только с уровня 3, в
+          расчёты индексов запись попадает с уровня 2.
+        </p>
+        <ul className="space-y-2">
+          {TRUST_LEVELS.map((t) => {
+            const current = Number(t.value) === value
+            return (
+              <li key={t.value} className="flex gap-2.5">
+                <span
+                  className={`w-5 flex-none text-right font-medium tabular-nums ${
+                    current ? 'text-forest-500' : 'text-ink-300'
+                  }`}
+                >
+                  {t.value}
+                </span>
+                <span className="min-w-0">
+                  <span className={current ? 'font-medium text-ink-900' : 'text-ink-900'}>
+                    {t.label}
+                  </span>
+                  {t.hint && <span className="block text-ink-500">{t.hint}</span>}
+                </span>
+              </li>
+            )
+          })}
+        </ul>
       </InfoTip>
     </span>
   )

@@ -7,6 +7,8 @@ import { ExteriorChart } from '@/components/ExteriorChart'
 import { AnimalEventsTab } from '@/components/AnimalEventsTab'
 import { AnimalOriginTab } from '@/components/AnimalOriginTab'
 import { TrustBadge } from '@/components/TrustBadge'
+import { AnimalAvatar } from '@/components/AnimalAvatar'
+import { InfoTip } from '@/components/InfoTip'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import {
   AGE_GROUPS,
@@ -62,12 +64,25 @@ const CARRIER_LABEL: Record<string, string> = {
   carrier: 'носитель',
 }
 
-const InfoIcon = () => (
-  <span
-    title="Уровень достоверности оценки: 1 — низкий, 5 — высокий"
-    className="ml-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-ink-900 text-[10px] font-bold text-white"
-  >
-    i
+/**
+ * Достоверность самой оценки (шкала 1…5) — это не то же самое, что уровень
+ * достоверности записи в шапке (шкала −1…3). Формулировки разведены намеренно,
+ * чтобы их не путали.
+ */
+const ReliabilityNote = ({ value }: { value?: number | null }) => (
+  <span className="inline-flex items-center gap-1.5 text-[13px] leading-none text-ink-500">
+    Достоверность оценки:{' '}
+    <span className="font-medium tabular-nums text-ink-900">{value ?? '—'}</span>
+    <span>из 5</span>
+    <InfoTip label="Что означает достоверность оценки">
+      <p className="mb-2 font-medium text-ink-900">Достоверность оценки</p>
+      <p>
+        Насколько надёжен прогноз племенной ценности: зависит от числа учтённых потомков,
+        лактаций и полноты родословной. 1 — оценка предварительная, 5 — подтверждена большим
+        массивом данных. Не путайте с уровнем достоверности записи в шапке карточки: тот
+        показывает, кем проверены сами данные.
+      </p>
+    </InfoTip>
   </span>
 )
 
@@ -145,35 +160,33 @@ export default async function AnimalPage({
 
       <main className="container-page pb-4">
         {/* ------------------------------ Шапка ------------------------------ */}
-        <section className="flex flex-wrap items-start justify-between gap-6">
-          <div className="flex items-start gap-6">
-            <div className="flex h-[92px] w-[92px] flex-none items-center justify-center overflow-hidden rounded-2xl bg-[#e9e9e9]">
-              <svg width="70" height="60" viewBox="0 0 70 60" fill="none" aria-hidden="true">
-                <ellipse cx="35" cy="34" rx="24" ry="22" fill="#fff" />
-                <ellipse cx="10" cy="26" rx="10" ry="6" fill="#c9c9c9" transform="rotate(-20 10 26)" />
-                <ellipse cx="60" cy="26" rx="10" ry="6" fill="#c9c9c9" transform="rotate(20 60 26)" />
-                <ellipse cx="27" cy="30" rx="3.4" ry="4.2" fill="#8d8d8d" />
-                <ellipse cx="43" cy="30" rx="3.4" ry="4.2" fill="#8d8d8d" />
-                <ellipse cx="35" cy="46" rx="13" ry="9" fill="#dcdcdc" />
-              </svg>
-            </div>
+        <section className="flex flex-wrap items-start justify-between gap-x-10 gap-y-6">
+          <div className="flex min-w-0 items-start gap-5">
+            <AnimalAvatar name={animal.name} identNumber={animal.identNumber} />
 
-            <div>
-              <h1 className="flex flex-wrap items-center gap-3 text-[26px] font-medium sm:text-[30px]">
-                <span>Кличка: {animal.name ?? '—'}</span>
-                <span className="rounded-md bg-[#eeeeee] px-2.5 py-1 text-[13px] font-normal text-ink-700">
+            <div className="min-w-0">
+              <p className="text-[12px] uppercase tracking-[0.09em] text-ink-500">Кличка</p>
+
+              <h1 className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2 text-[30px] font-medium leading-[1.08] sm:text-[36px]">
+                <span className="break-words">{animal.name ?? '—'}</span>
+                <span className="rounded-md bg-[#eeeeee] px-2.5 py-1 text-[13px] font-normal leading-none text-ink-700">
                   {kindLabel}
                 </span>
               </h1>
-              <p className="mt-1 text-[26px] font-medium sm:text-[30px]">
-                Инд. №: {animal.identNumber}
+
+              <p className="mt-3 text-[17px] leading-none">
+                <span className="text-ink-500">Инд. №</span>{' '}
+                <span className="font-medium tabular-nums">{animal.identNumber}</span>
               </p>
-              <p className="mt-2 text-[15px] text-ink-700">Владелец: {owner}</p>
+
+              <p className="mt-2 text-[15px] leading-snug text-ink-700">
+                <span className="text-ink-500">Владелец:</span> {owner}
+              </p>
             </div>
           </div>
 
-          <div className="flex flex-col items-end gap-3">
-            <p className="text-sm text-ink-700">Обновлено: {dateRu(animal.updatedAt)}</p>
+          <div className="flex flex-col items-start gap-2.5 lg:items-end">
+            <p className="text-[13px] text-ink-500">Обновлено {dateRu(animal.updatedAt)}</p>
             <TrustBadge level={animal.trustLevel} />
           </div>
         </section>
@@ -225,10 +238,7 @@ export default async function AnimalPage({
                 <div className="card">
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                     <h2 className="panel-heading mb-0">Продуктивные признаки</h2>
-                    <span className="text-[13px] text-ink-700">
-                      Уровень достоверности: {animal.production?.reliabilityLevel ?? '—'}
-                      <InfoIcon />
-                    </span>
+                    <ReliabilityNote value={animal.production?.reliabilityLevel} />
                   </div>
                   <MetricTable
                     head={['Селекционный признак', 'Прогноз', 'R, %']}
@@ -264,10 +274,7 @@ export default async function AnimalPage({
                 <div className="card">
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                     <h2 className="panel-heading mb-0">Признаки здоровья животного</h2>
-                    <span className="text-[13px] text-ink-700">
-                      Уровень достоверности: {animal.health?.reliabilityLevel ?? '—'}
-                      <InfoIcon />
-                    </span>
+                    <ReliabilityNote value={animal.health?.reliabilityLevel} />
                   </div>
                   <MetricTable
                     head={['Индексы', 'Прогноз', 'R, %']}

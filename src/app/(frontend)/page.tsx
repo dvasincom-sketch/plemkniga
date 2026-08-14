@@ -3,8 +3,6 @@ import { SiteFooter } from '@/components/SiteFooter'
 import { SearchPanel } from '@/components/SearchPanel'
 import { AnimalTable } from '@/components/AnimalTable'
 import { Pagination } from '@/components/Pagination'
-import { CowHeadIllustration } from '@/components/CowIllustration'
-import { Picture } from '@/components/Picture'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import {
   buildAnimalWhere,
@@ -31,7 +29,7 @@ export default async function HerdbookPage({
 
   const where = buildAnimalWhere(sp)
 
-  const [result, herdsResult, totalAll] = await Promise.all([
+  const [result, herdsResult, totalAll, totalBulls, totalVerified] = await Promise.all([
     payload.find({
       collection: 'animals',
       where,
@@ -44,6 +42,18 @@ export default async function HerdbookPage({
     }),
     payload.find({ collection: 'herds', limit: 100, sort: 'name', overrideAccess: true }),
     payload.count({ collection: 'animals', overrideAccess: false, user }),
+    payload.count({
+      collection: 'animals',
+      where: { kind: { equals: 'bull' } },
+      overrideAccess: false,
+      user,
+    }),
+    payload.count({
+      collection: 'animals',
+      where: { trustLevel: { greater_than_equal: 2 } },
+      overrideAccess: false,
+      user,
+    }),
   ])
 
   const defaults: Record<string, string> = {}
@@ -68,14 +78,27 @@ export default async function HerdbookPage({
               отправка на мясо).
             </p>
           </div>
-          <div className="overflow-hidden rounded-card">
-            <Picture
-              name="images/hero-plemkniga"
-              alt="Корова голштинской породы"
-              priority
-              className="h-full min-h-[240px] w-full"
-              fallback={<CowHeadIllustration className="h-full min-h-[240px] w-full object-cover" />}
-            />
+          <div className="flex flex-col justify-between rounded-card bg-white p-8 sm:p-10">
+            <p className="text-[13px] uppercase tracking-[0.09em] text-ink-500">
+              Книга в цифрах
+            </p>
+
+            <dl className="mt-8 grid grid-cols-2 gap-x-8 gap-y-8">
+              {[
+                { label: 'Животных в книге', value: totalAll.totalDocs },
+                { label: 'Быков-производителей', value: totalBulls.totalDocs },
+                { label: 'Хозяйств', value: herdsResult.totalDocs },
+                { label: 'Записей подтверждено', value: totalVerified.totalDocs },
+              ].map((s) => (
+                <div key={s.label}>
+                  <dt className="sr-only">{s.label}</dt>
+                  <dd className="stat-value text-[38px] leading-none sm:text-[46px]">
+                    {s.value.toLocaleString('ru-RU')}
+                  </dd>
+                  <p className="mt-2 text-[14px] leading-snug text-ink-700">{s.label}</p>
+                </div>
+              ))}
+            </dl>
           </div>
         </section>
 
