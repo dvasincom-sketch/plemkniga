@@ -5,6 +5,7 @@ import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { LoginForm } from '@/components/LoginForm'
 import { CowFullIllustration } from '@/components/CowIllustration'
+import { Picture } from '@/components/Picture'
 import { getCurrentUser } from '@/lib/payload'
 
 export const metadata: Metadata = { title: 'Вход' }
@@ -30,7 +31,13 @@ export default async function LoginPage() {
             </p>
 
             <div className="mt-8 overflow-hidden rounded-2xl">
-              <CowFullIllustration className="h-[220px] w-full object-cover" />
+              <Picture
+                name="images/login"
+                alt="Корова голштинской породы на пастбище"
+                sizes="(max-width: 1024px) 100vw, 40vw"
+                className="h-[220px] w-full"
+                fallback={<CowFullIllustration className="h-[220px] w-full object-cover" />}
+              />
             </div>
           </div>
 

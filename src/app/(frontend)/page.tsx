@@ -4,6 +4,7 @@ import { SearchPanel } from '@/components/SearchPanel'
 import { AnimalTable } from '@/components/AnimalTable'
 import { Pagination } from '@/components/Pagination'
 import { CowHeadIllustration } from '@/components/CowIllustration'
+import { Picture } from '@/components/Picture'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import {
   buildAnimalWhere,
@@ -68,7 +69,13 @@ export default async function HerdbookPage({
             </p>
           </div>
           <div className="overflow-hidden rounded-card">
-            <CowHeadIllustration className="h-full min-h-[240px] w-full object-cover" />
+            <Picture
+              name="images/hero-plemkniga"
+              alt="Корова голштинской породы"
+              priority
+              className="h-full min-h-[240px] w-full"
+              fallback={<CowHeadIllustration className="h-full min-h-[240px] w-full object-cover" />}
+            />
           </div>
         </section>
 

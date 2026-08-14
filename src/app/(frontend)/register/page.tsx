@@ -5,6 +5,7 @@ import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { RegisterWizard } from '@/components/RegisterWizard'
 import { CowFullIllustration } from '@/components/CowIllustration'
+import { Picture } from '@/components/Picture'
 import { getCurrentUser } from '@/lib/payload'
 
 export const metadata: Metadata = { title: 'Регистрация' }
@@ -76,7 +77,12 @@ export default async function RegisterPage() {
         {/* --------------------------- Обратная связь -------------------------- */}
         <section className="mt-16 grid grid-cols-1 gap-10 lg:grid-cols-2 lg:items-center">
           <div className="overflow-hidden rounded-card">
-            <CowFullIllustration className="h-full min-h-[300px] w-full object-cover" />
+            <Picture
+              name="images/contacts"
+              alt="Корова голштинской породы на пастбище"
+              className="h-full min-h-[300px] w-full"
+              fallback={<CowFullIllustration className="h-full min-h-[300px] w-full object-cover" />}
+            />
           </div>
 
           <div>
