@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { LoginForm } from '@/components/LoginForm'
+import { ImageSlot } from '@/components/ImageSlot'
 import { getCurrentUser } from '@/lib/payload'
 
 export const metadata: Metadata = { title: 'Вход' }
@@ -28,19 +29,12 @@ export default async function LoginPage() {
               формировать племенные свидетельства и видеть полные карточки животных.
             </p>
 
-            <ul className="mt-9 space-y-3 border-t border-white/25 pt-7 text-[15px] leading-snug text-white/95">
-              {[
-                'Полные карточки животных своего стада',
-                'Загрузка событий и документов на проверку',
-                'История проверки каждого пакета данных',
-                'Племенные свидетельства и выгрузки',
-              ].map((item) => (
-                <li key={item} className="flex gap-3">
-                  <span aria-hidden="true" className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-white" />
-                  {item}
-                </li>
-              ))}
-            </ul>
+            <ImageSlot
+              name="images/login"
+              alt="Голштинская порода"
+              sizes="(max-width: 1024px) 100vw, 40vw"
+              className="mt-8 h-[240px] w-full rounded-2xl"
+            />
           </div>
 
           <div className="rounded-[20px] bg-white p-7 sm:p-10">

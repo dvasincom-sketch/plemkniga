@@ -79,17 +79,18 @@ export async function GET() {
       hints.push('Схема не создана — запустите первый деплой с PAYLOAD_DB_PUSH=true')
     }
 
-    return NextResponse.json(
-      {
-        status: 'error',
-        service: 'plemkniga',
-        database: { connected: false, error: message },
-        hints,
-        env,
-        visibleEnv,
-        tookMs: Date.now() - started,
-      },
-      { status: 503 },
-    )
+    // Отвечаем 200 даже при недоступной базе: этот эндпоинт читают люди
+    // и диагностические утилиты, а многие из них на 5xx просто не показывают
+    // тело ответа — и причина остаётся невидимой. Состояние передаётся полем
+    // status, а Docker HEALTHCHECK смотрит на /healthz/live.
+    return NextResponse.json({
+      status: 'error',
+      service: 'plemkniga',
+      database: { connected: false, error: message },
+      hints,
+      env,
+      visibleEnv,
+      tookMs: Date.now() - started,
+    })
   }
 }

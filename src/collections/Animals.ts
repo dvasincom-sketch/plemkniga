@@ -309,6 +309,18 @@ export const Animals: CollectionConfig = {
               admin: { description: 'Итоговое значение, выводится в таблице поиска' },
             },
             {
+              // Служебное поле сортировки. PostgreSQL при `ORDER BY ipc DESC`
+              // ставит NULL первыми, поэтому животные без оценки вытесняли
+              // из начала списка тех, у кого оценка есть. Здесь пустой ИПЦ
+              // превращается в заведомо низкое число.
+              name: 'ipcRank',
+              type: 'number',
+              label: 'Ранг по ИПЦ (служебное)',
+              index: true,
+              defaultValue: -1_000_000,
+              admin: { hidden: true },
+            },
+            {
               name: 'ipcDetails',
               type: 'group',
               label: 'Общий индекс племенной ценности',
@@ -790,6 +802,10 @@ export const Animals: CollectionConfig = {
         // Аудит: кто и когда изменил (ТЗ, п. 1.6 — для MVP достаточно этих полей)
         if (req.user) data.lastEditUser = req.user.id
         data.lastEditTime = new Date().toISOString()
+
+        // Ранг сортировки: пустой ИПЦ уходит в конец списка, а не в начало
+        const ipcValue = data.ipc ?? originalDoc?.ipc
+        data.ipcRank = typeof ipcValue === 'number' ? ipcValue : -1_000_000
 
         // СБП = жир, кг + белок, кг
         const s = data?.summary

@@ -309,6 +309,7 @@ export interface Animal {
    * Итоговое значение, выводится в таблице поиска
    */
   ipc?: number | null;
+  ipcRank?: number | null;
   ipcDetails?: {
     forecast?: number | null;
     r?: number | null;
@@ -1347,6 +1348,7 @@ export interface AnimalsSelect<T extends boolean = true> {
   photo?: T;
   notes?: T;
   ipc?: T;
+  ipcRank?: T;
   ipcDetails?:
     | T
     | {
