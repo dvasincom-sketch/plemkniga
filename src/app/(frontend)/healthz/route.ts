@@ -12,6 +12,32 @@ export const dynamic = 'force-dynamic'
  * латиницей: панели и консоли иногда угадывают кодировку неверно,
  * и русские имена полей превращаются в мусор ровно там, где нужна ясность.
  */
+/** Сообщение верхнего уровня плюс все вложенные причины и поля ошибки PostgreSQL. */
+function describeError(e: unknown): string {
+  const parts: string[] = []
+  let current: unknown = e
+  const seen = new Set<unknown>()
+
+  while (current && typeof current === 'object' && !seen.has(current)) {
+    seen.add(current)
+    const err = current as { message?: string; code?: string; detail?: string; hint?: string; cause?: unknown }
+
+    const own = [
+      err.message?.trim(),
+      err.code ? `код ${err.code}` : null,
+      err.detail?.trim(),
+      err.hint?.trim(),
+    ]
+      .filter(Boolean)
+      .join(' · ')
+
+    if (own && !parts.includes(own)) parts.push(own)
+    current = err.cause
+  }
+
+  return parts.join(' ← ') || String(e)
+}
+
 export async function GET() {
   const started = Date.now()
   const db = resolveDatabase()
@@ -52,7 +78,15 @@ export async function GET() {
       tookMs: Date.now() - started,
     })
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e)
+    /*
+     * Разворачиваем цепочку причин.
+     *
+     * Drizzle оборачивает ошибку драйвера в свою: наверху остаётся только
+     * «Failed query: select count(*) from "animals"», а настоящая причина —
+     * например, «relation "animals" does not exist» — лежит в cause.
+     * Без этого диагностика показывает симптом вместо причины.
+     */
+    const message = describeError(e)
     const hints: string[] = []
 
     if (!db.uri) {

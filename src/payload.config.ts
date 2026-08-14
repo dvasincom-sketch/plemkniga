@@ -20,6 +20,7 @@ import { Calvings } from '@/collections/Calvings'
 import { DataSubmissions } from '@/collections/DataSubmissions'
 import { DICTIONARY_COLLECTIONS } from '@/collections/dictionaries'
 import { databaseEnvKeys, maskUri, resolveDatabase } from '@/lib/db-url'
+import { migrations } from '@/migrations'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -74,10 +75,20 @@ export default buildConfig({
       // на время отладки: DATABASE_SSL_REJECT_UNAUTHORIZED=false
       ssl: sslConfig,
     },
-    // На проде выключите (PAYLOAD_DB_PUSH=false) и работайте через миграции:
-    // npm run payload migrate:create && npm run payload migrate
+    /*
+     * push сравнивает схему с конфигом и правит базу на лету. Payload включает
+     * его только когда NODE_ENV не равен production — то есть на проде
+     * переменная PAYLOAD_DB_PUSH ни на что не влияет, и таблицы не появятся
+     * сами. Там схему создают миграции.
+     */
     push: process.env.PAYLOAD_DB_PUSH !== 'false',
     migrationDir: path.resolve(dirname, 'migrations'),
+    /*
+     * На проде Payload сам прогоняет эти миграции при старте: применяются
+     * только те, которых ещё нет в таблице payload_migrations, поэтому
+     * повторный запуск безопасен.
+     */
+    prodMigrations: migrations,
   }),
   sharp,
   cors: [process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'],
