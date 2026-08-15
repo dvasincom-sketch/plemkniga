@@ -42,7 +42,7 @@ export default async function HerdbookPage({
   const sort = resolveSort(sp)
   const hasActive = hasActiveFilters(sp)
 
-  const [result, herdsResult, totalAll, orgsResult] = await Promise.all([
+  const [result, herdsResult, totalAll, orgsResult, presetCounts] = await Promise.all([
     payload.find({
       collection: 'animals',
       where,
@@ -56,6 +56,15 @@ export default async function HerdbookPage({
     payload.find({ collection: 'herds', limit: 500, sort: 'name', overrideAccess: true }),
     payload.count({ collection: 'animals', overrideAccess: false, user }),
     payload.find({ collection: 'organizations', limit: 500, sort: 'name', overrideAccess: true }),
+    // Чипы с `probe` гаснут, когда под них нет ни одной записи
+    Promise.all(
+      PRESETS.map(async (p) =>
+        'probe' in p && p.probe
+          ? (await payload.count({ collection: 'animals', where: p.probe, overrideAccess: false, user }))
+              .totalDocs
+          : null,
+      ),
+    ),
   ])
 
   const defaults: Record<string, string> = {}
@@ -83,7 +92,7 @@ export default async function HerdbookPage({
     <>
       <SiteHeader active="/" />
 
-      <main className="container-page pb-4">
+      <main className="container-page pt-8 pb-6">
         {/*
           Шапка и заставка стоят в две колонки: так они занимают одну высоту
           вместо двух и каталог оказывается ближе к верху экрана. Как только
@@ -142,8 +151,23 @@ export default async function HerdbookPage({
           */}
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <span className="mr-1 text-[14px] text-ink-500">Быстрый отбор:</span>
-            {PRESETS.map((p) => {
+            {PRESETS.map((p, i) => {
               const isActive = preset === p.key
+              const muted = presetCounts[i] === 0
+
+              if (muted) {
+                return (
+                  <span
+                    key={p.key}
+                    aria-disabled="true"
+                    title={'emptyHint' in p ? p.emptyHint : 'Данных пока нет'}
+                    className="cursor-default rounded-lg bg-[#ededed] px-3 py-1.5 text-[14px] text-ink-300"
+                  >
+                    {p.label}
+                  </span>
+                )
+              }
+
               return (
                 <Link
                   key={p.key}

@@ -18,7 +18,7 @@ export default async function LoginPage() {
     <>
       <SiteHeader />
 
-      <main className="container-page">
+      <main className="container-page pt-8 pb-6">
         <section className="grid grid-cols-1 gap-8 rounded-card bg-brand-500 p-7 sm:p-10 lg:grid-cols-[1fr_1fr] lg:gap-12">
           <div className="text-white">
             <h1 className="text-[32px] font-medium leading-[1.12] sm:text-[42px]">

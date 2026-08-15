@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Logo } from './Logo'
 import { getCurrentUser } from '@/lib/payload'
 import { LogoutButton } from './LogoutButton'
+import { HeaderAccountMenu } from './HeaderAccountMenu'
 
 const LockIcon = () => (
   <svg width="12" height="14" viewBox="0 0 12 14" fill="none" aria-hidden="true">
@@ -78,23 +79,7 @@ export async function SiteHeader({ active }: { active?: string }) {
               </svg>
             </button>
 
-            <Link
-              href="/account/profile"
-              className={`flex items-center gap-2.5 transition-colors hover:text-forest-500 ${
-                active === '/account/profile' ? 'text-forest-500' : 'text-ink-900'
-              }`}
-            >
-              <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-ink-900 text-white">
-                <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                  <circle cx="10" cy="6.5" r="3.5" fill="currentColor" />
-                  <path d="M3.5 17c0-3.6 2.9-5.5 6.5-5.5s6.5 1.9 6.5 5.5" fill="currentColor" />
-                </svg>
-              </span>
-              <span className="hidden leading-tight sm:block">
-                <span className="block text-[15px]">{displayName}</span>
-                {orgName && <span className="block text-[12px] text-ink-500">{orgName}</span>}
-              </span>
-            </Link>
+            <HeaderAccountMenu displayName={displayName} orgName={orgName} active={active} />
 
             <LogoutButton compact />
           </div>

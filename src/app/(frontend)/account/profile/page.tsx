@@ -34,7 +34,7 @@ export default async function ProfilePage() {
     <>
       <SiteHeader active="/account/profile" />
 
-      <main className="container-page pb-4">
+      <main className="container-page pt-8 pb-6">
         <AccountNav />
 
         <Breadcrumbs

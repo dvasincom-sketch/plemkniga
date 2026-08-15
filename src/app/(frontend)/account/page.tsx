@@ -50,7 +50,7 @@ export default async function AccountPage({
     <>
       <SiteHeader active="/account" />
 
-      <main className="container-page pb-4">
+      <main className="container-page pt-8 pb-6">
         {/*
           Два уровня навигации разведены: в шапке — меню сайта простыми
           ссылками, здесь — разделы кабинета вертикальным списком плашек.

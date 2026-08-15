@@ -190,7 +190,19 @@ export const queryWithSort = (sp: SearchParams, sort: SortValue): string => {
 export const PRESETS = [
   { key: 'bulls', label: 'Быки-производители', params: { sex: 'male', ageGroup: 'bull' } },
   { key: 'milk', label: 'Коровы с высоким удоем', params: { sex: 'female', sort: 'milk' } },
-  { key: 'sale', label: 'Выставлены на продажу', params: { forSale: '1' } },
+  {
+    key: 'sale',
+    label: 'Выставлены на продажу',
+    params: { forSale: '1' },
+    /*
+     * Признак продажи заполняется хозяйствами вручную, и пока ни одно животное
+     * не выставлено, отбор вернул бы пустую страницу. Чип с `probe` перед
+     * показом считает записи и, если их нет, гаснет — вместо тупика
+     * пользователь видит, что данных пока просто нет.
+     */
+    probe: { forSale: { equals: true } } as Where,
+    emptyHint: 'Ни одно животное пока не выставлено на продажу',
+  },
   { key: 'pedigree', label: 'С полной родословной', params: { relation: 'bothParents' } },
   { key: 'verified', label: 'Проверено Ассоциацией', params: { trust: '3' } },
 ] as const

@@ -184,7 +184,7 @@ export default async function AnimalPage({
     <>
       <SiteHeader active="/" />
 
-      <main className="container-page pb-4">
+      <main className="container-page pt-8 pb-6">
         {isMine && <AccountNav active="animals" />}
 
         <div>

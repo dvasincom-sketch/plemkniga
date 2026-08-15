@@ -45,7 +45,7 @@ export default async function AnalyticsPage() {
   return (
     <>
       <SiteHeader active="/analytics" />
-      <main className="container-page">
+      <main className="container-page pt-8 pb-6">
         <h1 className="text-[38px] font-medium sm:text-[46px]">Аналитика</h1>
         <p className="mt-3 max-w-[70ch] text-[15px] text-ink-700">
           Сводные показатели по стаду. В полной версии сюда добавляются динамика удоя по месяцам,

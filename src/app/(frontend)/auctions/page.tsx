@@ -14,7 +14,7 @@ export default async function AuctionsPage() {
   return (
     <>
       <SiteHeader active="/auctions" />
-      <main className="container-page">
+      <main className="container-page pt-8 pb-6">
         <h1 className="text-[38px] font-medium sm:text-[46px]">Аукционы</h1>
         <div className="card mt-8">
           <p className="text-[15px] leading-relaxed text-ink-700">
