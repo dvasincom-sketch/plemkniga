@@ -56,14 +56,29 @@ export default async function HerdbookPage({
     payload.find({ collection: 'herds', limit: 500, sort: 'name', overrideAccess: true }),
     payload.count({ collection: 'animals', overrideAccess: false, user }),
     payload.find({ collection: 'organizations', limit: 500, sort: 'name', overrideAccess: true }),
-    // Чипы с `probe` гаснут, когда под них нет ни одной записи
+    /*
+     * Чипы с `probe` гаснут, когда под них нет ни одной записи.
+     *
+     * Ошибка здесь намеренно проглатывается: это украшение чипа, и оно
+     * не должно ронять страницу. Так бывает, например, сразу после добавления
+     * нового поля, пока запущенный процесс держит прежнюю схему коллекции
+     * в памяти — тогда чип просто погаснет, а книга откроется.
+     */
     Promise.all(
-      PRESETS.map(async (p) =>
-        'probe' in p && p.probe
-          ? (await payload.count({ collection: 'animals', where: p.probe, overrideAccess: false, user }))
-              .totalDocs
-          : null,
-      ),
+      PRESETS.map(async (p) => {
+        if (!('probe' in p) || !p.probe) return null
+        try {
+          const { totalDocs } = await payload.count({
+            collection: 'animals',
+            where: p.probe,
+            overrideAccess: false,
+            user,
+          })
+          return totalDocs
+        } catch {
+          return 0
+        }
+      }),
     ),
   ])
 
