@@ -364,13 +364,19 @@
   .data-table tbody td:last-child {
     padding-right: 1.25rem;
   }
-  .data-table tbody tr:hover td {
+  /*
+   * Подсветка строки — обещание «сюда можно нажать». Строка-заглушка
+   * с сообщением о пустом результате никуда не ведёт, поэтому она
+   * исключена: подсвеченная и не реагирующая на клик строка выглядит
+   * как сломанная.
+   */
+  .data-table tbody tr:not(.is-empty):hover td {
     background: var(--color-brand-500);
     color: #fff;
     border-bottom-color: var(--color-brand-500);
   }
-  .data-table tbody tr:hover td .ipc-positive,
-  .data-table tbody tr:hover td .ipc-negative {
+  .data-table tbody tr:not(.is-empty):hover td .ipc-positive,
+  .data-table tbody tr:not(.is-empty):hover td .ipc-negative {
     color: #fff;
   }
 
@@ -541,7 +547,7 @@
 .data-table tbody tr {
   position: relative;
 }
-.data-table tbody tr:hover {
+.data-table tbody tr:not(.is-empty):hover {
   cursor: pointer;
 }
 .row-link::after {

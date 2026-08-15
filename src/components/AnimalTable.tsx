@@ -55,7 +55,8 @@ export function AnimalTable({
   startIndex?: number
   /** Кто смотрит: от этого зависит, какие карточки под замком. */
   viewer?: Viewer
-  emptyText?: string
+  /** Узел, а не строка: в подсказке об отсутствии записей уместна ссылка. */
+  emptyText?: React.ReactNode
 }) {
   return (
     <div className="table-scroll">
@@ -71,7 +72,9 @@ export function AnimalTable({
         </thead>
         <tbody>
           {animals.length === 0 && (
-            <tr>
+            /* is-empty снимает со строки подсветку и курсор-руку:
+               нажимать здесь не на что */
+            <tr className="is-empty">
               <td colSpan={COLUMNS.length} className="py-10 text-center text-ink-500">
                 {emptyText}
               </td>

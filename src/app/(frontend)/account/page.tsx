@@ -15,6 +15,7 @@ import {
   PAGE_SIZES,
   buildAnimalWhere,
   currentPage,
+  hasActiveFilters,
   hasAdvancedValues,
   one,
   pageSizeLabel,
@@ -175,6 +176,31 @@ async function AnimalsTab({
   for (const key of Object.keys(sp)) defaults[key] = one(sp[key])
   defaults.tab = 'animals'
 
+  /*
+   * Пустая таблица объясняется по-разному.
+   *
+   * Раньше в обоих случаях стояло «в вашем стаде пока нет записей»: человек
+   * искал по стаду из полутора сотен голов, ничего не находил и читал, что
+   * стадо пустое. Теперь ответ зависит от того, задан ли отбор.
+   */
+  const filtered = hasActiveFilters(sp)
+  const emptyText = filtered ? (
+    <>
+      По заданным условиям в вашем стаде ничего не найдено.{' '}
+      <Link href="/account?tab=animals" className="underline underline-offset-4">
+        Сбросить отбор
+      </Link>
+    </>
+  ) : (
+    <>
+      В вашем стаде пока нет записей. Загрузите их через{' '}
+      <Link href="/account/import" className="underline underline-offset-4">
+        «Загрузку данных»
+      </Link>
+      .
+    </>
+  )
+
   return (
     <>
       {/*
@@ -227,7 +253,7 @@ async function AnimalsTab({
           animals={result.docs as Animal[]}
           startIndex={(page - 1) * (perPage || 0)}
           viewer={viewer}
-          emptyText="В вашем стаде пока нет записей. Загрузите данные через «Импорт данных»."
+          emptyText={emptyText}
         />
         {/*
            Подвал таблицы: слева — сколько показано и по сколько показывать,

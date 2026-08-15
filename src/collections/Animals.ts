@@ -789,6 +789,25 @@ export const Animals: CollectionConfig = {
   ],
 
   hooks: {
+    /*
+     * Запросы доступа удаляются вместе с животным.
+     *
+     * У запроса животное обязательно, поэтому колонка NOT NULL, а внешний
+     * ключ настроен на ON DELETE SET NULL — удаление животного, о котором
+     * кто-то спрашивал, обрывало бы всю транзакцию нарушением NOT NULL.
+     * Осиротевший запрос и сам по себе бессмыслен: он существует только
+     * как разговор об этой конкретной записи.
+     */
+    beforeDelete: [
+      async ({ req, id }) => {
+        await req.payload.delete({
+          collection: 'access-requests',
+          where: { animal: { equals: id } },
+          overrideAccess: true,
+          req,
+        })
+      },
+    ],
     beforeValidate: [
       ({ data, operation }) => {
         if (!data) return data
