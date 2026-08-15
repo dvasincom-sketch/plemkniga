@@ -36,6 +36,10 @@ export function describeFilter(
       const herd = herds.find((h) => String(h.id) === value)
       return { label: 'Стадо', value: herd?.name ?? value }
     }
+    case 'trust':
+      return { label: 'Достоверность', value: `не ниже ${value}` }
+    case 'forSale':
+      return { label: 'Продажа', value: 'выставлено' }
     case 'ipcFrom':
       return { label: 'ИПЦ', value: `от ${value}` }
     case 'ipcTo':

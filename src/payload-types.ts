@@ -305,6 +305,7 @@ export interface Animal {
   publicDetails?: boolean | null;
   photo?: (number | null) | Media;
   notes?: string | null;
+  forSale?: boolean | null;
   /**
    * Итоговое значение, выводится в таблице поиска
    */
@@ -1348,6 +1349,7 @@ export interface AnimalsSelect<T extends boolean = true> {
   publicDetails?: T;
   photo?: T;
   notes?: T;
+  forSale?: T;
   ipc?: T;
   ipcRank?: T;
   ipcDetails?:

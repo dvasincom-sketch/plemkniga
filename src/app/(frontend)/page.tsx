@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { ImageSlot } from '@/components/ImageSlot'
-import { FilterSidebar } from '@/components/FilterSidebar'
+import { HerdbookFilterBar } from '@/components/HerdbookFilterBar'
 import { ResultsBar } from '@/components/ResultsBar'
 import { EmptyResults } from '@/components/EmptyResults'
 import { AnimalTable } from '@/components/AnimalTable'
@@ -11,11 +11,13 @@ import { Pagination } from '@/components/Pagination'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import {
   FILTER_KEYS,
+  PRESETS,
+  activePreset,
   buildAnimalWhere,
   currentPage,
   hasActiveFilters,
-  hasAdvancedValues,
   one,
+  presetHref,
   resolveSort,
   type SearchParams,
 } from '@/lib/animal-query'
@@ -25,12 +27,6 @@ import type { Animal } from '@/payload-types'
 export const dynamic = 'force-dynamic'
 
 const PER_PAGE = 12
-
-/** Готовый отбор в один клик — самый частый запрос к книге. */
-const PRESET = {
-  href: '/?sex=female&sort=milk#results',
-  label: 'Коровы с высоким удоем',
-}
 
 export default async function HerdbookPage({
   searchParams,
@@ -46,7 +42,7 @@ export default async function HerdbookPage({
   const sort = resolveSort(sp)
   const hasActive = hasActiveFilters(sp)
 
-  const [result, herdsResult, totalAll] = await Promise.all([
+  const [result, herdsResult, totalAll, orgsResult] = await Promise.all([
     payload.find({
       collection: 'animals',
       where,
@@ -57,14 +53,18 @@ export default async function HerdbookPage({
       overrideAccess: false,
       user,
     }),
-    payload.find({ collection: 'herds', limit: 100, sort: 'name', overrideAccess: true }),
+    payload.find({ collection: 'herds', limit: 500, sort: 'name', overrideAccess: true }),
     payload.count({ collection: 'animals', overrideAccess: false, user }),
+    payload.find({ collection: 'organizations', limit: 500, sort: 'name', overrideAccess: true }),
   ])
 
   const defaults: Record<string, string> = {}
   for (const key of Object.keys(sp)) defaults[key] = one(sp[key])
 
   const herds = herdsResult.docs.map((h) => ({ id: h.id as number, name: h.name }))
+  const herdOptions = herds.map((h) => ({ value: String(h.id), label: h.name }))
+  // Значение — название хозяйства: отбор идёт по нему, и в «фишке» видно то же
+  const ownerOptions = orgsResult.docs.map((o) => ({ value: o.name, label: o.name }))
 
   // Названия активных условий — для подсказок в пустой выдаче
   const filterLabels: Record<string, string> = {}
@@ -77,7 +77,7 @@ export default async function HerdbookPage({
 
   const animals = result.docs as Animal[]
   const found = result.totalDocs ?? 0
-  const presetActive = one(sp.sex) === 'female' && one(sp.sort) === 'milk'
+  const preset = activePreset(sp)
 
   return (
     <>
@@ -134,74 +134,83 @@ export default async function HerdbookPage({
 
         {/* ------------------------------ Каталог ----------------------------- */}
         <section id="results" className="mt-10 scroll-mt-6">
-          <div className="mb-5 flex flex-wrap items-center gap-3">
-            <span className="text-[14px] text-ink-500">Быстрый отбор:</span>
-            <Link
-              href={presetActive ? '/#results' : PRESET.href}
-              aria-current={presetActive ? 'true' : undefined}
-              className={`rounded-lg px-3.5 py-2 text-[14px] transition-colors ${
-                presetActive
-                  ? 'bg-forest-500 font-medium text-white'
-                  : 'bg-white text-ink-900 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] hover:bg-[#f6f6f6]'
-              }`}
-            >
-              {PRESET.label}
-            </Link>
+          {/*
+             Отбор стоит над таблицей, а не сбоку: колонка фильтров съедала
+             ширину, а таблице на четырнадцать колонок ширина нужнее.
+             Развёрнутый фильтр по продуктивности живёт в личном кабинете —
+             там он нужен для работы со своим стадом.
+          */}
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <span className="mr-1 text-[14px] text-ink-500">Быстрый отбор:</span>
+            {PRESETS.map((p) => {
+              const isActive = preset === p.key
+              return (
+                <Link
+                  key={p.key}
+                  href={isActive ? '/#results' : presetHref(p)}
+                  aria-current={isActive ? 'true' : undefined}
+                  className={`rounded-lg px-3 py-1.5 text-[14px] transition-colors ${
+                    isActive
+                      ? 'bg-forest-500 font-medium text-white'
+                      : 'bg-white text-ink-900 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] hover:bg-[#f6f6f6]'
+                  }`}
+                >
+                  {p.label}
+                </Link>
+              )
+            })}
           </div>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-8">
-            <FilterSidebar
-              herds={herds}
-              defaults={defaults}
-              sort={one(sp.sort)}
+          <HerdbookFilterBar
+            defaults={defaults}
+            owners={ownerOptions}
+            herds={herdOptions}
+            sort={one(sp.sort)}
+          />
+
+          <div className="mt-7">
+            <ResultsBar
+              sp={sp}
+              total={found}
+              sort={sort.value}
               hasActive={hasActive}
-              openAdvanced={hasAdvancedValues(sp)}
+              herds={herds}
             />
 
-            <div className="min-w-0">
-              <ResultsBar
-                sp={sp}
-                total={found}
-                sort={sort.value}
-                hasActive={hasActive}
-                herds={herds}
-              />
-
-              {animals.length === 0 ? (
-                <EmptyResults sp={sp} hasActive={hasActive} labels={filterLabels} />
-              ) : (
-                <>
-                  <div className="hidden lg:block">
-                    <AnimalTable
-                      animals={animals}
-                      startIndex={(page - 1) * PER_PAGE}
-                      canOpenAll={Boolean(user)}
-                    />
-                  </div>
-
-                  <div className="lg:hidden">
-                    <AnimalCards animals={animals} canOpenAll={Boolean(user)} />
-                  </div>
-
-                  <Pagination
-                    page={result.page ?? 1}
-                    totalPages={result.totalPages ?? 1}
-                    searchParams={sp}
-                    basePath="/"
+            {animals.length === 0 ? (
+              <EmptyResults sp={sp} hasActive={hasActive} labels={filterLabels} />
+            ) : (
+              <>
+                <div className="hidden lg:block">
+                  <AnimalTable
+                    animals={animals}
+                    startIndex={(page - 1) * PER_PAGE}
+                    canOpenAll={Boolean(user)}
                   />
-                </>
-              )}
+                </div>
 
-              {!user && animals.length > 0 && (
-                <p className="mt-6 text-[14px] leading-relaxed text-ink-500">
-                  Показаны животные, которых владельцы открыли для публичного просмотра.{' '}
-                  <Link href="/login" className="underline underline-offset-4 hover:text-ink-900">
-                    Войдите
-                  </Link>
-                  , чтобы видеть полные карточки своего стада.
-                </p>
-              )}
-            </div>
+                <div className="lg:hidden">
+                  <AnimalCards animals={animals} canOpenAll={Boolean(user)} />
+                </div>
+
+                <Pagination
+                  page={result.page ?? 1}
+                  totalPages={result.totalPages ?? 1}
+                  searchParams={sp}
+                  basePath="/"
+                />
+              </>
+            )}
+
+            {!user && animals.length > 0 && (
+              <p className="mt-6 text-[14px] leading-relaxed text-ink-500">
+                Показаны животные, которых владельцы открыли для публичного просмотра.{' '}
+                <Link href="/login" className="underline underline-offset-4 hover:text-ink-900">
+                  Войдите
+                </Link>
+                , чтобы видеть полные карточки своего стада и развёрнутый фильтр по продуктивности.
+              </p>
+            )}
           </div>
         </section>
       </main>

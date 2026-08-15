@@ -57,6 +57,11 @@ export function buildAnimalWhere(sp: SearchParams, extra?: Where): Where {
     })
   }
 
+  const trust = one(sp.trust)
+  if (trust) and.push({ trustLevel: { greater_than_equal: Number(trust) } })
+
+  if (one(sp.forSale) === '1') and.push({ forSale: { equals: true } })
+
   const relation = one(sp.relation)
   if (relation === 'father') and.push({ father: { exists: true } })
   if (relation === 'mother') and.push({ mother: { exists: true } })
@@ -137,6 +142,8 @@ export const FILTER_KEYS = [
   ...ADVANCED_FIELDS.map((f) => f.name),
   'ipcFrom',
   'ipcTo',
+  'trust',
+  'forSale',
 ] as const
 
 /** true, если задано хотя бы одно условие отбора. */
@@ -166,4 +173,41 @@ export const queryWithSort = (sp: SearchParams, sort: SortValue): string => {
   if (sort !== SORT_OPTIONS[0].value) params.set('sort', sort)
   const qs = params.toString()
   return qs ? `/?${qs}` : '/'
+}
+
+
+/* ------------------------------------------------------------------ *
+ *                          Быстрый отбор                              *
+ * ------------------------------------------------------------------ */
+
+/**
+ * Готовые наборы условий под самые частые вопросы к книге.
+ *
+ * Каждый пресет — это просто набор query-параметров, поэтому он работает
+ * теми же механизмами, что и ручной отбор: остаётся в адресе, снимается
+ * «фишками» и сочетается с сортировкой.
+ */
+export const PRESETS = [
+  { key: 'bulls', label: 'Быки-производители', params: { sex: 'male', ageGroup: 'bull' } },
+  { key: 'milk', label: 'Коровы с высоким удоем', params: { sex: 'female', sort: 'milk' } },
+  { key: 'sale', label: 'Выставлены на продажу', params: { forSale: '1' } },
+  { key: 'pedigree', label: 'С полной родословной', params: { relation: 'bothParents' } },
+  { key: 'verified', label: 'Проверено Ассоциацией', params: { trust: '3' } },
+] as const
+
+export type PresetKey = (typeof PRESETS)[number]['key']
+
+/** Пресет считается активным, когда все его параметры заданы. */
+export const activePreset = (sp: SearchParams): PresetKey | null => {
+  for (const preset of PRESETS) {
+    const match = Object.entries(preset.params).every(([k, v]) => one(sp[k]) === v)
+    if (match) return preset.key
+  }
+  return null
+}
+
+/** Ссылка на пресет: заменяет текущий отбор целиком, чтобы не накапливать условия. */
+export const presetHref = (preset: (typeof PRESETS)[number]): string => {
+  const params = new URLSearchParams(preset.params as Record<string, string>)
+  return `/?${params.toString()}#results`
 }

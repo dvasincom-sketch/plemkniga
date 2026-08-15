@@ -95,9 +95,9 @@ export default async function SubmissionPage({
       <SiteHeader active="/account" />
 
       <main className="container-page pb-4">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-10">
-          <AccountNav active="events" />
+        <AccountNav active="events" />
 
+        <div>
           <div className="min-w-0">
         <Breadcrumbs
           items={[

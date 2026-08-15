@@ -273,6 +273,7 @@ const run = async () => {
           owner: orgs[orgIndex].id,
           author: authorFor(orgIndex),
           publicVisible: true,
+          forSale: rnd() < 0.12,
           publicDetails: true,
           trustLevel: 3,
           trustCheckedAt: new Date(2025, 2, 12).toISOString(),

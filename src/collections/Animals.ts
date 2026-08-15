@@ -294,6 +294,15 @@ export const Animals: CollectionConfig = {
             },
             { name: 'photo', type: 'upload', relationTo: 'media', label: 'Фото' },
             { name: 'notes', type: 'textarea', label: 'Примечание' },
+        {
+          // Витрина продаж: по нему работает быстрый отбор «Выставлены
+          // на продажу» и, позже, раздел аукционов
+          name: 'forSale',
+          type: 'checkbox',
+          label: 'Выставлено на продажу',
+          defaultValue: false,
+          index: true,
+        },
           ],
         },
 

@@ -24,6 +24,13 @@ export async function SiteHeader({ active }: { active?: string }) {
   const displayName =
     [user?.lastName, user?.firstName].filter(Boolean).join(' ') || user?.email || 'Кабинет'
 
+  // Название организации под именем: в системе один человек всегда действует
+  // от лица хозяйства, и это важнее, чем должность
+  const orgName =
+    typeof user?.organization === 'object' && user.organization
+      ? (user.organization.shortName || user.organization.name)
+      : null
+
   const nav: NavItem[] = [
     { href: '/', label: 'Племенная книга' },
     { href: '/analytics', label: 'Аналитика', locked: !user },
@@ -31,8 +38,8 @@ export async function SiteHeader({ active }: { active?: string }) {
   ]
 
   return (
-    <header className="bg-canvas">
-      <div className="container-page flex h-[74px] items-center justify-between gap-6">
+    <header className="border-b border-ink-100 bg-white">
+      <div className="container-page flex h-[78px] items-center justify-between gap-6">
         <Logo />
 
         <nav className="hidden items-center gap-10 lg:flex">
@@ -72,18 +79,21 @@ export async function SiteHeader({ active }: { active?: string }) {
             </button>
 
             <Link
-              href="/account"
-              className={`flex items-center gap-2.5 text-[15px] transition-colors hover:text-forest-500 ${
-                active?.startsWith('/account') ? 'text-forest-500' : 'text-ink-900'
+              href="/account/profile"
+              className={`flex items-center gap-2.5 transition-colors hover:text-forest-500 ${
+                active === '/account/profile' ? 'text-forest-500' : 'text-ink-900'
               }`}
             >
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-ink-900 text-white">
+              <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-ink-900 text-white">
                 <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true">
                   <circle cx="10" cy="6.5" r="3.5" fill="currentColor" />
                   <path d="M3.5 17c0-3.6 2.9-5.5 6.5-5.5s6.5 1.9 6.5 5.5" fill="currentColor" />
                 </svg>
               </span>
-              <span className="hidden sm:inline">{displayName}</span>
+              <span className="hidden leading-tight sm:block">
+                <span className="block text-[15px]">{displayName}</span>
+                {orgName && <span className="block text-[12px] text-ink-500">{orgName}</span>}
+              </span>
             </Link>
 
             <LogoutButton compact />

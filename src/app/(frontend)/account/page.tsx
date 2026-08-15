@@ -57,9 +57,9 @@ export default async function AccountPage({
           Список остаётся на месте при переходе между разделами, поэтому
           всегда видно, где вы находитесь.
         */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-10">
-          <AccountNav active={tab} />
+        <AccountNav active={tab} />
 
+        <div>
           <div className="min-w-0">
             <h1 className="text-[30px] font-medium leading-tight sm:text-[36px]">{tabTitle}</h1>
 
@@ -77,14 +77,23 @@ export default async function AccountPage({
 
             {tab === 'settings' && (
               <>
-                <section className="mt-8">
-                  <h2 className="section-title mb-6">Личные данные</h2>
-                  <ProfileForm user={user} org={org} roleLabel={labelOf(ROLES, user.role)} />
-                </section>
-
-                <section className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <section className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
             <h2 className="section-title lg:col-span-2">Видимость и доступ</h2>
             <VisibilityFormWrapper orgId={orgId} />
+            <div className="card">
+              <h3 className="panel-heading">Личные данные</h3>
+              <p className="text-sm leading-relaxed text-ink-700">
+                Фамилия, телефон, реквизиты организации и роль в системе вынесены на отдельную
+                страницу — она открывается кликом по имени в шапке.
+              </p>
+              <Link
+                href="/account/profile"
+                className="mt-4 inline-block underline underline-offset-4 hover:text-forest-500"
+              >
+                Открыть профиль пользователя
+              </Link>
+            </div>
+
             <div className="card">
               <h3 className="panel-heading">Интеграции и API</h3>
               <p className="text-sm leading-relaxed text-ink-700">
@@ -161,25 +170,6 @@ async function AnimalsTab({
          страницу и в строку кнопок, а раздел занят одним делом — работой
          со списком животных.
       */}
-      <section className="mt-6 flex flex-wrap items-center gap-3">
-        <Link href="/account/import" className="btn btn-brand">
-          Загрузить данные
-        </Link>
-        <span className="text-[14px] text-ink-500">Выгрузить стадо:</span>
-        <a
-          href="/account/export?format=csv"
-          className="rounded-lg bg-white px-3 py-2 text-[14px] shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] hover:bg-[#f6f6f6]"
-        >
-          CSV
-        </a>
-        <a
-          href="/account/export?format=json"
-          className="rounded-lg bg-white px-3 py-2 text-[14px] shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] hover:bg-[#f6f6f6]"
-        >
-          JSON
-        </a>
-      </section>
-
       <section className="mt-6">
         <SearchPanel
           action="/account"
@@ -193,6 +183,34 @@ async function AnimalsTab({
 
       <section className="mt-8">
         <h2 className="section-title mb-5">Животные</h2>
+
+        {/*
+           Панель действий относится к таблице, поэтому стоит вплотную над ней:
+           раньше она висела в начале страницы отдельным блоком и читалась
+           как самостоятельный сценарий, спорящий с поиском.
+        */}
+        <div className="flex flex-wrap items-center gap-3 rounded-t-2xl border border-b-0 border-ink-100 bg-white px-4 py-3">
+          <Link href="/account/import" className="btn btn-brand">
+            Загрузить данные
+          </Link>
+          <span className="text-[14px] text-ink-500">Выгрузить стадо:</span>
+          <a
+            href="/account/export?format=csv"
+            className="rounded-lg bg-[#f2f2f2] px-3 py-2 text-[14px] transition-colors hover:bg-[#e8e8e8]"
+          >
+            CSV
+          </a>
+          <a
+            href="/account/export?format=json"
+            className="rounded-lg bg-[#f2f2f2] px-3 py-2 text-[14px] transition-colors hover:bg-[#e8e8e8]"
+          >
+            JSON
+          </a>
+          <span className="ml-auto text-[14px] text-ink-500">
+            Всего в стаде: <span className="font-medium text-ink-900">{total.totalDocs}</span>
+          </span>
+        </div>
+
         <AnimalTable
           animals={result.docs as Animal[]}
           startIndex={(page - 1) * PER_PAGE}

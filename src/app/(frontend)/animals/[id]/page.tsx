@@ -7,7 +7,6 @@ import { ExteriorChart } from '@/components/ExteriorChart'
 import { AnimalEventsTab } from '@/components/AnimalEventsTab'
 import { AnimalOriginTab } from '@/components/AnimalOriginTab'
 import { TrustBadge } from '@/components/TrustBadge'
-import { AnimalAvatar } from '@/components/AnimalAvatar'
 import { InfoTip } from '@/components/InfoTip'
 import { AccountNav } from '@/components/AccountNav'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
@@ -186,21 +185,15 @@ export default async function AnimalPage({
       <SiteHeader active="/" />
 
       <main className="container-page pb-4">
-        <div
-          className={
-            isMine ? 'grid grid-cols-1 gap-6 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-10' : ''
-          }
-        >
-          {isMine && <AccountNav active="animals" />}
+        {isMine && <AccountNav active="animals" />}
 
+        <div>
           <div className="min-w-0">
         <Breadcrumbs items={crumbs} />
 
         {/* ------------------------------ Шапка ------------------------------ */}
         <section className="flex flex-wrap items-start justify-between gap-x-10 gap-y-6">
-          <div className="flex min-w-0 items-start gap-5">
-            <AnimalAvatar name={animal.name} identNumber={animal.identNumber} />
-
+          <div className="min-w-0">
             <div className="min-w-0">
               <p className="text-[12px] uppercase tracking-[0.09em] text-ink-500">Кличка</p>
 
