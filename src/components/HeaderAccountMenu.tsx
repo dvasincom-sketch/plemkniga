@@ -89,13 +89,17 @@ export function HeaderAccountMenu({
            Скругление задано всегда, а не только в раскрытом состоянии:
            иначе при появлении фона углы успевали мигнуть прямыми — фон
            анимируется, радиус нет.
+
+           Собственной подсветки при наведении у ссылки нет намеренно:
+           наведение и так раскрывает меню и красит блок в зелёный.
+           Две реакции на одно движение читались как два разных элемента.
         */
         className={`flex items-center gap-2.5 rounded-t-2xl px-3 py-2 transition-colors duration-150 ${
           open
             ? 'bg-forest-500 text-white'
             : isProfile
-              ? 'text-forest-500 hover:bg-brand-50'
-              : 'text-ink-900 hover:bg-brand-50 hover:text-forest-500'
+              ? 'text-forest-500'
+              : 'text-ink-900'
         }`}
       >
         <span

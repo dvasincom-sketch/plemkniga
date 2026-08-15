@@ -55,7 +55,12 @@ export default async function HerdbookPage({
     }),
     payload.find({ collection: 'herds', limit: 500, sort: 'name', overrideAccess: true }),
     payload.count({ collection: 'animals', overrideAccess: false, user }),
-    payload.find({ collection: 'organizations', limit: 500, sort: 'name', overrideAccess: true }),
+    payload.find({
+      collection: 'organizations',
+      limit: 500,
+      sort: 'name',
+      overrideAccess: true,
+    }),
     /*
      * Чипы с `probe` гаснут, когда под них нет ни одной записи.
      *
@@ -89,6 +94,7 @@ export default async function HerdbookPage({
   const herdOptions = herds.map((h) => ({ value: String(h.id), label: h.name }))
   // Значение — название хозяйства: отбор идёт по нему, и в «фишке» видно то же
   const ownerOptions = orgsResult.docs.map((o) => ({ value: o.name, label: o.name }))
+  const farmCount = orgsResult.docs.filter((o) => o.type === 'farm').length
 
   // Названия активных условий — для подсказок в пустой выдаче
   const filterLabels: Record<string, string> = {}
@@ -122,8 +128,14 @@ export default async function HerdbookPage({
         <section
           className={`grid grid-cols-1 gap-5 ${hasActive ? '' : 'lg:grid-cols-[1.05fr_1fr]'}`}
         >
+          {/*
+             Блок тёмно-зелёный, а не светлый: белый текст на светлой зелени
+             давал контраст около 2,6:1 — ниже порога читаемости, а это первое,
+             что читает человек, впервые попавший на сайт. На тёмном фоне
+             контраст выше 4,9:1, и текст читается без дополнительной плашки.
+          */}
           <div
-            className={`rounded-card bg-brand-500 p-8 text-white sm:p-10 ${
+            className={`rounded-card bg-forest-500 p-8 text-white sm:p-10 ${
               hasActive
                 ? 'grid gap-6 lg:grid-cols-2 lg:items-end lg:gap-12'
                 : 'flex flex-col justify-between gap-8'
@@ -133,26 +145,33 @@ export default async function HerdbookPage({
               <h1 className="text-[40px] font-medium leading-[1.05] sm:text-[48px]">
                 Племенная книга
               </h1>
-              <p className="mt-4 text-[15px] text-white/85">
-                {totalAll.totalDocs.toLocaleString('ru-RU')} записей доступно для просмотра
+              <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[15px] text-white/85">
+                <span>
+                  <span className="font-medium text-white">
+                    {totalAll.totalDocs.toLocaleString('ru-RU')}
+                  </span>{' '}
+                  животных
+                </span>
+                <span aria-hidden="true" className="text-white/40">·</span>
+                <span>
+                  <span className="font-medium text-white">{farmCount}</span> хозяйств
+                </span>
+                <span aria-hidden="true" className="text-white/40">·</span>
+                <span>
+                  <span className="font-medium text-white">{herds.length}</span> стад
+                </span>
               </p>
             </div>
 
-            {/*
-               Описание вынесено на светлую плашку.
-               Белый текст на фирменном зелёном даёт контраст около 2,6:1 —
-               ниже любого порога читаемости, а это первое, что читает человек,
-               попавший на сайт. Тёмный текст на белом даёт больше 12:1.
-            */}
-            <div className="rounded-2xl bg-white/95 p-6 sm:p-7">
-              <p className="max-w-[62ch] text-[16px] leading-[1.65] text-ink-900">
-                Информационная система для сбора, хранения и анализа данных о крупном рогатом скоте
-                (КРС) с целью определения наиболее перспективных быков-производителей для селекции.
+            <div className="max-w-[60ch] space-y-4 text-[16px] leading-[1.6]">
+              <p>
+                Единая книга Ассоциации: хозяйства-участники ведут здесь свои стада, а записи
+                проверяет Ассоциация — происхождение, продуктивность, здоровье каждого животного
+                в одном месте.
               </p>
-              <p className="mt-4 max-w-[62ch] text-[16px] leading-[1.65] text-ink-700">
-                На основе статистики продуктивности, здоровья и других параметров система должна
-                помогать принимать решения о дальнейшем использовании животных — племенное
-                разведение или отправка на мясо.
+              <p className="text-white/85">
+                По этим данным считают племенную ценность, подбирают быков-производителей и решают,
+                оставить животное на племя или вывести из стада.
               </p>
             </div>
           </div>
