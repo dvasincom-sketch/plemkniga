@@ -75,6 +75,11 @@
     padding-inline: 1.25rem;
   }
 
+  /* Воздух между шапкой и содержимым — одним правилом на все страницы */
+  main.container-page {
+    padding-top: 2rem;
+  }
+
   /* ---------- Заголовок раздела с оранжевым маркером ---------- */
   .section-title {
     display: flex;

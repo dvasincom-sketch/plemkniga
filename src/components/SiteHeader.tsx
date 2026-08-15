@@ -39,7 +39,7 @@ export async function SiteHeader({ active }: { active?: string }) {
 
   return (
     <header className="border-b border-ink-100 bg-white">
-      <div className="container-page flex h-[78px] items-center justify-between gap-6">
+      <div className="container-page flex items-center justify-between gap-6 py-4">
         <Logo />
 
         <nav className="hidden items-center gap-10 lg:flex">

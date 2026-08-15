@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 /**
  * Выпадающий список с поиском по строке.
@@ -9,6 +10,11 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react'
  * сотни, и тогда прокрутка перестаёт работать как способ выбора — нужен ввод.
  * Поэтому здесь поле ввода фильтрует варианты по подстроке, а выбранное
  * значение уходит в форму скрытым input, как и у обычного `Select`.
+ *
+ * Сам список рисуется порталом в <body> с координатами от поля. Внутри потока
+ * он уходил под таблицу: у заголовков таблицы `position: sticky`, и они
+ * перекрывали выпадающий список. Портал снимает вопрос порядка наложения
+ * целиком, а не подбором z-index.
  */
 
 export type Option = { value: string; label: string }
@@ -36,7 +42,17 @@ export function ComboBox({
   const [cursor, setCursor] = useState(0)
 
   const boxRef = useRef<HTMLDivElement>(null)
+  const fieldRef = useRef<HTMLInputElement>(null)
+  const listRef = useRef<HTMLUListElement>(null)
+  const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null)
   const listId = useId()
+
+  const place = useCallback(() => {
+    const el = fieldRef.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    setRect({ top: r.bottom + 4, left: r.left, width: r.width })
+  }, [])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -46,11 +62,25 @@ export function ComboBox({
 
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
-      if (!boxRef.current?.contains(e.target as Node)) setOpen(false)
+      const target = e.target as Node
+      if (boxRef.current?.contains(target) || listRef.current?.contains(target)) return
+      setOpen(false)
     }
     document.addEventListener('mousedown', onDocClick)
     return () => document.removeEventListener('mousedown', onDocClick)
   }, [])
+
+  useEffect(() => {
+    if (!open) return
+    place()
+    const onMove = () => place()
+    window.addEventListener('scroll', onMove, true)
+    window.addEventListener('resize', onMove)
+    return () => {
+      window.removeEventListener('scroll', onMove, true)
+      window.removeEventListener('resize', onMove)
+    }
+  }, [open, place])
 
   const choose = (o: Option | null) => {
     setValue(o?.value ?? '')
@@ -63,6 +93,7 @@ export function ComboBox({
       {value && <input type="hidden" name={name} value={value} />}
 
       <input
+        ref={fieldRef}
         type="text"
         role="combobox"
         aria-expanded={open}
@@ -75,10 +106,14 @@ export function ComboBox({
         onChange={(e) => {
           setQuery(e.target.value)
           setValue('')
+          place()
           setOpen(true)
           setCursor(0)
         }}
-        onFocus={() => setOpen(true)}
+        onFocus={() => {
+          place()
+          setOpen(true)
+        }}
         onKeyDown={(e) => {
           if (e.key === 'ArrowDown') {
             e.preventDefault()
@@ -109,33 +144,40 @@ export function ComboBox({
         </button>
       )}
 
-      {open && (
-        <ul
-          id={listId}
-          role="listbox"
-          className="absolute z-40 mt-1 max-h-[260px] w-full overflow-auto rounded-xl bg-white py-1.5 shadow-[0_12px_32px_rgb(23_24_26_/_0.18)]"
-        >
-          {filtered.length === 0 && (
-            <li className="px-4 py-2.5 text-[14px] text-ink-500">Ничего не найдено</li>
-          )}
-          {filtered.map((o, i) => (
-            <li key={o.value}>
-              <button
-                type="button"
-                role="option"
-                aria-selected={o.value === value}
-                onMouseEnter={() => setCursor(i)}
-                onClick={() => choose(o)}
-                className={`block w-full px-4 py-2.5 text-left text-[14px] transition-colors ${
-                  i === cursor ? 'bg-brand-50 text-forest-600' : 'text-ink-900 hover:bg-[#f4f4f4]'
-                }`}
-              >
-                {o.label}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      {open &&
+        rect &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <ul
+            ref={listRef}
+            id={listId}
+            role="listbox"
+            style={{ top: rect.top, left: rect.left, width: rect.width }}
+            className="fixed z-[90] max-h-[260px] overflow-auto rounded-xl bg-white py-1.5 shadow-[0_12px_32px_rgb(23_24_26_/_0.18)]"
+          >
+            {filtered.length === 0 && (
+              <li className="px-4 py-2.5 text-[14px] text-ink-500">Ничего не найдено</li>
+            )}
+            {filtered.map((o, i) => (
+              <li key={o.value}>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={o.value === value}
+                  onMouseEnter={() => setCursor(i)}
+                  onClick={() => choose(o)}
+                  className={`block w-full px-4 py-2.5 text-left text-[14px] transition-colors ${
+                    i === cursor ? 'bg-brand-50 text-forest-600' : 'text-ink-900 hover:bg-[#f4f4f4]'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              </li>
+            ))}
+          </ul>,
+          document.body,
+        )}
+
     </div>
   )
 }

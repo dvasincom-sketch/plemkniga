@@ -182,33 +182,35 @@ async function AnimalsTab({
       </section>
 
       <section className="mt-8">
-        <h2 className="section-title mb-5">Животные</h2>
-
         {/*
-           Панель действий относится к таблице, поэтому стоит вплотную над ней:
-           раньше она висела в начале страницы отдельным блоком и читалась
-           как самостоятельный сценарий, спорящий с поиском.
+           Панель действий стоит в одной строке с заголовком раздела:
+           это настройка таблицы, а не отдельный сценарий, и занимать
+           собственную полосу ей незачем.
         */}
-        <div className="flex flex-wrap items-center gap-3 rounded-t-2xl border border-b-0 border-ink-100 bg-white px-4 py-3">
-          <Link href="/account/import" className="btn btn-brand">
-            Загрузить данные
-          </Link>
-          <span className="text-[14px] text-ink-500">Выгрузить стадо:</span>
-          <a
-            href="/account/export?format=csv"
-            className="rounded-lg bg-[#f2f2f2] px-3 py-2 text-[14px] transition-colors hover:bg-[#e8e8e8]"
-          >
-            CSV
-          </a>
-          <a
-            href="/account/export?format=json"
-            className="rounded-lg bg-[#f2f2f2] px-3 py-2 text-[14px] transition-colors hover:bg-[#e8e8e8]"
-          >
-            JSON
-          </a>
-          <span className="ml-auto text-[14px] text-ink-500">
-            Всего в стаде: <span className="font-medium text-ink-900">{total.totalDocs}</span>
-          </span>
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+          <h2 className="section-title mb-0">Животные</h2>
+
+          <div className="flex flex-wrap items-center gap-2 text-[14px]">
+            <span className="text-ink-500">Всего в стаде: {total.totalDocs}</span>
+            <span aria-hidden="true" className="mx-1 text-ink-300">
+              ·
+            </span>
+            <a
+              href="/account/export?format=csv"
+              className="rounded-lg bg-white px-3 py-2 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] transition-colors hover:bg-[#f6f6f6]"
+            >
+              Выгрузить CSV
+            </a>
+            <a
+              href="/account/export?format=json"
+              className="rounded-lg bg-white px-3 py-2 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] transition-colors hover:bg-[#f6f6f6]"
+            >
+              JSON
+            </a>
+            <Link href="/account/import" className="btn btn-brand">
+              Загрузить данные
+            </Link>
+          </div>
         </div>
 
         <AnimalTable
