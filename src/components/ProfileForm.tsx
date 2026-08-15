@@ -7,6 +7,9 @@ const label = 'mb-1.5 block text-sm text-ink-700'
 
 type Props = {
   user: {
+    notifySubmissions?: boolean | null
+    notifyTrust?: boolean | null
+    notifyNews?: boolean | null
     lastName?: string | null
     firstName?: string | null
     middleName?: string | null
@@ -24,18 +27,25 @@ type Props = {
     membership?: string | null
   } | null
   roleLabel: string
+  /**
+   * Какую часть профиля показывать. Профиль разбит на вкладки, и каждая
+   * отправляет только свои поля — действие сохранения обновляет ровно то,
+   * что пришло.
+   */
+  section: 'user' | 'org' | 'notifications'
 }
 
-export function ProfileForm({ user, org, roleLabel }: Props) {
+export function ProfileForm({ user, org, roleLabel, section }: Props) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(
     updateProfileAction,
     {},
   )
 
   return (
-    <form action={formAction} className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+    <form action={formAction} className="grid grid-cols-1 gap-6">
+      {section === 'user' && (
       <div className="card">
-        <h3 className="panel-heading">Пользователь</h3>
+        <h3 className="panel-heading">Персональные данные</h3>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label>
             <span className={label}>Фамилия</span>
@@ -66,7 +76,55 @@ export function ProfileForm({ user, org, roleLabel }: Props) {
           Роль в системе: <span className="text-ink-900">{roleLabel}</span>
         </p>
       </div>
+      )}
 
+      {section === 'notifications' && (
+      <div className="card">
+        <input type="hidden" name="notificationsForm" value="1" />
+        <h3 className="panel-heading">Что присылать на почту</h3>
+        <p className="mb-5 max-w-[70ch] text-sm leading-relaxed text-ink-700">
+          Рассылка включится вместе с почтовым адаптером — сейчас письма пишутся в журнал
+          сервера. Выбор сохраняется уже сейчас, чтобы потом не спрашивать согласие задним числом.
+        </p>
+        <div className="space-y-3">
+          {[
+            {
+              name: 'notifySubmissions',
+              label: 'Проверка пакетов данных',
+              hint: 'Пакет принят, проверен или отклонён Ассоциацией',
+              checked: user.notifySubmissions ?? true,
+            },
+            {
+              name: 'notifyTrust',
+              label: 'Изменение уровня достоверности',
+              hint: 'Запись подтверждена лабораторией или верифицирована Ассоциацией',
+              checked: user.notifyTrust ?? true,
+            },
+            {
+              name: 'notifyNews',
+              label: 'Сообщения Ассоциации',
+              hint: 'Изменения правил, сроки релизов оценок, объявления',
+              checked: user.notifyNews ?? false,
+            },
+          ].map((n) => (
+            <label key={n.name} className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                name={n.name}
+                defaultChecked={n.checked}
+                className="checkbox mt-0.5"
+              />
+              <span>
+                <span className="block text-[15px]">{n.label}</span>
+                <span className="block text-[13px] leading-snug text-ink-500">{n.hint}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+      </div>
+      )}
+
+      {section === 'org' && (
       <div className="card">
         <h3 className="panel-heading">Организация</h3>
         {org ? (
@@ -102,8 +160,9 @@ export function ProfileForm({ user, org, roleLabel }: Props) {
           <p className="text-sm text-ink-500">Организация не привязана.</p>
         )}
       </div>
+      )}
 
-      <div className="lg:col-span-2">
+      <div>
         {state.error && (
           <p className="mb-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{state.error}</p>
         )}

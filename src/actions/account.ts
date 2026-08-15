@@ -20,22 +20,40 @@ export async function updateProfileAction(
   const get = (k: string) => String(formData.get(k) || '').trim()
   const payload = await getClient()
 
+  /*
+   * Обновляем только те поля, которые реально пришли в форме.
+   *
+   * Профиль разбит на вкладки, и каждая отправляет свою часть. Раньше
+   * отсутствующее поле трактовалось как пустое, и сохранение вкладки
+   * «Организация» стирало отчество и должность пользователя.
+   */
+  const pick = (keys: string[]) => {
+    const out: Record<string, string | boolean> = {}
+    for (const k of keys) if (formData.has(k)) out[k] = get(k)
+    return out
+  }
+
   try {
-    await payload.update({
-      collection: 'users',
-      id: user.id,
-      overrideAccess: true,
-      data: {
-        lastName: get('lastName') || user.lastName,
-        firstName: get('firstName') || user.firstName,
-        middleName: get('middleName') || undefined,
-        phone: get('phone') || undefined,
-        position: get('position') || undefined,
-      },
-    })
+    const userData = pick(['lastName', 'firstName', 'middleName', 'phone', 'position'])
+
+    // Флажки уведомлений приходят только когда включены
+    if (formData.has('notificationsForm')) {
+      userData.notifySubmissions = formData.has('notifySubmissions')
+      userData.notifyTrust = formData.has('notifyTrust')
+      userData.notifyNews = formData.has('notifyNews')
+    }
+
+    if (Object.keys(userData).length > 0) {
+      await payload.update({
+        collection: 'users',
+        id: user.id,
+        overrideAccess: true,
+        data: userData,
+      })
+    }
 
     const orgId = orgOf(user)
-    if (orgId && get('orgName')) {
+    if (orgId && formData.has('orgName')) {
       await payload.update({
         collection: 'organizations',
         id: orgId,
@@ -53,6 +71,7 @@ export async function updateProfileAction(
   }
 
   revalidatePath('/account')
+  revalidatePath('/account/profile')
   return { message: 'Изменения сохранены' }
 }
 

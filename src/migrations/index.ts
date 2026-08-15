@@ -1,5 +1,6 @@
 import * as migration_20260814_195548 from './20260814_195548';
 import * as migration_20260815_061539 from './20260815_061539';
+import * as migration_20260815_075706 from './20260815_075706';
 
 export const migrations = [
   {
@@ -10,6 +11,11 @@ export const migrations = [
   {
     up: migration_20260815_061539.up,
     down: migration_20260815_061539.down,
-    name: '20260815_061539'
+    name: '20260815_061539',
+  },
+  {
+    up: migration_20260815_075706.up,
+    down: migration_20260815_075706.down,
+    name: '20260815_075706'
   },
 ];

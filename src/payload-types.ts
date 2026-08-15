@@ -185,6 +185,9 @@ export interface User {
   position?: string | null;
   confirmed?: boolean | null;
   acceptedPolicy?: boolean | null;
+  notifySubmissions?: boolean | null;
+  notifyTrust?: boolean | null;
+  notifyNews?: boolean | null;
   updatedAt: string;
   createdAt: string;
   email: string;
@@ -1252,6 +1255,9 @@ export interface UsersSelect<T extends boolean = true> {
   position?: T;
   confirmed?: T;
   acceptedPolicy?: T;
+  notifySubmissions?: T;
+  notifyTrust?: T;
+  notifyNews?: T;
   updatedAt?: T;
   createdAt?: T;
   email?: T;

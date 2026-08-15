@@ -75,5 +75,35 @@ export const Users: CollectionConfig = {
       label: 'Согласие на обработку персональных данных',
       defaultValue: false,
     },
+    {
+      /*
+       * Что присылать на почту.
+       *
+       * Сама рассылка появится вместе с почтовым адаптером, но выбор
+       * пользователя хранится с самого начала: иначе при включении рассылки
+       * придётся спрашивать согласие задним числом у всех сразу.
+       */
+      type: 'row',
+      fields: [
+        {
+          name: 'notifySubmissions',
+          type: 'checkbox',
+          label: 'Проверка пакетов данных',
+          defaultValue: true,
+        },
+        {
+          name: 'notifyTrust',
+          type: 'checkbox',
+          label: 'Изменение уровня достоверности',
+          defaultValue: true,
+        },
+        {
+          name: 'notifyNews',
+          type: 'checkbox',
+          label: 'Сообщения Ассоциации',
+          defaultValue: false,
+        },
+      ],
+    },
   ],
 }
