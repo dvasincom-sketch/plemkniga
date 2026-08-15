@@ -1,42 +1,64 @@
 import Link from 'next/link'
 import { Logo } from './Logo'
 
+/**
+ * Подвал сайта.
+ *
+ * Тёмная подложка — одна на всех страницах. Раньше подвал был светло-серым
+ * и на разных страницах читался по-разному: на бледно-зелёной карточке
+ * животного он выглядел случайным пятном, а на серой главной сливался
+ * с содержимым, и граница страницы терялась.
+ *
+ * Тёмная полоса внизу решает обе задачи сразу — она одинакова везде
+ * и однозначно говорит, что содержимое закончилось.
+ */
 export function SiteFooter() {
+  // Отступ сверху берётся из общей переменной: та же величина нужна заливке
+  // страницы «не своего» животного, чтобы фон доходил до подвала без разрыва
   return (
-    <footer className="mt-16 bg-canvas py-12">
+    <footer
+      style={{ marginTop: 'var(--footer-air)' }}
+      className="bg-basement py-12 text-white"
+    >
       <div className="container-page grid grid-cols-1 gap-10 md:grid-cols-[1.2fr_1fr_1fr_1fr]">
         <div className="flex flex-col items-start gap-4">
-          <Logo />
-          <Link href="/privacy" className="text-sm underline underline-offset-4">
+          {/* Логотип на тёмном: инверсия подписи, знак остаётся цветным */}
+          <Logo onDark />
+          <Link
+            href="/privacy"
+            className="text-sm text-white/75 underline underline-offset-4 transition-colors hover:text-white"
+          >
             Политика конфиденциальности
           </Link>
         </div>
 
         <div>
-          <h3 className="mb-3 text-sm font-bold uppercase tracking-wide">Адрес</h3>
-          <p className="text-sm leading-relaxed text-ink-700">
+          <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-white/60">Адрес</h3>
+          <p className="text-sm leading-relaxed text-white/90">
             443109, Россия, Самарская область, город Самара, улица Металлургическая, 92
           </p>
         </div>
 
         <div>
-          <h3 className="mb-3 text-sm font-bold uppercase tracking-wide">Контакты</h3>
-          <p className="text-sm leading-relaxed text-ink-700">
-            <a href="tel:+78469312595" className="hover:text-forest-500">
+          <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-white/60">Контакты</h3>
+          <p className="text-sm leading-relaxed text-white/90">
+            <a href="tel:+78469312595" className="transition-colors hover:text-brand-400">
               +7 846 931 25 95
             </a>
             <br />
-            <a href="mailto:info@holstein-russia.ru" className="hover:text-forest-500">
+            <a href="mailto:info@holstein-russia.ru" className="transition-colors hover:text-brand-400">
               info@holstein-russia.ru
             </a>
           </p>
         </div>
 
         <div>
-          <h3 className="mb-3 text-sm font-bold uppercase tracking-wide">Служба поддержки</h3>
+          <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-white/60">
+            Служба поддержки
+          </h3>
           <a
             href="https://t.me/"
-            className="inline-flex text-ink-900 hover:text-forest-500"
+            className="inline-flex text-white transition-colors hover:text-brand-400"
             aria-label="Telegram"
           >
             <svg width="30" height="26" viewBox="0 0 30 26" fill="none" aria-hidden="true">

@@ -8,11 +8,30 @@ import { findPublicAsset } from '@/lib/media'
  * автоматически и заменит встроенную заглушку. Высота задаётся классом,
  * ширина подстраивается по пропорциям файла.
  */
-export function Logo({ className = '' }: { className?: string }) {
+export function Logo({
+  className = '',
+  onDark = false,
+}: {
+  className?: string
+  /**
+   * Знак стоит на тёмной подложке.
+   *
+   * Логотип цветной и с чёрной подписью — перекрашивать его нельзя,
+   * а на тёмном он пропадает. Поэтому на тёмном фоне он ставится
+   * на светлую плашку: знак остаётся ровно таким, каким его утвердили.
+   */
+  onDark?: boolean
+}) {
   const custom = findPublicAsset('logo')
 
   return (
-    <Link href="/" className={`flex items-center gap-2.5 ${className}`} aria-label="На главную">
+    <Link
+      href="/"
+      className={`flex items-center gap-2.5 ${
+        onDark ? 'rounded-xl bg-white px-3 py-2.5' : ''
+      } ${className}`}
+      aria-label="На главную"
+    >
       {custom ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
