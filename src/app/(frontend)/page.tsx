@@ -107,7 +107,7 @@ export default async function HerdbookPage({
     <>
       <SiteHeader active="/" />
 
-      <main className="container-page pt-8 pb-6">
+      <main className="container-page pt-10 pb-8">
         {/*
           Шапка и заставка стоят в две колонки: так они занимают одну высоту
           вместо двух и каталог оказывается ближе к верху экрана. Как только
@@ -176,7 +176,7 @@ export default async function HerdbookPage({
                     key={p.key}
                     aria-disabled="true"
                     title={'emptyHint' in p ? p.emptyHint : 'Данных пока нет'}
-                    className="cursor-default rounded-lg bg-[#ededed] px-3 py-1.5 text-[14px] text-ink-300"
+                    className="cursor-default rounded-lg bg-white px-3 py-1.5 text-[14px] text-ink-300 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)]"
                   >
                     {p.label}
                   </span>

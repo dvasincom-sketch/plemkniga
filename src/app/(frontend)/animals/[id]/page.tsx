@@ -167,6 +167,17 @@ export default async function AnimalPage({
   const ownerId = typeof animal.owner === 'object' && animal.owner ? animal.owner.id : animal.owner
   const isMine = Boolean(user && userOrgId && ownerId && userOrgId === ownerId)
 
+  /*
+   * Чужое животное оформляется иначе — целиком.
+   *
+   * Зоотехник открывает карточки вперемешку: своих и чужих. Одинаковый вид
+   * приводит к тому, что чужие данные принимают за свои и пытаются править.
+   * Поэтому вся страница уходит в бледно-зелёный фон, а шапка с кличкой
+   * и номером — на тёмную плашку: отличие видно раньше, чем прочитан
+   * владелец.
+   */
+  const isForeign = Boolean(user) && !isMine
+
   const readiness = tab === 'documents' ? await certificateReadiness(payload, animal) : null
 
   const crumbs = isMine
@@ -184,40 +195,70 @@ export default async function AnimalPage({
     <>
       <SiteHeader active="/" />
 
-      <main className="container-page pt-8 pb-6">
+      <main className={`container-page pt-10 pb-8 ${isForeign ? 'foreign-animal' : ''}`}>
         {isMine && <AccountNav active="animals" />}
+
+        {isForeign && (
+          <p className="mb-5 flex flex-wrap items-center gap-2 rounded-xl bg-white px-5 py-3.5 text-[15px] text-ink-900 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)]">
+            <span className="rounded-md bg-forest-500 px-2 py-0.5 text-[13px] font-medium text-white">
+              Чужое хозяйство
+            </span>
+            Это животное принадлежит {owner} — данные доступны только для просмотра.
+          </p>
+        )}
 
         <div>
           <div className="min-w-0">
         <Breadcrumbs items={crumbs} />
 
         {/* ------------------------------ Шапка ------------------------------ */}
-        <section className="flex flex-wrap items-start justify-between gap-x-10 gap-y-6">
+        <section
+          className={`flex flex-wrap items-start justify-between gap-x-10 gap-y-6 ${
+            isForeign ? 'rounded-card bg-forest-500 p-7 text-white sm:p-8' : ''
+          }`}
+        >
           <div className="min-w-0">
             <div className="min-w-0">
-              <p className="text-[12px] uppercase tracking-[0.09em] text-ink-500">Кличка</p>
+              <p
+                className={`text-[12px] uppercase tracking-[0.09em] ${
+                  isForeign ? 'text-white/70' : 'text-ink-500'
+                }`}
+              >
+                Кличка
+              </p>
 
               <h1 className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2 text-[30px] font-medium leading-[1.08] sm:text-[36px]">
                 <span className="break-words">{animal.name ?? '—'}</span>
-                <span className="rounded-md bg-[#eeeeee] px-2.5 py-1 text-[13px] font-normal leading-none text-ink-700">
+                <span
+                  className={`rounded-md px-2.5 py-1 text-[13px] font-normal leading-none ${
+                    isForeign ? 'bg-white/20 text-white' : 'bg-[#eeeeee] text-ink-700'
+                  }`}
+                >
                   {kindLabel}
                 </span>
               </h1>
 
               <p className="mt-3 text-[17px] leading-none">
-                <span className="text-ink-500">Инд. №</span>{' '}
+                <span className={isForeign ? 'text-white/70' : 'text-ink-500'}>Инд. №</span>{' '}
                 <span className="font-medium tabular-nums">{animal.identNumber}</span>
               </p>
 
-              <p className="mt-2 text-[15px] leading-snug text-ink-700">
-                <span className="text-ink-500">Владелец:</span> {owner}
+              <p
+                className={`mt-2 text-[15px] leading-snug ${
+                  isForeign ? 'text-white/90' : 'text-ink-700'
+                }`}
+              >
+                <span className={isForeign ? 'text-white/70' : 'text-ink-500'}>Владелец:</span>{' '}
+                {owner}
               </p>
             </div>
           </div>
 
           <div className="flex flex-col items-start gap-2.5 lg:items-end">
-            <p className="text-[13px] text-ink-500">Обновлено {dateRu(animal.updatedAt)}</p>
-            <TrustBadge level={animal.trustLevel} />
+            <p className={`text-[13px] ${isForeign ? 'text-white/70' : 'text-ink-500'}`}>
+              Обновлено {dateRu(animal.updatedAt)}
+            </p>
+            <TrustBadge level={animal.trustLevel} onDark={isForeign} />
           </div>
         </section>
 

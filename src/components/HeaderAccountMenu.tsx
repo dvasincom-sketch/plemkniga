@@ -1,18 +1,22 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ACCOUNT_TABS } from './AccountNav'
 
 /**
  * Меню кабинета в шапке — раскрывается при наведении на имя пользователя.
  *
- * Разделы оформлены теми же зелёными плашками, что и основное меню кабинета:
- * это один и тот же список, и выглядеть он должен одинаково, где бы
- * ни показывался. Иначе пользователь считает их разными меню.
+ * Список рисуется порталом в <body> с координатами от блока имени: внутри
+ * потока он оказывался под содержимым страницы, и подбирать z-index здесь
+ * бесполезно — на соседнем экране всё повторилось бы.
  *
- * Само имя остаётся ссылкой на профиль: наведение раскрывает список,
- * клик ведёт на страницу профиля.
+ * Пока меню раскрыто, сам блок имени тоже становится зелёным и смыкается
+ * с выпадающим списком в одну плашку: так видно, что это одно целое,
+ * а не две случайно наложившиеся поверхности. Подписи разделов в шапке
+ * не показываются — здесь важна краткость, развёрнутый вид остаётся
+ * в основном меню кабинета.
  */
 export function HeaderAccountMenu({
   displayName,
@@ -24,18 +28,30 @@ export function HeaderAccountMenu({
   active?: string
 }) {
   const [open, setOpen] = useState(false)
+  const [rect, setRect] = useState<{ top: number; right: number } | null>(null)
+  const anchorRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const place = useCallback(() => {
+    const el = anchorRef.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    setRect({ top: r.bottom, right: window.innerWidth - r.right })
+  }, [])
 
   // Небольшая задержка на закрытие: иначе меню исчезает, пока курсор
   // переходит с имени на список
-  const show = () => {
+  const show = useCallback(() => {
     if (closeTimer.current) clearTimeout(closeTimer.current)
+    place()
     setOpen(true)
-  }
-  const hide = () => {
+  }, [place])
+
+  const hide = useCallback(() => {
     if (closeTimer.current) clearTimeout(closeTimer.current)
     closeTimer.current = setTimeout(() => setOpen(false), 160)
-  }
+  }, [])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
@@ -46,18 +62,39 @@ export function HeaderAccountMenu({
     }
   }, [])
 
+  useEffect(() => {
+    if (!open) return
+    const onMove = () => place()
+    window.addEventListener('scroll', onMove, true)
+    window.addEventListener('resize', onMove)
+    return () => {
+      window.removeEventListener('scroll', onMove, true)
+      window.removeEventListener('resize', onMove)
+    }
+  }, [open, place])
+
+  const isProfile = active === '/account/profile'
+
   return (
-    <div className="relative" onMouseEnter={show} onMouseLeave={hide}>
+    <div ref={anchorRef} onMouseEnter={show} onMouseLeave={hide}>
       <Link
         href="/account/profile"
         aria-expanded={open}
         aria-haspopup="true"
         onFocus={show}
-        className={`flex items-center gap-2.5 transition-colors hover:text-forest-500 ${
-          active === '/account/profile' ? 'text-forest-500' : 'text-ink-900'
+        className={`flex items-center gap-2.5 rounded-t-2xl px-3 py-2 transition-colors ${
+          open
+            ? 'bg-forest-500 text-white'
+            : isProfile
+              ? 'text-forest-500'
+              : 'text-ink-900 hover:text-forest-500'
         }`}
       >
-        <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-ink-900 text-white">
+        <span
+          className={`flex h-9 w-9 flex-none items-center justify-center rounded-full ${
+            open ? 'bg-white text-forest-500' : 'bg-ink-900 text-white'
+          }`}
+        >
           <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true">
             <circle cx="10" cy="6.5" r="3.5" fill="currentColor" />
             <path d="M3.5 17c0-3.6 2.9-5.5 6.5-5.5s6.5 1.9 6.5 5.5" fill="currentColor" />
@@ -65,42 +102,49 @@ export function HeaderAccountMenu({
         </span>
         <span className="hidden leading-tight sm:block">
           <span className="block text-[15px]">{displayName}</span>
-          {orgName && <span className="block text-[12px] text-ink-500">{orgName}</span>}
+          {orgName && (
+            <span className={`block text-[12px] ${open ? 'text-white/75' : 'text-ink-500'}`}>
+              {orgName}
+            </span>
+          )}
         </span>
       </Link>
 
-      {open && (
-        <div
-          className="absolute right-0 top-[calc(100%+10px)] z-[80] w-[290px] rounded-2xl bg-white p-3 shadow-[0_16px_40px_rgb(23_24_26_/_0.16)]"
-          onMouseEnter={show}
-          onMouseLeave={hide}
-        >
-          <ul className="space-y-2">
-            {ACCOUNT_TABS.map((t) => (
-              <li key={t.key}>
-                <Link
-                  href={`/account?tab=${t.key}`}
-                  onClick={() => setOpen(false)}
-                  className="block rounded-xl bg-forest-500 px-4 py-2.5 text-white transition-colors hover:bg-brand-500"
-                >
-                  <span className="block text-[15px] font-medium">{t.label}</span>
-                  <span className="mt-0.5 block text-[12px] leading-snug text-white/75">
-                    {t.hint}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-
-          <Link
-            href="/account/profile"
-            onClick={() => setOpen(false)}
-            className="mt-3 block rounded-xl px-4 py-2.5 text-[14px] text-ink-700 transition-colors hover:bg-[#f4f4f4] hover:text-ink-900"
+      {open &&
+        rect &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            ref={listRef}
+            onMouseEnter={show}
+            onMouseLeave={hide}
+            style={{ top: rect.top, right: rect.right }}
+            className="fixed z-[100] w-[230px] overflow-hidden rounded-b-2xl rounded-tl-2xl bg-forest-500 py-1.5 shadow-[0_16px_40px_rgb(23_24_26_/_0.22)]"
           >
-            Профиль пользователя
-          </Link>
-        </div>
-      )}
+            <ul>
+              {ACCOUNT_TABS.map((t) => (
+                <li key={t.key}>
+                  <Link
+                    href={`/account?tab=${t.key}`}
+                    onClick={() => setOpen(false)}
+                    className="block px-4 py-2.5 text-[15px] text-white transition-colors hover:bg-brand-500"
+                  >
+                    {t.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+
+            <Link
+              href="/account/profile"
+              onClick={() => setOpen(false)}
+              className="mt-1.5 block border-t border-white/20 px-4 py-2.5 text-[14px] text-white/85 transition-colors hover:bg-brand-500 hover:text-white"
+            >
+              Профиль пользователя
+            </Link>
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }

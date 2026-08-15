@@ -62,6 +62,7 @@ export function buildAnimalWhere(sp: SearchParams, extra?: Where): Where {
 
   if (one(sp.forSale) === '1') and.push({ forSale: { equals: true } })
 
+
   const relation = one(sp.relation)
   if (relation === 'father') and.push({ father: { exists: true } })
   if (relation === 'mother') and.push({ mother: { exists: true } })
@@ -190,6 +191,8 @@ export const queryWithSort = (sp: SearchParams, sort: SortValue): string => {
 export const PRESETS = [
   { key: 'bulls', label: 'Быки-производители', params: { sex: 'male', ageGroup: 'bull' } },
   { key: 'milk', label: 'Коровы с высоким удоем', params: { sex: 'female', sort: 'milk' } },
+  { key: 'pedigree', label: 'С полной родословной', params: { relation: 'bothParents' } },
+  { key: 'verified', label: 'Проверено Ассоциацией', params: { trust: '3' } },
   {
     key: 'sale',
     label: 'Выставлены на продажу',
@@ -203,8 +206,6 @@ export const PRESETS = [
     probe: { forSale: { equals: true } } as Where,
     emptyHint: 'Ни одно животное пока не выставлено на продажу',
   },
-  { key: 'pedigree', label: 'С полной родословной', params: { relation: 'bothParents' } },
-  { key: 'verified', label: 'Проверено Ассоциацией', params: { trust: '3' } },
 ] as const
 
 export type PresetKey = (typeof PRESETS)[number]['key']

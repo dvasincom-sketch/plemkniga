@@ -8,7 +8,7 @@ export default function PrivacyPage() {
   return (
     <>
       <SiteHeader />
-      <main className="container-page pt-8 pb-6">
+      <main className="container-page pt-10 pb-8">
         <h1 className="text-[38px] font-medium sm:text-[46px]">Политика конфиденциальности</h1>
         <div className="card mt-8 max-w-[80ch] space-y-4 text-[15px] leading-relaxed text-ink-700">
           <p>

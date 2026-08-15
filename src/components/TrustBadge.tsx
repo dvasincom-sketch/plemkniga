@@ -12,9 +12,12 @@ import { TRUST_LEVELS, trustLabel } from '@/lib/dictionaries'
 export function TrustBadge({
   level,
   className = '',
+  onDark = false,
 }: {
   level?: number | null
   className?: string
+  /** Значок стоит на тёмной плашке — подпись должна остаться читаемой. */
+  onDark?: boolean
 }) {
   const value = level ?? 0
 
@@ -27,7 +30,7 @@ export function TrustBadge({
 
   return (
     <span className={`inline-flex items-center gap-2 text-[15px] leading-none ${className}`}>
-      <span className="text-ink-500">Достоверность</span>
+      <span className={onDark ? 'text-white/75' : 'text-ink-500'}>Достоверность</span>
 
       <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-medium ${tone}`}>
         <span className="tabular-nums">{value}</span>
