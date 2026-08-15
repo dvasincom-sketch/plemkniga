@@ -224,3 +224,63 @@ export const presetHref = (preset: (typeof PRESETS)[number]): string => {
   const params = new URLSearchParams(preset.params as Record<string, string>)
   return `/?${params.toString()}#results`
 }
+
+/* ------------------------------------------------------------------ *
+ *                      Постраничный показ и «Показать ещё»            *
+ * ------------------------------------------------------------------ */
+
+/** Сколько записей показывать за раз в публичной книге. */
+export const SHOW_STEP = 12
+
+/**
+ * Сколько записей уже раскрыто на главной.
+ *
+ * Состояние живёт в адресе, а не в памяти компонента: ссылку на раскрытый
+ * список можно переслать, работает кнопка «назад», и страница остаётся
+ * серверной — без выгрузки данных в браузер.
+ */
+export const shownCount = (sp: SearchParams): number => {
+  const raw = Number(one(sp.shown) || SHOW_STEP)
+  if (!Number.isFinite(raw) || raw < SHOW_STEP) return SHOW_STEP
+  return Math.min(Math.floor(raw / SHOW_STEP) * SHOW_STEP, 600)
+}
+
+/**
+ * Ссылка «Показать ещё»: тот же отбор, больше записей.
+ *
+ * Без якоря в адресе: переход с якорем на тот же маршрут браузер иногда
+ * считает прокруткой, а не навигацией, и вторая подряд «Показать ещё»
+ * не срабатывает. Позиция сохраняется через `scroll={false}` у ссылки.
+ */
+export const showMoreHref = (sp: SearchParams, next: number): string => {
+  const params = new URLSearchParams()
+  for (const [k, v] of Object.entries(sp)) {
+    if (k === 'shown' || k === 'page') continue
+    const value = one(v)
+    if (value) params.set(k, value)
+  }
+  params.set('shown', String(next))
+  return `/?${params.toString()}`
+}
+
+/**
+ * Предел для неавторизованных.
+ *
+ * Первые страницы книги открыты всем — это витрина Ассоциации. Дальше
+ * предлагаем завести учётную запись: бесплатно и снимает ограничение.
+ */
+export const ANON_SHOW_LIMIT = SHOW_STEP * 3
+
+/* ------------------------------------------------------------------ *
+ *                        Размер страницы в кабинете                   *
+ * ------------------------------------------------------------------ */
+
+export const PAGE_SIZES = [25, 100, 500, 0] as const
+
+export const pageSizeLabel = (n: number) => (n === 0 ? 'Все' : String(n))
+
+/** Выбранный размер страницы; 0 означает «без разбивки». */
+export const resolvePageSize = (sp: SearchParams): number => {
+  const raw = Number(one(sp.perPage) || PAGE_SIZES[0])
+  return (PAGE_SIZES as readonly number[]).includes(raw) ? raw : PAGE_SIZES[0]
+}

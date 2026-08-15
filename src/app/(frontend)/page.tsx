@@ -7,14 +7,16 @@ import { ResultsBar } from '@/components/ResultsBar'
 import { EmptyResults } from '@/components/EmptyResults'
 import { AnimalTable } from '@/components/AnimalTable'
 import { AnimalCards } from '@/components/AnimalCards'
-import { Pagination } from '@/components/Pagination'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import {
+  ANON_SHOW_LIMIT,
   FILTER_KEYS,
   PRESETS,
+  SHOW_STEP,
+  shownCount,
+  showMoreHref,
   activePreset,
   buildAnimalWhere,
-  currentPage,
   hasActiveFilters,
   one,
   presetHref,
@@ -26,15 +28,13 @@ import type { Animal } from '@/payload-types'
 
 export const dynamic = 'force-dynamic'
 
-const PER_PAGE = 12
-
 export default async function HerdbookPage({
   searchParams,
 }: {
   searchParams: Promise<SearchParams>
 }) {
   const sp = await searchParams
-  const page = currentPage(sp)
+  const shown = shownCount(sp)
   const user = await getCurrentUser()
   const payload = await getClient()
 
@@ -47,8 +47,8 @@ export default async function HerdbookPage({
       collection: 'animals',
       where,
       depth: 1,
-      page,
-      limit: PER_PAGE,
+      page: 1,
+      limit: shown,
       sort: sort.payload,
       overrideAccess: false,
       user,
@@ -101,6 +101,9 @@ export default async function HerdbookPage({
 
   const animals = result.docs as Animal[]
   const found = result.totalDocs ?? 0
+  const hasMore = found > animals.length
+  // Гостю книга открыта на три экрана, дальше предлагаем бесплатную регистрацию
+  const canShowMore = Boolean(user) || shown < ANON_SHOW_LIMIT
   const preset = activePreset(sp)
 
   return (
@@ -230,24 +233,83 @@ export default async function HerdbookPage({
               <EmptyResults sp={sp} hasActive={hasActive} labels={filterLabels} />
             ) : (
               <>
-                <div className="hidden lg:block">
-                  <AnimalTable
-                    animals={animals}
-                    startIndex={(page - 1) * PER_PAGE}
-                    canOpenAll={Boolean(user)}
-                  />
+                {/*
+                   Под таблицей — градиент, если записи ещё есть.
+                   Он делает продолжение списка видимым до того, как человек
+                   прочитает подпись: строки уходят под мягкую заливку,
+                   а не обрываются на границе таблицы.
+                */}
+                <div className={`relative ${hasMore ? 'pb-2' : ''}`}>
+                  <div className="hidden lg:block">
+                    <AnimalTable animals={animals} canOpenAll={Boolean(user)} />
+                  </div>
+
+                  <div className="lg:hidden">
+                    <AnimalCards animals={animals} canOpenAll={Boolean(user)} />
+                  </div>
+
+                  {hasMore && (
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-b from-transparent to-canvas"
+                    />
+                  )}
                 </div>
 
-                <div className="lg:hidden">
-                  <AnimalCards animals={animals} canOpenAll={Boolean(user)} />
-                </div>
+                <div id="more" className="mt-6 scroll-mt-6 text-center">
+                  {hasMore && canShowMore && (
+                    <>
+                      <Link
+                        href={showMoreHref(sp, shown + SHOW_STEP)}
+                        scroll={false}
+                        className="btn btn-brand"
+                      >
+                        Показать ещё {Math.min(SHOW_STEP, found - shown)}
+                        <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                          <path
+                            d="M10 4v12m0 0 5-5m-5 5-5-5"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </Link>
+                      <p className="mt-3 text-[13px] text-ink-500">
+                        Показано {animals.length} из {found.toLocaleString('ru-RU')}
+                      </p>
+                    </>
+                  )}
 
-                <Pagination
-                  page={result.page ?? 1}
-                  totalPages={result.totalPages ?? 1}
-                  searchParams={sp}
-                  basePath="/"
-                />
+                  {hasMore && !canShowMore && (
+                    <div className="mx-auto max-w-[560px] rounded-card bg-white p-7 shadow-[0_2px_10px_rgb(23_24_26_/_0.06)]">
+                      <p className="text-[19px] font-medium leading-snug">
+                        Дальше — ещё {(found - shown).toLocaleString('ru-RU')} записей
+                      </p>
+                      <p className="mx-auto mt-3 max-w-[46ch] text-[15px] leading-relaxed text-ink-700">
+                        Регистрация в системе бесплатная. Она снимает ограничение на просмотр книги,
+                        открывает полные карточки животных и развёрнутый фильтр по продуктивности.
+                      </p>
+                      <div className="mt-6 flex flex-wrap justify-center gap-3">
+                        <Link href="/register" className="btn btn-brand">
+                          Зарегистрироваться бесплатно
+                        </Link>
+                        <Link
+                          href="/login"
+                          className="btn bg-white text-ink-900 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] hover:bg-[#f6f6f6]"
+                        >
+                          У меня уже есть учётная запись
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+
+                  {!hasMore && found > SHOW_STEP && (
+                    <p className="text-[13px] text-ink-500">
+                      Показаны все {found.toLocaleString('ru-RU')} записей
+                    </p>
+                  )}
+                </div>
               </>
             )}
 

@@ -10,7 +10,16 @@ import { Pagination } from '@/components/Pagination'
 import { ProfileForm } from '@/components/ProfileForm'
 import { VisibilityForm } from '@/components/VisibilityForm'
 import { getClient, getCurrentUser } from '@/lib/payload'
-import { buildAnimalWhere, currentPage, hasAdvancedValues, one, type SearchParams } from '@/lib/animal-query'
+import {
+  PAGE_SIZES,
+  buildAnimalWhere,
+  currentPage,
+  hasAdvancedValues,
+  one,
+  pageSizeLabel,
+  resolvePageSize,
+  type SearchParams,
+} from '@/lib/animal-query'
 import { DOCUMENT_TYPES, EVENT_TYPES, ROLES, labelOf } from '@/lib/dictionaries'
 import { SubmissionHistory } from '@/components/SubmissionHistory'
 import { dateRu } from '@/lib/format'
@@ -19,8 +28,6 @@ import type { Animal, Organization } from '@/payload-types'
 
 export const metadata: Metadata = { title: 'Личный кабинет' }
 export const dynamic = 'force-dynamic'
-
-const PER_PAGE = 12
 
 export default async function AccountPage({
   searchParams,
@@ -136,6 +143,7 @@ async function AnimalsTab({
 }) {
   const payload = await getClient()
   const page = currentPage(sp)
+  const perPage = resolvePageSize(sp)
   const scope: Where = orgId ? { owner: { equals: orgId } } : { author: { equals: userId } }
 
   const [result, herdsResult, total] = await Promise.all([
@@ -144,7 +152,8 @@ async function AnimalsTab({
       where: buildAnimalWhere(sp, scope),
       depth: 1,
       page,
-      limit: PER_PAGE,
+      // 0 означает «без разбивки»: Payload отдаёт всё найденное одним ответом
+      limit: perPage,
       sort: '-ipcRank',
       overrideAccess: true,
     }),
@@ -191,6 +200,38 @@ async function AnimalsTab({
           <h2 className="section-title mb-0">Животные</h2>
 
           <div className="flex flex-wrap items-center gap-2 text-[14px]">
+            {/* Размер страницы: у крупных хозяйств тысячи голов, и листать
+                по 25 штук им незачем */}
+            <span className="text-ink-500">Показывать по:</span>
+            {PAGE_SIZES.map((size) => {
+              const isActive = perPage === size
+              const params = new URLSearchParams()
+              for (const [k, v] of Object.entries(sp)) {
+                if (k === 'perPage' || k === 'page') continue
+                const value = one(v)
+                if (value) params.set(k, value)
+              }
+              params.set('tab', 'animals')
+              if (size !== PAGE_SIZES[0]) params.set('perPage', String(size))
+
+              return (
+                <Link
+                  key={size}
+                  href={`/account?${params.toString()}`}
+                  aria-current={isActive ? 'true' : undefined}
+                  className={`rounded-lg px-2.5 py-2 transition-colors ${
+                    isActive
+                      ? 'bg-brand-50 font-medium text-forest-600'
+                      : 'text-ink-700 hover:bg-[#ededed]'
+                  }`}
+                >
+                  {pageSizeLabel(size)}
+                </Link>
+              )
+            })}
+            <span aria-hidden="true" className="mx-1 text-ink-300">
+              ·
+            </span>
             <span className="text-ink-500">Всего в стаде: {total.totalDocs}</span>
             <span aria-hidden="true" className="mx-1 text-ink-300">
               ·
@@ -215,7 +256,7 @@ async function AnimalsTab({
 
         <AnimalTable
           animals={result.docs as Animal[]}
-          startIndex={(page - 1) * PER_PAGE}
+          startIndex={(page - 1) * (perPage || 0)}
           canOpenAll
           emptyText="В вашем стаде пока нет записей. Загрузите данные через «Импорт данных»."
         />
