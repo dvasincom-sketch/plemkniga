@@ -21,8 +21,8 @@ const ageShort = (v?: string | null) => AGE_GROUPS.find((o) => o.value === v)?.s
 
 const LockBadge = () => (
   <span
-    title="Полная карточка доступна после авторизации"
-    className="ml-1.5 inline-flex align-middle text-ink-900"
+    title="Карточка этого животного закрыта владельцем — откроется после авторизации"
+    className="inline-flex align-middle text-ink-500"
   >
     <svg width="11" height="13" viewBox="0 0 12 14" fill="none" aria-hidden="true">
       <rect x="1" y="6" width="10" height="7" rx="1.6" fill="currentColor" />
@@ -40,6 +40,10 @@ const LockBadge = () => (
 /** `hide` — класс, скрывающий колонку на тесных ширинах. */
 const COLUMNS: { key: string; label: string; hide?: string }[] = [
   { key: 'num', label: '№' },
+  // Замок относится к конкретному животному, а не к его владельцу: у одного
+  // хозяйства часть записей может быть открыта, часть закрыта. Поэтому
+  // он стоит рядом с номером, а не в колонке «Владелец»
+  { key: 'lock', label: '' },
   { key: 'ident', label: 'Инд.№' },
   { key: 'name', label: 'Кличка' },
   { key: 'state', label: 'Состояние', hide: 'hidden 2xl:table-cell' },
@@ -100,6 +104,7 @@ export function AnimalTable({
             return (
               <tr key={a.id}>
                 <td className="tabular-nums">{startIndex + i + 1}</td>
+                <td className="w-6 pl-0 pr-0">{locked && <LockBadge />}</td>
                 <td className="tabular-nums">
                   {locked ? (
                     <span>{a.identNumber}</span>
@@ -139,7 +144,6 @@ export function AnimalTable({
                 </td>
                 <td className="cell-truncate" title={owner}>
                   {owner}
-                  {locked && <LockBadge />}
                 </td>
               </tr>
             )

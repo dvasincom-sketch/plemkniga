@@ -250,7 +250,21 @@ export default async function AnimalPage({
                 }`}
               >
                 <span className={isForeign ? 'text-white/70' : 'text-ink-500'}>Владелец:</span>{' '}
-                {owner}
+                {/* Ссылка ведёт в книгу с отбором по этому хозяйству —
+                    «а что ещё у них есть» самый частый следующий вопрос */}
+                {owner === '—' ? (
+                  owner
+                ) : (
+                  <Link
+                    href={`/?owner=${encodeURIComponent(owner)}#results`}
+                    className={`underline underline-offset-4 ${
+                      isForeign ? 'hover:text-white' : 'hover:text-forest-500'
+                    }`}
+                    title={`Показать животных хозяйства «${owner}»`}
+                  >
+                    {owner}
+                  </Link>
+                )}
               </p>
             </div>
           </div>

@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import type { Animal } from '@/payload-types'
 import { AGE_GROUPS, DISPOSAL_HINT, labelOf } from '@/lib/dictionaries'
 import { dateRu } from '@/lib/format'
@@ -56,7 +57,18 @@ export function AnimalPassport({ animal }: { animal: Animal }) {
 
         <div className="grid grid-cols-[1.2fr_1fr_1fr_1fr] gap-x-4 border-t border-ink-100 px-4 py-3 text-[15px]">
           <span className="text-ink-500">Владелец</span>
-          <span className="break-words">{relName(owner)}</span>
+          <span className="break-words">
+            {relName(owner) === '—' ? (
+              '—'
+            ) : (
+              <Link
+                href={`/?owner=${encodeURIComponent(relName(owner))}#results`}
+                className="underline underline-offset-4 hover:text-forest-500"
+              >
+                {relName(owner)}
+              </Link>
+            )}
+          </span>
           <span>{region}</span>
           <span>—</span>
         </div>
