@@ -3,9 +3,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
-import { AccountTabs, ACCOUNT_TABS, type AccountTabKey } from '@/components/AccountTabs'
-import { ImportCard } from '@/components/ImportCard'
-import { ExportCard } from '@/components/ExportCard'
+import { AccountNav, ACCOUNT_TABS, type AccountTabKey } from '@/components/AccountNav'
 import { SearchPanel } from '@/components/SearchPanel'
 import { AnimalTable } from '@/components/AnimalTable'
 import { Pagination } from '@/components/Pagination'
@@ -33,8 +31,14 @@ export default async function AccountPage({
   const user = await getCurrentUser()
   if (!user) redirect('/login')
 
-  const tabParam = one(sp.tab) as AccountTabKey
-  const tab: AccountTabKey = ACCOUNT_TABS.some((t) => t.key === tabParam) ? tabParam : 'animals'
+  const tabParam = one(sp.tab)
+  // «Личные данные» переехали в настройки отдельным блоком — старые ссылки не ломаем
+  const normalized = tabParam === 'profile' ? 'settings' : tabParam
+  const tab: AccountTabKey = ACCOUNT_TABS.some((t) => t.key === normalized)
+    ? (normalized as AccountTabKey)
+    : 'animals'
+
+  const tabTitle = ACCOUNT_TABS.find((t) => t.key === tab)?.label ?? 'Личный кабинет'
 
   const org =
     typeof user.organization === 'object' && user.organization
@@ -47,38 +51,39 @@ export default async function AccountPage({
       <SiteHeader active="/account" />
 
       <main className="container-page pb-4">
-        <h1 className="mb-8 text-[38px] font-medium sm:text-[46px]">Личный кабинет</h1>
+        {/*
+          Два уровня навигации разведены: в шапке — меню сайта простыми
+          ссылками, здесь — разделы кабинета вертикальным списком плашек.
+          Список остаётся на месте при переходе между разделами, поэтому
+          всегда видно, где вы находитесь.
+        */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-10">
+          <AccountNav active={tab} />
 
-        <AccountTabs active={tab} />
+          <div className="min-w-0">
+            <h1 className="text-[30px] font-medium leading-tight sm:text-[36px]">{tabTitle}</h1>
 
-        {!user.confirmed && (
-          <p className="mt-6 rounded-xl bg-brand-50 px-5 py-4 text-sm text-forest-600">
-            Регистрация завершена. Заявка отправлена на проверку в Ассоциацию — до подтверждения
-            данные видны только вам.
-          </p>
-        )}
+            {!user.confirmed && (
+              <p className="mt-5 rounded-xl bg-brand-50 px-5 py-4 text-sm text-forest-600">
+                Регистрация завершена. Заявка отправлена на проверку в Ассоциацию — до подтверждения
+                данные видны только вам.
+              </p>
+            )}
 
-        {tab === 'animals' && (
-          <AnimalsTab sp={sp} orgId={orgId} userId={user.id} />
-        )}
+            {tab === 'animals' && <AnimalsTab sp={sp} orgId={orgId} userId={user.id} />}
 
-        {tab === 'profile' && (
-          <section className="mt-10">
-            <h2 className="section-title mb-7">Личные данные</h2>
-            <ProfileForm
-              user={user}
-              org={org}
-              roleLabel={labelOf(ROLES, user.role)}
-            />
-          </section>
-        )}
+            {tab === 'events' && <EventsTab orgId={orgId} />}
+            {tab === 'documents' && <DocumentsTab orgId={orgId} />}
 
-        {tab === 'events' && <EventsTab orgId={orgId} />}
-        {tab === 'documents' && <DocumentsTab orgId={orgId} />}
+            {tab === 'settings' && (
+              <>
+                <section className="mt-8">
+                  <h2 className="section-title mb-6">Личные данные</h2>
+                  <ProfileForm user={user} org={org} roleLabel={labelOf(ROLES, user.role)} />
+                </section>
 
-        {tab === 'settings' && (
-          <section className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <h2 className="section-title lg:col-span-2">Настройки</h2>
+                <section className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <h2 className="section-title lg:col-span-2">Видимость и доступ</h2>
             <VisibilityFormWrapper orgId={orgId} />
             <div className="card">
               <h3 className="panel-heading">Интеграции и API</h3>
@@ -95,8 +100,11 @@ export default async function AccountPage({
                 </Link>
               </p>
             </div>
-          </section>
-        )}
+                </section>
+              </>
+            )}
+          </div>
+        </div>
       </main>
 
       <SiteFooter />
@@ -128,7 +136,7 @@ async function AnimalsTab({
       depth: 1,
       page,
       limit: PER_PAGE,
-      sort: 'identNumber',
+      sort: '-ipcRank',
       overrideAccess: true,
     }),
     payload.find({
@@ -147,15 +155,32 @@ async function AnimalsTab({
 
   return (
     <>
-      <section className="mt-12">
-        <h2 className="section-title">Действия</h2>
-        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <ImportCard />
-          <ExportCard />
-        </div>
+      {/*
+         Раньше здесь одновременно жили два несовместимых сценария: крупные
+         карточки импорта-экспорта и поиск по стаду. Действия ушли на свою
+         страницу и в строку кнопок, а раздел занят одним делом — работой
+         со списком животных.
+      */}
+      <section className="mt-6 flex flex-wrap items-center gap-3">
+        <Link href="/account/import" className="btn btn-brand">
+          Загрузить данные
+        </Link>
+        <span className="text-[14px] text-ink-500">Выгрузить стадо:</span>
+        <a
+          href="/account/export?format=csv"
+          className="rounded-lg bg-white px-3 py-2 text-[14px] shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] hover:bg-[#f6f6f6]"
+        >
+          CSV
+        </a>
+        <a
+          href="/account/export?format=json"
+          className="rounded-lg bg-white px-3 py-2 text-[14px] shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] hover:bg-[#f6f6f6]"
+        >
+          JSON
+        </a>
       </section>
 
-      <section className="mt-8">
+      <section className="mt-6">
         <SearchPanel
           action="/account"
           total={total.totalDocs}
@@ -166,8 +191,8 @@ async function AnimalsTab({
         />
       </section>
 
-      <section className="mt-14">
-        <h2 className="section-title mb-7">Животные</h2>
+      <section className="mt-8">
+        <h2 className="section-title mb-5">Животные</h2>
         <AnimalTable
           animals={result.docs as Animal[]}
           startIndex={(page - 1) * PER_PAGE}
@@ -213,8 +238,8 @@ async function EventsTab({ orgId }: { orgId?: number }) {
 
   return (
     <>
-      <section className="mt-10">
-        <h2 className="section-title mb-7">История</h2>
+      <section className="mt-8">
+        <h2 className="section-title mb-6">История загрузок</h2>
         <SubmissionHistory submissions={submissions.docs} />
       </section>
 
@@ -286,8 +311,7 @@ async function DocumentsTab({ orgId }: { orgId?: number }) {
   })
 
   return (
-    <section className="mt-10">
-      <h2 className="section-title mb-7">Документы</h2>
+    <section className="mt-8">
       <div className="card overflow-x-auto">
         <table className="metric-table min-w-[720px]">
           <thead>

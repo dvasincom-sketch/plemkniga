@@ -63,7 +63,8 @@ UNIFORM-Agri или AfiFarm, результаты контрольных дое�
 | Справочники НСИ с кодами «Селэкс» | ● Работает | `src/collections/dictionaries.ts` |
 | Ролевой доступ, публичность записей, импорт/экспорт CSV | ● Работает | `src/collections/Animals.ts` |
 | REST и GraphQL API поверх модели | ● Работает | [docs/api.md](docs/api.md) |
-| Генерация племенных сертификатов | ◐ Спроектировано | [docs/sertifikaty-audit.md](docs/sertifikaty-audit.md) |
+| Документы животного: два бланка онлайн с печатью в PDF | ● Работает | [docs/sertifikaty-audit.md](docs/sertifikaty-audit.md) |
+| Проверка «готовность к сертификации» | ● Работает | `src/lib/certification.ts` |
 | Настраиваемый пользовательский индекс | ◐ Спроектировано | [docs/pozicionirovanie.md](docs/pozicionirovanie.md) |
 | Модуль подбора пар, инбридинг-контроль | ◐ Спроектировано | [docs/pozicionirovanie.md](docs/pozicionirovanie.md) |
 | Совместимость с ICAR ADE | ◐ Спроектировано | [docs/standarty.md](docs/standarty.md) |
@@ -260,7 +261,10 @@ dna-test-types, haplotype-types, health-event-types, technicians
 | `/login`, `/register` | Вход и регистрация в 4 шага |
 | `/account` | Личный кабинет: `?tab=profile\|animals\|events\|documents\|settings` |
 | `/animals/[id]` | Карточка животного: `?tab=general\|evaluation\|events\|origin\|documents\|media` |
+| `/account/import` | Загрузка и выгрузка данных стада |
 | `/account/submissions/[id]` | Пакет загрузки: проверка, протокол ошибок, публикация |
+| `/animals/[id]/certificate/zootechnical` | Зоотехнический сертификат (ЕС 2016/1012), печать в PDF |
+| `/animals/[id]/certificate/pedigree` | Племенное свидетельство, три ряда предков |
 | `/analytics`, `/auctions` | Разделы под замком для анонимов |
 | `/admin` | Административная панель Payload |
 | `/api`, `/api/graphql` | REST и GraphQL |

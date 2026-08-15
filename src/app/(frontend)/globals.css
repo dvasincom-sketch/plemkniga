@@ -430,3 +430,32 @@
     margin-bottom: 1rem;
   }
 }
+
+/* ---------------- Печать документов животного ---------------- */
+@media print {
+  /* Служебные элементы: панели, навигация, кнопки — на бумаге не нужны */
+  .no-print,
+  header.bg-canvas,
+  footer {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  .doc-page {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Разделы бланка не должны разрываться между страницами */
+  .break-inside-avoid {
+    break-inside: avoid;
+  }
+
+  @page {
+    margin: 14mm;
+  }
+}

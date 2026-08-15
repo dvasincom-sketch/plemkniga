@@ -3,7 +3,8 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
-import { AccountTabs } from '@/components/AccountTabs'
+import { AccountNav } from '@/components/AccountNav'
+import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { SubmissionPublishForm } from '@/components/SubmissionPublishForm'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { SUBMISSION_KINDS, SUBMISSION_STATUSES } from '@/collections/DataSubmissions'
@@ -94,13 +95,21 @@ export default async function SubmissionPage({
       <SiteHeader active="/account" />
 
       <main className="container-page pb-4">
-        <h1 className="mb-8 text-[38px] font-medium sm:text-[46px]">Личный кабинет</h1>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-10">
+          <AccountNav active="events" />
 
-        <AccountTabs active="events" />
+          <div className="min-w-0">
+        <Breadcrumbs
+          items={[
+            { label: 'Личный кабинет', href: '/account' },
+            { label: 'События', href: '/account?tab=events' },
+            { label: 'Пакет данных' },
+          ]}
+        />
 
         <Link
           href="/account?tab=events"
-          className="mt-8 inline-flex items-center gap-2 text-[15px] hover:text-forest-500"
+          className="inline-flex items-center gap-2 text-[15px] hover:text-forest-500"
         >
           <svg width="18" height="14" viewBox="0 0 20 14" fill="none" aria-hidden="true">
             <path
@@ -213,6 +222,8 @@ export default async function SubmissionPage({
             )}
           </div>
         </section>
+          </div>
+        </div>
       </main>
 
       <SiteFooter />

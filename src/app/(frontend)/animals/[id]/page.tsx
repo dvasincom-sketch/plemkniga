@@ -9,6 +9,11 @@ import { AnimalOriginTab } from '@/components/AnimalOriginTab'
 import { TrustBadge } from '@/components/TrustBadge'
 import { AnimalAvatar } from '@/components/AnimalAvatar'
 import { InfoTip } from '@/components/InfoTip'
+import { AccountNav } from '@/components/AccountNav'
+import { Breadcrumbs } from '@/components/Breadcrumbs'
+import { LactationDynamics } from '@/components/LactationDynamics'
+import { CertificateSection } from '@/components/CertificateSection'
+import { certificateReadiness } from '@/lib/certification'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import {
   AGE_GROUPS,
@@ -154,11 +159,43 @@ export default async function AnimalPage({
   const kindLabel = labelOf(ANIMAL_KINDS, animal.kind)
   const exteriorRaw = (animal.exterior ?? {}) as Record<string, number | null | undefined>
 
+  // Животное «своё», если принадлежит организации пользователя. От этого
+  // зависит, показывать ли навигацию кабинета и куда ведёт цепочка возврата.
+  const userOrgId =
+    typeof user?.organization === 'object' && user.organization
+      ? user.organization.id
+      : (user?.organization ?? null)
+  const ownerId = typeof animal.owner === 'object' && animal.owner ? animal.owner.id : animal.owner
+  const isMine = Boolean(user && userOrgId && ownerId && userOrgId === ownerId)
+
+  const readiness = tab === 'documents' ? await certificateReadiness(payload, animal) : null
+
+  const crumbs = isMine
+    ? [
+        { label: 'Личный кабинет', href: '/account' },
+        { label: 'Мои животные', href: '/account?tab=animals' },
+        { label: animal.name ?? String(animal.identNumber) },
+      ]
+    : [
+        { label: 'Племенная книга', href: '/' },
+        { label: animal.name ?? String(animal.identNumber) },
+      ]
+
   return (
     <>
       <SiteHeader active="/" />
 
       <main className="container-page pb-4">
+        <div
+          className={
+            isMine ? 'grid grid-cols-1 gap-6 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-10' : ''
+          }
+        >
+          {isMine && <AccountNav active="animals" />}
+
+          <div className="min-w-0">
+        <Breadcrumbs items={crumbs} />
+
         {/* ------------------------------ Шапка ------------------------------ */}
         <section className="flex flex-wrap items-start justify-between gap-x-10 gap-y-6">
           <div className="flex min-w-0 items-start gap-5">
@@ -192,7 +229,10 @@ export default async function AnimalPage({
         </section>
 
         {/* ------------------------------ Вкладки ---------------------------- */}
-        <nav className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+        <p className="mb-3 mt-8 text-[12px] uppercase tracking-[0.09em] text-ink-500">
+          Разделы карточки
+        </p>
+        <nav aria-label="Разделы карточки животного" className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
           {TABS.map((t) => (
             <Link
               key={t.key}
@@ -389,25 +429,11 @@ export default async function AnimalPage({
               </dl>
             </div>
 
-            <div className="card">
-              <h2 className="panel-heading">Продуктивность (последняя лактация)</h2>
-              <dl className="divide-y divide-[#ededed] text-sm">
-                {[
-                  ['Удой, л', nf(animal.summary?.milkYield)],
-                  ['Жир, %', nf(animal.summary?.fatPercent, 2)],
-                  ['Белок, %', nf(animal.summary?.proteinPercent, 2)],
-                  ['Жир, кг', nf(animal.summary?.fatKg)],
-                  ['Белок, кг', nf(animal.summary?.proteinKg)],
-                  ['СБП, кг', nf(animal.summary?.fatProteinSum)],
-                  ['ИПЦ', signed(animal.ipc)],
-                ].map(([k, v]) => (
-                  <div key={String(k)} className="flex justify-between gap-6 py-2.5">
-                    <dt className="text-ink-500">{k}</dt>
-                    <dd className="text-right tabular-nums">{v as string}</dd>
-                  </div>
-                ))}
-              </dl>
-              {animal.notes && <p className="mt-5 text-sm text-ink-700">{animal.notes}</p>}
+            <div>
+              <LactationDynamics animal={animal} />
+              {animal.notes && (
+                <p className="mt-4 text-sm leading-relaxed text-ink-700">{animal.notes}</p>
+              )}
             </div>
 
             <div className="card lg:col-span-2">
@@ -478,7 +504,18 @@ export default async function AnimalPage({
         {tab === 'origin' && <AnimalOriginTab animal={animal} />}
 
         {/* ---------------------------- Документы ---------------------------- */}
-        {tab === 'documents' && <DocumentsTab animalId={animal.id} />}
+        {tab === 'documents' && (
+          <>
+            {readiness && (
+              <CertificateSection
+                animalId={animal.id}
+                zootechnical={readiness.zootechnical}
+                pedigree={readiness.pedigree}
+              />
+            )}
+            <DocumentsTab animalId={animal.id} />
+          </>
+        )}
 
         {/* ---------------------------- Фото/Видео --------------------------- */}
         {tab === 'media' && (
@@ -504,6 +541,8 @@ export default async function AnimalPage({
             </div>
           </section>
         )}
+          </div>
+        </div>
       </main>
 
       <SiteFooter />
