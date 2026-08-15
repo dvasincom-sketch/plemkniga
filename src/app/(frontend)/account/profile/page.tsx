@@ -38,7 +38,11 @@ export default async function ProfilePage() {
         <AccountNav />
 
         <Breadcrumbs
-          items={[{ label: 'Личный кабинет', href: '/account' }, { label: 'Профиль пользователя' }]}
+          items={[
+            { label: 'Личный кабинет', href: '/account' },
+            { label: 'Настройки', href: '/account?tab=settings' },
+            { label: 'Профиль пользователя' },
+          ]}
         />
 
         <h1 className="text-[30px] font-medium leading-tight sm:text-[36px]">

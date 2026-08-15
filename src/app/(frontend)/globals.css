@@ -472,3 +472,50 @@
   box-shadow: 0 0 0 100vmax var(--color-brand-50);
   clip-path: inset(0 -100vmax);
 }
+
+
+/* ---------------- Появление меню профиля в шапке ---------------- */
+/*
+ * Меню появляется сразу в конечной форме: анимируются только прозрачность
+ * и небольшой сдвиг. Скругление и цвет заданы статически — любая их
+ * анимация давала бы промежуточные кадры с прямыми углами.
+ */
+@keyframes account-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.account-menu {
+  animation: account-menu-in 0.14s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .account-menu {
+    animation: none;
+  }
+}
+
+/* ---------------- Кликабельная строка таблицы ---------------- */
+/*
+ * Ссылка растягивается на всю строку невидимым слоем: клик работает в любом
+ * месте, при этом остаётся настоящей ссылкой — открывается в новой вкладке
+ * и читается программами чтения с экрана. Подчёркивание не нужно: строка
+ * и так подсвечивается целиком при наведении.
+ */
+.data-table tbody tr {
+  position: relative;
+}
+.data-table tbody tr:hover {
+  cursor: pointer;
+}
+.row-link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}

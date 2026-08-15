@@ -85,12 +85,17 @@ export function HeaderAccountMenu({
         aria-expanded={open}
         aria-haspopup="true"
         onFocus={show}
-        className={`flex items-center gap-2.5 px-3 py-2 transition-colors ${
+        /*
+           Скругление задано всегда, а не только в раскрытом состоянии:
+           иначе при появлении фона углы успевали мигнуть прямыми — фон
+           анимируется, радиус нет.
+        */
+        className={`flex items-center gap-2.5 rounded-t-2xl px-3 py-2 transition-colors duration-150 ${
           open
-            ? 'rounded-t-2xl bg-forest-500 text-white'
+            ? 'bg-forest-500 text-white'
             : isProfile
-              ? 'text-forest-500'
-              : 'text-ink-900 hover:text-forest-500'
+              ? 'text-forest-500 hover:bg-brand-50'
+              : 'text-ink-900 hover:bg-brand-50 hover:text-forest-500'
         }`}
       >
         <span
@@ -122,7 +127,7 @@ export function HeaderAccountMenu({
             onMouseEnter={show}
             onMouseLeave={hide}
             style={{ top: rect.top, right: rect.right, width: rect.width }}
-            className="fixed z-[100] overflow-hidden rounded-b-2xl bg-forest-500 pb-1.5 shadow-[0_16px_40px_rgb(23_24_26_/_0.22)]"
+            className="account-menu fixed z-[100] overflow-hidden rounded-b-2xl bg-forest-500 pb-1.5 shadow-[0_16px_40px_rgb(23_24_26_/_0.22)]"
           >
             <ul className="border-t border-white/15">
               {ACCOUNT_TABS.map((t) => (

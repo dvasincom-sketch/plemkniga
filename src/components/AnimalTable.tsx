@@ -11,6 +11,10 @@ import { nf, signed } from '@/lib/format'
  * есть приоритет: основные видны всегда, вспомогательные показываются, когда
  * для них есть место. Ничего не теряется — полный набор всегда в карточке
  * животного, а на широком экране видна и вся таблица.
+ *
+ * Строка кликабельна целиком: ссылка в первой ячейке растягивается на всю
+ * строку невидимым слоем. Раньше кликались только номер и кличка, хотя
+ * подсвечивалась вся строка — подсветка обещала больше, чем работало.
  */
 
 const ageShort = (v?: string | null) => AGE_GROUPS.find((o) => o.value === v)?.short ?? '—'
@@ -100,19 +104,17 @@ export function AnimalTable({
                   {locked ? (
                     <span>{a.identNumber}</span>
                   ) : (
-                    <Link href={`/animals/${a.id}`} className="hover:underline">
+                    <Link
+                      href={`/animals/${a.id}`}
+                      className="row-link"
+                      title={`Открыть карточку: ${a.name ?? a.identNumber}`}
+                    >
                       {a.identNumber}
                     </Link>
                   )}
                 </td>
-                <td className="cell-truncate" title={a.name ?? undefined}>
-                  {locked ? (
-                    (a.name ?? '—')
-                  ) : (
-                    <Link href={`/animals/${a.id}`} className="font-medium hover:underline">
-                      {a.name ?? '—'}
-                    </Link>
-                  )}
+                <td className="cell-truncate font-medium" title={a.name ?? undefined}>
+                  {a.name ?? '—'}
                 </td>
                 {/* Полное название состояния: сокращения «Ж» у пола и у состояния означали разное */}
                 <td className={cls('state')}>
