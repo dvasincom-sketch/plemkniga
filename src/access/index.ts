@@ -43,6 +43,37 @@ export const animalMutate: Access = ({ req: { user } }) => {
   return { owner: { equals: org } }
 }
 
+/**
+ * Запрос доступа виден обеим сторонам: тому, кто просил, и хозяйству,
+ * у которого просят. Ассоциация видит все — разбирать спорные случаи
+ * приходится ей.
+ */
+export const accessRequestRead: Access = ({ req: { user } }) => {
+  const u = user as U | null
+  if (!u) return false
+  if (u.role === 'admin') return true
+  const org = orgId(u)
+  const or: Where[] = [{ requester: { equals: u.id } }]
+  if (org) or.push({ owner: { equals: org } })
+  return { or }
+}
+
+/**
+ * Решение по запросу принимает только владелец животного.
+ *
+ * Заявителю править запись нечего: даже отметка «ответ прочитан» ставится
+ * служебно, в обход правил доступа, — иначе пришлось бы разрешить ему
+ * запись в ту же строку, где лежит решение.
+ */
+export const accessRequestDecide: Access = ({ req: { user } }) => {
+  const u = user as U | null
+  if (!u) return false
+  if (u.role === 'admin') return true
+  const org = orgId(u)
+  if (!org) return false
+  return { owner: { equals: org } }
+}
+
 export const selfOrAdmin: Access = ({ req: { user } }) => {
   const u = user as U | null
   if (!u) return false

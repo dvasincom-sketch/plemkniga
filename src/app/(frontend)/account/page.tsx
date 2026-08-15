@@ -10,6 +10,7 @@ import { Pagination } from '@/components/Pagination'
 import { ProfileForm } from '@/components/ProfileForm'
 import { VisibilityForm } from '@/components/VisibilityForm'
 import { getClient, getCurrentUser } from '@/lib/payload'
+import { viewerOf, type Viewer } from '@/lib/visibility'
 import {
   PAGE_SIZES,
   buildAnimalWhere,
@@ -36,6 +37,7 @@ export default async function AccountPage({
 }) {
   const sp = await searchParams
   const user = await getCurrentUser()
+  const viewer = viewerOf(user)
   if (!user) redirect('/login')
 
   const tabParam = one(sp.tab)
@@ -77,7 +79,7 @@ export default async function AccountPage({
               </p>
             )}
 
-            {tab === 'animals' && <AnimalsTab sp={sp} orgId={orgId} userId={user.id} />}
+            {tab === 'animals' && <AnimalsTab sp={sp} orgId={orgId} userId={user.id} viewer={viewer} />}
 
             {tab === 'events' && <EventsTab orgId={orgId} />}
             {tab === 'documents' && <DocumentsTab orgId={orgId} />}
@@ -136,10 +138,12 @@ async function AnimalsTab({
   sp,
   orgId,
   userId,
+  viewer,
 }: {
   sp: SearchParams
   orgId?: number
   userId: number | string
+  viewer: Viewer
 }) {
   const payload = await getClient()
   const page = currentPage(sp)
@@ -222,7 +226,7 @@ async function AnimalsTab({
         <AnimalTable
           animals={result.docs as Animal[]}
           startIndex={(page - 1) * (perPage || 0)}
-          canOpenAll
+          viewer={viewer}
           emptyText="В вашем стаде пока нет записей. Загрузите данные через «Импорт данных»."
         />
         {/*

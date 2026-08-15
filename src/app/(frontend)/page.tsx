@@ -8,6 +8,7 @@ import { EmptyResults } from '@/components/EmptyResults'
 import { AnimalTable } from '@/components/AnimalTable'
 import { AnimalCards } from '@/components/AnimalCards'
 import { getClient, getCurrentUser } from '@/lib/payload'
+import { viewerOf } from '@/lib/visibility'
 import {
   ANON_SHOW_LIMIT,
   FILTER_KEYS,
@@ -36,6 +37,7 @@ export default async function HerdbookPage({
   const sp = await searchParams
   const shown = shownCount(sp)
   const user = await getCurrentUser()
+  const viewer = viewerOf(user)
   const payload = await getClient()
 
   const where = buildAnimalWhere(sp)
@@ -260,11 +262,11 @@ export default async function HerdbookPage({
                 */}
                 <div className={`relative ${hasMore ? 'pb-2' : ''}`}>
                   <div className="hidden lg:block">
-                    <AnimalTable animals={animals} canOpenAll={Boolean(user)} />
+                    <AnimalTable animals={animals} viewer={viewer} />
                   </div>
 
                   <div className="lg:hidden">
-                    <AnimalCards animals={animals} canOpenAll={Boolean(user)} />
+                    <AnimalCards animals={animals} viewer={viewer} />
                   </div>
 
                   {hasMore && (

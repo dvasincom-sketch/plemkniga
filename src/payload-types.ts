@@ -76,6 +76,7 @@ export interface Config {
     'milk-tests': MilkTest;
     'health-events': HealthEvent;
     'data-submissions': DataSubmission;
+    'access-requests': AccessRequest;
     events: Event;
     documents: Document;
     media: Media;
@@ -110,6 +111,7 @@ export interface Config {
     'milk-tests': MilkTestsSelect<false> | MilkTestsSelect<true>;
     'health-events': HealthEventsSelect<false> | HealthEventsSelect<true>;
     'data-submissions': DataSubmissionsSelect<false> | DataSubmissionsSelect<true>;
+    'access-requests': AccessRequestsSelect<false> | AccessRequestsSelect<true>;
     events: EventsSelect<false> | EventsSelect<true>;
     documents: DocumentsSelect<false> | DocumentsSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
@@ -188,6 +190,7 @@ export interface User {
   notifySubmissions?: boolean | null;
   notifyTrust?: boolean | null;
   notifyNews?: boolean | null;
+  notifySeenAt?: string | null;
   updatedAt: string;
   createdAt: string;
   email: string;
@@ -1036,6 +1039,31 @@ export interface DataSubmission {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "access-requests".
+ */
+export interface AccessRequest {
+  id: number;
+  animal: number | Animal;
+  /**
+   * Заполняется по животному
+   */
+  owner?: (number | null) | Organization;
+  requester?: (number | null) | User;
+  requesterOrg?: (number | null) | Organization;
+  purpose: 'purchase' | 'semen' | 'mating' | 'verification' | 'research' | 'other';
+  status: 'new' | 'approved' | 'declined';
+  /**
+   * Что именно нужно посмотреть и зачем
+   */
+  comment?: string | null;
+  response?: string | null;
+  decidedAt?: string | null;
+  decidedBy?: (number | null) | User;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "events".
  */
 export interface Event {
@@ -1126,6 +1154,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'data-submissions';
         value: number | DataSubmission;
+      } | null)
+    | ({
+        relationTo: 'access-requests';
+        value: number | AccessRequest;
       } | null)
     | ({
         relationTo: 'events';
@@ -1258,6 +1290,7 @@ export interface UsersSelect<T extends boolean = true> {
   notifySubmissions?: T;
   notifyTrust?: T;
   notifyNews?: T;
+  notifySeenAt?: T;
   updatedAt?: T;
   createdAt?: T;
   email?: T;
@@ -1673,6 +1706,24 @@ export interface DataSubmissionsSelect<T extends boolean = true> {
         note?: T;
         id?: T;
       };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "access-requests_select".
+ */
+export interface AccessRequestsSelect<T extends boolean = true> {
+  animal?: T;
+  owner?: T;
+  requester?: T;
+  requesterOrg?: T;
+  purpose?: T;
+  status?: T;
+  comment?: T;
+  response?: T;
+  decidedAt?: T;
+  decidedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }

@@ -151,6 +151,7 @@ organizations ──< herds ──< animals >── users (автор запис
                               └──< documents ──> media
 
 organizations ──< data-submissions ──> media (протокол ошибок)
+organizations ──< access-requests ──> animals (запрос доступа к закрытой карточке)
 
 справочники НСИ: breeds, lines, breeding-categories, breeding-classes,
 animal-purposes, disposal-reasons, coat-colors, blood-groups,
@@ -168,6 +169,7 @@ dna-test-types, haplotype-types, health-event-types, technicians
 | **Lactation Curve** | массив лактаций: удой за лактацию и за 305 дней, жир и белок в % и кг, дойные дни, соматические клетки |
 | **Genotype SNP** | ◐ генотип животного: чип, число маркеров, call rate, ссылка на исходный файл, набор вызовов по маркерам |
 | **Evaluation** | ИПЦ и признаки в виде пары «прогноз + достоверность R,%» — форма, готовая принять EBV и gEBV |
+| **AccessRequest** | обращение к владельцу закрытой записи: цель, сообщение, решение хозяйства с датой и автором |
 
 Полное описание сущностей, валидаций и уровней достоверности —
 [docs/model-dannyh.md](docs/model-dannyh.md).
@@ -260,8 +262,9 @@ dna-test-types, haplotype-types, health-event-types, technicians
 | `/` | Племенная книга: просмотр анонимом, поиск и расширенный фильтр |
 | `/login`, `/register` | Вход и регистрация в 4 шага |
 | `/account` | Личный кабинет: `?tab=profile\|animals\|events\|documents\|settings` |
-| `/animals/[id]` | Карточка животного: `?tab=general\|evaluation\|events\|origin\|documents\|media` |
+| `/animals/[id]` | Карточка животного: `?tab=general\|evaluation\|events\|origin\|documents\|media`; если владелец закрыл подробности — страница с запросом доступа и похожими открытыми записями |
 | `/account/import` | Загрузка и выгрузка данных стада |
+| `/account/notifications` | Лента событий: запросы доступа, ответы на них, результаты проверки загрузок |
 | `/account/submissions/[id]` | Пакет загрузки: проверка, протокол ошибок, публикация |
 | `/animals/[id]/certificate/zootechnical` | Зоотехнический сертификат (ЕС 2016/1012), печать в PDF |
 | `/animals/[id]/certificate/pedigree` | Племенное свидетельство, три ряда предков |

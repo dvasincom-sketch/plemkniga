@@ -44,7 +44,7 @@ function Stepper({ step }: { step: number }) {
 
 const label = 'mb-1.5 block text-sm text-ink-700'
 
-export function RegisterWizard() {
+export function RegisterWizard({ next }: { next?: string }) {
   const [step, setStep] = useState(0)
   const [role, setRole] = useState<Role>('farmer')
   const [state, formAction, pending] = useActionState<AuthState, FormData>(registerAction, {})
@@ -56,6 +56,8 @@ export function RegisterWizard() {
       <Stepper step={step} />
 
       <form action={formAction}>
+        {/* Возврат туда, откуда пришли: регистрация чаще всего не цель, а препятствие */}
+        {next && <input type="hidden" name="next" value={next} />}
         <input type="hidden" name="role" value={role} />
 
         {/* --------------------------- Шаг 1: роль --------------------------- */}

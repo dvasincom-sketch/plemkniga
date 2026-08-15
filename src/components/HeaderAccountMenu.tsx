@@ -22,10 +22,12 @@ export function HeaderAccountMenu({
   displayName,
   orgName,
   active,
+  unread = 0,
 }: {
   displayName: string
   orgName: string | null
   active?: string
+  unread?: number
 }) {
   const [open, setOpen] = useState(false)
   const [rect, setRect] = useState<{ top: number; right: number; width: number } | null>(null)
@@ -147,13 +149,30 @@ export function HeaderAccountMenu({
               ))}
             </ul>
 
-            <Link
-              href="/account/profile"
-              onClick={() => setOpen(false)}
-              className="mt-1.5 block border-t border-white/20 px-4 py-2.5 text-[14px] text-white/85 transition-colors hover:bg-brand-500 hover:text-white"
-            >
-              Профиль пользователя
-            </Link>
+            {/* Уведомления и профиль — не разделы кабинета, а личные страницы
+                пользователя, поэтому стоят за чертой */}
+            <div className="mt-1.5 border-t border-white/20">
+              <Link
+                href="/account/notifications"
+                onClick={() => setOpen(false)}
+                className="flex items-center justify-between gap-3 px-4 py-2.5 text-[14px] text-white/85 transition-colors hover:bg-brand-500 hover:text-white"
+              >
+                Уведомления
+                {unread > 0 && (
+                  <span className="min-w-[18px] rounded-full bg-white px-1 text-center text-[11px] font-medium leading-[18px] text-forest-500">
+                    {unread > 99 ? '99+' : unread}
+                  </span>
+                )}
+              </Link>
+
+              <Link
+                href="/account/profile"
+                onClick={() => setOpen(false)}
+                className="block px-4 py-2.5 text-[14px] text-white/85 transition-colors hover:bg-brand-500 hover:text-white"
+              >
+                Профиль пользователя
+              </Link>
+            </div>
           </div>,
           document.body,
         )}

@@ -2,6 +2,8 @@ import Link from 'next/link'
 import type { Animal } from '@/payload-types'
 import { AGE_GROUPS, SEXES, STATES, labelOf } from '@/lib/dictionaries'
 import { nf, signed } from '@/lib/format'
+import { LockHint } from './LockHint'
+import { ANONYMOUS, LOCK_HINT, isAnimalLocked, type Viewer } from '@/lib/visibility'
 
 /**
  * Карточки вместо таблицы на узком экране.
@@ -12,17 +14,17 @@ import { nf, signed } from '@/lib/format'
  */
 export function AnimalCards({
   animals,
-  canOpenAll = false,
+  viewer = ANONYMOUS,
 }: {
   animals: Animal[]
-  canOpenAll?: boolean
+  viewer?: Viewer
 }) {
   return (
     <ul className="space-y-3">
       {animals.map((a) => {
         const owner =
           typeof a.owner === 'object' && a.owner ? a.owner.shortName || a.owner.name : '—'
-        const locked = !canOpenAll && !a.publicDetails
+        const locked = isAnimalLocked(a, viewer)
         const s = a.summary
         const ipc = a.ipc ?? null
 
@@ -35,7 +37,9 @@ export function AnimalCards({
 
         const head = (
           <>
-            <p className="text-[17px] font-medium leading-tight">{a.name ?? '—'}</p>
+            <p className="flex items-center gap-1.5 text-[17px] font-medium leading-tight">
+              {a.name ?? '—'}
+            </p>
             <p className="mt-0.5 text-[13px] tabular-nums text-ink-500">№ {a.identNumber}</p>
           </>
         )
@@ -43,8 +47,11 @@ export function AnimalCards({
         return (
           <li key={a.id} className="rounded-2xl bg-white p-4 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)]">
             <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                {locked ? head : <Link href={`/animals/${a.id}`}>{head}</Link>}
+              <div className="flex min-w-0 items-start gap-2">
+                {locked && <LockHint href={`/animals/${a.id}`} text={LOCK_HINT} />}
+                <Link href={`/animals/${a.id}`} className="min-w-0">
+                  {head}
+                </Link>
               </div>
 
               <div className="flex-none text-right">
@@ -74,7 +81,7 @@ export function AnimalCards({
 
             <p className="mt-3 text-[13px] text-ink-500">
               {owner}
-              {locked && ' · карточка откроется после входа'}
+              {locked && ' · подробности закрыты владельцем'}
             </p>
           </li>
         )

@@ -7,6 +7,7 @@ import {
   RELATIONS,
   SEXES,
   STATES,
+  TRUST_LEVELS,
 } from '@/lib/dictionaries'
 import { ADVANCED_FIELDS } from '@/lib/animal-query'
 import { Select } from './Select'
@@ -199,31 +200,66 @@ export function SearchPanel({
             ))}
           </div>
 
-          <div className="mt-4">
-            <span className="mb-1.5 block text-xs text-white/90">Индекс племенной ценности</span>
-            <div className="flex flex-wrap gap-4">
-              {(
-                [
-                  { name: 'ipcFrom', prefix: 'от', ph: '−00000,0' },
-                  { name: 'ipcTo', prefix: 'до', ph: '+00000,0' },
-                ] as const
-              ).map((f) => (
-                <span
-                  key={f.name}
-                  className="flex w-[160px] items-center overflow-hidden rounded-lg bg-white"
-                >
-                  <span className="pl-3 pr-1 text-sm text-ink-500">{f.prefix}</span>
-                  <span className="my-2 w-px self-stretch bg-ink-100" />
-                  <input
-                    name={f.name}
-                    defaultValue={d(f.name)}
-                    placeholder={f.ph}
-                    inputMode="decimal"
-                    className="h-[46px] w-full bg-transparent px-2.5 text-sm text-ink-900 outline-none placeholder:text-ink-300"
-                  />
-                </span>
-              ))}
+          {/*
+             Диапазон ИПЦ и уровень достоверности стоят в одной строке
+             намеренно: вопрос «насколько животное ценно» и вопрос «насколько
+             этой цифре можно верить» — части одного решения, и разносить их
+             по разным блокам значит предлагать отбор по индексу без оглядки
+             на то, кем он подтверждён.
+          */}
+          <div className="mt-4 flex flex-wrap items-end gap-x-6 gap-y-4">
+            <div>
+              <span className="mb-1.5 block text-xs text-white/90">Индекс племенной ценности</span>
+              <div className="flex flex-wrap gap-4">
+                {(
+                  [
+                    { name: 'ipcFrom', prefix: 'от', ph: '−00000,0' },
+                    { name: 'ipcTo', prefix: 'до', ph: '+00000,0' },
+                  ] as const
+                ).map((f) => (
+                  <span
+                    key={f.name}
+                    className="flex w-[160px] items-center overflow-hidden rounded-lg bg-white"
+                  >
+                    <span className="pl-3 pr-1 text-sm text-ink-500">{f.prefix}</span>
+                    <span className="my-2 w-px self-stretch bg-ink-100" />
+                    <input
+                      name={f.name}
+                      defaultValue={d(f.name)}
+                      placeholder={f.ph}
+                      inputMode="decimal"
+                      className="h-[46px] w-full bg-transparent px-2.5 text-sm text-ink-900 outline-none placeholder:text-ink-300"
+                    />
+                  </span>
+                ))}
+              </div>
             </div>
+
+            <label className="block">
+              <span className="mb-1.5 block text-xs text-white/90">
+                Уровень достоверности данных
+              </span>
+              {/*
+                 Отбор идёт «не ниже выбранного»: уровни — это ступени проверки,
+                 и запись, верифицированная Ассоциацией, отвечает и более мягкому
+                 условию. Точное совпадение здесь давало бы пустые списки там,
+                 где данные лучше запрошенного.
+              */}
+              <Select
+                name="trust"
+                ariaLabel="Уровень достоверности данных"
+                placeholder="Любой"
+                defaultValue={d('trust')}
+                options={[...TRUST_LEVELS]
+                  .reverse()
+                  .filter((t) => Number(t.value) >= 0)
+                  .map((t) => ({
+                    value: t.value,
+                    label: `${t.value} — ${t.label}${Number(t.value) < 3 ? ' и выше' : ''}`,
+                  }))}
+                className="w-[320px]"
+              />
+            </label>
           </div>
         </div>
       )}

@@ -10,9 +10,15 @@ import { getCurrentUser } from '@/lib/payload'
 export const metadata: Metadata = { title: 'Вход' }
 export const dynamic = 'force-dynamic'
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>
+}) {
   const user = await getCurrentUser()
-  if (user) redirect('/account')
+  const { next: nextRaw } = await searchParams
+  const next = nextRaw && nextRaw.startsWith('/') && !nextRaw.startsWith('//') ? nextRaw : undefined
+  if (user) redirect(next ?? '/account')
 
   return (
     <>
@@ -41,11 +47,14 @@ export default async function LoginPage() {
 
           <div className="rounded-[20px] bg-white p-7 sm:p-10">
             <h2 className="mb-7 text-[30px] font-medium leading-none">Авторизация</h2>
-            <LoginForm />
+            <LoginForm next={next} />
 
             <p className="mt-6 text-sm text-ink-700">
               Ещё нет учётной записи?{' '}
-              <Link href="/register" className="font-medium underline underline-offset-4">
+              <Link
+                href={next ? `/register?next=${encodeURIComponent(next)}` : '/register'}
+                className="font-medium underline underline-offset-4"
+              >
                 Зарегистрироваться
               </Link>
             </p>

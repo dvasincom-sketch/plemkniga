@@ -33,9 +33,15 @@ const Check = () => (
   </span>
 )
 
-export default async function RegisterPage() {
+export default async function RegisterPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>
+}) {
   const user = await getCurrentUser()
-  if (user) redirect('/account')
+  const { next: nextRaw } = await searchParams
+  const next = nextRaw && nextRaw.startsWith('/') && !nextRaw.startsWith('//') ? nextRaw : undefined
+  if (user) redirect(next ?? '/account')
 
   return (
     <>
@@ -70,7 +76,7 @@ export default async function RegisterPage() {
             </p>
           </div>
 
-          <RegisterWizard />
+          <RegisterWizard next={next} />
         </section>
 
         {/* --------------------------- Обратная связь -------------------------- */}

@@ -3,11 +3,13 @@
 import { useActionState } from 'react'
 import { loginAction, type AuthState } from '@/actions/auth'
 
-export function LoginForm() {
+export function LoginForm({ next }: { next?: string }) {
   const [state, formAction, pending] = useActionState<AuthState, FormData>(loginAction, {})
 
   return (
     <form action={formAction} className="space-y-4">
+      {/* Возврат туда, откуда пришли: вход чаще всего не цель, а препятствие */}
+      {next && <input type="hidden" name="next" value={next} />}
       <label className="block">
         <span className="mb-1.5 block text-sm text-ink-700">E-mail</span>
         <input

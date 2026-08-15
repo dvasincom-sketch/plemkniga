@@ -2,6 +2,8 @@ import Link from 'next/link'
 import type { Animal } from '@/payload-types'
 import { AGE_GROUPS, SEXES, STATES } from '@/lib/dictionaries'
 import { nf, signed } from '@/lib/format'
+import { LockHint } from './LockHint'
+import { ANONYMOUS, LOCK_HINT, isAnimalLocked, type Viewer } from '@/lib/visibility'
 
 /**
  * Таблица книги.
@@ -18,24 +20,6 @@ import { nf, signed } from '@/lib/format'
  */
 
 const ageShort = (v?: string | null) => AGE_GROUPS.find((o) => o.value === v)?.short ?? '—'
-
-const LockBadge = () => (
-  <span
-    title="Карточка этого животного закрыта владельцем — откроется после авторизации"
-    className="inline-flex align-middle text-ink-500"
-  >
-    <svg width="11" height="13" viewBox="0 0 12 14" fill="none" aria-hidden="true">
-      <rect x="1" y="6" width="10" height="7" rx="1.6" fill="currentColor" />
-      <path
-        d="M3.2 6V4.2a2.8 2.8 0 1 1 5.6 0V6"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        fill="none"
-        strokeLinecap="round"
-      />
-    </svg>
-  </span>
-)
 
 /** `hide` — класс, скрывающий колонку на тесных ширинах. */
 const COLUMNS: { key: string; label: string; hide?: string }[] = [
@@ -64,13 +48,13 @@ const cls = (key: string) => COLUMNS.find((c) => c.key === key)?.hide ?? ''
 export function AnimalTable({
   animals,
   startIndex = 0,
-  canOpenAll = false,
+  viewer = ANONYMOUS,
   emptyText = 'По заданным условиям животных не найдено',
 }: {
   animals: Animal[]
   startIndex?: number
-  /** Пользователь авторизован — открыты все карточки. */
-  canOpenAll?: boolean
+  /** Кто смотрит: от этого зависит, какие карточки под замком. */
+  viewer?: Viewer
   emptyText?: string
 }) {
   return (
@@ -97,26 +81,30 @@ export function AnimalTable({
           {animals.map((a, i) => {
             const owner =
               typeof a.owner === 'object' && a.owner ? a.owner.shortName || a.owner.name : '—'
-            const locked = !canOpenAll && !a.publicDetails
+            const locked = isAnimalLocked(a, viewer)
             const s = a.summary
             const ipc = a.ipc ?? null
 
             return (
               <tr key={a.id}>
                 <td className="tabular-nums">{startIndex + i + 1}</td>
-                <td className="w-6 pl-0 pr-0">{locked && <LockBadge />}</td>
+                <td className="w-6 pl-0 pr-0">
+                  {locked && <LockHint href={`/animals/${a.id}`} text={LOCK_HINT} />}
+                </td>
+                {/* Строка закрытого животного тоже кликабельна: на его странице
+                    объясняется, кто закрыл доступ, и там же его запрашивают */}
                 <td className="tabular-nums">
-                  {locked ? (
-                    <span>{a.identNumber}</span>
-                  ) : (
-                    <Link
-                      href={`/animals/${a.id}`}
-                      className="row-link"
-                      title={`Открыть карточку: ${a.name ?? a.identNumber}`}
-                    >
-                      {a.identNumber}
-                    </Link>
-                  )}
+                  <Link
+                    href={`/animals/${a.id}`}
+                    className="row-link"
+                    title={
+                      locked
+                        ? `Доступ закрыт владельцем — открыть запись и запросить доступ: ${a.name ?? a.identNumber}`
+                        : `Открыть карточку: ${a.name ?? a.identNumber}`
+                    }
+                  >
+                    {a.identNumber}
+                  </Link>
                 </td>
                 <td className="cell-truncate font-medium" title={a.name ?? undefined}>
                   {a.name ?? '—'}

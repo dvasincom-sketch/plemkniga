@@ -19,5 +19,24 @@ export const dateRu = (value?: string | null): string => {
   return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
+/**
+ * Дата со временем — для ленты событий.
+ *
+ * В ленте за один день накапливается несколько записей, и без времени
+ * их порядок выглядит случайным.
+ */
+export const dateTimeRu = (value?: string | null): string => {
+  if (!value) return '—'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 export const dash = <T,>(v: T | null | undefined): T | '—' =>
   v === null || v === undefined || v === '' ? '—' : v

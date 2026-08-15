@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { getClient, getCurrentUser } from '@/lib/payload'
+import { isAnimalLocked, viewerOf } from '@/lib/visibility'
 import { buildPedigree, wrightInbreeding, type PedigreeNode } from '@/lib/pedigree'
 import {
   CERTIFICATE_KINDS,
@@ -119,7 +120,8 @@ export default async function CertificatePage({ params }: { params: Promise<Para
     notFound()
   }
   if (!animal) notFound()
-  if (!user && !animal.publicDetails) redirect('/login')
+  // Закрытая запись объясняет себя на своей странице, а не редиректом на вход
+  if (isAnimalLocked(animal, viewerOf(user))) redirect(`/animals/${id}`)
 
   const readiness = await certificateReadiness(payload, animal)
   const state = readiness[kind as CertificateKind]

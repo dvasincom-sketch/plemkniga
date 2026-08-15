@@ -19,6 +19,18 @@ const setAuthCookie = async (token: string, exp?: number) => {
 
 export type AuthState = { error?: string; ok?: boolean }
 
+/**
+ * Куда вернуть человека после входа.
+ *
+ * Принимаем только внутренние пути: значение приходит из адресной строки,
+ * и «//evil.example» браузер считает внешним адресом. Открытый редирект
+ * на форме входа — классический способ увести чужую сессию.
+ */
+const safeNext = (raw: FormDataEntryValue | null): string => {
+  const v = String(raw || '')
+  return v.startsWith('/') && !v.startsWith('//') ? v : '/account'
+}
+
 export async function loginAction(_prev: AuthState, formData: FormData): Promise<AuthState> {
   const email = String(formData.get('email') || '').trim()
   const password = String(formData.get('password') || '')
@@ -37,7 +49,7 @@ export async function loginAction(_prev: AuthState, formData: FormData): Promise
     return { error: 'Неверный e-mail или пароль' }
   }
 
-  redirect('/account')
+  redirect(safeNext(formData.get('next')))
 }
 
 export type RegisterPayload = {
@@ -133,7 +145,7 @@ export async function registerAction(
     return { error: e instanceof Error ? e.message : 'Не удалось создать пользователя' }
   }
 
-  redirect('/account')
+  redirect(safeNext(formData.get('next')))
 }
 
 export async function logoutAction() {

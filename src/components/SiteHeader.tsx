@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Logo } from './Logo'
-import { getCurrentUser } from '@/lib/payload'
+import { getClient, getCurrentUser } from '@/lib/payload'
+import { countUnreadNotifications } from '@/lib/notifications'
 import { LogoutButton } from './LogoutButton'
 import { HeaderAccountMenu } from './HeaderAccountMenu'
 
@@ -21,6 +22,7 @@ type NavItem = { href: string; label: string; locked?: boolean }
 
 export async function SiteHeader({ active }: { active?: string }) {
   const user = await getCurrentUser()
+  const unread = user ? await countUnreadNotifications(await getClient(), user) : 0
 
   const displayName =
     [user?.lastName, user?.firstName].filter(Boolean).join(' ') || user?.email || 'Кабинет'
@@ -65,11 +67,16 @@ export async function SiteHeader({ active }: { active?: string }) {
 
         {user ? (
           <div className="flex items-center gap-4">
-            <button
-              type="button"
-              className="relative text-ink-900 transition-colors hover:text-forest-500"
-              aria-label="Уведомления"
-              title="Уведомления"
+            {/* Колокольчик ведёт в ленту событий: запросы доступа к животным
+                хозяйства, ответы на свои запросы, результаты проверки загрузок.
+                Цифра — то, что случилось после прошлого посещения ленты */}
+            <Link
+              href="/account/notifications"
+              className={`relative transition-colors hover:text-forest-500 ${
+                active === '/account/notifications' ? 'text-forest-500' : 'text-ink-900'
+              }`}
+              aria-label={unread > 0 ? `Уведомления: ${unread} новых` : 'Уведомления'}
+              title={unread > 0 ? `Новых уведомлений: ${unread}` : 'Уведомления'}
             >
               <svg width="18" height="20" viewBox="0 0 18 20" fill="none" aria-hidden="true">
                 <path
@@ -78,9 +85,20 @@ export async function SiteHeader({ active }: { active?: string }) {
                 />
                 <path d="M7 16a2 2 0 0 0 4 0" stroke="currentColor" strokeWidth="1.5" fill="none" />
               </svg>
-            </button>
 
-            <HeaderAccountMenu displayName={displayName} orgName={orgName} active={active} />
+              {unread > 0 && (
+                <span className="absolute -right-2 -top-1.5 min-w-[17px] rounded-full bg-[#c0392b] px-1 text-center text-[11px] font-medium leading-[17px] text-white">
+                  {unread > 99 ? '99+' : unread}
+                </span>
+              )}
+            </Link>
+
+            <HeaderAccountMenu
+              displayName={displayName}
+              orgName={orgName}
+              active={active}
+              unread={unread}
+            />
 
             <LogoutButton compact />
           </div>

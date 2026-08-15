@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { notFound, redirect } from 'next/navigation'
+import { notFound } from 'next/navigation'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { ExteriorChart } from '@/components/ExteriorChart'
@@ -14,7 +14,9 @@ import { LactationDynamics } from '@/components/LactationDynamics'
 import { AnimalPassport } from '@/components/AnimalPassport'
 import { CertificateSection } from '@/components/CertificateSection'
 import { certificateReadiness } from '@/lib/certification'
+import { ClosedAnimal } from '@/components/ClosedAnimal'
 import { getClient, getCurrentUser } from '@/lib/payload'
+import { isAnimalLocked, viewerOf } from '@/lib/visibility'
 import {
   AGE_GROUPS,
   ANIMAL_KINDS,
@@ -29,7 +31,7 @@ import {
   labelOf,
 } from '@/lib/dictionaries'
 import { dateRu, nf, signed } from '@/lib/format'
-import type { Animal } from '@/payload-types'
+import type { AccessRequest, Animal } from '@/payload-types'
 
 export const dynamic = 'force-dynamic'
 
@@ -136,6 +138,7 @@ export default async function AnimalPage({
   const tab: TabKey = TABS.some((t) => t.key === tabParam) ? (tabParam as TabKey) : 'evaluation'
 
   const user = await getCurrentUser()
+  const viewer = viewerOf(user)
   const payload = await getClient()
 
   let animal: Animal | null = null
@@ -151,7 +154,6 @@ export default async function AnimalPage({
     notFound()
   }
   if (!animal) notFound()
-  if (!user && !animal.publicDetails) redirect('/login')
 
   const owner =
     typeof animal.owner === 'object' && animal.owner ? animal.owner.name : '—'
@@ -169,15 +171,120 @@ export default async function AnimalPage({
   const isMine = Boolean(user && userOrgId && ownerId && userOrgId === ownerId)
 
   /*
-   * Чужое животное оформляется иначе — целиком.
+   * Не своё животное оформляется иначе — целиком.
    *
    * Зоотехник открывает карточки вперемешку: своих и чужих. Одинаковый вид
    * приводит к тому, что чужие данные принимают за свои и пытаются править.
    * Поэтому вся страница уходит в бледно-зелёный фон, а шапка с кличкой
    * и номером — на тёмную плашку: отличие видно раньше, чем прочитан
    * владелец.
+   *
+   * Гостю оформление нужно ровно так же. Раньше оно включалось только после
+   * входа, и неавторизованный посетитель видел карточку в том же виде,
+   * что фермер — свою собственную: страница выглядела как «моё животное»
+   * у человека, у которого животных вообще нет.
    */
-  const isForeign = Boolean(user) && !isMine
+  const isForeign = !isMine
+
+  /*
+   * Формулировка зависит от того, знаем ли мы, кто смотрит.
+   *
+   * Вошедшему можно сказать «чужое хозяйство» — мы сравнили организации.
+   * Гостю сказать нечего: он вполне может быть сотрудником этого самого
+   * хозяйства. Поэтому ему сообщается не про принадлежность, а про режим
+   * показа — владелец открыл эти данные публично.
+   */
+  const foreignNote = user
+    ? {
+        badge: 'Чужое хозяйство',
+        text: `Это животное принадлежит ${owner} — данные доступны только для просмотра.`,
+      }
+    : {
+        badge: 'Открытые данные',
+        text: `Это животное принадлежит ${owner} — данные открыты для публичного просмотра владельцем.`,
+      }
+
+  /*
+   * Закрытая карточка — отдельная страница, а не редирект на вход.
+   *
+   * Замок ставит владелец, и вход в систему его не снимает. Прежний редирект
+   * на /login обещал обратное: человек вводил пароль и попадал на ту же
+   * закрытую запись. Теперь страница объясняет, кто закрыл данные, и даёт
+   * два выхода — запрос владельцу и похожие открытые животные.
+   */
+  if (isAnimalLocked(animal, viewer)) {
+    const [request, similar] = await Promise.all([
+      user
+        ? payload
+            .find({
+              collection: 'access-requests',
+              where: {
+                and: [{ animal: { equals: animal.id } }, { requester: { equals: user.id } }],
+              },
+              sort: '-createdAt',
+              limit: 1,
+              depth: 0,
+              overrideAccess: false,
+              user,
+            })
+            .then((r) => (r.docs[0] as AccessRequest | undefined) ?? null)
+            .catch(() => null)
+        : Promise.resolve(null),
+      payload
+        .find({
+          collection: 'animals',
+          where: {
+            and: [
+              { publicDetails: { equals: true } },
+              { id: { not_equals: animal.id } },
+              ...(animal.sex ? [{ sex: { equals: animal.sex } }] : []),
+              ...(animal.ageGroup ? [{ ageGroup: { equals: animal.ageGroup } }] : []),
+            ],
+          },
+          sort: '-ipcRank',
+          limit: 6,
+          depth: 1,
+          overrideAccess: false,
+          user,
+        })
+        .then((r) => r.docs as Animal[])
+        .catch(() => [] as Animal[]),
+    ])
+
+    // Ссылка «все похожие» повторяет те же условия в отборе книги, чтобы
+    // список можно было продолжить, а не начинать поиск заново
+    const params = new URLSearchParams()
+    if (animal.sex) params.set('sex', animal.sex)
+    if (animal.ageGroup) params.set('ageGroup', animal.ageGroup)
+
+    return (
+      <>
+        <SiteHeader active="/" />
+
+        {/* Тот же бледно-зелёный фон, что и у чужой карточки: это не своё
+            животное, и страница не должна выглядеть как раздел кабинета */}
+        <main className="container-page foreign-animal pb-8">
+          <Breadcrumbs
+            items={[
+              { label: 'Племенная книга', href: '/' },
+              { label: `№ ${animal.identNumber}` },
+            ]}
+          />
+
+          <ClosedAnimal
+            animal={animal}
+            ownerName={owner}
+            signedIn={Boolean(user)}
+            request={request}
+            similar={similar}
+            similarHref={`/?${params.toString()}#results`}
+          />
+        </main>
+
+        <SiteFooter />
+      </>
+    )
+  }
 
   const readiness = tab === 'documents' ? await certificateReadiness(payload, animal) : null
 
@@ -202,9 +309,9 @@ export default async function AnimalPage({
         {isForeign && (
           <p className="mb-5 flex flex-wrap items-center gap-2 rounded-xl bg-white px-5 py-3.5 text-[15px] text-ink-900 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)]">
             <span className="rounded-md bg-forest-500 px-2 py-0.5 text-[13px] font-medium text-white">
-              Чужое хозяйство
+              {foreignNote.badge}
             </span>
-            Это животное принадлежит {owner} — данные доступны только для просмотра.
+            {foreignNote.text}
           </p>
         )}
 

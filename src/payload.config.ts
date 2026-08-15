@@ -18,6 +18,7 @@ import { MilkTests } from '@/collections/MilkTests'
 import { HealthEvents } from '@/collections/HealthEvents'
 import { Calvings } from '@/collections/Calvings'
 import { DataSubmissions } from '@/collections/DataSubmissions'
+import { AccessRequests } from '@/collections/AccessRequests'
 import { DICTIONARY_COLLECTIONS } from '@/collections/dictionaries'
 import { databaseEnvKeys, maskUri, resolveDatabase } from '@/lib/db-url'
 import { migrations } from '@/migrations'
@@ -56,6 +57,7 @@ export default buildConfig({
     MilkTests,
     HealthEvents,
     DataSubmissions,
+    AccessRequests,
     Events,
     Documents,
     Media,
