@@ -37,9 +37,10 @@ export function HeaderAccountMenu({
     const el = anchorRef.current
     if (!el) return
     const r = el.getBoundingClientRect()
-    // Ширина списка равна ширине блока имени — тогда тригger и список
-    // складываются в один силуэт со скруглёнными углами, без ступеньки
-    setRect({ top: r.bottom, right: window.innerWidth - r.right, width: Math.max(r.width, 210) })
+    // Ширина списка в точности равна ширине блока имени: любое расхождение
+    // даёт ступеньку на стыке, и силуэт перестаёт читаться как одна плашка.
+    // Минимальную ширину задаёт сам блок имени, а не список.
+    setRect({ top: r.bottom, right: window.innerWidth - r.right, width: r.width })
   }, [])
 
   // Небольшая задержка на закрытие: иначе меню исчезает, пока курсор
@@ -78,7 +79,7 @@ export function HeaderAccountMenu({
   const isProfile = active === '/account/profile'
 
   return (
-    <div ref={anchorRef} onMouseEnter={show} onMouseLeave={hide}>
+    <div ref={anchorRef} className="sm:min-w-[210px]" onMouseEnter={show} onMouseLeave={hide}>
       <Link
         href="/account/profile"
         aria-expanded={open}
