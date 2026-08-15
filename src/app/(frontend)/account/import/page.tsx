@@ -7,6 +7,7 @@ import { AccountNav } from '@/components/AccountNav'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { ImportCard } from '@/components/ImportCard'
 import { ExportCard } from '@/components/ExportCard'
+import { IntegrationChannels } from '@/components/IntegrationChannels'
 import { getCurrentUser } from '@/lib/payload'
 
 export const metadata: Metadata = { title: 'Загрузка данных' }
@@ -58,6 +59,8 @@ export default async function ImportPage() {
               <ImportCard />
               <ExportCard />
             </div>
+
+            <IntegrationChannels />
           </div>
         </div>
       </main>

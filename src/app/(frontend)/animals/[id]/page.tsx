@@ -11,6 +11,7 @@ import { InfoTip } from '@/components/InfoTip'
 import { AccountNav } from '@/components/AccountNav'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { LactationDynamics } from '@/components/LactationDynamics'
+import { AnimalPassport } from '@/components/AnimalPassport'
 import { CertificateSection } from '@/components/CertificateSection'
 import { certificateReadiness } from '@/lib/certification'
 import { getClient, getCurrentUser } from '@/lib/payload'
@@ -432,6 +433,8 @@ export default async function AnimalPage({
         {/* --------------------------- Общие данные -------------------------- */}
         {tab === 'general' && (
           <section className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <AnimalPassport animal={animal} />
+
             <div className="card">
               <h2 className="panel-heading">Идентификация</h2>
               <dl className="divide-y divide-[#ededed] text-sm">

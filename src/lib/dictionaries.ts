@@ -152,3 +152,6 @@ export const labelOf = (
   arr: readonly { value: string; label: string }[],
   value?: string | null,
 ): string => arr.find((o) => o.value === value)?.label ?? '—'
+
+/** Подпись, когда животное ещё в стаде и причины выбытия нет. */
+export const DISPOSAL_HINT = 'Животное в стаде'

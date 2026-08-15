@@ -20,6 +20,8 @@ export type SearchPanelProps = {
   /** Показывать поле «Владелец» (только в публичной книге). */
   withOwner?: boolean
   defaults: Record<string, string>
+  /** Подпись счётчика: в книге это вся база, в кабинете — одно хозяйство. */
+  totalLabel?: string
   openAdvanced?: boolean
   /** Скрытые поля, которые нужно сохранить при GET-сабмите (например, вкладка). */
   hidden?: Record<string, string>
@@ -57,6 +59,7 @@ export function SearchPanel({
   herds,
   withOwner = false,
   defaults,
+  totalLabel = 'Всего животных',
   openAdvanced = false,
   hidden,
 }: SearchPanelProps) {
@@ -76,7 +79,7 @@ export function SearchPanel({
       <div className="mb-6 flex flex-wrap items-baseline justify-between gap-3">
         <h2 className="text-[28px] font-medium sm:text-[32px]">Поиск среди животных</h2>
         <p className="text-sm text-white/85">
-          Всего животных: <span className="font-medium">{total.toLocaleString('ru-RU')}</span>
+          {totalLabel}: <span className="font-medium">{total.toLocaleString('ru-RU')}</span>
         </p>
       </div>
 

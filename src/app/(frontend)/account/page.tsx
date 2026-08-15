@@ -183,6 +183,7 @@ async function AnimalsTab({
         <SearchPanel
           action="/account"
           total={total.totalDocs}
+          totalLabel="Животных в хозяйстве"
           herds={herdsResult.docs.map((h) => ({ id: h.id as number, name: h.name }))}
           defaults={defaults}
           openAdvanced={hasAdvancedValues(sp)}
@@ -200,42 +201,6 @@ async function AnimalsTab({
           <h2 className="section-title mb-0">Животные</h2>
 
           <div className="flex flex-wrap items-center gap-2 text-[14px]">
-            {/* Размер страницы: у крупных хозяйств тысячи голов, и листать
-                по 25 штук им незачем */}
-            <span className="text-ink-500">Показывать по:</span>
-            {PAGE_SIZES.map((size) => {
-              const isActive = perPage === size
-              const params = new URLSearchParams()
-              for (const [k, v] of Object.entries(sp)) {
-                if (k === 'perPage' || k === 'page') continue
-                const value = one(v)
-                if (value) params.set(k, value)
-              }
-              params.set('tab', 'animals')
-              if (size !== PAGE_SIZES[0]) params.set('perPage', String(size))
-
-              return (
-                <Link
-                  key={size}
-                  href={`/account?${params.toString()}`}
-                  aria-current={isActive ? 'true' : undefined}
-                  className={`rounded-lg px-2.5 py-2 transition-colors ${
-                    isActive
-                      ? 'bg-brand-50 font-medium text-forest-600'
-                      : 'text-ink-700 hover:bg-[#ededed]'
-                  }`}
-                >
-                  {pageSizeLabel(size)}
-                </Link>
-              )
-            })}
-            <span aria-hidden="true" className="mx-1 text-ink-300">
-              ·
-            </span>
-            <span className="text-ink-500">Всего в стаде: {total.totalDocs}</span>
-            <span aria-hidden="true" className="mx-1 text-ink-300">
-              ·
-            </span>
             <a
               href="/account/export?format=csv"
               className="rounded-lg bg-white px-3 py-2 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] transition-colors hover:bg-[#f6f6f6]"
@@ -260,12 +225,56 @@ async function AnimalsTab({
           canOpenAll
           emptyText="В вашем стаде пока нет записей. Загрузите данные через «Импорт данных»."
         />
-        <Pagination
-          page={result.page ?? 1}
-          totalPages={result.totalPages ?? 1}
-          searchParams={{ ...sp, tab: 'animals' }}
-          basePath="/account"
-        />
+        {/*
+           Подвал таблицы: слева — сколько показано и по сколько показывать,
+           справа — страницы. Оба управляют одной таблицей, поэтому стоят
+           под ней, а не в шапке раздела.
+        */}
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+          <div className="flex flex-wrap items-center gap-2 text-[14px]">
+            <span className="text-ink-500">
+              Показано {result.docs.length} из {result.totalDocs ?? 0}
+              {result.totalDocs !== total.totalDocs && ' (с учётом отбора)'}
+            </span>
+            <span aria-hidden="true" className="mx-1 text-ink-300">
+              ·
+            </span>
+            <span className="text-ink-500">Показывать по:</span>
+            {PAGE_SIZES.map((size) => {
+              const isActive = perPage === size
+              const params = new URLSearchParams()
+              for (const [k, v] of Object.entries(sp)) {
+                if (k === 'perPage' || k === 'page') continue
+                const value = one(v)
+                if (value) params.set(k, value)
+              }
+              params.set('tab', 'animals')
+              if (size !== PAGE_SIZES[0]) params.set('perPage', String(size))
+
+              return (
+                <Link
+                  key={size}
+                  href={`/account?${params.toString()}`}
+                  aria-current={isActive ? 'true' : undefined}
+                  className={`rounded-lg px-2.5 py-1.5 transition-colors ${
+                    isActive
+                      ? 'bg-brand-50 font-medium text-forest-600'
+                      : 'text-ink-700 hover:bg-[#ededed]'
+                  }`}
+                >
+                  {pageSizeLabel(size)}
+                </Link>
+              )
+            })}
+          </div>
+
+          <Pagination
+            page={result.page ?? 1}
+            totalPages={result.totalPages ?? 1}
+            searchParams={{ ...sp, tab: 'animals' }}
+            basePath="/account"
+          />
+        </div>
       </section>
     </>
   )
