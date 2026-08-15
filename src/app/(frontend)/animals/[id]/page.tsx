@@ -195,7 +195,7 @@ export default async function AnimalPage({
     <>
       <SiteHeader active="/" />
 
-      <main className={`container-page pt-10 pb-8 ${isForeign ? 'foreign-animal' : ''}`}>
+      <main className={`container-page pb-8 ${isForeign ? 'foreign-animal' : ''}`}>
         {isMine && <AccountNav active="animals" />}
 
         {isForeign && (

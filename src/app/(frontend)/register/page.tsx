@@ -41,7 +41,7 @@ export default async function RegisterPage() {
     <>
       <SiteHeader />
 
-      <main className="container-page pt-10 pb-8">
+      <main className="container-page pb-8">
         <section className="grid grid-cols-1 gap-8 rounded-card bg-brand-500 p-7 sm:p-10 lg:grid-cols-[1fr_1.05fr] lg:gap-12">
           <div className="text-white">
             <h1 className="text-[32px] font-medium leading-[1.12] sm:text-[42px]">

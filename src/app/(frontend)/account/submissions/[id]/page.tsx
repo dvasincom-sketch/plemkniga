@@ -94,7 +94,7 @@ export default async function SubmissionPage({
     <>
       <SiteHeader active="/account" />
 
-      <main className="container-page pt-10 pb-8">
+      <main className="container-page pb-8">
         <AccountNav active="events" />
 
         <div>

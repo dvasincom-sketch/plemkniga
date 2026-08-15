@@ -27,7 +27,7 @@ export default async function ImportPage() {
     <>
       <SiteHeader active="/account" />
 
-      <main className="container-page pt-10 pb-8">
+      <main className="container-page pb-8">
         <AccountNav active="animals" />
 
         <div>

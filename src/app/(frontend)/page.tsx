@@ -107,7 +107,7 @@ export default async function HerdbookPage({
     <>
       <SiteHeader active="/" />
 
-      <main className="container-page pt-10 pb-8">
+      <main className="container-page pb-8">
         {/*
           Шапка и заставка стоят в две колонки: так они занимают одну высоту
           вместо двух и каталог оказывается ближе к верху экрана. Как только

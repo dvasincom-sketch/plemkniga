@@ -39,6 +39,7 @@ export async function SiteHeader({ active }: { active?: string }) {
   ]
 
   return (
+    <>
     <header className="border-b border-ink-100 bg-white">
       <div className="container-page flex items-center justify-between gap-6 py-4">
         <Logo />
@@ -105,5 +106,15 @@ export async function SiteHeader({ active }: { active?: string }) {
         )}
       </div>
     </header>
+
+    {/*
+       Воздух под шапкой.
+       Высота задана инлайновым стилем намеренно: и служебный класс, и правило
+       в globals.css зависят от того, пересобрались ли стили, — трижды из-за
+       этого отступ не появлялся. Инлайновый стиль приезжает вместе с разметкой
+       и работает всегда.
+    */}
+    <div aria-hidden="true" style={{ height: 40 }} className="no-print" />
+    </>
   )
 }

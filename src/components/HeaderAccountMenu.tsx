@@ -28,7 +28,7 @@ export function HeaderAccountMenu({
   active?: string
 }) {
   const [open, setOpen] = useState(false)
-  const [rect, setRect] = useState<{ top: number; right: number } | null>(null)
+  const [rect, setRect] = useState<{ top: number; right: number; width: number } | null>(null)
   const anchorRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -37,7 +37,9 @@ export function HeaderAccountMenu({
     const el = anchorRef.current
     if (!el) return
     const r = el.getBoundingClientRect()
-    setRect({ top: r.bottom, right: window.innerWidth - r.right })
+    // Ширина списка равна ширине блока имени — тогда тригger и список
+    // складываются в один силуэт со скруглёнными углами, без ступеньки
+    setRect({ top: r.bottom, right: window.innerWidth - r.right, width: Math.max(r.width, 210) })
   }, [])
 
   // Небольшая задержка на закрытие: иначе меню исчезает, пока курсор
@@ -82,9 +84,9 @@ export function HeaderAccountMenu({
         aria-expanded={open}
         aria-haspopup="true"
         onFocus={show}
-        className={`flex items-center gap-2.5 rounded-t-2xl px-3 py-2 transition-colors ${
+        className={`flex items-center gap-2.5 px-3 py-2 transition-colors ${
           open
-            ? 'bg-forest-500 text-white'
+            ? 'rounded-t-2xl bg-forest-500 text-white'
             : isProfile
               ? 'text-forest-500'
               : 'text-ink-900 hover:text-forest-500'
@@ -118,10 +120,10 @@ export function HeaderAccountMenu({
             ref={listRef}
             onMouseEnter={show}
             onMouseLeave={hide}
-            style={{ top: rect.top, right: rect.right }}
-            className="fixed z-[100] w-[230px] overflow-hidden rounded-b-2xl rounded-tl-2xl bg-forest-500 py-1.5 shadow-[0_16px_40px_rgb(23_24_26_/_0.22)]"
+            style={{ top: rect.top, right: rect.right, width: rect.width }}
+            className="fixed z-[100] overflow-hidden rounded-b-2xl bg-forest-500 pb-1.5 shadow-[0_16px_40px_rgb(23_24_26_/_0.22)]"
           >
-            <ul>
+            <ul className="border-t border-white/15">
               {ACCOUNT_TABS.map((t) => (
                 <li key={t.key}>
                   <Link
