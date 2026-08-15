@@ -89,7 +89,7 @@ export async function collectPedigreeFacts(
 
 const trustRequirement = (animal: Animal): Requirement => ({
   key: 'trust',
-  label: 'Уровень достоверности данных — 3 (верифицировано Ассоциацией)',
+  label: 'Данные верифицированы Ассоциацией',
   ok: (animal.trustLevel ?? 0) >= 3,
   fix: 'Отправьте данные на проверку через «События → Загрузка данных». Уровень поднимает сотрудник Ассоциации после сверки документов',
 })

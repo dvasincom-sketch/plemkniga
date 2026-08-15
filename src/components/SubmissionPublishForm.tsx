@@ -20,7 +20,7 @@ export function SubmissionPublishForm({
   if (alreadyPublished) {
     return (
       <p className="mt-6 rounded-xl bg-brand-50 px-5 py-4 text-sm text-forest-600">
-        Данные приняты и опубликованы. Животные организации получили уровень достоверности 3 —
+        Данные приняты и опубликованы. Записи организации получили статус
         «Верифицировано ассоциацией».
       </p>
     )

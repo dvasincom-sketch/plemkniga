@@ -255,7 +255,10 @@ export function SearchPanel({
                   .filter((t) => Number(t.value) >= 0)
                   .map((t) => ({
                     value: t.value,
-                    label: `${t.value} — ${t.label}${Number(t.value) < 3 ? ' и выше' : ''}`,
+                    // Номер ступени в подпись не выносится: он ничего
+                    // не добавляет к названию и заставляет держать шкалу
+                    // в голове. «И выше» само задаёт порядок
+                    label: `${t.label}${Number(t.value) < 3 ? ' и выше' : ''}`,
                   }))}
                 className="w-[320px]"
               />

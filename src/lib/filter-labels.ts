@@ -1,4 +1,4 @@
-import { AGE_GROUPS, ID_FORMATS, RELATIONS, SEXES, STATES, labelOf } from '@/lib/dictionaries'
+import { AGE_GROUPS, ID_FORMATS, RELATIONS, SEXES, STATES, TRUST_LEVELS, labelOf } from '@/lib/dictionaries'
 import { ADVANCED_FIELDS } from '@/lib/animal-query'
 
 export type Herd = { id: number; name: string }
@@ -36,8 +36,13 @@ export function describeFilter(
       const herd = herds.find((h) => String(h.id) === value)
       return { label: 'Стадо', value: herd?.name ?? value }
     }
-    case 'trust':
-      return { label: 'Достоверность', value: `не ниже ${value}` }
+    case 'trust': {
+      // В «фишке» отбора то же название ступени, что и в карточке животного,
+      // — цифра шкалы наружу нигде не выходит
+      const level = TRUST_LEVELS.find((t) => t.value === value)
+      const suffix = Number(value) < 3 ? ' и выше' : ''
+      return { label: 'Достоверность', value: level ? `${level.label}${suffix}` : value }
+    }
     case 'forSale':
       return { label: 'Продажа', value: 'выставлено' }
     case 'ipcFrom':
