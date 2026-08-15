@@ -12,6 +12,7 @@ import { VisibilityForm } from '@/components/VisibilityForm'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { viewerOf, type Viewer } from '@/lib/visibility'
 import {
+  NOT_ARCHIVED,
   PAGE_SIZES,
   buildAnimalWhere,
   currentPage,
@@ -169,7 +170,11 @@ async function AnimalsTab({
       sort: 'name',
       overrideAccess: true,
     }),
-    payload.count({ collection: 'animals', where: scope, overrideAccess: true }),
+    payload.count({
+      collection: 'animals',
+      where: { and: [NOT_ARCHIVED, scope] },
+      overrideAccess: true,
+    }),
   ])
 
   const defaults: Record<string, string> = {}

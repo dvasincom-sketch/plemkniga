@@ -10,6 +10,7 @@ import { AnimalCards } from '@/components/AnimalCards'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { viewerOf } from '@/lib/visibility'
 import {
+  NOT_ARCHIVED,
   ANON_SHOW_LIMIT,
   FILTER_KEYS,
   PRESETS,
@@ -56,7 +57,7 @@ export default async function HerdbookPage({
       user,
     }),
     payload.find({ collection: 'herds', limit: 500, sort: 'name', overrideAccess: true }),
-    payload.count({ collection: 'animals', overrideAccess: false, user }),
+    payload.count({ collection: 'animals', where: NOT_ARCHIVED, overrideAccess: false, user }),
     payload.find({
       collection: 'organizations',
       limit: 500,
@@ -77,7 +78,7 @@ export default async function HerdbookPage({
         try {
           const { totalDocs } = await payload.count({
             collection: 'animals',
-            where: p.probe,
+            where: { and: [NOT_ARCHIVED, p.probe] },
             overrideAccess: false,
             user,
           })

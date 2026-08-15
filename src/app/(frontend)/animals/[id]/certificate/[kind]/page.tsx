@@ -3,7 +3,8 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { isAnimalLocked, viewerOf } from '@/lib/visibility'
-import { buildPedigree, wrightInbreeding, type PedigreeNode } from '@/lib/pedigree'
+import { buildPedigree, type PedigreeNode } from '@/lib/pedigree'
+import { analyzeAncestry } from '@/lib/ancestry'
 import {
   CERTIFICATE_KINDS,
   certificateReadiness,
@@ -131,7 +132,9 @@ export default async function CertificatePage({ params }: { params: Promise<Para
 
   const roots = await buildPedigree(payload, animal, 3)
   const nodes = byCode(roots)
-  const coi = await wrightInbreeding(payload, animal)
+  // Тот же расчёт, что и в карточке: два независимых считателя одного
+  // коэффициента рано или поздно разойдутся, и в документе это недопустимо
+  const coi = (await analyzeAncestry(payload, animal)).coi
 
   const owner = relName(animal.owner)
   const ownerAddress =

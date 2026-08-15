@@ -466,14 +466,22 @@ const run = async () => {
     created++
   }
 
-  /* ---------------- Родословная эталонной карточки (3 ряда предков) -------- */
+  /* ------------- Родословная эталонной карточки: девять колен ------------- */
   log('Создание предков для генеалогического древа…')
 
   type Anc = { code: string; name: string; num: string; sex: 'male' | 'female'; year: number }
 
-  // Ряды: О/М → ОО/МО/ОМ/ММ → восемь предков третьего ряда
-  // Ключи — условные, не коды позиций: одно животное может стоять в двух местах древа
+  /*
+   * Три ближних колена заданы поимённо: они попадают в дерево карточки
+   * и в оба документа, поэтому клички и номера здесь не случайные.
+   * Колена с четвёртого по девятое строятся дальше по коду.
+   *
+   * Порядок списка — от дальних колен к ближним: связи ставятся сразу при
+   * создании, поэтому родитель должен существовать раньше потомка.
+   * Ключи условные, не коды позиций: одно животное стоит в разных местах древа.
+   */
   const ancestors: (Anc & { trust?: number })[] = [
+    // 3-е колено и ближе — они же участвуют в древе и в документах
     { code: 'enhancer', name: 'Г.Энханкер', num: '343514', sex: 'male', year: 2000, trust: 3 },
     { code: 'pinkey', name: 'Пинкей', num: '3243815', sex: 'female', year: 2000, trust: 1 },
     { code: 'sharlet', name: 'Шарлет', num: '11206193', sex: 'female', year: 2000, trust: 3 },
@@ -489,11 +497,14 @@ const run = async () => {
   ]
 
   /**
-   * Связи подобраны так, чтобы древо демонстрировало обе ситуации:
+   * Связи в трёх видимых рядах подобраны так, чтобы древо демонстрировало
+   * обе ситуации:
    *  — Шарлет стоит и у отца (ММО), и у матери (МММ) — общий предок,
    *    даёт вклад в коэффициент инбридинга животного: (1/2)^5 = 3,125%;
    *  — Г.Энханкер дважды встречается только со стороны отца (ООО и ОМО) —
    *    инбредным оказывается сам отец, на COI потомка это не влияет.
+   *
+   * Глубже связи достраиваются кодом — см. ниже.
    */
   const parentsOf: Record<string, [string | null, string | null]> = {
     palash: ['dubras', 'shfsharlet'],
@@ -502,6 +513,7 @@ const run = async () => {
     shfsharlet: ['enhancer', 'sharlet'],
     ralf: ['jupiter', 'klay'],
     prelest: ['fagin', 'sharlet'],
+
   }
 
   const ancIds: Record<string, number> = {}
@@ -532,6 +544,99 @@ const run = async () => {
       },
     })
     ancIds[a.code] = (created as { id: number }).id
+  }
+
+  /* --------------- Колена с четвёртого по девятое: генерация -------------- */
+
+  /*
+   * Дальние колена перечислять вручную бессмысленно: их сотни, клички там
+   * никто не читает, а нужны они ради одного — чтобы разбор родословной
+   * вглубь имел что показать.
+   *
+   * Размеры колен подобраны по жизни, а не по формуле 2^n. Настоящая
+   * родословная в глубину сужается: слоты удваиваются, а разных животных
+   * становится всё меньше, потому что одни и те же быки стоят в десятках
+   * мест. Если же взять слишком узкое колено, ветви схлопнутся к горстке
+   * основателей и коэффициент инбридинга улетит к десяткам процентов —
+   * такого в голштинской популяции не бывает.
+   */
+  const DEEP_SIZES: Record<number, number> = { 4: 12, 5: 22, 6: 40, 7: 68, 8: 104, 9: 140 }
+
+  /** Предки третьего колена — от них начинается достройка вглубь. */
+  const GEN3 = ['enhancer', 'pinkey', 'sharlet', 'jupiter', 'klay', 'fagin']
+
+  const deepName = (generation: number, index: number, male: boolean) =>
+    `${male ? 'Предок' : 'Праматерь'} ${generation}-${index + 1}`
+
+  let previous = GEN3
+
+  for (let generation = 4; generation <= 9; generation++) {
+    const size = DEEP_SIZES[generation]
+    const males = Math.ceil(size / 2)
+    const codes: string[] = []
+
+    for (let i = 0; i < size; i++) {
+      const male = i < males
+      const code = `g${generation}_${i}`
+      codes.push(code)
+
+      const created = await payload.create({
+        collection: 'animals',
+        overrideAccess: true,
+        data: {
+          identNumber: `${generation}${String(i).padStart(3, '0')}${male ? '1' : '2'}00`,
+          idFormat: 'internal',
+          name: deepName(generation, i, male),
+          kind: male ? 'bull' : 'cow',
+          sex: male ? 'male' : 'female',
+          state: 'sold',
+          ageGroup: male ? 'bull' : 'cow3',
+          birthDate: new Date(2010 - generation * 5, 0, 1).toISOString(),
+          breed: ref('breeds', '1'),
+          owner: orgs[0].id,
+          author: farmer.id,
+          // Записи предков в книге не показываются: они не поголовье,
+          // а строительный материал родословных
+          publicVisible: false,
+          publicDetails: false,
+          trustLevel: generation <= 5 ? 2 : 1,
+          archived: true,
+          archiveReason: 'Запись предка для построения родословной',
+        },
+      })
+      ancIds[code] = (created as { id: number }).id
+    }
+
+    /*
+     * Раздача родителей.
+     *
+     * Подряд, а не с шагом. Шаг казался способом «перемешать» родителей,
+     * но кратный размеру колена он схлопывает выбор до двух-трёх животных:
+     * при шаге 3 и шести быках отцами становятся только первый и четвёртый.
+     * Родословная вырождалась в несколько замкнутых линий, а коэффициент
+     * инбридинга улетал за 20 % — таких животных в породе не бывает.
+     *
+     * Подряд же повторы возникают ровно там, где колено уже слоя потомков,
+     * и тем глубже, чем дальше от животного: именно так устроена настоящая
+     * родословная. Женский индекс дополнительно сдвигается, иначе одна и та же
+     * пара родителей повторялась бы целиком и вместо общих предков появились
+     * бы полные сибсы.
+     */
+    const femalesFrom = males
+    const femaleCount = size - males
+
+    for (let i = 0; i < previous.length; i++) {
+      const father = codes[i % males]
+      const mother = codes[femalesFrom + ((i + Math.floor(i / femaleCount)) % femaleCount)]
+      await payload.update({
+        collection: 'animals',
+        id: ancIds[previous[i]],
+        overrideAccess: true,
+        data: { father: ancIds[father], mother: ancIds[mother] },
+      })
+    }
+
+    previous = codes
   }
 
   /* ------------------- Показательная карточка «Поляна» --------------------- */

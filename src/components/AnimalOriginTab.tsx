@@ -1,7 +1,9 @@
 import Link from 'next/link'
 import { getClient } from '@/lib/payload'
-import { analyzePedigree, buildPedigree, flattenPedigree, wrightInbreeding } from '@/lib/pedigree'
+import { analyzePedigree, buildPedigree, flattenPedigree } from '@/lib/pedigree'
+import { analyzeAncestry } from '@/lib/ancestry'
 import { PedigreeTree } from './PedigreeTree'
+import { KeyAncestors } from './KeyAncestors'
 import { dateRu, nf } from '@/lib/format'
 import { trustLabel } from '@/lib/dictionaries'
 import { INBREEDING_MANUAL_APPROVAL, INBREEDING_WARNING } from '@/lib/animal-id'
@@ -19,10 +21,20 @@ const relName = (v: unknown): string => {
 export async function AnimalOriginTab({ animal }: { animal: Animal }) {
   const payload = await getClient()
 
-  const [roots, computedCoi] = await Promise.all([
+  /*
+   * Дерево и разбор вглубь считаются из одного и того же графа предков,
+   * но по-разному: дерево — три ряда для чтения и для документов, разбор —
+   * девять колен, свёрнутых в таблицу.
+   *
+   * Коэффициент инбридинга берётся из разбора, а не считается отдельно:
+   * иначе число под деревом и сумма вкладов в таблице разошлись бы, и было
+   * бы непонятно, какому из них верить.
+   */
+  const [roots, ancestry] = await Promise.all([
     buildPedigree(payload, animal, 3),
-    wrightInbreeding(payload, animal, 5),
+    analyzeAncestry(payload, animal),
   ])
+  const computedCoi = ancestry.coi
 
   // Источники данных: откуда в системе появились сведения об этом животном
   const [submissions, documents] = await Promise.all([
@@ -102,6 +114,12 @@ export async function AnimalOriginTab({ animal }: { animal: Animal }) {
 
       <section className="mt-6">
         <PedigreeTree roots={roots} coi={coi} analysis={analysis} />
+      </section>
+
+      {/* Вглубь — отдельным блоком: три ряда читают глазами, девять колен
+          читают числами */}
+      <section className="mt-8">
+        <KeyAncestors report={ancestry} />
       </section>
 
       {typeof coi === 'number' && coi > INBREEDING_WARNING && (

@@ -2,16 +2,16 @@ import type { Payload } from 'payload'
 import type { Animal } from '@/payload-types'
 
 /**
- * Построение генеалогического древа и расчёт коэффициента инбридинга.
+ * Построение генеалогического древа для карточки и документов.
  *
- * ТЗ, UC-02 п. 6.2.2: визуализация родословной, коэффициент инбридинга
- * рассчитывается автоматически по формуле Райта
- *   F = Σ (1/2)^(p+q+1) · (1 + F_A),
- * где p и q — число поколений от отца и от матери до общего предка A,
- * F_A — коэффициент инбридинга самого общего предка.
+ * ТЗ, UC-02 п. 6.2.2: визуализация родословной. Здесь только три ряда —
+ * ровно то, что печатается в зоотехническом сертификате и в племенном
+ * свидетельстве, и ровно то, что человек способен прочитать глазами.
  *
- * Контрольные значения (ТЗ): родитель–потомок 0,5; полные сибсы 0,5;
- * двоюродные 0,125; неродственные ≈ 0.
+ * Коэффициент инбридинга живёт в `lib/ancestry.ts` вместе с разбором
+ * родословной вглубь: он считается по тем же путям, что и доли крови
+ * предков, и держать рядом вторую реализацию формулы Райта — верный способ
+ * получить два разных числа в двух местах одной страницы.
  */
 
 export type PedigreeAnimal = {
@@ -129,90 +129,6 @@ export async function buildPedigree(
       name: pt?.motherName,
     }),
   ]
-}
-
-/* ------------------------------------------------------------------ */
-/*                  Коэффициент инбридинга (формула Райта)              */
-/* ------------------------------------------------------------------ */
-
-/**
- * Все предки животного с минимальным числом поколений до него.
- * Возвращает Map<id предка, набор длин путей>.
- */
-async function ancestorPaths(
-  load: (id: number) => Promise<Animal | null>,
-  startId: number | null,
-  maxDepth: number,
-): Promise<Map<number, number[]>> {
-  const result = new Map<number, number[]>()
-  if (!startId) return result
-
-  const walk = async (id: number | null, dist: number) => {
-    if (!id || dist > maxDepth) return
-    const paths = result.get(id) ?? []
-    paths.push(dist)
-    result.set(id, paths)
-
-    const doc = await load(id)
-    if (!doc) return
-    await walk(idOf(doc.father), dist + 1)
-    await walk(idOf(doc.mother), dist + 1)
-  }
-
-  await walk(startId, 0)
-  return result
-}
-
-/**
- * Коэффициент инбридинга животного, %.
- * Учитывает только общих предков отца и матери в пределах `maxDepth` поколений.
- */
-export async function wrightInbreeding(
-  payload: Payload,
-  animal: Animal,
-  maxDepth = 5,
-): Promise<number> {
-  const load = createAnimalLoader(payload)
-
-  const fatherId = idOf(animal.father)
-  const motherId = idOf(animal.mother)
-  if (!fatherId || !motherId) return 0
-
-  const [sirePaths, damPaths] = await Promise.all([
-    ancestorPaths(load, fatherId, maxDepth),
-    ancestorPaths(load, motherId, maxDepth),
-  ])
-
-  let f = 0
-  for (const [ancestorId, ps] of sirePaths) {
-    const qs = damPaths.get(ancestorId)
-    if (!qs) continue
-
-    // Коэффициент инбридинга самого общего предка (одно поколение вглубь)
-    const ancestor = await load(ancestorId)
-    const aFather = ancestor ? idOf(ancestor.father) : null
-    const aMother = ancestor ? idOf(ancestor.mother) : null
-    let fa = 0
-    if (aFather && aMother) {
-      const [afp, amp] = await Promise.all([
-        ancestorPaths(load, aFather, Math.max(0, maxDepth - 2)),
-        ancestorPaths(load, aMother, Math.max(0, maxDepth - 2)),
-      ])
-      for (const [cid, cps] of afp) {
-        const cqs = amp.get(cid)
-        if (!cqs) continue
-        for (const p of cps) for (const q of cqs) fa += 0.5 ** (p + q + 1)
-      }
-    }
-
-    for (const p of ps) {
-      for (const q of qs) {
-        f += 0.5 ** (p + q + 1) * (1 + fa)
-      }
-    }
-  }
-
-  return Math.round(f * 100 * 100) / 100
 }
 
 /** Плоский список узлов — для проверок и выгрузок. */
