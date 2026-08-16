@@ -131,7 +131,7 @@ export function SubmissionHistory({ submissions }: { submissions: DataSubmission
         return (
           <li
             key={e.key}
-            className={`flex items-center gap-6 rounded-2xl pr-4 transition-shadow sm:pr-6 ${
+            className={`flex items-center gap-6 rounded-2xl pl-4 pr-4 transition-shadow sm:pl-2 sm:pr-2 ${
               e.isCurrent
                 ? 'bg-white shadow-[0_2px_10px_rgb(23_24_26_/_0.06)]'
                 : 'bg-white/55 hover:bg-white'

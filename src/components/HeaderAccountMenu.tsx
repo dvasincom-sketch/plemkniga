@@ -42,7 +42,7 @@ export function HeaderAccountMenu({
     // Ширина списка в точности равна ширине блока имени: любое расхождение
     // даёт ступеньку на стыке, и силуэт перестаёт читаться как одна плашка.
     // Минимальную ширину задаёт сам блок имени, а не список.
-    setRect({ top: r.bottom, right: window.innerWidth - r.right, width: r.width })
+    setRect({ top: r.bottom - 1, right: window.innerWidth - r.right, width: r.width })
   }, [])
 
   // Небольшая задержка на закрытие: иначе меню исчезает, пока курсор
@@ -88,24 +88,18 @@ export function HeaderAccountMenu({
         aria-haspopup="true"
         onFocus={show}
         /*
-           Скругление задано всегда, а не только в раскрытом состоянии:
-           иначе при появлении фона углы успевали мигнуть прямыми — фон
-           анимируется, радиус нет.
-
-           Собственной подсветки при наведении у ссылки нет намеренно:
-           наведение и так раскрывает меню и красит блок в зелёный.
-           Две реакции на одно движение читались как два разных элемента.
+           Скругление сверху только в раскрытом состоянии: в шапке блок
+           выглядит как обычная кнопка, а при открытии смыкается со списком
+           в одну плашку. В закрытом виде — лёгкая подсветка фона при наведении.
         */
-        className={`flex items-center gap-2.5 rounded-t-2xl px-3 py-2 transition-colors duration-150 ${
+        className={`flex items-center gap-2.5 px-3 py-2 transition-[background-color,color,box-shadow] duration-150 ${
           open
-            ? 'bg-forest-500 text-white'
-            : isProfile
-              ? 'text-forest-500'
-              : 'text-ink-900'
+            ? 'rounded-t-2xl bg-forest-500 text-white shadow-[0_8px_24px_rgb(23_24_26_/_0.12)]'
+            : `rounded-xl ${isProfile ? 'text-forest-500' : 'text-ink-900'} hover:bg-ink-50`
         }`}
       >
         <span
-          className={`flex h-9 w-9 flex-none items-center justify-center rounded-full ${
+          className={`flex h-9 w-9 flex-none items-center justify-center rounded-full transition-colors duration-150 ${
             open ? 'bg-white text-forest-500' : 'bg-ink-900 text-white'
           }`}
         >
@@ -135,13 +129,13 @@ export function HeaderAccountMenu({
             style={{ top: rect.top, right: rect.right, width: rect.width }}
             className="account-menu fixed z-[100] overflow-hidden rounded-b-2xl bg-forest-500 pb-1.5 shadow-[0_16px_40px_rgb(23_24_26_/_0.22)]"
           >
-            <ul className="border-t border-white/15">
+            <ul>
               {ACCOUNT_TABS.map((t) => (
                 <li key={t.key}>
                   <Link
                     href={`/account?tab=${t.key}`}
                     onClick={() => setOpen(false)}
-                    className="block px-4 py-2.5 text-[15px] text-white transition-colors hover:bg-brand-500"
+                    className="block px-4 py-2.5 text-[15px] text-white/95 transition-colors hover:bg-white/10 active:bg-white/15"
                   >
                     {t.label}
                   </Link>
@@ -151,11 +145,11 @@ export function HeaderAccountMenu({
 
             {/* Уведомления и профиль — не разделы кабинета, а личные страницы
                 пользователя, поэтому стоят за чертой */}
-            <div className="mt-1.5 border-t border-white/20">
+            <div className="mt-1 border-t border-white/15 pt-1">
               <Link
                 href="/account/notifications"
                 onClick={() => setOpen(false)}
-                className="flex items-center justify-between gap-3 px-4 py-2.5 text-[14px] text-white/85 transition-colors hover:bg-brand-500 hover:text-white"
+                className="flex items-center justify-between gap-3 px-4 py-2.5 text-[14px] text-white/80 transition-colors hover:bg-white/10 hover:text-white active:bg-white/15"
               >
                 Уведомления
                 {unread > 0 && (
@@ -168,7 +162,7 @@ export function HeaderAccountMenu({
               <Link
                 href="/account/profile"
                 onClick={() => setOpen(false)}
-                className="block px-4 py-2.5 text-[14px] text-white/85 transition-colors hover:bg-brand-500 hover:text-white"
+                className="block px-4 py-2.5 text-[14px] text-white/80 transition-colors hover:bg-white/10 hover:text-white active:bg-white/15"
               >
                 Профиль пользователя
               </Link>
