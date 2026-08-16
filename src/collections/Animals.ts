@@ -907,5 +907,47 @@ export const Animals: CollectionConfig = {
         return data
       },
     ],
+
+    /*
+     * Индекс племенной ценности хранится рассчитанным — по строке на пару
+     * «животное + профиль». Оценки изменились, значит изменился и индекс:
+     * пересчитываем это животное по всем профилям.
+     *
+     * Ошибка пересчёта не отменяет сохранение животного. Данные о животном
+     * первичны, индекс — производная от них; уронить сохранение из-за
+     * производной значило бы поменять их местами. Расхождение потом видно
+     * в списке и чинится `npm run backfill:index`.
+     */
+    afterChange: [
+      async ({ doc, req }) => {
+        const { skipRecompute, recomputeAnimal } = await import('@/lib/index-values')
+        if (skipRecompute()) return doc
+        try {
+          await recomputeAnimal(req.payload, doc, { req })
+        } catch (e) {
+          req.payload.logger.error(
+            `Не удалось пересчитать индекс животного ${doc.identNumber}: ${
+              e instanceof Error ? e.message : e
+            }`,
+          )
+        }
+        return doc
+      },
+    ],
+
+    afterDelete: [
+      async ({ doc, req }) => {
+        try {
+          await req.payload.delete({
+            collection: 'index-values',
+            where: { animal: { equals: doc.id } },
+            overrideAccess: true,
+          })
+        } catch {
+          // Значения без животного никому не мешают и уберутся при пересчёте
+        }
+        return doc
+      },
+    ],
   },
 }

@@ -5,6 +5,13 @@
  * Скрипт идемпотентен: перед наполнением он удаляет ранее созданные демо-записи.
  */
 import 'dotenv/config'
+
+/*
+ * Пересчёт индекса на время сида выключен: он делается одним прогоном в конце.
+ * Флаг ставится до импорта Payload, потому что хуки читают его при вызове.
+ */
+process.env.INDEX_VALUES_SKIP = '1'
+
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { getPayload } from 'payload'
@@ -1181,6 +1188,16 @@ const run = async () => {
       organization: orgs[0].id,
     },
   })
+
+  /*
+   * Пересчёт индекса — одним прогоном в конце, а не хуком на каждом животном.
+   * Хуки на время сида выключены (`INDEX_VALUES_SKIP`): пересчитывать
+   * пять с лишним сотен животных по одному значило бы растянуть наполнение
+   * базы на десятки минут ради значений, которые всё равно переписываются.
+   */
+  const { recomputeAll } = await import('../lib/index-values')
+  const { profiles: profileCount, rows } = await recomputeAll(payload)
+  log(`Индекс рассчитан: профилей ${profileCount}, значений ${rows}.`)
 
   log(`Готово. Организаций: ${orgs.length + 1}, животных: ${created + bulls.length + 1}.`)
   log(`Демо-вход: farmer@nazarovskoe.ru / ${PASSWORD}`)

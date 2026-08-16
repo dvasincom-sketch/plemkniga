@@ -28,7 +28,8 @@ import {
 } from '@/lib/animal-query'
 import { describeFilter } from '@/lib/filter-labels'
 import { loadProfileChoices, selectProfile } from '@/lib/index-profiles'
-import { RANKING_CAP, findRankedByProfile, indexValues } from '@/lib/index-column'
+import { RANKING_CAP, indexValues, rankByProfile } from '@/lib/index-column'
+import { indexValuesLag } from '@/lib/index-values'
 import type { Animal, Organization } from '@/payload-types'
 
 export const dynamic = 'force-dynamic'
@@ -66,11 +67,11 @@ export default async function HerdbookPage({
   ])
   const profileKey = profile?.key ?? NO_PROFILE
   const sort = resolveSort(sp, Boolean(profile))
-  const rankByProfile = Boolean(profile) && sort.value === 'profile'
+  const orderByProfile = Boolean(profile) && sort.value === 'profile'
 
   const [result, herdsResult, totalAll, orgsResult, presetCounts] = await Promise.all([
-    rankByProfile
-      ? findRankedByProfile({
+    orderByProfile
+      ? rankByProfile({
           payload,
           where,
           profile: profile!,
@@ -152,6 +153,16 @@ export default async function HerdbookPage({
       : indexValues(animals, profile)
     : undefined
   const rankingCapped = 'capped' in result ? result.capped : false
+
+  /*
+   * Отставание пересчёта проверяется только когда порядок построен
+   * по хранимым значениям: в остальных случаях список и так собран
+   * из живых данных, и сверять нечего.
+   */
+  const lagMissing =
+    profile && 'stored' in result && result.stored
+      ? (await indexValuesLag(payload, profile.key)).missing
+      : 0
   const hasMore = found > animals.length
   // Гостю книга открыта на три экрана, дальше предлагаем бесплатную регистрацию
   const canShowMore = Boolean(user) || shown < ANON_SHOW_LIMIT
@@ -296,17 +307,27 @@ export default async function HerdbookPage({
             />
 
             {/*
-               Усечение проговаривается вслух. Порядок по профилю строится
-               в памяти, и когда отбор шире потолка, наверху оказываются лучшие
-               из порции, а не из всей книги. Промолчать здесь — показать
-               неполный список как полный.
+               Неполнота проговаривается вслух — в обоих её видах.
+               Порядок без хранимых значений строится в памяти по порции,
+               и наверху оказываются лучшие из порции, а не из книги. Отставший
+               пересчёт означает, что часть животных в список просто не попала.
+               Промолчать здесь — показать неполный список как полный.
             */}
             {rankingCapped && (
               <p className="mb-4 rounded-xl bg-[#fff6e5] px-4 py-3 text-[14px] leading-relaxed">
                 Порядок по профилю «{profile?.name}» построен по{' '}
                 {RANKING_CAP.toLocaleString('ru-RU')} записям отбора с наибольшим ИПЦ — всего
-                в отборе {found.toLocaleString('ru-RU')}. Сузьте отбор, чтобы охватить весь
-                список.
+                в отборе {found.toLocaleString('ru-RU')}. Значения по этому профилю ещё
+                не рассчитаны; после пересчёта ограничение снимается.
+              </p>
+            )}
+
+            {lagMissing > 0 && (
+              <p className="mb-4 rounded-xl bg-[#fff6e5] px-4 py-3 text-[14px] leading-relaxed">
+                Пересчёт по профилю «{profile?.name}» не охватил{' '}
+                {lagMissing.toLocaleString('ru-RU')}{' '}
+                {plural(lagMissing, 'запись', 'записи', 'записей')} — их нет в этом порядке.
+                Полный пересчёт: <code className="rounded bg-canvas px-1.5 py-0.5">npm run backfill:index</code>
               </p>
             )}
 
@@ -420,4 +441,13 @@ export default async function HerdbookPage({
       <SiteFooter />
     </>
   )
+}
+
+/** Склонение по числу: 1 запись, 2 записи, 5 записей. */
+const plural = (n: number, one_: string, few: string, many: string) => {
+  const n10 = n % 10
+  const n100 = n % 100
+  if (n10 === 1 && n100 !== 11) return one_
+  if (n10 >= 2 && n10 <= 4 && (n100 < 12 || n100 > 14)) return few
+  return many
 }

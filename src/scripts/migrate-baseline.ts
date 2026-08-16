@@ -61,6 +61,11 @@ const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
     probe: { kind: 'table', name: 'index_profiles' },
     note: 'профили индекса',
   },
+  {
+    name: '20260816_081002_index_values',
+    probe: { kind: 'table', name: 'index_values' },
+    note: 'хранимые значения индекса',
+  },
 ]
 
 const { driverUri, uri, source, sslConfig } = resolveDatabase()

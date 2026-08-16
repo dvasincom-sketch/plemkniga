@@ -78,6 +78,7 @@ export interface Config {
     'data-submissions': DataSubmission;
     'access-requests': AccessRequest;
     'index-profiles': IndexProfile;
+    'index-values': IndexValue;
     events: Event;
     documents: Document;
     media: Media;
@@ -114,6 +115,7 @@ export interface Config {
     'data-submissions': DataSubmissionsSelect<false> | DataSubmissionsSelect<true>;
     'access-requests': AccessRequestsSelect<false> | AccessRequestsSelect<true>;
     'index-profiles': IndexProfilesSelect<false> | IndexProfilesSelect<true>;
+    'index-values': IndexValuesSelect<false> | IndexValuesSelect<true>;
     events: EventsSelect<false> | EventsSelect<true>;
     documents: DocumentsSelect<false> | DocumentsSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
@@ -1108,6 +1110,33 @@ export interface IndexProfile {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "index-values".
+ */
+export interface IndexValue {
+  id: number;
+  animal: number | Animal;
+  profileKey: string;
+  profileName?: string | null;
+  kind?: ('selection' | 'economic') | null;
+  weights?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  baseVersion?: string | null;
+  value: number;
+  reliability?: number | null;
+  used?: number | null;
+  computedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "events".
  */
 export interface Event {
@@ -1206,6 +1235,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'index-profiles';
         value: number | IndexProfile;
+      } | null)
+    | ({
+        relationTo: 'index-values';
+        value: number | IndexValue;
       } | null)
     | ({
         relationTo: 'events';
@@ -1793,6 +1826,24 @@ export interface IndexProfilesSelect<T extends boolean = true> {
         id?: T;
       };
   author?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "index-values_select".
+ */
+export interface IndexValuesSelect<T extends boolean = true> {
+  animal?: T;
+  profileKey?: T;
+  profileName?: T;
+  kind?: T;
+  weights?: T;
+  baseVersion?: T;
+  value?: T;
+  reliability?: T;
+  used?: T;
+  computedAt?: T;
   updatedAt?: T;
   createdAt?: T;
 }

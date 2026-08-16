@@ -151,5 +151,47 @@ export const IndexProfiles: CollectionConfig = {
         return data
       },
     ],
+
+    /*
+     * Веса изменились — значит изменился порядок животных по этому профилю.
+     * Пересчёт трогает всю книгу и потому не мгновенный: правка весов
+     * перестаёт быть бесплатной.
+     *
+     * Это осознанный размен. Профиль настраивают редко и обдуманно, а платят
+     * пересчётом один раз; списки же открывают каждый день, и там нужен
+     * готовый порядок. Обратный размен — считать при каждом показе — упирался
+     * в потолок ранжирования, из-за которого широкий отбор показывал неполный
+     * список.
+     */
+    afterChange: [
+      async ({ doc, req }) => {
+        const { skipRecompute, recomputeProfile } = await import('@/lib/index-values')
+        const { profileOfDoc } = await import('@/lib/index-profiles')
+        if (skipRecompute()) return doc
+        try {
+          await recomputeProfile(req.payload, profileOfDoc(doc))
+        } catch (e) {
+          req.payload.logger.error(
+            `Не удалось пересчитать индекс по профилю «${doc.name}»: ${
+              e instanceof Error ? e.message : e
+            }`,
+          )
+        }
+        return doc
+      },
+    ],
+
+    afterDelete: [
+      async ({ doc, req }) => {
+        const { dropProfileValues } = await import('@/lib/index-values')
+        const { ownKey } = await import('@/lib/index-profiles')
+        try {
+          await dropProfileValues(req.payload, ownKey(doc.id))
+        } catch {
+          // Осиротевшие значения уберёт полный пересчёт
+        }
+        return doc
+      },
+    ],
   },
 }

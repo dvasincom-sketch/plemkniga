@@ -3,6 +3,7 @@ import * as migration_20260815_061539 from './20260815_061539';
 import * as migration_20260815_075706 from './20260815_075706';
 import * as migration_20260815_112204_access_requests from './20260815_112204_access_requests';
 import * as migration_20260816_071534_index_profiles from './20260816_071534_index_profiles';
+import * as migration_20260816_081002_index_values from './20260816_081002_index_values';
 
 export const migrations = [
   {
@@ -28,6 +29,11 @@ export const migrations = [
   {
     up: migration_20260816_071534_index_profiles.up,
     down: migration_20260816_071534_index_profiles.down,
-    name: '20260816_071534_index_profiles'
+    name: '20260816_071534_index_profiles',
+  },
+  {
+    up: migration_20260816_081002_index_values.up,
+    down: migration_20260816_081002_index_values.down,
+    name: '20260816_081002_index_values'
   },
 ];

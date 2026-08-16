@@ -13,6 +13,7 @@
     "lint": "next lint",
     "seed": "cross-env NODE_OPTIONS=--no-deprecation tsx src/seed/index.ts",
     "backfill:sort-ranks": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/backfill-sort-ranks.ts",
+    "backfill:index": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/backfill-index.ts",
     "repair:uuid": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/repair-uuid.ts",
     "payload": "cross-env NODE_OPTIONS=--no-deprecation payload",
     "generate:types": "cross-env NODE_OPTIONS=--no-deprecation payload generate:types",

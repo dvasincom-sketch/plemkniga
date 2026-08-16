@@ -75,6 +75,27 @@ export const accessRequestDecide: Access = ({ req: { user } }) => {
 }
 
 /**
+ * Значение индекса видно ровно тем, кому видно само животное.
+ *
+ * Правило повторяет `animalRead` через связь: держать здесь собственную
+ * логику видимости значило бы завести второе место, где решается один
+ * и тот же вопрос, и рано или поздно они разойдутся.
+ */
+export const indexValueRead: Access = ({ req: { user } }) => {
+  const u = user as U | null
+  if (u?.role === 'admin') return true
+  const org = orgId(u)
+  if (u && org) {
+    const w: Where = {
+      or: [{ 'animal.owner': { equals: org } }, { 'animal.publicVisible': { equals: true } }],
+    }
+    return w
+  }
+  const w: Where = { 'animal.publicVisible': { equals: true } }
+  return w
+}
+
+/**
  * Профиль индекса виден своей организации и всем — если он без владельца.
  *
  * Профиль без организации заводит Ассоциация: это стандартный ИПЦ и

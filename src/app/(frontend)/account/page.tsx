@@ -26,7 +26,8 @@ import {
 import { DOCUMENT_TYPES, EVENT_TYPES, ROLES, labelOf } from '@/lib/dictionaries'
 import { SubmissionHistory } from '@/components/SubmissionHistory'
 import { dateRu } from '@/lib/format'
-import { RANKING_CAP, findRankedByProfile } from '@/lib/index-column'
+import { RANKING_CAP, rankByProfile } from '@/lib/index-column'
+import { indexValuesLag } from '@/lib/index-values'
 import { ASSOCIATION_PROFILE } from '@/lib/breeding-index'
 import { loadOwnProfiles, selectProfile } from '@/lib/index-profiles'
 import type { Where } from 'payload'
@@ -175,7 +176,7 @@ async function AnimalsTab({
 
   const [result, herdsResult, total] = await Promise.all([
     profile
-      ? findRankedByProfile({
+      ? rankByProfile({
           payload,
           where,
           profile,
@@ -210,6 +211,12 @@ async function AnimalsTab({
   const defaults: Record<string, string> = {}
   for (const key of Object.keys(sp)) defaults[key] = one(sp[key])
   defaults.tab = 'animals'
+
+  // Сверка хранимых значений с книгой — только когда порядок построен по ним
+  const lagMissing =
+    profile && 'stored' in result && result.stored
+      ? (await indexValuesLag(payload, profile.key)).missing
+      : 0
 
   /*
    * Пустая таблица объясняется по-разному.
@@ -292,8 +299,15 @@ async function AnimalsTab({
             </Link>
             {'capped' in result && result.capped && (
               <>
-                {' '}· ранжирование охватывает {RANKING_CAP.toLocaleString('ru-RU')} записей
-                с наибольшим ИПЦ из {(result.totalDocs ?? 0).toLocaleString('ru-RU')}
+                {' '}· значения по профилю ещё не рассчитаны, поэтому порядок построен
+                по {RANKING_CAP.toLocaleString('ru-RU')} записям с наибольшим ИПЦ
+                из {(result.totalDocs ?? 0).toLocaleString('ru-RU')}
+              </>
+            )}
+            {lagMissing > 0 && (
+              <>
+                {' '}· пересчёт не охватил {lagMissing.toLocaleString('ru-RU')} записей —
+                выполните <code className="rounded bg-canvas px-1.5 py-0.5">npm run backfill:index</code>
               </>
             )}
           </p>
