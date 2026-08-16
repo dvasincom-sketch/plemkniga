@@ -71,18 +71,35 @@ async function main() {
   const payload = await getPayload({ config })
 
   /* ------------------------- Находим животное ------------------------- */
-  const numeric = Number(rawKey)
-  const found = await payload.find({
+  /*
+   * Сначала по индивидуальному номеру, и только потом по id.
+   *
+   * Искать «или по id, или по номеру» одним запросом нельзя: номер — текст,
+   * и он спокойно бывает длиннее, чем вмещает integer. Postgres на попытке
+   * сравнить `id = 3662217000196` падает с «out of range for type integer»,
+   * не добравшись до второго условия. Поэтому запроса два, и по id мы идём
+   * только когда аргумент похож на id — короткое целое без точки.
+   */
+  const foundByNumber = await payload.find({
     collection: 'animals',
-    where: Number.isInteger(numeric)
-      ? { or: [{ id: { equals: numeric } }, { identNumber: { equals: rawKey } }] }
-      : { identNumber: { equals: rawKey } },
+    where: { identNumber: { equals: rawKey } },
     limit: 1,
     depth: 0,
     overrideAccess: true,
   })
 
-  const animal = found.docs[0]
+  let animal = foundByNumber.docs[0]
+
+  if (!animal && /^[1-9]\d{0,8}$/.test(rawKey)) {
+    const byId = await payload.find({
+      collection: 'animals',
+      where: { id: { equals: Number(rawKey) } },
+      limit: 1,
+      depth: 0,
+      overrideAccess: true,
+    })
+    animal = byId.docs[0]
+  }
   if (!animal) {
     console.error(`Животное «${rawKey}» не найдено`)
     process.exit(1)
