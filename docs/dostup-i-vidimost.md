@@ -177,13 +177,16 @@
 | `organizations` | `anyone` | `anyone` | `ownOrganization` | `isAdmin` |
 | `herds` | `anyone` | `isAuthenticated` | `isAuthenticated` | `isAdmin` |
 | `media` | `anyone` | `isAuthenticated` | `isAuthenticated` | `isAdmin` |
-| `calvings` | `isAuthenticated` | `isAuthenticated` | `isAuthenticated` | `isAdmin` |
-| `inseminations` | `isAuthenticated` | `isAuthenticated` | `isAuthenticated` | `isAdmin` |
-| `milk-tests` | `isAuthenticated` | `isAuthenticated` | `isAuthenticated` | `isAdmin` |
-| `health-events` | `isAuthenticated` | `isAuthenticated` | `isAuthenticated` | `isAdmin` |
-| `events` | `isAuthenticated` | `isAuthenticated` | `isAuthenticated` | `isAdmin` |
-| `documents` | `isAuthenticated` | `isAuthenticated` | `isAuthenticated` | `isAdmin` |
-| `data-submissions` | `isAuthenticated` | `isAuthenticated` | `isAuthenticated` | `isAdmin` |
+| `calvings` | `animalScopedRead` | `isAuthenticated` | `isAuthenticated` | `isAdmin` |
+| `inseminations` | `animalScopedRead` | `isAuthenticated` | `isAuthenticated` | `isAdmin` |
+| `milk-tests` | `animalScopedRead` | `isAuthenticated` | `isAuthenticated` | `isAdmin` |
+| `health-events` | `animalScopedRead` | `isAuthenticated` | `isAuthenticated` | `isAdmin` |
+| `events` | `animalScopedRead` | `isAuthenticated` | `isAuthenticated` | `isAdmin` |
+| `animal-evaluations` | `animalScopedRead` | `isAdmin` | `isAdmin` | `isAdmin` |
+| `animal-exteriors` | `animalScopedRead` | `isAdmin` | `isAdmin` | `isAdmin` |
+| `index-values` | `indexValueRead` | — | — | — |
+| `documents` | `documentRead` | `isAuthenticated` | `isAuthenticated` | `isAdmin` |
+| `data-submissions` | `organizationScopedRead` | `isAuthenticated` | `isAuthenticated` | `isAdmin` |
 | Справочники НСИ: `breeds`, `lines`, `breeding-categories`, `breeding-classes`, `animal-purposes`, `disposal-reasons`, `coat-colors`, `blood-groups`, `reproduction-methods`, `semen-types`, `insemination-results`, `dna-test-types`, `haplotype-types`, `health-event-types`, `technicians` | `anyone` | `isAdmin` | `isAdmin` | `isAdmin` |
 
 ### Что делают правила
@@ -197,6 +200,10 @@
 | `animalMutate` | Админ — всё; авторизованный — записи своей организации; без организации — ничего |
 | `accessRequestRead` | Админ — всё; остальные — свои отправленные запросы плюс запросы к животным своей организации |
 | `accessRequestDecide` | Админ — всё; остальные — только запросы к животным своей организации |
+| `animalScopedRead` | Видимость наследуется от животного: своё стадо плюс `publicVisible: true`. Так закрыты дойки, отёлы, осеменения, здоровье, события и история оценок |
+| `indexValueRead` | То же правило, но по копиям полей в самой строке значения — ради скорости, см. `docs/refaktoring-bazy.md` |
+| `organizationScopedRead` | Только записи своей организации, публичной видимости здесь нет |
+| `documentRead` | Свои документы плюс документы публичных карточек |
 | `selfOrAdmin` | Своя учётная запись либо админ |
 | `ownOrganization` | Своя организация либо админ |
 
@@ -254,6 +261,24 @@
 Публичная книга, карточка животного и выгрузка стада, наоборот, ходят
 с правами пользователя (`overrideAccess: false, user`). Выгрузка поэтому
 физически не может вернуть больше, чем видно в интерфейсе.
+
+---
+
+### Как это проверяется
+
+`npm run audit:tenancy` заходит в систему от лица настоящего фермера
+и двумя способами ищет утечку: смотрит списки на предмет чужих записей
+и пробует прочитать по идентификатору заведомо чужую закрытую запись.
+Второе важнее: список может не дотянуться до чужой строки случайно,
+а прицельное чтение отвечает однозначно.
+
+Ревизия не теоретическая. При первом запуске она нашла, что дойки, отёлы,
+осеменения, случаи болезни, события и пакеты загрузки были закрыты правилом
+`isAuthenticated` — то есть любой вошедший фермер читал производственные
+данные чужого стада. Карточка животного при этом была закрыта как надо:
+защитили запись, а данные, висящие на ней, — нет. Такое находится проверкой
+и почти не находится чтением кода: в описании каждой коллекции по отдельности
+`isAuthenticated` выглядит осмысленно.
 
 ---
 

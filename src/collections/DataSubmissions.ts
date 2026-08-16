@@ -1,5 +1,5 @@
 import type { CollectionConfig } from 'payload'
-import { isAdmin, isAuthenticated } from '@/access'
+import { isAdmin, isAuthenticated, organizationScopedRead } from '@/access'
 
 export const SUBMISSION_STATUSES = [
   { value: 'uploaded', label: 'Загружено' },
@@ -33,7 +33,11 @@ export const DataSubmissions: CollectionConfig = {
     group: 'Племенная книга',
   },
   access: {
-    read: isAuthenticated,
+    /*
+     * Пакет загрузки — внутренняя кухня хозяйства: кто когда что загрузил
+     * и сколько строк не прошло проверку. Соседям не показывается никогда.
+     */
+    read: organizationScopedRead,
     create: isAuthenticated,
     update: isAuthenticated,
     delete: isAdmin,

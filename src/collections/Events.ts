@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import { EVENT_TYPES, RETIRED_EVENT_TYPES, toOptions } from '@/lib/dictionaries'
-import { isAdmin, isAuthenticated } from '@/access'
+import { isAdmin, isAuthenticated, animalScopedRead } from '@/access'
 
 export const Events: CollectionConfig = {
   slug: 'events',
@@ -11,7 +11,13 @@ export const Events: CollectionConfig = {
     group: 'Племенная книга',
   },
   access: {
-    read: isAuthenticated,
+    /*
+     * Видимость наследуется от животного, а не «любой вошедший».
+     * Надой, отёл и лечение чужой закрытой коровы — такие же её данные,
+     * как и карточка: показывать их соседям система не должна.
+     * Разбор — docs/dostup-i-vidimost.md.
+     */
+    read: animalScopedRead,
     create: isAuthenticated,
     update: isAuthenticated,
     delete: isAdmin,

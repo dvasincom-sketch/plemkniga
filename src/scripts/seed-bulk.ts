@@ -403,6 +403,14 @@ async function generate(client: PoolClient) {
   const dams = Math.round((TOTAL - bulls) * 0.3)
   const daughters = TOTAL - bulls - dams
 
+  /*
+   * Разбег дат подобран так, чтобы поколения не пересекались: самая поздняя
+   * мать старше самой ранней дочери на два с лишним года. Первые версии
+   * разбрасывали даты шире, и ревизия родословной честно нашла полторы тысячи
+   * коров, отелившихся в тринадцать месяцев. Синтетика не обязана быть
+   * настоящей, но обязана быть возможной — иначе на ней нельзя проверять
+   * проверки.
+   */
   const year = (y: number, spread: number) =>
     new Date(Date.UTC(y, int(0, 11), int(1, 28)) - int(0, spread) * 86_400_000)
 
@@ -434,7 +442,7 @@ async function generate(client: PoolClient) {
       animalRow({
         n: counter++,
         sex: 'female',
-        birth: year(2018, 500),
+        birth: year(2018, 300),
         ctx,
         herdIndex: i,
         father: bullIds[i % bullIds.length]!,
@@ -458,7 +466,7 @@ async function generate(client: PoolClient) {
       animalRow({
         n: counter++,
         sex: 'female',
-        birth: year(2022, 900),
+        birth: year(2022, 300),
         ctx,
         herdIndex: i,
         father: bullIds[i % bullIds.length]!,
@@ -683,11 +691,26 @@ async function main() {
    * тоже авария, просто другого рода.
    */
   if (process.env.SEED_CONFIRM !== '1') {
+    /*
+     * Подсказка повторяет команду целиком, вместе с базой.
+     *
+     * Иначе выходит ловушка: человек запускает
+     * `DATABASE_URI=…прод… npm run seed:bulk`, читает подсказку, копирует
+     * её — и теряет `DATABASE_URI`, потому что в подсказке его не было.
+     * Дальше либо отказ повторяется, либо, что хуже, наполняется не та база.
+     */
+    const prefix = `SEED_CONFIRM=1${
+      process.env.DATABASE_URI ? ` DATABASE_URI='${maskUri(uri ?? '')}'` : ''
+    }`
+
     console.error(
       '\nЗапуск не подтверждён.\n\n' +
         'Скрипт добавит в эту базу до сотен тысяч записей. Убедитесь, что\n' +
-        'строка подключения выше указывает на вашу локальную базу, и повторите:\n\n' +
-        `  SEED_CONFIRM=1 npm run seed:bulk -- --animals ${TOTAL}\n`,
+        'строка подключения выше — это та база, которую вы хотите наполнить,\n' +
+        'и повторите команду целиком:\n\n' +
+        `  ${prefix} npm run seed:bulk -- --animals ${TOTAL}\n\n` +
+        'Строку подключения подставьте настоящую: выше она показана\n' +
+        'с замаскированным паролем.\n',
     )
     process.exitCode = 1
     return

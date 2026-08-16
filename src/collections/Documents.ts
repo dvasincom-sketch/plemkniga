@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import { DOCUMENT_TYPES, toOptions } from '@/lib/dictionaries'
-import { isAdmin, isAuthenticated } from '@/access'
+import { isAdmin, isAuthenticated, documentRead } from '@/access'
 
 export const Documents: CollectionConfig = {
   slug: 'documents',
@@ -11,7 +11,7 @@ export const Documents: CollectionConfig = {
     group: 'Племенная книга',
   },
   access: {
-    read: isAuthenticated,
+    read: documentRead,
     create: isAuthenticated,
     update: isAuthenticated,
     delete: isAdmin,

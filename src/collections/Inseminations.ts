@@ -1,5 +1,5 @@
 import type { CollectionConfig } from 'payload'
-import { isAdmin, isAuthenticated } from '@/access'
+import { isAdmin, isAuthenticated, animalScopedRead } from '@/access'
 
 /**
  * Осеменения — отдельная сущность.
@@ -19,7 +19,13 @@ export const Inseminations: CollectionConfig = {
     group: 'Воспроизводство',
   },
   access: {
-    read: isAuthenticated,
+    /*
+     * Видимость наследуется от животного, а не «любой вошедший».
+     * Надой, отёл и лечение чужой закрытой коровы — такие же её данные,
+     * как и карточка: показывать их соседям система не должна.
+     * Разбор — docs/dostup-i-vidimost.md.
+     */
+    read: animalScopedRead,
     create: isAuthenticated,
     update: isAuthenticated,
     delete: isAdmin,

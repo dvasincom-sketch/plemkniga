@@ -155,6 +155,40 @@ export const indexProfileMutate: Access = ({ req: { user } }) => {
   return { organization: { equals: org } }
 }
 
+/**
+ * Запись, принадлежащая организации: пакеты загрузки, документы хозяйства.
+ *
+ * Отличается от `animalScopedRead` тем, что публичной видимости здесь нет
+ * и быть не может: пакет данных — это внутренняя кухня хозяйства, кто когда
+ * что загрузил и сколько строк не прошло проверку. Соседям это не показывают
+ * ни при каких настройках.
+ *
+ * Ассоциация видит всё: разбирать спорные загрузки приходится ей.
+ */
+export const organizationScopedRead: Access = ({ req: { user } }) => {
+  const u = user as U | null
+  if (!u) return false
+  if (u.role === 'admin') return true
+  const org = orgId(u)
+  if (!org) return false
+  return { organization: { equals: org } }
+}
+
+/**
+ * Документ хозяйства: виден своим, а также всем — если привязан к публичной
+ * карточке. Племенное свидетельство на открытое животное показывают вместе
+ * с карточкой, в этом и смысл публикации.
+ */
+export const documentRead: Access = ({ req: { user } }) => {
+  const u = user as U | null
+  if (u?.role === 'admin') return true
+
+  const or: Where[] = [{ 'animal.publicVisible': { equals: true } }]
+  const org = orgId(u)
+  if (u && org) or.push({ organization: { equals: org } }, { 'animal.owner': { equals: org } })
+  return { or }
+}
+
 export const selfOrAdmin: Access = ({ req: { user } }) => {
   const u = user as U | null
   if (!u) return false

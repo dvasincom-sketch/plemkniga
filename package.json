@@ -24,7 +24,9 @@
     "migrate:baseline": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/migrate-baseline.ts",
     "db:precheck": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/db-precheck.ts",
     "backfill:evaluations": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/backfill-evaluations.ts",
-    "seed:bulk": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/seed-bulk.ts"
+    "seed:bulk": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/seed-bulk.ts",
+    "audit:pedigree": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/audit-pedigree.ts",
+    "audit:tenancy": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/audit-tenancy.ts"
   },
   "dependencies": {
     "@fontsource-variable/onest": "^5.3.0",
