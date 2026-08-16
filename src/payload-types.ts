@@ -77,6 +77,7 @@ export interface Config {
     'health-events': HealthEvent;
     'data-submissions': DataSubmission;
     'access-requests': AccessRequest;
+    'index-profiles': IndexProfile;
     events: Event;
     documents: Document;
     media: Media;
@@ -112,6 +113,7 @@ export interface Config {
     'health-events': HealthEventsSelect<false> | HealthEventsSelect<true>;
     'data-submissions': DataSubmissionsSelect<false> | DataSubmissionsSelect<true>;
     'access-requests': AccessRequestsSelect<false> | AccessRequestsSelect<true>;
+    'index-profiles': IndexProfilesSelect<false> | IndexProfilesSelect<true>;
     events: EventsSelect<false> | EventsSelect<true>;
     documents: DocumentsSelect<false> | DocumentsSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
@@ -1064,6 +1066,48 @@ export interface AccessRequest {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "index-profiles".
+ */
+export interface IndexProfile {
+  id: number;
+  name: string;
+  kind: 'selection' | 'economic';
+  /**
+   * Одна фраза: какое узкое место хозяйства он закрывает
+   */
+  hint?: string | null;
+  /**
+   * Пусто — стандартный профиль Ассоциации, виден всем
+   */
+  organization?: (number | null) | Organization;
+  isDefault?: boolean | null;
+  weights?:
+    | {
+        trait:
+          | 'milk'
+          | 'fatKg'
+          | 'proteinKg'
+          | 'productiveLongevity'
+          | 'udderHealth'
+          | 'fertility'
+          | 'calvingEase'
+          | 'calfMortality'
+          | 'bodyComposite'
+          | 'udderComposite'
+          | 'legsComposite';
+        /**
+         * Для селекционных — проценты влияния (отрицательные допустимы), для экономических — рублей на единицу
+         */
+        weight: number;
+        id?: string | null;
+      }[]
+    | null;
+  author?: (number | null) | User;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "events".
  */
 export interface Event {
@@ -1158,6 +1202,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'access-requests';
         value: number | AccessRequest;
+      } | null)
+    | ({
+        relationTo: 'index-profiles';
+        value: number | IndexProfile;
       } | null)
     | ({
         relationTo: 'events';
@@ -1724,6 +1772,27 @@ export interface AccessRequestsSelect<T extends boolean = true> {
   response?: T;
   decidedAt?: T;
   decidedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "index-profiles_select".
+ */
+export interface IndexProfilesSelect<T extends boolean = true> {
+  name?: T;
+  kind?: T;
+  hint?: T;
+  organization?: T;
+  isDefault?: T;
+  weights?:
+    | T
+    | {
+        trait?: T;
+        weight?: T;
+        id?: T;
+      };
+  author?: T;
   updatedAt?: T;
   createdAt?: T;
 }

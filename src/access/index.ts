@@ -74,6 +74,40 @@ export const accessRequestDecide: Access = ({ req: { user } }) => {
   return { owner: { equals: org } }
 }
 
+/**
+ * Профиль индекса виден своей организации и всем — если он без владельца.
+ *
+ * Профиль без организации заводит Ассоциация: это стандартный ИПЦ и
+ * национальные индексы, на них ссылаются как на общую точку отсчёта.
+ * Чужие профили не видны никому: набор весов выдаёт экономику хозяйства
+ * (что оно доплачивает за белок, где у него выбытие), а это коммерческая
+ * information, которую хозяйство не обязано открывать соседям.
+ */
+export const indexProfileRead: Access = ({ req: { user } }) => {
+  const u = user as U | null
+  if (u?.role === 'admin') return true
+  const org = orgId(u)
+  const or: Where[] = [{ organization: { exists: false } }]
+  if (org) or.push({ organization: { equals: org } })
+  return { or }
+}
+
+/**
+ * Менять профили может только своя организация; стандартные — только админ.
+ *
+ * Профиль настраивает главный генетик холдинга, а зоотехники отделений
+ * работают с готовым — разделения прав внутри организации здесь нет
+ * намеренно: оно потребовало бы отдельной роли, которой в системе пока нет.
+ */
+export const indexProfileMutate: Access = ({ req: { user } }) => {
+  const u = user as U | null
+  if (!u) return false
+  if (u.role === 'admin') return true
+  const org = orgId(u)
+  if (!org) return false
+  return { organization: { equals: org } }
+}
+
 export const selfOrAdmin: Access = ({ req: { user } }) => {
   const u = user as U | null
   if (!u) return false

@@ -26,6 +26,8 @@ import {
 import { DOCUMENT_TYPES, EVENT_TYPES, ROLES, labelOf } from '@/lib/dictionaries'
 import { SubmissionHistory } from '@/components/SubmissionHistory'
 import { dateRu } from '@/lib/format'
+import { ASSOCIATION_PROFILE } from '@/lib/breeding-index'
+import { loadOwnProfiles } from '@/lib/index-profiles'
 import type { Where } from 'payload'
 import type { Animal, Organization } from '@/payload-types'
 
@@ -104,6 +106,14 @@ export default async function AccountPage({
                 Открыть профиль пользователя
               </Link>
             </div>
+
+            {/*
+              Профили весов — настройка уровня хозяйства, а не личная: её делает
+              главный генетик, и она меняет порядок животных для всех сотрудников.
+              Поэтому блок стоит рядом с видимостью данных, а не в профиле
+              пользователя.
+            */}
+            <IndexProfilesCard orgId={orgId} />
 
             <div className="card">
               <h3 className="panel-heading">Интеграции и API</h3>
@@ -477,5 +487,47 @@ async function VisibilityFormWrapper({ orgId }: { orgId?: number }) {
       defaultVisible={Boolean(first?.publicVisible)}
       defaultDetails={Boolean(first?.publicDetails)}
     />
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*                        Профили индекса — карточка                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Короткая справка о том, по какому профилю сейчас считается индекс.
+ *
+ * Настройка живёт на отдельной странице: там одиннадцать весов, сравнение
+ * с профилем Ассоциации и пересчёт порядка животных — в карточку настроек
+ * это не помещается, да и заходят туда раз в сезон.
+ */
+async function IndexProfilesCard({ orgId }: { orgId?: number }) {
+  const { docs, defaultDoc } = await loadOwnProfiles(orgId)
+  const activeName = defaultDoc ? defaultDoc.name : ASSOCIATION_PROFILE.name
+
+  return (
+    <div className="card">
+      <h3 className="panel-heading">Профиль индекса племенной ценности</h3>
+      <p className="text-sm leading-relaxed text-ink-700">
+        Индекс считается по профилю{' '}
+        <span className="font-medium">{activeName}</span>
+        {defaultDoc ? ' — вашему собственному набору весов.' : ' — стандартному набору весов Ассоциации.'}{' '}
+        Свой профиль нужен, когда экономика хозяйства расходится со средней по отрасли:
+        белок дороже жира при сдаче на сыр, выбытие первотёлок, переполненный роддом.
+      </p>
+
+      {docs.length > 0 && (
+        <p className="mt-3 text-sm text-ink-500">
+          Профилей хозяйства: {docs.length}
+        </p>
+      )}
+
+      <Link
+        href="/account/indices"
+        className="mt-4 inline-block underline underline-offset-4 hover:text-forest-500"
+      >
+        {docs.length > 0 ? 'Настроить профили' : 'Создать свой профиль'}
+      </Link>
+    </div>
   )
 }
