@@ -14,7 +14,7 @@ export async function up({ db, payload, req }: MigrateUpArgs): Promise<void> {
   ALTER TABLE "animals" ADD CONSTRAINT "chk_animals_not_own_father" CHECK (("father_id" is null or "father_id" <> "id"));
   ALTER TABLE "animals" ADD CONSTRAINT "chk_animals_not_own_mother" CHECK (("mother_id" is null or "mother_id" <> "id"));
   ALTER TABLE "animals" ADD CONSTRAINT "chk_animals_parents_differ" CHECK (("father_id" is null or "mother_id" is null or "father_id" <> "mother_id"));
-  ALTER TABLE "animals" ADD CONSTRAINT "chk_animals_trust_level" CHECK (("trust_level" is null or ("trust_level" >= 0 and "trust_level" <= 3)));
+  ALTER TABLE "animals" ADD CONSTRAINT "chk_animals_trust_level" CHECK (("trust_level" is null or ("trust_level" >= -1 and "trust_level" <= 3)));
   ALTER TABLE "animals" ADD CONSTRAINT "chk_animals_blood_percent" CHECK (("blood_percent" is null or ("blood_percent" >= 0 and "blood_percent" <= 100)));
   ALTER TABLE "animals" ADD CONSTRAINT "chk_animals_inbreeding" CHECK (("inbreeding" is null or ("inbreeding" >= 0 and "inbreeding" <= 100)));
   ALTER TABLE "animals" ADD CONSTRAINT "chk_animals_improvers_share1" CHECK (("improvers_share1" is null or ("improvers_share1" >= 0 and "improvers_share1" <= 100)));

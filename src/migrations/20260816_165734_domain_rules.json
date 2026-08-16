@@ -2638,7 +2638,7 @@
         },
         "chk_animals_trust_level": {
           "name": "chk_animals_trust_level",
-          "value": "(\"trust_level\" is null or (\"trust_level\" >= 0 and \"trust_level\" <= 3))"
+          "value": "(\"trust_level\" is null or (\"trust_level\" >= -1 and \"trust_level\" <= 3))"
         },
         "chk_animals_blood_percent": {
           "name": "chk_animals_blood_percent",
@@ -9903,6 +9903,6 @@
     "tables": {},
     "columns": {}
   },
-  "id": "3103ca06-d0f8-429a-ae29-9f02dc1e507b",
+  "id": "a5d4a5b2-6b44-451c-8f27-a9913bb38c74",
   "prevId": "00000000-0000-0000-0000-000000000000"
 }

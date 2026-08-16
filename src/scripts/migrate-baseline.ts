@@ -89,7 +89,7 @@ const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
     note: 'причины непринятых строк',
   },
   {
-    name: '20260816_112457_domain_rules',
+    name: '20260816_165734_domain_rules',
     probe: { kind: 'constraint', name: 'chk_animals_not_own_father' },
     note: 'правила предметной области и типы счётчиков',
   },
