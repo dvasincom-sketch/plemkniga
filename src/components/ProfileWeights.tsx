@@ -11,34 +11,30 @@ import { sharesOf } from '@/lib/index-profiles'
  *
  * Признаки с нулевым весом не показываются: в профиле «Разгрузить роддом»
  * их треть, и они только удлиняют список.
+ *
+ * Сравнения со стандартным профилем здесь больше нет: цифра в скобках рядом
+ * с весом требовала подсказки, чтобы понять, что она значит, и всё равно
+ * не давала сравнить профили между собой — они отсортированы каждый по-своему.
+ * На этот вопрос отвечает общая таблица внизу страницы.
  */
 
 const label = (key: string) => TRAIT_BASE.find((t) => t.key === key)?.label ?? key
 
-export function ProfileWeights({
-  profile,
-  /** С чем сравнивать: серая метка официального веса на той же полосе. */
-  compare,
-  limit,
-}: {
-  profile: IndexProfile
-  compare?: IndexProfile
-  limit?: number
-}) {
+const plural = (n: number, one: string, few: string, many: string) => {
+  const n10 = n % 10
+  const n100 = n % 100
+  if (n10 === 1 && n100 !== 11) return one
+  if (n10 >= 2 && n10 <= 4 && (n100 < 12 || n100 > 14)) return few
+  return many
+}
+
+export function ProfileWeights({ profile, limit }: { profile: IndexProfile; limit?: number }) {
   const shares = sharesOf(profile)
     .filter((s) => s.share !== 0)
     .sort((a, b) => Math.abs(b.share) - Math.abs(a.share))
   const shown = limit ? shares.slice(0, limit) : shares
   const hidden = shares.length - shown.length
 
-  /*
-   * Сравнивать проценты влияния с рублями нельзя: это разные величины.
-   * Столбец сопоставления показывается только когда обе шкалы совпадают.
-   */
-  const cmp =
-    compare && compare.kind === profile.kind
-      ? new Map(sharesOf(compare).map((s) => [s.key, s.share]))
-      : null
   const max = Math.max(...shares.map((s) => Math.abs(s.share)), 1)
   const suffix = profile.kind === 'economic' ? ' ₽' : ' %'
 
@@ -48,7 +44,6 @@ export function ProfileWeights({
         {shown.map((s) => {
           const width = (Math.abs(s.share) / max) * 100
           const negative = s.share < 0
-          const other = cmp?.get(s.key)
           return (
             <li key={s.key} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3">
               <div className="min-w-0">
@@ -66,19 +61,15 @@ export function ProfileWeights({
                   ? Math.round(Math.abs(s.share)).toLocaleString('ru-RU')
                   : Math.abs(s.share).toFixed(0)}
                 {suffix}
-                {other !== undefined && Math.round(other) !== Math.round(s.share) && (
-                  <span className="ml-1.5 text-ink-500" title="В стандартном профиле Ассоциации">
-                    ({other > 0 ? '+' : ''}
-                    {other.toFixed(0)})
-                  </span>
-                )}
               </p>
             </li>
           )
         })}
       </ul>
       {hidden > 0 && (
-        <p className="mt-2 text-[12px] text-ink-500">и ещё {hidden} признаков с меньшим весом</p>
+        <p className="mt-2 text-[12px] text-ink-500">
+          и ещё {hidden} {plural(hidden, 'признак', 'признака', 'признаков')} с меньшим весом
+        </p>
       )}
     </div>
   )

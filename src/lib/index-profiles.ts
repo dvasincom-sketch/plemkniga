@@ -7,6 +7,7 @@ import {
   NATIONAL_PROFILES,
   PROFIT_PROFILE,
   TRAIT_BASE,
+  type Base,
   type IndexProfile,
   type TraitKey,
   type WeightKind,
@@ -215,6 +216,32 @@ export async function resolveProfile(
  * профиля пользователь мог оставить любые числа. Приведение к процентам
  * здесь то же, что в расчёте, — иначе на экране одно, а в индексе другое.
  */
+/**
+ * Доля влияния признака в индексе, % — одна шкала для всех профилей.
+ *
+ * Селекционные веса уже проценты влияния. Экономические заданы в рублях
+ * на единицу признака, и сравнивать их напрямую нельзя: рубль за килограмм
+ * жира и рубль за балл вымени — разные рубли. Умножение на σ признака
+ * переводит их в ту же шкалу: сколько рублей стоит одно стандартное
+ * отклонение, то есть какую долю разброса индекса даёт признак.
+ *
+ * Нужна ровно для одного — сравнить профили между собой в общей таблице.
+ * В самом расчёте индекса эта величина не участвует.
+ */
+export function influenceShares(
+  profile: IndexProfile,
+  base: Base,
+): { key: TraitKey; share: number }[] {
+  const bySd = new Map(base.traits.map((t) => [t.key, t.sd]))
+  const raw = (Object.entries(profile.weights) as [TraitKey, number][]).map(([key, w]) => ({
+    key,
+    value: profile.kind === 'economic' ? (w ?? 0) * (bySd.get(key) ?? 1) : (w ?? 0),
+  }))
+  const sum = raw.reduce((a, r) => a + Math.abs(r.value), 0)
+  if (!sum) return raw.map((r) => ({ key: r.key, share: 0 }))
+  return raw.map((r) => ({ key: r.key, share: (r.value / sum) * 100 }))
+}
+
 export function sharesOf(profile: IndexProfile): { key: TraitKey; share: number }[] {
   const entries = Object.entries(profile.weights) as [TraitKey, number][]
   if (profile.kind === 'economic') return entries.map(([key, w]) => ({ key, share: w }))
