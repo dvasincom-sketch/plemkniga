@@ -17,6 +17,47 @@ export const Organizations: CollectionConfig = {
     update: ownOrganization,
     delete: isAdmin,
   },
+  hooks: {
+    /*
+     * Организацию со стадом удалить нельзя, и сказать об этом надо словами.
+     *
+     * У животного владелец обязателен, поэтому колонка `owner_id` объявлена
+     * `NOT NULL`, а внешний ключ — `ON DELETE SET NULL`. Попытка удалить
+     * организацию упирается в это противоречие и заканчивается ошибкой
+     * PostgreSQL про NULL в колонке `owner_id` — по ней невозможно понять,
+     * что произошло на самом деле.
+     *
+     * Каскадное удаление здесь было бы куда хуже отказа: вместе с записью
+     * о хозяйстве исчезли бы карточки животных, их родословные и оценки —
+     * то есть содержимое племенной книги. Поэтому отказ, но внятный.
+     */
+    beforeDelete: [
+      async ({ req, id }) => {
+        const animals = await req.payload.count({
+          collection: 'animals',
+          where: { owner: { equals: id } },
+          overrideAccess: true,
+          req,
+        })
+
+        if (animals.totalDocs > 0) {
+          throw new Error(
+            `Организацию нельзя удалить: за ней числится записей животных — ${animals.totalDocs}. ` +
+              'Передайте их другому владельцу или отправьте в архив.',
+          )
+        }
+
+        // Стада без животных осиротеют, но сами по себе они и не нужны
+        await req.payload.delete({
+          collection: 'herds',
+          where: { organization: { equals: id } },
+          overrideAccess: true,
+          req,
+        })
+      },
+    ],
+  },
+
   fields: [
     { name: 'name', type: 'text', label: 'Наименование', required: true },
     { name: 'shortName', type: 'text', label: 'Краткое наименование' },

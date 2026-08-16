@@ -33,6 +33,8 @@ import { maskUri, resolveDatabase } from '../lib/db-url'
 type Probe =
   | { kind: 'table'; name: string }
   | { kind: 'column'; table: string; column: string }
+  /** Ограничение целостности: миграция может не добавлять ни таблиц, ни колонок. */
+  | { kind: 'constraint'; name: string }
 
 /** Порядок тот же, что в `src/migrations/index.ts`. */
 const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
@@ -86,6 +88,11 @@ const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
     probe: { kind: 'table', name: 'data_submissions_intake_issues' },
     note: 'причины непринятых строк',
   },
+  {
+    name: '20260816_112457_domain_rules',
+    probe: { kind: 'constraint', name: 'chk_animals_not_own_father' },
+    note: 'правила предметной области и типы счётчиков',
+  },
 ]
 
 const { driverUri, uri, source, sslConfig } = resolveDatabase()
@@ -103,6 +110,14 @@ const exists = async (probe: Probe): Promise<boolean> => {
   if (probe.kind === 'table') {
     const r = await pool.query(`select to_regclass($1) as t`, [`public.${probe.name}`])
     return r.rows[0]?.t !== null
+  }
+  if (probe.kind === 'constraint') {
+    const r = await pool.query(
+      `select 1 from pg_constraint where conname = $1
+        and connamespace = 'public'::regnamespace`,
+      [probe.name],
+    )
+    return r.rowCount === 1
   }
   const r = await pool.query(
     `select 1 from information_schema.columns

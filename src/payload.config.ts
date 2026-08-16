@@ -23,6 +23,7 @@ import { IndexProfiles } from '@/collections/IndexProfiles'
 import { IndexValues } from '@/collections/IndexValues'
 import { IndexBases } from '@/collections/IndexBases'
 import { DICTIONARY_COLLECTIONS } from '@/collections/dictionaries'
+import { addDomainConstraints } from '@/lib/db-constraints'
 import { databaseEnvKeys, maskUri, resolveDatabase } from '@/lib/db-url'
 import { migrations } from '@/migrations'
 
@@ -91,6 +92,12 @@ export default buildConfig({
      */
     push: process.env.PAYLOAD_DB_PUSH !== 'false',
     migrationDir: path.resolve(dirname, 'migrations'),
+    /*
+     * Правила предметной области дописываются к схеме, которую Payload
+     * построил из полей коллекций: диапазоны, знаки, запрет быть себе
+     * родителем. Разбор — в самом файле.
+     */
+    afterSchemaInit: [addDomainConstraints],
     /*
      * На проде Payload сам прогоняет эти миграции при старте: применяются
      * только те, которых ещё нет в таблице payload_migrations, поэтому

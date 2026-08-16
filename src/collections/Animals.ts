@@ -790,22 +790,117 @@ export const Animals: CollectionConfig = {
 
   hooks: {
     /*
-     * Запросы доступа удаляются вместе с животным.
+     * Зависимые записи удаляются вместе с животным.
      *
-     * У запроса животное обязательно, поэтому колонка NOT NULL, а внешний
-     * ключ настроен на ON DELETE SET NULL — удаление животного, о котором
-     * кто-то спрашивал, обрывало бы всю транзакцию нарушением NOT NULL.
-     * Осиротевший запрос и сам по себе бессмыслен: он существует только
-     * как разговор об этой конкретной записи.
+     * Почему это делает приложение, а не база. Payload строит внешние ключи
+     * для обязательных связей одинаково: колонка `NOT NULL`, а ключ —
+     * `ON DELETE SET NULL`. Комбинация внутренне противоречива: PostgreSQL
+     * при удалении родителя пытается записать NULL и упирается в `NOT NULL`.
+     * Фактическое поведение получается как у `ON DELETE RESTRICT`, только
+     * сообщает о себе оно невнятно: «null value in column "animal_id"
+     * violates not-null constraint» — про NULL, которого никто не просил.
+     * Правило зашито в адаптере (`@payloadcms/drizzle`, `traverseFields`),
+     * настройкой поля его не поменять, и подменять ключ руками в миграции
+     * бессмысленно: `drizzle push` в разработке вернёт всё обратно.
+     *
+     * Поэтому вопрос решается там, где на него вообще есть ответ, —
+     * в предметной области. Он звучит так: имеет ли запись смысл без
+     * животного? Отёл, дойка, осеменение, случай болезни, запись в ленте,
+     * значение индекса — не имеют: это факты о конкретном животном,
+     * без него они не наблюдение, а мусор. Запрос доступа — тоже: он
+     * существует только как разговор об этой карточке.
+     *
+     * Порядок перечисления не важен: всё уходит в одной транзакции `req`.
      */
     beforeDelete: [
       async ({ req, id }) => {
-        await req.payload.delete({
-          collection: 'access-requests',
-          where: { animal: { equals: id } },
+        const dependents = [
+          'access-requests',
+          'calvings',
+          'milk-tests',
+          'inseminations',
+          'health-events',
+          'events',
+          'index-values',
+        ] as const
+
+        for (const collection of dependents) {
+          await req.payload.delete({
+            collection,
+            where: { animal: { equals: id } },
+            overrideAccess: true,
+            req,
+          })
+        }
+
+        /*
+         * Осеменения ссылаются на животное дважды: как на осеменённую корову
+         * и как на быка-производителя. Удаление быка не должно стирать
+         * осеменения чужих коров — там теряется вся запись о событии.
+         * Поэтому ссылка на быка просто снимается: поле необязательное,
+         * а «осеменение быком, которого больше нет в книге» — состояние
+         * вполне описуемое.
+         */
+        await req.payload.update({
+          collection: 'inseminations',
+          where: { bull: { equals: id } },
+          overrideAccess: true,
+          data: { bull: null },
+          req,
+        })
+
+        /*
+         * Потомки: ссылка на родителя необязательна, поэтому база сама
+         * поставит NULL и ничего не заметит. А заметить есть что — из
+         * родословной пропадёт ряд предков, причём молча.
+         *
+         * Перед удалением номер и кличка переезжают в `pedigreeText`
+         * потомка — тот самый слой «родословная по бумаге, а не по книге»,
+         * которым карточка уже умеет пользоваться (`src/lib/pedigree.ts`).
+         * Так связь превращается из ссылки в запись со слов документа,
+         * а не исчезает. Заполняем только пустые слоты: если бумажные
+         * данные там уже есть, они старше и достовернее наших.
+         */
+        const doomed = await req.payload.findByID({
+          collection: 'animals',
+          id,
+          depth: 0,
           overrideAccess: true,
           req,
         })
+
+        if (doomed) {
+          const snapshot = { id: doomed.identNumber ?? null, name: doomed.name ?? null }
+
+          for (const side of ['father', 'mother'] as const) {
+            const children = await req.payload.find({
+              collection: 'animals',
+              where: { [side]: { equals: id } },
+              limit: 0,
+              depth: 0,
+              overrideAccess: true,
+              req,
+            })
+
+            for (const child of children.docs) {
+              const text = child.pedigreeText ?? {}
+              if (text[`${side}Id`] || text[`${side}Name`]) continue
+              await req.payload.update({
+                collection: 'animals',
+                id: child.id,
+                overrideAccess: true,
+                data: {
+                  pedigreeText: {
+                    ...text,
+                    [`${side}Id`]: snapshot.id,
+                    [`${side}Name`]: snapshot.name,
+                  },
+                },
+                req,
+              })
+            }
+          }
+        }
       },
     ],
     beforeValidate: [
@@ -935,19 +1030,17 @@ export const Animals: CollectionConfig = {
       },
     ],
 
-    afterDelete: [
-      async ({ doc, req }) => {
-        try {
-          await req.payload.delete({
-            collection: 'index-values',
-            where: { animal: { equals: doc.id } },
-            overrideAccess: true,
-          })
-        } catch {
-          // Значения без животного никому не мешают и уберутся при пересчёте
-        }
-        return doc
-      },
-    ],
+    /*
+     * Здесь был `afterDelete`, убиравший значения индекса. Он не работал
+     * и не мог: `index_values.animal_id` объявлена `NOT NULL`, поэтому
+     * удаление животного падало ещё до «после удаления». Хуже того, вызов
+     * шёл без `req` — то есть по отдельному подключению, мимо открытой
+     * транзакции удаления, — и вместо ошибки получалось ожидание блокировки
+     * до таймаута. Молчаливый `catch` довершал картину: снаружи операция
+     * выглядела просто зависшей.
+     *
+     * Значения индекса теперь убираются в `beforeDelete` вместе с прочими
+     * зависимыми записями и внутри той же транзакции.
+     */
   },
 }
