@@ -20,7 +20,6 @@ import { maskUri, resolveDatabase } from '../lib/db-url'
 import {
   EXTERIOR_COMPOSITES,
   EXTERIOR_TRAITS,
-  REGIONS,
 } from '../lib/dictionaries'
 import { DICTIONARY_SEED } from './dictionaries-data'
 
@@ -73,12 +72,12 @@ const ebv = (sd: number, shift = 0, digits = 1, limit?: [number, number]) => {
 
 /* --------------------------------- Данные -------------------------------- */
 const FARMS = [
-  { name: 'ЗАО «Назаровское»', short: 'ЗАО Назаровское', inn: '2456000101', region: REGIONS[4] },
-  { name: 'АО «Племзавод Заволжское»', short: 'АО Заволжское', inn: '6330000202', region: REGIONS[0] },
-  { name: 'ООО «Русское молоко»', short: 'ООО Русское молоко', inn: '5030000303', region: REGIONS[1] },
-  { name: 'СПК «Красная Звезда»', short: 'СПК Красная Звезда', inn: '4312000404', region: REGIONS[8] },
-  { name: 'АО «Агрофирма Дороничи»', short: 'АО Дороничи', inn: '4345000505', region: REGIONS[8] },
-  { name: 'ООО «Агрокомплекс Кубань»', short: 'ООО Кубань', inn: '2312000606', region: REGIONS[3] },
+  { name: 'ЗАО «Назаровское»', short: 'ЗАО Назаровское', inn: '2456000101', region: 'Красноярский край' },
+  { name: 'АО «Племзавод Заволжское»', short: 'АО Заволжское', inn: '6330000202', region: 'Самарская область' },
+  { name: 'ООО «Русское молоко»', short: 'ООО Русское молоко', inn: '5030000303', region: 'Московская область' },
+  { name: 'СПК «Красная Звезда»', short: 'СПК Красная Звезда', inn: '4312000404', region: 'Кировская область' },
+  { name: 'АО «Агрофирма Дороничи»', short: 'АО Дороничи', inn: '4345000505', region: 'Кировская область' },
+  { name: 'ООО «Агрокомплекс Кубань»', short: 'ООО Кубань', inn: '2312000606', region: 'Краснодарский край' },
 ]
 
 const COW_NAMES = [
@@ -222,7 +221,7 @@ const run = async () => {
       shortName: 'СЦ Волга',
       type: 'service',
       inn: '6316000707',
-      region: REGIONS[0] as never,
+      region: 'Самарская область' as never,
       address: 'г. Самара, ул. Металлургическая, 92',
       membership: 'member',
     },

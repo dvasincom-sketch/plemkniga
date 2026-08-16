@@ -35,6 +35,15 @@ type Probe =
   | { kind: 'column'; table: string; column: string }
   /** Ограничение целостности: миграция может не добавлять ни таблиц, ни колонок. */
   | { kind: 'constraint'; name: string }
+  /**
+   * Индекс. Отдельный вид, а не разновидность ограничения: индексы лежат
+   * в `pg_indexes`, ограничения — в `pg_constraint`, и это разные каталоги.
+   * Проверка индекса по `pg_constraint` не находит ничего никогда — скрипт
+   * при этом уверенно сообщает «записана в журнале, а в базе нет» и советует
+   * разбираться вручную. Ложная тревога такого рода хуже отсутствия проверки:
+   * человек идёт чинить целую базу.
+   */
+  | { kind: 'index'; name: string }
 
 /** Порядок тот же, что в `src/migrations/index.ts`. */
 const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
@@ -110,7 +119,7 @@ const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
   },
   {
     name: '20260816_183242_index_value_page',
-    probe: { kind: 'constraint', name: 'profileKey_publicVisible_state_archived_value_idx' },
+    probe: { kind: 'index', name: 'profileKey_publicVisible_state_archived_value_idx' },
     note: 'составной индекс под страницу книги',
   },
 ]
@@ -130,6 +139,13 @@ const exists = async (probe: Probe): Promise<boolean> => {
   if (probe.kind === 'table') {
     const r = await pool.query(`select to_regclass($1) as t`, [`public.${probe.name}`])
     return r.rows[0]?.t !== null
+  }
+  if (probe.kind === 'index') {
+    const r = await pool.query(
+      `select 1 from pg_indexes where schemaname = 'public' and indexname = $1`,
+      [probe.name],
+    )
+    return r.rowCount === 1
   }
   if (probe.kind === 'constraint') {
     const r = await pool.query(

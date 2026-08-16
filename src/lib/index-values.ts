@@ -403,6 +403,8 @@ export async function recomputeAll(
   const orphans = cleaned.rowCount ?? 0
   if (orphans > 0) log(`убрано значений исчезнувших профилей: ${orphans}`)
 
+  forgetIndexValuesLag()
+
   return { profiles: profiles.length, rows, orphans }
 }
 
@@ -469,10 +471,37 @@ export async function percentileFromStored(
  * например, животных завели при выключенных хуках. Молчать об этом нельзя:
  * список отсортируется, но части записей в нём не окажется.
  */
+/**
+ * Отставание пересчёта: сколько животных остались без значения индекса.
+ *
+ * Сообщение под таблицей, а не диагностика по расписанию: если хуки были
+ * выключены или пересчёт прервали, список молча покажет неполный порядок,
+ * и человек об этом не узнает. Лучше сказать прямо.
+ *
+ * Результат держится в памяти минуту, и вот почему. Оба счёта — полные:
+ * PostgreSQL не хранит количество строк и на трёхстах тысячах животных
+ * тратит на пару таких запросов около двухсот миллисекунд. Платить их
+ * на каждой странице ради строки, которая появляется раз в месяц после
+ * сбоя, — плохая сделка. Отставание при этом не та величина, которую надо
+ * знать с точностью до секунды: оно возникает не мгновенно и не исчезает
+ * само, минутная задержка ничего не меняет.
+ *
+ * Кэш живёт в процессе: у каждого экземпляра приложения он свой, общего
+ * хранилища тут не нужно. Худшее, что бывает, — сообщение задержится
+ * на минуту у одного из них.
+ */
+const LAG_TTL_MS = 60_000
+const lagCache = new Map<string, { at: number; value: IndexValuesLag }>()
+
+export type IndexValuesLag = { animals: number; values: number; missing: number }
+
 export async function indexValuesLag(
   payload: Payload,
   profileKey: string,
-): Promise<{ animals: number; values: number; missing: number }> {
+): Promise<IndexValuesLag> {
+  const cached = lagCache.get(profileKey)
+  if (cached && Date.now() - cached.at < LAG_TTL_MS) return cached.value
+
   const [animals, values] = await Promise.all([
     payload.count({ collection: 'animals', overrideAccess: true }),
     payload.count({
@@ -481,7 +510,17 @@ export async function indexValuesLag(
       overrideAccess: true,
     }),
   ])
+
   const a = animals.totalDocs ?? 0
   const v = values.totalDocs ?? 0
-  return { animals: a, values: v, missing: Math.max(0, a - v) }
+  const value = { animals: a, values: v, missing: Math.max(0, a - v) }
+
+  lagCache.set(profileKey, { at: Date.now(), value })
+  return value
 }
+
+/**
+ * Сбросить кэш отставания — после пересчёта, чтобы сообщение не висело
+ * лишнюю минуту после того, как проблему уже устранили.
+ */
+export const forgetIndexValuesLag = () => lagCache.clear()
