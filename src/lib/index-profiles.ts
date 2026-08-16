@@ -5,6 +5,7 @@ import {
   BUILTIN_PROFILES,
   FARM_PROFILES,
   NATIONAL_PROFILES,
+  PROFIT_PROFILE,
   TRAIT_BASE,
   type IndexProfile,
   type TraitKey,
@@ -32,6 +33,12 @@ export const PROFILE_GROUPS = [
     title: 'Стандартный профиль Ассоциации',
     hint: 'По нему считается ИПЦ в книге, если хозяйство не выбрало свой',
     profiles: [ASSOCIATION_PROFILE],
+  },
+  {
+    key: 'profit',
+    title: 'Экономический индекс',
+    hint: 'Веса в рублях на единицу признака: индекс отвечает не «на сколько лучше», а «сколько принесёт». Цены открыты ниже',
+    profiles: [PROFIT_PROFILE],
   },
   {
     key: 'national',

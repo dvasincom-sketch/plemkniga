@@ -86,7 +86,19 @@ export const IndexBases: CollectionConfig = {
               options: TRAIT_BASE.map((t) => ({ value: t.key, label: `${t.label}, ${t.unit}` })),
             },
             { name: 'mean', type: 'number', label: 'Среднее', required: true },
-            { name: 'sd', type: 'number', label: 'Отклонение', required: true },
+            {
+              /*
+               * Генетическое отклонение — то, по которому стандартизуется
+               * признак. Получено из наблюдаемого разброса оценок делением
+               * на корень из средней достоверности.
+               */
+              name: 'sd',
+              type: 'number',
+              label: 'Генетическое σ',
+              required: true,
+            },
+            { name: 'sdObserved', type: 'number', label: 'Разброс оценок' },
+            { name: 'meanR', type: 'number', label: 'Средняя достоверность, %' },
             {
               name: 'n',
               type: 'number',

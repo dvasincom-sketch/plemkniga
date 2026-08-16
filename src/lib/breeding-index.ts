@@ -36,6 +36,8 @@ import type { Animal } from '@/payload-types'
  *                         База сравнения                              *
  * ------------------------------------------------------------------ */
 
+import { ECONOMIC_WEIGHTS } from '@/lib/economics'
+
 export type TraitKey =
   | 'milk'
   | 'fatKg'
@@ -393,7 +395,33 @@ export const FARM_PROFILES: IndexProfile[] = [
   },
 ]
 
-export const BUILTIN_PROFILES = [ASSOCIATION_PROFILE, ...NATIONAL_PROFILES, ...FARM_PROFILES]
+/**
+ * Профиль в деньгах.
+ *
+ * Отвечает на вопрос «сколько это животное принесёт за продуктивную жизнь»,
+ * как NM$ в США и Pro$ в Канаде. Веса — рубли на единицу признака, они
+ * не нормируются: у них есть собственный смысл, и сумма получается
+ * в рублях, а не в очках.
+ *
+ * Цена честности — прозрачность допущений: индекс верен ровно настолько,
+ * насколько верны цены под ним. Все они собраны в `src/lib/economics.ts`
+ * и показаны в интерфейсе рядом с профилем.
+ */
+export const PROFIT_PROFILE: IndexProfile = {
+  key: 'profit',
+  name: 'Прибыль, ₽ за жизнь',
+  hint: 'Экономический индекс: рубли на единицу признака по ценам 2026 года. Допущения открыты и правятся',
+  kind: 'economic',
+  owner: null,
+  weights: ECONOMIC_WEIGHTS,
+}
+
+export const BUILTIN_PROFILES = [
+  ASSOCIATION_PROFILE,
+  PROFIT_PROFILE,
+  ...NATIONAL_PROFILES,
+  ...FARM_PROFILES,
+]
 
 /* ------------------------------------------------------------------ *
  *                              Расчёт                                 *

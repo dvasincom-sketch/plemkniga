@@ -7,7 +7,9 @@ import { AccountNav } from '@/components/AccountNav'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { ProfileEditor } from '@/components/ProfileEditor'
 import { getClient, getCurrentUser } from '@/lib/payload'
-import { ASSOCIATION_PROFILE, BASE_VERSION, computeIndex } from '@/lib/breeding-index'
+import { ASSOCIATION_PROFILE, computeIndex } from '@/lib/breeding-index'
+import { loadActiveBase } from '@/lib/index-base'
+import { CorrelatedResponse } from '@/components/CorrelatedResponse'
 import { profileOfDoc, sharesOf } from '@/lib/index-profiles'
 import type { Animal, IndexProfile as IndexProfileDoc, Organization } from '@/payload-types'
 import type { TraitKey } from '@/lib/breeding-index'
@@ -49,6 +51,7 @@ export default async function EditIndexProfilePage({
   if (!org || String(owner) !== String(org.id)) notFound()
 
   const profile = profileOfDoc(doc)
+  const base = await loadActiveBase(payload)
 
   /*
    * Порядок животных по этому профилю против стандартного.
@@ -68,8 +71,8 @@ export default async function EditIndexProfilePage({
 
   const scored = animals.map((a) => ({
     animal: a,
-    own: computeIndex(a, profile).value,
-    std: computeIndex(a, ASSOCIATION_PROFILE).value,
+    own: computeIndex(a, profile, base).value,
+    std: computeIndex(a, ASSOCIATION_PROFILE, base).value,
   }))
 
   const rankOf = (list: typeof scored, pick: (s: (typeof scored)[number]) => number) => {
@@ -106,7 +109,7 @@ export default async function EditIndexProfilePage({
             <p className="mt-3 max-w-[75ch] text-[15px] leading-relaxed text-ink-700">
               Веса отвечают на вопрос, за что хозяйство готово платить. Меняются они редко:
               каждое изменение переставляет животных в списке, и решение о нём принимают
-              на уровне холдинга. База сравнения — {BASE_VERSION}.
+              на уровне холдинга. База сравнения — {base.version}.
             </p>
           </div>
           {doc.isDefault && (
@@ -127,6 +130,8 @@ export default async function EditIndexProfilePage({
           }}
           official={official}
         />
+
+        <CorrelatedResponse profile={profile} base={base} />
 
         {/* --------------------- Что профиль делает со стадом ----------------- */}
         <section className="mt-10">

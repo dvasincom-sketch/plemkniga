@@ -7,8 +7,10 @@ import { AccountNav } from '@/components/AccountNav'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { ProfileWeights } from '@/components/ProfileWeights'
 import { CreateProfile } from '@/components/CreateProfile'
-import { getCurrentUser } from '@/lib/payload'
-import { ASSOCIATION_PROFILE, BASE_VERSION } from '@/lib/breeding-index'
+import { getClient, getCurrentUser } from '@/lib/payload'
+import { ASSOCIATION_PROFILE } from '@/lib/breeding-index'
+import { ECONOMIC_ASSUMPTIONS } from '@/lib/economics'
+import { loadActiveBase } from '@/lib/index-base'
 import { PROFILE_GROUPS, loadOwnProfiles, ownKey, profileOfDoc } from '@/lib/index-profiles'
 import { setDefaultProfileAction } from '@/actions/index-profiles'
 import { dateRu } from '@/lib/format'
@@ -41,7 +43,11 @@ export default async function IndexProfilesPage() {
       ? (user.organization as Organization)
       : null
 
-  const { docs, defaultDoc } = await loadOwnProfiles(org?.id)
+  const payload = await getClient()
+  const [{ docs, defaultDoc }, base] = await Promise.all([
+    loadOwnProfiles(org?.id),
+    loadActiveBase(payload),
+  ])
   const active = defaultDoc ? profileOfDoc(defaultDoc) : ASSOCIATION_PROFILE
   const activeKey = defaultDoc ? ownKey(defaultDoc.id) : 'association'
 
@@ -87,7 +93,7 @@ export default async function IndexProfilesPage() {
             </p>
           )}
           <p className="mt-4 text-[13px] text-white/70">
-            База сравнения {BASE_VERSION}
+            База сравнения {base.version}
             {defaultDoc ? ` · изменён ${dateRu(defaultDoc.updatedAt)}` : ' · профиль Ассоциации'}
           </p>
 
@@ -225,6 +231,37 @@ export default async function IndexProfilesPage() {
             </ul>
           </section>
         ))}
+
+        {/* --------------------- Экономика под рублями ------------------------ */}
+        <details className="mt-10 rounded-card bg-white p-6 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)]">
+          <summary className="cursor-pointer text-[17px] font-medium">
+            Из каких цен считается профиль «Прибыль, ₽ за жизнь»
+          </summary>
+          <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
+            Экономический индекс верен ровно настолько, насколько верны цены под ним. Поэтому
+            они здесь открыты. Это допущения по рынку 2026 года, а не истина: у хозяйства цифры
+            свои, и под них заводят собственный профиль.
+          </p>
+
+          <dl className="mt-5 grid gap-x-8 gap-y-3 sm:grid-cols-2">
+            {ECONOMIC_ASSUMPTIONS.map((a) => (
+              <div key={a.label} className="border-b border-ink-100 pb-2">
+                <dt className="flex items-baseline justify-between gap-3 text-[14px]">
+                  <span>{a.label}</span>
+                  <span className="whitespace-nowrap font-medium tabular-nums">{a.value}</span>
+                </dt>
+                <dd className="mt-0.5 text-[12px] leading-snug text-ink-500">{a.note}</dd>
+              </div>
+            ))}
+          </dl>
+
+          <p className="mt-5 max-w-[75ch] text-[13px] leading-relaxed text-ink-500">
+            Композитам вымени и ног цена намеренно не назначена: их экономика уже учтена через
+            здоровье вымени и долголетие. Дать им ещё и собственную цену значило бы посчитать
+            одно и то же дважды — ошибка, которой в экономических индексах избегают в первую
+            очередь.
+          </p>
+        </details>
 
         <p className="mt-10 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
           Национальные индексы даны приближением: пересчитать NM$ и TPI один в один нельзя —

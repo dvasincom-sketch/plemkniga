@@ -1168,6 +1168,8 @@ export interface IndexBase {
           | 'legsComposite';
         mean: number;
         sd: number;
+        sdObserved?: number | null;
+        meanR?: number | null;
         /**
          * По скольким животным посчитано
          */
@@ -1911,6 +1913,8 @@ export interface IndexBasesSelect<T extends boolean = true> {
         trait?: T;
         mean?: T;
         sd?: T;
+        sdObserved?: T;
+        meanR?: T;
         n?: T;
         id?: T;
       };

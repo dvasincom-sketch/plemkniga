@@ -31,7 +31,14 @@ export function ProfileWeights({
   const shown = limit ? shares.slice(0, limit) : shares
   const hidden = shares.length - shown.length
 
-  const cmp = compare ? new Map(sharesOf(compare).map((s) => [s.key, s.share])) : null
+  /*
+   * Сравнивать проценты влияния с рублями нельзя: это разные величины.
+   * Столбец сопоставления показывается только когда обе шкалы совпадают.
+   */
+  const cmp =
+    compare && compare.kind === profile.kind
+      ? new Map(sharesOf(compare).map((s) => [s.key, s.share]))
+      : null
   const max = Math.max(...shares.map((s) => Math.abs(s.share)), 1)
   const suffix = profile.kind === 'economic' ? ' ₽' : ' %'
 
@@ -54,8 +61,10 @@ export function ProfileWeights({
                 </div>
               </div>
               <p className="whitespace-nowrap text-right text-[13px] tabular-nums">
-                {s.share > 0 ? '+' : ''}
-                {s.share.toFixed(profile.kind === 'economic' ? 0 : 0)}
+                {s.share > 0 ? '+' : '−'}
+                {profile.kind === 'economic'
+                  ? Math.round(Math.abs(s.share)).toLocaleString('ru-RU')
+                  : Math.abs(s.share).toFixed(0)}
                 {suffix}
                 {other !== undefined && Math.round(other) !== Math.round(s.share) && (
                   <span className="ml-1.5 text-ink-500" title="В стандартном профиле Ассоциации">

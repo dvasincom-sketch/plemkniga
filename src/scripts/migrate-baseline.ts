@@ -71,6 +71,11 @@ const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
     probe: { kind: 'table', name: 'index_bases' },
     note: 'базы сравнения',
   },
+  {
+    name: '20260816_091110_index_base_sd',
+    probe: { kind: 'column', table: 'index_bases_traits', column: 'sd_observed' },
+    note: 'разброс оценок и достоверность в базе',
+  },
 ]
 
 const { driverUri, uri, source, sslConfig } = resolveDatabase()
