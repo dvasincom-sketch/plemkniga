@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { indexValueRead } from '@/access'
 import { WEIGHT_KINDS } from './IndexProfiles'
+import { STATES, toOptions } from '@/lib/dictionaries'
 
 /**
  * Рассчитанный индекс племенной ценности — по одной строке на пару
@@ -36,6 +37,13 @@ export const IndexValues: CollectionConfig = {
   indexes: [
     // Порядок в списке: отбор по профилю, сортировка по значению
     { fields: ['profileKey', 'value'] },
+    /*
+     * Страница книги целиком: профиль, три условия отбора, сортировка.
+     * Колонки идут в том порядке, в каком они стоят в запросе — сначала
+     * равенства, потом то, по чему сортируют. Так PostgreSQL берёт готовый
+     * отрезок индекса и не сортирует ничего сам.
+     */
+    { fields: ['profileKey', 'publicVisible', 'state', 'archived', 'value'] },
     // Значение конкретного животного по конкретному профилю — ровно одно
     { fields: ['animal', 'profileKey'], unique: true },
   ],
@@ -84,6 +92,68 @@ export const IndexValues: CollectionConfig = {
       name: 'baseVersion',
       type: 'text',
       label: 'Версия базы сравнения',
+    },
+    /*
+     * Копии полей животного, по которым отбирают всегда.
+     *
+     * Условие на связь Payload превращает в отдельный `left join` — по одному
+     * на каждое условие. Страница книги отбирает по видимости, архиву
+     * и владельцу, то есть тянула три копии таблицы животных: 1,3 секунды
+     * на подсчёт итога вместо 0,19 с единственным join.
+     *
+     * Копии не расходятся с оригиналом: строка значения переписывается хуком
+     * при каждом изменении животного, эти поля пишутся тогда же и оттуда же.
+     * Читать их вместо `animal.*` умеет `prefixWhere` в `src/lib/index-column.ts`.
+     */
+    {
+      type: 'row',
+      fields: [
+        {
+          name: 'owner',
+          type: 'relationship',
+          relationTo: 'organizations',
+          label: 'Владелец (копия)',
+          index: true,
+          admin: { readOnly: true },
+        },
+        {
+          name: 'publicVisible',
+          type: 'checkbox',
+          label: 'Публичная (копия)',
+          index: true,
+          admin: { readOnly: true },
+        },
+        {
+          name: 'archived',
+          type: 'checkbox',
+          label: 'В архиве (копия)',
+          index: true,
+          admin: { readOnly: true },
+        },
+        {
+          // Книга по умолчанию показывает живых — условие стоит в каждом запросе
+          name: 'state',
+          type: 'select',
+          options: toOptions(STATES),
+          label: 'Состояние (копия)',
+          index: true,
+          admin: { readOnly: true },
+        },
+      ],
+    },
+    {
+      /*
+       * Из какой оценки посчитано. Веса и база сравнения записаны рядом,
+       * а сами EBV — нет: раньше их было ровно по одному набору на животное,
+       * и вопрос не стоял. С появлением истории он встал: через полгода
+       * число в выпущенном документе нужно уметь объяснить целиком, а без
+       * ссылки на строку оценки половина исходных данных теряется.
+       */
+      name: 'evaluation',
+      type: 'relationship',
+      relationTo: 'animal-evaluations',
+      label: 'Оценка, по которой посчитано',
+      index: true,
     },
     {
       name: 'value',

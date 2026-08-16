@@ -25,6 +25,11 @@ organizations ──< data-submissions ──> media   (исходный фай�
 index-bases                        (версии базы сравнения: μ и σ признаков; действующая одна)
 index-profiles ──> organizations   (владелец профиля весов; пусто — профиль Ассоциации)
 index-values   ──> animals         (рассчитанный индекс: строка на пару «животное + профиль»)
+               ──> animal-evaluations (из какой оценки посчитан)
+
+animal-evaluations ──> animals    (история племенной оценки: строка на переоценку)
+animal-exteriors   ──> animals    (история линейной оценки экстерьера)
+                   ──> technicians (бонитёр)
 
 access-requests ──> animals        (о какой записи речь)
                 ──> organizations  (владелец записи, owner)

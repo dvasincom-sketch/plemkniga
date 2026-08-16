@@ -93,6 +93,26 @@ const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
     probe: { kind: 'constraint', name: 'chk_animals_not_own_father' },
     note: 'правила предметной области и типы счётчиков',
   },
+  {
+    name: '20260816_172319_evaluation_history',
+    probe: { kind: 'table', name: 'animal_evaluations' },
+    note: 'история оценок и экстерьера',
+  },
+  {
+    name: '20260816_180908_index_value_scope',
+    probe: { kind: 'column', table: 'index_values', column: 'public_visible' },
+    note: 'поля отбора в строке значения индекса',
+  },
+  {
+    name: '20260816_182450_index_value_state',
+    probe: { kind: 'column', table: 'index_values', column: 'state' },
+    note: 'состояние животного в строке значения индекса',
+  },
+  {
+    name: '20260816_183242_index_value_page',
+    probe: { kind: 'constraint', name: 'profileKey_publicVisible_state_archived_value_idx' },
+    note: 'составной индекс под страницу книги',
+  },
 ]
 
 const { driverUri, uri, source, sslConfig } = resolveDatabase()

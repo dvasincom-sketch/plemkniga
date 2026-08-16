@@ -75,6 +75,8 @@ export interface Config {
     inseminations: Insemination;
     'milk-tests': MilkTest;
     'health-events': HealthEvent;
+    'animal-evaluations': AnimalEvaluation;
+    'animal-exteriors': AnimalExterior;
     'data-submissions': DataSubmission;
     'access-requests': AccessRequest;
     'index-profiles': IndexProfile;
@@ -113,6 +115,8 @@ export interface Config {
     inseminations: InseminationsSelect<false> | InseminationsSelect<true>;
     'milk-tests': MilkTestsSelect<false> | MilkTestsSelect<true>;
     'health-events': HealthEventsSelect<false> | HealthEventsSelect<true>;
+    'animal-evaluations': AnimalEvaluationsSelect<false> | AnimalEvaluationsSelect<true>;
+    'animal-exteriors': AnimalExteriorsSelect<false> | AnimalExteriorsSelect<true>;
     'data-submissions': DataSubmissionsSelect<false> | DataSubmissionsSelect<true>;
     'access-requests': AccessRequestsSelect<false> | AccessRequestsSelect<true>;
     'index-profiles': IndexProfilesSelect<false> | IndexProfilesSelect<true>;
@@ -997,6 +1001,93 @@ export interface HealthEventType {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "animal-evaluations".
+ */
+export interface AnimalEvaluation {
+  id: number;
+  animal: number | Animal;
+  evaluatedAt: string;
+  /**
+   * Кто посчитал. Оценки из разных источников нельзя сравнивать напрямую: у них разные модели и разные базы
+   */
+  source: 'center' | 'association' | 'import' | 'foreign';
+  /**
+   * Относительно чего считались отклонения; см. index-bases
+   */
+  baseVersion?: string | null;
+  isCurrent?: boolean | null;
+  ipc?: number | null;
+  ipcR?: number | null;
+  ipcPercentile?: number | null;
+  productionReliabilityLevel?: number | null;
+  milkForecast?: number | null;
+  milkR?: number | null;
+  fatPercentForecast?: number | null;
+  fatPercentR?: number | null;
+  proteinPercentForecast?: number | null;
+  proteinPercentR?: number | null;
+  fatKgForecast?: number | null;
+  fatKgR?: number | null;
+  proteinKgForecast?: number | null;
+  proteinKgR?: number | null;
+  productionIndexForecast?: number | null;
+  productionIndexR?: number | null;
+  fertilityForecast?: number | null;
+  fertilityR?: number | null;
+  healthReliabilityLevel?: number | null;
+  productiveLongevityForecast?: number | null;
+  productiveLongevityR?: number | null;
+  udderHealthForecast?: number | null;
+  udderHealthR?: number | null;
+  calfMortalityForecast?: number | null;
+  calfMortalityR?: number | null;
+  calvingEaseForecast?: number | null;
+  calvingEaseR?: number | null;
+  note?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "animal-exteriors".
+ */
+export interface AnimalExterior {
+  id: number;
+  animal: number | Animal;
+  assessedAt: string;
+  /**
+   * По какой лактации оценивали; 0 — до первого отёла
+   */
+  lactation?: number | null;
+  assessor?: (number | null) | Technician;
+  isCurrent?: boolean | null;
+  height?: number | null;
+  chestWidth?: number | null;
+  bodyDepth?: number | null;
+  bodyType?: number | null;
+  rumpAngle?: number | null;
+  rumpWidth?: number | null;
+  rearLegsRear?: number | null;
+  rearLegsSide?: number | null;
+  hoofAngle?: number | null;
+  frontLegs?: number | null;
+  movement?: number | null;
+  foreUdder?: number | null;
+  frontTeatPlacement?: number | null;
+  teatLength?: number | null;
+  udderDepth?: number | null;
+  rearUdder?: number | null;
+  centralLigament?: number | null;
+  rearTeatPlacement?: number | null;
+  bodyComposite?: number | null;
+  udderComposite?: number | null;
+  legsComposite?: number | null;
+  note?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "data-submissions".
  */
 export interface DataSubmission {
@@ -1154,6 +1245,11 @@ export interface IndexValue {
     | boolean
     | null;
   baseVersion?: string | null;
+  owner?: (number | null) | Organization;
+  publicVisible?: boolean | null;
+  archived?: boolean | null;
+  state?: ('alive' | 'sold' | 'culled' | 'dead') | null;
+  evaluation?: (number | null) | AnimalEvaluation;
   value: number;
   reliability?: number | null;
   used?: number | null;
@@ -1210,7 +1306,7 @@ export interface IndexBase {
  */
 export interface Event {
   id: number;
-  type: 'calving' | 'insemination' | 'dryOff' | 'milkTest' | 'exteriorScore' | 'vetTreatment' | 'move' | 'disposal';
+  type: 'dryOff' | 'exteriorScore' | 'move' | 'disposal' | 'calving' | 'insemination' | 'milkTest' | 'vetTreatment';
   date: string;
   animal: number | Animal;
   title?: string | null;
@@ -1292,6 +1388,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'health-events';
         value: number | HealthEvent;
+      } | null)
+    | ({
+        relationTo: 'animal-evaluations';
+        value: number | AnimalEvaluation;
+      } | null)
+    | ({
+        relationTo: 'animal-exteriors';
+        value: number | AnimalExterior;
       } | null)
     | ({
         relationTo: 'data-submissions';
@@ -1823,6 +1927,82 @@ export interface HealthEventsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "animal-evaluations_select".
+ */
+export interface AnimalEvaluationsSelect<T extends boolean = true> {
+  animal?: T;
+  evaluatedAt?: T;
+  source?: T;
+  baseVersion?: T;
+  isCurrent?: T;
+  ipc?: T;
+  ipcR?: T;
+  ipcPercentile?: T;
+  productionReliabilityLevel?: T;
+  milkForecast?: T;
+  milkR?: T;
+  fatPercentForecast?: T;
+  fatPercentR?: T;
+  proteinPercentForecast?: T;
+  proteinPercentR?: T;
+  fatKgForecast?: T;
+  fatKgR?: T;
+  proteinKgForecast?: T;
+  proteinKgR?: T;
+  productionIndexForecast?: T;
+  productionIndexR?: T;
+  fertilityForecast?: T;
+  fertilityR?: T;
+  healthReliabilityLevel?: T;
+  productiveLongevityForecast?: T;
+  productiveLongevityR?: T;
+  udderHealthForecast?: T;
+  udderHealthR?: T;
+  calfMortalityForecast?: T;
+  calfMortalityR?: T;
+  calvingEaseForecast?: T;
+  calvingEaseR?: T;
+  note?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "animal-exteriors_select".
+ */
+export interface AnimalExteriorsSelect<T extends boolean = true> {
+  animal?: T;
+  assessedAt?: T;
+  lactation?: T;
+  assessor?: T;
+  isCurrent?: T;
+  height?: T;
+  chestWidth?: T;
+  bodyDepth?: T;
+  bodyType?: T;
+  rumpAngle?: T;
+  rumpWidth?: T;
+  rearLegsRear?: T;
+  rearLegsSide?: T;
+  hoofAngle?: T;
+  frontLegs?: T;
+  movement?: T;
+  foreUdder?: T;
+  frontTeatPlacement?: T;
+  teatLength?: T;
+  udderDepth?: T;
+  rearUdder?: T;
+  centralLigament?: T;
+  rearTeatPlacement?: T;
+  bodyComposite?: T;
+  udderComposite?: T;
+  legsComposite?: T;
+  note?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "data-submissions_select".
  */
 export interface DataSubmissionsSelect<T extends boolean = true> {
@@ -1930,6 +2110,11 @@ export interface IndexValuesSelect<T extends boolean = true> {
   kind?: T;
   weights?: T;
   baseVersion?: T;
+  owner?: T;
+  publicVisible?: T;
+  archived?: T;
+  state?: T;
+  evaluation?: T;
   value?: T;
   reliability?: T;
   used?: T;

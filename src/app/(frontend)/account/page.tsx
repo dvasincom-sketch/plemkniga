@@ -23,7 +23,7 @@ import {
   resolvePageSize,
   type SearchParams,
 } from '@/lib/animal-query'
-import { DOCUMENT_TYPES, EVENT_TYPES, ROLES, labelOf } from '@/lib/dictionaries'
+import { DOCUMENT_TYPES, ROLES, eventTypeLabel, labelOf } from '@/lib/dictionaries'
 import { SubmissionHistory } from '@/components/SubmissionHistory'
 import { dateRu } from '@/lib/format'
 import { RANKING_CAP, rankByProfile } from '@/lib/index-column'
@@ -433,7 +433,7 @@ async function EventsTab({ orgId }: { orgId?: number }) {
               {events.docs.map((e) => (
                 <tr key={e.id}>
                   <td>{dateRu(e.date)}</td>
-                  <td>{labelOf(EVENT_TYPES, e.type)}</td>
+                  <td>{eventTypeLabel(e.type)}</td>
                   <td>
                     {typeof e.animal === 'object' && e.animal ? (
                       <Link href={`/animals/${e.animal.id}`} className="underline underline-offset-2">

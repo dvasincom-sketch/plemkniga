@@ -75,13 +75,15 @@ export const accessRequestDecide: Access = ({ req: { user } }) => {
 }
 
 /**
- * Значение индекса видно ровно тем, кому видно само животное.
+ * Запись, привязанная к животному, видна ровно тем, кому видно животное.
  *
- * Правило повторяет `animalRead` через связь: держать здесь собственную
- * логику видимости значило бы завести второе место, где решается один
- * и тот же вопрос, и рано или поздно они разойдутся.
+ * Правило повторяет `animalRead` через связь: держать в каждой такой
+ * коллекции собственную логику видимости значило бы завести несколько мест,
+ * где решается один и тот же вопрос, и рано или поздно они разойдутся.
+ * Отсюда читают значения индекса, история оценок и линейные оценки
+ * экстерьера — всё это части карточки, а не самостоятельные сущности.
  */
-export const indexValueRead: Access = ({ req: { user } }) => {
+export const animalScopedRead: Access = ({ req: { user } }) => {
   const u = user as U | null
   if (u?.role === 'admin') return true
   const org = orgId(u)
@@ -104,6 +106,30 @@ export const indexValueRead: Access = ({ req: { user } }) => {
  * (что оно доплачивает за белок, где у него выбытие), а это коммерческая
  * information, которую хозяйство не обязано открывать соседям.
  */
+/**
+ * Значения индекса — по своим копиям полей животного, а не по связи.
+ *
+ * Правило то же самое: своё стадо плюс публичные записи. Но проверяется оно
+ * по колонкам самой строки, а не через `animal.*`, и это не оптимизация
+ * ради оптимизации. Условие на связь Payload превращает в `left join`
+ * таблицы животных — на трёхстах тысячах записей один только подсчёт итога
+ * страницы занимал 1,2 секунды. Копии полей живут в строке значения
+ * и обновляются вместе с ним (`src/collections/IndexValues.ts`).
+ */
+export const indexValueRead: Access = ({ req: { user } }) => {
+  const u = user as U | null
+  if (u?.role === 'admin') return true
+
+  const org = orgId(u)
+  if (u && org) {
+    const w: Where = { or: [{ owner: { equals: org } }, { publicVisible: { equals: true } }] }
+    return w
+  }
+
+  const w: Where = { publicVisible: { equals: true } }
+  return w
+}
+
 export const indexProfileRead: Access = ({ req: { user } }) => {
   const u = user as U | null
   if (u?.role === 'admin') return true

@@ -19,6 +19,8 @@ import { HealthEvents } from '@/collections/HealthEvents'
 import { Calvings } from '@/collections/Calvings'
 import { DataSubmissions } from '@/collections/DataSubmissions'
 import { AccessRequests } from '@/collections/AccessRequests'
+import { AnimalEvaluations } from '@/collections/AnimalEvaluations'
+import { AnimalExteriors } from '@/collections/AnimalExteriors'
 import { IndexProfiles } from '@/collections/IndexProfiles'
 import { IndexValues } from '@/collections/IndexValues'
 import { IndexBases } from '@/collections/IndexBases'
@@ -60,6 +62,8 @@ export default buildConfig({
     Inseminations,
     MilkTests,
     HealthEvents,
+    AnimalEvaluations,
+    AnimalExteriors,
     DataSubmissions,
     AccessRequests,
     IndexProfiles,

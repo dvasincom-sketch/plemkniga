@@ -9,6 +9,10 @@ import * as migration_20260816_091110_index_base_sd from './20260816_091110_inde
 import * as migration_20260816_105109_submission_animals from './20260816_105109_submission_animals';
 import * as migration_20260816_110132_submission_issues from './20260816_110132_submission_issues';
 import * as migration_20260816_165734_domain_rules from './20260816_165734_domain_rules';
+import * as migration_20260816_172319_evaluation_history from './20260816_172319_evaluation_history';
+import * as migration_20260816_180908_index_value_scope from './20260816_180908_index_value_scope';
+import * as migration_20260816_182450_index_value_state from './20260816_182450_index_value_state';
+import * as migration_20260816_183242_index_value_page from './20260816_183242_index_value_page';
 
 export const migrations = [
   {
@@ -64,6 +68,26 @@ export const migrations = [
   {
     up: migration_20260816_165734_domain_rules.up,
     down: migration_20260816_165734_domain_rules.down,
-    name: '20260816_165734_domain_rules'
+    name: '20260816_165734_domain_rules',
+  },
+  {
+    up: migration_20260816_172319_evaluation_history.up,
+    down: migration_20260816_172319_evaluation_history.down,
+    name: '20260816_172319_evaluation_history',
+  },
+  {
+    up: migration_20260816_180908_index_value_scope.up,
+    down: migration_20260816_180908_index_value_scope.down,
+    name: '20260816_180908_index_value_scope',
+  },
+  {
+    up: migration_20260816_182450_index_value_state.up,
+    down: migration_20260816_182450_index_value_state.down,
+    name: '20260816_182450_index_value_state',
+  },
+  {
+    up: migration_20260816_183242_index_value_page.up,
+    down: migration_20260816_183242_index_value_page.down,
+    name: '20260816_183242_index_value_page'
   },
 ];

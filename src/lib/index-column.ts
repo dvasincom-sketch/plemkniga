@@ -47,18 +47,45 @@ export function indexValues(animals: Animal[], profile: IndexProfile): Record<nu
 }
 
 /**
+ * Поля животного, продублированные в самой строке значения индекса.
+ *
+ * Условие на связь Payload превращает в отдельный `left join` — и отдельный
+ * на каждое условие. Страница книги по умолчанию отбирает по трём признакам
+ * (не в архиве, публичная, живая, иногда владелец), и запрос получал три копии
+ * таблицы животных: на трёхстах тысячах записей это 1,3 секунды на один
+ * только подсчёт итога против 190 миллисекунд с единственным join.
+ *
+ * Дублирование здесь дёшево и само поддерживается: строки значений
+ * переписываются хуком при каждом изменении животного, вместе со значением
+ * обновляются и эти три поля. Расходиться им негде — они пишутся из того же
+ * места и в тот же момент.
+ *
+ * Список намеренно короткий. Это не «вынести все фильтры», а «вынести те,
+ * что стоят в каждом запросе»: видимость и архив приходят из слоя доступа
+ * и применяются всегда, владелец — почти всегда. Остальные фильтры человек
+ * задаёт сам, они сужают выборку и стоят своего join.
+ */
+const LOCAL_FIELDS = new Set(['archived', 'publicVisible', 'owner', 'state'])
+
+/**
  * Перенос условий отбора на связь: `sex` → `animal.sex`.
  *
  * Запрос идёт к значениям индекса, а отбор описан в терминах животного —
  * тем же `buildAnimalWhere`, что и везде. Переписывать фильтры вторым набором
  * правил нельзя: два описания одного и того же расходятся при первой же правке,
  * и расхождение всплывает не там, где его сделали.
+ *
+ * Исключение — поля из `LOCAL_FIELDS`: они есть в самой строке, и условие
+ * остаётся без префикса. Это единственная разница между «отбором по животному»
+ * и «отбором по значению», и она про скорость, а не про смысл.
  */
 export function prefixWhere(where: Where, prefix = 'animal'): Where {
   const out: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(where)) {
     if ((key === 'and' || key === 'or') && Array.isArray(value)) {
       out[key] = (value as Where[]).map((w) => prefixWhere(w, prefix))
+    } else if (LOCAL_FIELDS.has(key)) {
+      out[key] = value
     } else {
       out[`${prefix}.${key}`] = value
     }
@@ -190,11 +217,26 @@ export async function findByStoredIndex({
     and: [{ profileKey: { equals: profile.key } }, prefixWhere(where)],
   }
 
+  /*
+   * Два запроса вместо одного с `depth: 2`.
+   *
+   * Раньше страница тянулась одним вызовом с глубиной 2: Payload доставал
+   * двадцать значений индекса, к каждому животное, а к каждому животному —
+   * владельца, стадо, породу, отца и мать, и к ним ещё по кругу. На книге
+   * из двухсот записей это стоило миллисекунды, на трёхстах тысячах —
+   * полторы секунды на страницу, при том что сами запросы к базе занимали
+   * две миллисекунды. Всё время уходило на сотню мелких дозапросов.
+   *
+   * Теперь сначала идентификаторы и значения без связей вовсе, затем одна
+   * выборка животных той же глубины, что и в обычном списке. Порядок
+   * восстанавливается в памяти по массиву идентификаторов: `where id in (…)`
+   * возвращает строки в своём порядке, и полагаться на него нельзя.
+   */
   const found = await payload.find({
     collection: 'index-values',
     where: scope,
     sort: '-value',
-    depth: 2,
+    depth: 0,
     limit: limit > 0 ? limit : 0,
     page: limit > 0 ? Math.floor(offset / limit) + 1 : 1,
     overrideAccess,
@@ -217,13 +259,30 @@ export async function findByStoredIndex({
     if ((any.totalDocs ?? 0) === 0) return null
   }
 
-  const docs: Animal[] = []
   const values: Record<number, number> = {}
+  const order: number[] = []
   for (const row of rows) {
-    if (typeof row.animal !== 'object' || !row.animal) continue
-    const animal = row.animal as Animal
-    docs.push(animal)
-    values[animal.id as number] = row.value
+    const id = typeof row.animal === 'object' && row.animal ? row.animal.id : row.animal
+    if (typeof id !== 'number') continue
+    order.push(id)
+    values[id] = row.value
+  }
+
+  const docs: Animal[] = []
+  if (order.length) {
+    const loaded = await payload.find({
+      collection: 'animals',
+      where: { id: { in: order } },
+      depth: 1,
+      limit: order.length,
+      overrideAccess,
+      ...(overrideAccess ? {} : { user }),
+    })
+    const byId = new Map((loaded.docs as Animal[]).map((a) => [a.id as number, a]))
+    for (const id of order) {
+      const animal = byId.get(id)
+      if (animal) docs.push(animal)
+    }
   }
 
   return {

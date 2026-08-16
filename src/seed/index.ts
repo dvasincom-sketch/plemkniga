@@ -1165,11 +1165,8 @@ const run = async () => {
   /* ------------------------------- События -------------------------------- */
   log('Создание событий и документов…')
   const eventSamples = [
-    { type: 'calving', title: 'Отёл, тёлочка 38 кг', date: new Date(2025, 0, 14) },
-    { type: 'insemination', title: 'Осеменение, HOUSA0148711', date: new Date(2025, 2, 30) },
-    { type: 'milkTest', title: 'Контрольная дойка, 34,2 л', date: new Date(2025, 4, 12) },
+    { type: 'move', title: 'Перевод в группу раздоя', date: new Date(2025, 0, 14) },
     { type: 'exteriorScore', title: 'Линейная оценка экстерьера', date: new Date(2025, 5, 3) },
-    { type: 'vetTreatment', title: 'Обработка копыт', date: new Date(2025, 6, 21) },
     { type: 'dryOff', title: 'Запуск', date: new Date(2025, 7, 2) },
   ] as const
 

@@ -2,7 +2,7 @@ import type { Where } from 'payload'
 import { getClient } from '@/lib/payload'
 import { dateRu, nf } from '@/lib/format'
 import { CALVING_RESULTS } from '@/collections/Calvings'
-import { EVENT_TYPES, labelOf } from '@/lib/dictionaries'
+import { eventTypeLabel } from '@/lib/dictionaries'
 import type { Animal } from '@/payload-types'
 
 /**
@@ -175,7 +175,7 @@ export async function AnimalHistory({ animal }: { animal: Animal }) {
       id: `e${e.id}`,
       at: new Date(e.date).getTime(),
       kind: 'event',
-      title: e.title || labelOf(EVENT_TYPES, e.type),
+      title: e.title || eventTypeLabel(e.type),
       detail:
         e.value !== null && e.value !== undefined
           ? `${nf(e.value, 0)} ${plural(Math.round(e.value), 'балл', 'балла', 'баллов')}`

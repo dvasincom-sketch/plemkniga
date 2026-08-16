@@ -1,5 +1,5 @@
 import type { CollectionConfig } from 'payload'
-import { EVENT_TYPES, toOptions } from '@/lib/dictionaries'
+import { EVENT_TYPES, RETIRED_EVENT_TYPES, toOptions } from '@/lib/dictionaries'
 import { isAdmin, isAuthenticated } from '@/access'
 
 export const Events: CollectionConfig = {
@@ -25,7 +25,19 @@ export const Events: CollectionConfig = {
           type: 'select',
           label: 'Тип события',
           required: true,
-          options: toOptions(EVENT_TYPES),
+          /*
+             Выведенные типы остаются в списке значений — иначе PostgreSQL
+             не примет сужение enum, пока в таблице есть старые строки,
+             а стирать их миграцией нельзя. В интерфейсе они подписаны так,
+             чтобы выбирать их не хотелось, а хук ниже и не даст.
+          */
+          options: [
+            ...toOptions(EVENT_TYPES),
+            ...RETIRED_EVENT_TYPES.map((t) => ({
+              value: t.value,
+              label: `${t.label} — записывать в «${t.instead}»`,
+            })),
+          ],
         },
         { name: 'date', type: 'date', label: 'Дата', required: true },
       ],
@@ -56,6 +68,30 @@ export const Events: CollectionConfig = {
     { name: 'author', type: 'relationship', relationTo: 'users', label: 'Автор' },
   ],
   hooks: {
+    beforeValidate: [
+      ({ data }) => {
+        if (!data?.type) return data
+
+        /*
+         * Запрет на типы, у которых есть своя таблица.
+         *
+         * Список вариантов поля их уже не содержит, но через API и скрипты
+         * тип приходит строкой, а не выбором из списка. Без этой проверки
+         * дубли вернулись бы тем же путём, каким появились в первый раз, —
+         * и снова стало бы неясно, где правда об отёле: в `calvings`
+         * или в ленте.
+         */
+        const retired = RETIRED_EVENT_TYPES.find((t) => t.value === data.type)
+        if (retired) {
+          throw new Error(
+            `«${retired.label}» больше не записывается в ленту событий: ` +
+              `для этого есть раздел «${retired.instead}». ` +
+              'Лента собирается из специализированных таблиц при показе карточки.',
+          )
+        }
+        return data
+      },
+    ],
     beforeChange: [
       ({ data, req, operation }) => {
         if (operation === 'create' && req.user && !data.author) data.author = req.user.id

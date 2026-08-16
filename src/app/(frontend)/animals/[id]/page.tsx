@@ -32,6 +32,7 @@ import {
 } from '@/lib/dictionaries'
 import { dateRu, nf, signed } from '@/lib/format'
 import { IndexBreakdown } from '@/components/IndexBreakdown'
+import { EvaluationHistory } from '@/components/EvaluationHistory'
 import { Collapsible } from '@/components/Collapsible'
 import { computeIndex } from '@/lib/breeding-index'
 import { loadActiveBase } from '@/lib/index-base'
@@ -454,6 +455,16 @@ export default async function AnimalPage({
                выгрузок и протоколов оценки. Смешивать их в один поток
                карточек значило бы уравнять «мы посчитали» и «нам прислали».
             */}
+            {/*
+               История оценок стоит между расчётом и документами намеренно.
+               Она про то же число, что и блок выше, но во времени: сегодняшняя
+               оценка без ряда предыдущих не даёт понять, устоялась она
+               или ещё ползёт. Блок сам себя прячет, когда истории нет.
+            */}
+            <section className="mt-8">
+              <EvaluationHistory animalId={animal.id} />
+            </section>
+
             <h2 className="section-title mt-10">Данные из документов</h2>
             <p className="-mt-2 mb-6 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
               Оценки по признакам, экстерьер и лактации привезены вместе с животным. Индекс выше
