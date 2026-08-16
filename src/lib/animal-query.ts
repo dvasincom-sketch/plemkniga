@@ -218,7 +218,18 @@ export const queryWithSort = (sp: SearchParams, sort: SortValue): string => {
  */
 export const PRESETS = [
   { key: 'bulls', label: 'Быки-производители', params: { sex: 'male', ageGroup: 'bull' } },
-  { key: 'milk', label: 'Коровы с высоким удоем', params: { sex: 'female', sort: 'milk' } },
+  /*
+   * «Высокий удой» — это условие отбора, а не порядок показа.
+   *
+   * Раньше чип задавал `sort: milk`: список оставался прежним, менялась только
+   * последовательность строк. Отсюда две неприятности. Выбор сортировки после
+   * чипа выглядел как сброс отбора — потому что чип и был сортировкой. А сам
+   * чип гас, стоило переключить порядок, хотя отбор не менялся.
+   *
+   * Порог 9000 л делит стадо примерно пополам по верхней границе: это
+   * осмысленная выборка, а не «все коровы в другом порядке».
+   */
+  { key: 'milk', label: 'Коровы с высоким удоем', params: { sex: 'female', milk: '9000' } },
   { key: 'pedigree', label: 'С полной родословной', params: { relation: 'bothParents' } },
   { key: 'verified', label: 'Проверено Ассоциацией', params: { trust: '3' } },
   {
@@ -247,9 +258,20 @@ export const activePreset = (sp: SearchParams): PresetKey | null => {
   return null
 }
 
-/** Ссылка на пресет: заменяет текущий отбор целиком, чтобы не накапливать условия. */
-export const presetHref = (preset: (typeof PRESETS)[number]): string => {
+/**
+ * Ссылка на пресет: заменяет отбор целиком, чтобы условия не накапливались.
+ *
+ * Выбранный порядок показа при этом сохраняется. Сортировка — не условие
+ * отбора, а способ смотреть на результат, и терять её при переключении
+ * чипа незачем: человек только что сказал, в каком порядке ему удобно.
+ */
+export const presetHref = (
+  preset: (typeof PRESETS)[number],
+  sp: SearchParams = {},
+): string => {
   const params = new URLSearchParams(preset.params as Record<string, string>)
+  const sort = one(sp.sort)
+  if (sort && SORT_OPTIONS.some((o) => o.value === sort)) params.set('sort', sort)
   return `/?${params.toString()}#results`
 }
 

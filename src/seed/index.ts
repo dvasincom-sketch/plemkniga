@@ -9,6 +9,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { getPayload } from 'payload'
 import config from '../payload.config'
+import { maskUri, resolveDatabase } from '../lib/db-url'
 import {
   EXTERIOR_COMPOSITES,
   EXTERIOR_TRAITS,
@@ -76,6 +77,36 @@ const TRUST_CYCLE = [3, 2, 3, 1, 3, 2, 0, 3, 2, 3, 1, 3, -1, 2, 3, 1, 2, 3, 0, 2
 const run = async () => {
   const payload = await getPayload({ config })
   const log = (...a: unknown[]) => payload.logger.info(a.join(' '))
+
+  /*
+   * Предохранитель.
+   *
+   * Сид начинается с полной очистки: это наполнение пустой базы, а не
+   * обновление данных. На рабочей системе такой запуск уничтожает всё,
+   * что там накопилось, — и один раз это уже случилось на проде.
+   *
+   * Поэтому: если в базе уже есть животные, скрипт останавливается
+   * и требует явного подтверждения переменной SEED_CONFIRM=1. Заодно
+   * показывает, к какой именно базе подключился, — перепутать локальную
+   * строку с прод-строкой проще, чем кажется.
+   *
+   * Чтобы просто углубить родословную, сид не нужен: для этого есть
+   * `npm run pedigree:deep`, который ничего не удаляет.
+   */
+  const { totalDocs: existingAnimals } = await payload.count({
+    collection: 'animals',
+    overrideAccess: true,
+  })
+
+  if (existingAnimals > 0 && process.env.SEED_CONFIRM !== '1') {
+    payload.logger.error(
+      `В базе уже есть животные (${existingAnimals}). Сид сначала удалит их все.\n` +
+        `  База: ${maskUri(resolveDatabase().uri)}\n` +
+        `  Если это действительно демо-база и данные не жаль — повторите с SEED_CONFIRM=1.\n` +
+        `  Если нужно только углубить родословную — используйте npm run pedigree:deep, он ничего не удаляет.`,
+    )
+    process.exit(1)
+  }
 
   log('Очистка предыдущих демо-данных…')
   const toClear = [

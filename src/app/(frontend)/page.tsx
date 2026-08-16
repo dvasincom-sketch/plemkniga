@@ -221,7 +221,7 @@ export default async function HerdbookPage({
               return (
                 <Link
                   key={p.key}
-                  href={isActive ? '/#results' : presetHref(p)}
+                  href={isActive ? '/#results' : presetHref(p, sp)}
                   aria-current={isActive ? 'true' : undefined}
                   className={`rounded-lg px-3 py-1.5 text-[14px] transition-colors ${
                     isActive

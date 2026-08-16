@@ -16,7 +16,8 @@
     "repair:uuid": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/repair-uuid.ts",
     "payload": "cross-env NODE_OPTIONS=--no-deprecation payload",
     "generate:types": "cross-env NODE_OPTIONS=--no-deprecation payload generate:types",
-    "generate:importmap": "cross-env NODE_OPTIONS=--no-deprecation payload generate:importmap"
+    "generate:importmap": "cross-env NODE_OPTIONS=--no-deprecation payload generate:importmap",
+    "pedigree:deep": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/deep-pedigree.ts"
   },
   "dependencies": {
     "@fontsource-variable/onest": "^5.3.0",
