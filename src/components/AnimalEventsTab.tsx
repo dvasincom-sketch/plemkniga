@@ -1,6 +1,7 @@
 import { getClient } from '@/lib/payload'
 import { dateRu, nf } from '@/lib/format'
 import { CALVING_RESULTS } from '@/collections/Calvings'
+import { AnimalHistory } from './AnimalHistory'
 import type { Animal } from '@/payload-types'
 
 /**
@@ -119,6 +120,16 @@ export async function AnimalEventsTab({ animal }: { animal: Animal }) {
       <p className="mt-8 text-[17px]">
         <span className="font-semibold">Половозрелость:</span> {maturityLabel(animal)}
       </p>
+
+      {/*
+         Хроника стоит первой: на вопрос «что происходило с этой коровой»
+         отвечает она, а таблицы ниже — на вопросы «когда был третий отёл»
+         и «чем закончилось второе осеменение». Сначала общая картина,
+         потом разборы по разделам.
+      */}
+      <section className="mt-7">
+        <AnimalHistory animal={animal} />
+      </section>
 
       <h2 className="section-title mt-7">Оперативное состояние животного</h2>
 

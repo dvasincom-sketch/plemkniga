@@ -20,6 +20,7 @@
     "generate:types": "cross-env NODE_OPTIONS=--no-deprecation payload generate:types",
     "generate:importmap": "cross-env NODE_OPTIONS=--no-deprecation payload generate:importmap",
     "pedigree:deep": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/deep-pedigree.ts",
+    "seed:history": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/seed-history.ts",
     "migrate:baseline": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/migrate-baseline.ts"
   },
   "dependencies": {
