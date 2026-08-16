@@ -57,6 +57,7 @@ const rowOf = (animal: Animal, profile: IndexProfile, base: Base) => {
     publicVisible: Boolean(animal.publicVisible),
     archived: Boolean(animal.archived),
     state: animal.state ?? null,
+    birthYear: animal.birthDate ? new Date(animal.birthDate).getUTCFullYear() : null,
     profileKey: profile.key,
     profileName: profile.name,
     kind: profile.kind,
@@ -125,8 +126,9 @@ async function insertRows(payload: Payload, rows: Row[]): Promise<void> {
           r.publicVisible,
           r.archived,
           r.state,
+          r.birthYear,
         )
-        return `($${at + 1},$${at + 2},$${at + 3},$${at + 4},$${at + 5}::jsonb,$${at + 6},$${at + 7},$${at + 8},$${at + 9},$${at + 10},$${at + 11},$${at + 12},$${at + 13},$${at + 14},now(),now())`
+        return `($${at + 1},$${at + 2},$${at + 3},$${at + 4},$${at + 5}::jsonb,$${at + 6},$${at + 7},$${at + 8},$${at + 9},$${at + 10},$${at + 11},$${at + 12},$${at + 13},$${at + 14},$${at + 15},now(),now())`
       })
       .join(',')
 
@@ -134,7 +136,8 @@ async function insertRows(payload: Payload, rows: Row[]): Promise<void> {
       `insert into index_values
          (animal_id, profile_key, profile_name, kind, weights, base_version,
           value, reliability, used, computed_at,
-          owner_id, public_visible, archived, state, updated_at, created_at)
+          owner_id, public_visible, archived, state, birth_year,
+          updated_at, created_at)
        values ${values}`,
       params,
     )
@@ -226,6 +229,7 @@ const TRAIT_COLUMNS: [column: string, path: string][] = [
   ['public_visible', 'publicVisible'],
   ['archived', 'archived'],
   ['state', 'state'],
+  ['birth_date', 'birthDate'],
   ['production_milk_forecast', 'production.milk.forecast'],
   ['production_milk_r', 'production.milk.r'],
   ['production_fat_kg_forecast', 'production.fatKg.forecast'],
@@ -258,6 +262,11 @@ const shapeAnimal = (row: Record<string, unknown>): Animal => {
     // Поля отбора переносятся как есть, без приведения к числу
     if (typeof raw === 'boolean' || (typeof raw === 'string' && !path.includes('.'))) {
       animal[path] = raw
+      continue
+    }
+    // Дата рождения нужна целиком: год из неё возьмёт `rowOf`
+    if (raw instanceof Date) {
+      animal[path] = raw.toISOString()
       continue
     }
 
@@ -404,6 +413,7 @@ export async function recomputeAll(
   if (orphans > 0) log(`убрано значений исчезнувших профилей: ${orphans}`)
 
   forgetIndexValuesLag()
+  forgetCohorts()
 
   return { profiles: profiles.length, rows, orphans }
 }
@@ -420,7 +430,20 @@ export async function recomputeAll(
  * бессмысленно, за пятнадцать лет база сдвинулась. Если ровесников мало,
  * группа расширяется до всей книги — процентиль по десятку животных
  * не значит ничего, и лучше честно сравнить со всеми.
+ *
+ * Отбор идёт по копиям полей в самой строке значения, а не по связи
+ * с животным. Через связь Payload делал по отдельному `left join` на каждое
+ * условие — три условия, три копии таблицы животных, и каждый из трёх счётов
+ * занимал около секунды. Карточка животного из-за этого открывалась 2,8 с
+ * и была самой медленной страницей системы.
  */
+/** Размеры групп сравнения: свойство книги, а не животного. */
+const COHORT_TTL_MS = 5 * 60_000
+const cohortCache = new Map<string, { at: number; value: number }>()
+
+/** Сбросить размеры групп — после пересчёта книга стала другой. */
+export const forgetCohorts = () => cohortCache.clear()
+
 export async function percentileFromStored(
   payload: Payload,
   profileKey: string,
@@ -432,24 +455,42 @@ export async function percentileFromStored(
   const scope = (year?: number | null): Where => ({
     and: [
       { profileKey: { equals: profileKey } },
-      { 'animal.archived': { not_equals: true } },
-      ...(year
-        ? [
-            { 'animal.birthDate': { greater_than_equal: `${year}-01-01` } },
-            { 'animal.birthDate': { less_than: `${year + 1}-01-01` } },
-          ]
-        : []),
+      { archived: { not_equals: true } },
+      ...(year ? [{ birthYear: { equals: year } }] : []),
     ],
   })
 
   const count = async (where: Where) =>
     (await payload.count({ collection: 'index-values', where, overrideAccess: true })).totalDocs ?? 0
 
+  /*
+   * Размер группы сравнения кэшируется, а «ниже» и «равных» — нет.
+   *
+   * Разница в том, от чего они зависят. Размер группы — свойство книги:
+   * для всех животных одного года и профиля он один и тот же, и меняется
+   * только когда книга пополняется. «Ниже» зависит от конкретного значения,
+   * и кэшировать его пришлось бы на каждое животное отдельно — то есть
+   * никак.
+   *
+   * Особенно дорог случай, когда ровесников мало и группа расширяется
+   * до всей книги: это счёт по двум миллионам строк, примерно 360 мс,
+   * и он повторялся на каждой карточке старого животного заново.
+   */
+  const groupCount = async (year: number | null): Promise<number> => {
+    const key = `${profileKey}|${year ?? 'all'}`
+    const hit = cohortCache.get(key)
+    if (hit && Date.now() - hit.at < COHORT_TTL_MS) return hit.value
+
+    const value = await count(scope(year))
+    cohortCache.set(key, { at: Date.now(), value })
+    return value
+  }
+
   let sameYear = Boolean(birthYear)
-  let group = await count(scope(sameYear ? birthYear : null))
+  let group = await groupCount(sameYear ? birthYear! : null)
   if (sameYear && group < MIN_COHORT) {
     sameYear = false
-    group = await count(scope(null))
+    group = await groupCount(null)
   }
   if (group < 2) return null
 

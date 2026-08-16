@@ -49,6 +49,16 @@ type Probe =
    * человек идёт чинить целую базу.
    */
   | { kind: 'index'; name: string }
+  /**
+   * Опорного объекта больше нет: его убрала более поздняя миграция.
+   *
+   * Случай неочевидный, но неизбежный. Миграция завела индекс, по нему её
+   * и опознавали; следующая миграция индекс удалила — и сверка честно
+   * доложила «записана в журнале, а в базе нет», посоветовав разбираться
+   * вручную. Разбираться там нечего: обе применены, просто вторая отменила
+   * первую. Признаком становится опорный объект той миграции, что отменила.
+   */
+  | { kind: 'superseded'; by: string }
 
 /** Порядок тот же, что в `src/migrations/index.ts`. */
 const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
@@ -124,14 +134,20 @@ const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
   },
   {
     name: '20260816_183242_index_value_page',
-    probe: { kind: 'index', name: 'profileKey_publicVisible_state_archived_value_idx' },
-    note: 'составной индекс под страницу книги',
+    // Индекс убран следующей миграцией — опознаём по ней
+    probe: { kind: 'superseded', by: '20260816_202140_index_cleanup' },
+    note: 'составной индекс под страницу книги (позже убран)',
   },
   {
     name: '20260816_202140_index_cleanup',
     // Миграция только удаляет: признак применённости — отсутствие индекса
     probe: { kind: 'absent-index', name: 'identNumber_idx' },
     note: 'убраны индексы, не пригодившиеся ни разу',
+  },
+  {
+    name: '20260816_202627_index_value_cohort',
+    probe: { kind: 'column', table: 'index_values', column: 'birth_year' },
+    note: 'год рождения для группы сравнения',
   },
 ]
 
@@ -147,6 +163,11 @@ const apply = process.argv.includes('--apply')
 const pool = new Pool({ connectionString: driverUri, ssl: sslConfig })
 
 const exists = async (probe: Probe): Promise<boolean> => {
+  if (probe.kind === 'superseded') {
+    const later = MIGRATIONS.find((m) => m.name === probe.by)
+    if (!later) throw new Error(`Не найдена миграция ${probe.by}, отменившая опорный объект`)
+    return exists(later.probe)
+  }
   if (probe.kind === 'table') {
     const r = await pool.query(`select to_regclass($1) as t`, [`public.${probe.name}`])
     return r.rows[0]?.t !== null

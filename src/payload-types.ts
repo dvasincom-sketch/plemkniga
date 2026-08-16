@@ -1249,6 +1249,7 @@ export interface IndexValue {
   publicVisible?: boolean | null;
   archived?: boolean | null;
   state?: ('alive' | 'sold' | 'culled' | 'dead') | null;
+  birthYear?: number | null;
   evaluation?: (number | null) | AnimalEvaluation;
   value: number;
   reliability?: number | null;
@@ -2114,6 +2115,7 @@ export interface IndexValuesSelect<T extends boolean = true> {
   publicVisible?: T;
   archived?: T;
   state?: T;
+  birthYear?: T;
   evaluation?: T;
   value?: T;
   reliability?: T;

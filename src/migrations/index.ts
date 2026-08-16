@@ -14,6 +14,7 @@ import * as migration_20260816_180908_index_value_scope from './20260816_180908_
 import * as migration_20260816_182450_index_value_state from './20260816_182450_index_value_state';
 import * as migration_20260816_183242_index_value_page from './20260816_183242_index_value_page';
 import * as migration_20260816_202140_index_cleanup from './20260816_202140_index_cleanup';
+import * as migration_20260816_202627_index_value_cohort from './20260816_202627_index_value_cohort';
 
 export const migrations = [
   {
@@ -94,6 +95,11 @@ export const migrations = [
   {
     up: migration_20260816_202140_index_cleanup.up,
     down: migration_20260816_202140_index_cleanup.down,
-    name: '20260816_202140_index_cleanup'
+    name: '20260816_202140_index_cleanup',
+  },
+  {
+    up: migration_20260816_202627_index_value_cohort.up,
+    down: migration_20260816_202627_index_value_cohort.down,
+    name: '20260816_202627_index_value_cohort'
   },
 ];
