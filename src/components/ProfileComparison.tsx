@@ -72,15 +72,14 @@ export function ProfileComparison({
             <tr>
               <th className="text-left">Признак</th>
               {columns.map((c) => (
-                <th
-                  key={c.profile.key}
-                  className={`whitespace-normal text-right ${
-                    c.profile.key === activeKey ? 'text-forest-600' : ''
-                  }`}
-                >
+                <th key={c.profile.key} className="whitespace-normal text-right">
                   {c.profile.name}
+                  {/*
+                     Подпись светлая: шапка таблицы тёмно-зелёная, и фирменный
+                     зелёный текст на ней читался как пятно.
+                  */}
                   {c.profile.key === activeKey && (
-                    <span className="block text-[11px] font-normal text-forest-600">основной</span>
+                    <span className="block text-[11px] font-normal opacity-75">основной</span>
                   )}
                 </th>
               ))}

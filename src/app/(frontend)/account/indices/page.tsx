@@ -37,8 +37,19 @@ export const dynamic = 'force-dynamic'
  * страницы, они относились ко всему сразу и ни к чему конкретно.
  */
 
-/** Раздел: заголовок слева, содержимое справа. */
-function Band({
+/**
+ * Раздел: заголовок во всю ширину, под ним сетка карточек.
+ *
+ * Заголовок стоял отдельной колонкой слева — и съедал у карточек четверть
+ * ширины. На трёх столбцах карточка сжималась до двухсот пикселей: полоски
+ * весов схлопывались, подписи ломались, а раскрытый блок цен внутри такой
+ * карточки разваливался совсем.
+ *
+ * Пустые ячейки сетки, из-за которых заголовок и уезжал вбок, закрыты иначе —
+ * пояснениями (`Note`). Они занимают место рядом с карточками и там же,
+ * где раньше была пустота, говорят то, что относится именно к этому разделу.
+ */
+function Section({
   title,
   hint,
   action,
@@ -50,14 +61,50 @@ function Band({
   children: React.ReactNode
 }) {
   return (
-    <section className="mt-10 grid gap-5 lg:grid-cols-[240px_1fr] lg:gap-8">
-      <div>
-        <h2 className="text-[20px] font-medium leading-tight">{title}</h2>
-        <p className="mt-1.5 text-[13px] leading-relaxed text-ink-500">{hint}</p>
-        {action && <div className="mt-4">{action}</div>}
+    <section className="mt-12">
+      <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
+        <div>
+          <h2 className="text-[22px] font-medium leading-tight">{title}</h2>
+          <p className="mt-1.5 max-w-[80ch] text-[14px] leading-relaxed text-ink-500">{hint}</p>
+        </div>
+        {action}
       </div>
-      <div className="min-w-0">{children}</div>
+
+      {/*
+         items-start: карточка не тянется под высоту соседнего пояснения.
+         Растянутая, она оставляла дыру между весами и ссылкой внизу —
+         тем заметнее, чем длиннее текст рядом.
+      */}
+      <div className="mt-5 grid grid-cols-1 items-start gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {children}
+      </div>
     </section>
+  )
+}
+
+/**
+ * Пояснение в ячейке сетки — рядом с карточками, а не под ними.
+ *
+ * Выглядит нарочно иначе, чем карточка профиля: без тени, на прозрачном фоне.
+ * Иначе читалось бы как ещё один профиль, у которого почему-то нет весов.
+ */
+function Note({
+  title,
+  wide,
+  children,
+}: {
+  title: string
+  /** Занять две ячейки: в ряду с одной карточкой иначе остаётся пустое место. */
+  wide?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <div className={`rounded-2xl border border-ink-100 p-5 ${wide ? 'xl:col-span-2' : ''}`}>
+      <h3 className="text-[15px] font-medium leading-tight">{title}</h3>
+      <div className="mt-2 space-y-3 text-[13px] leading-relaxed text-ink-500 [&>p]:max-w-[70ch]">
+        {children}
+      </div>
+    </div>
   )
 }
 
@@ -67,18 +114,16 @@ function ProfileCard({
   hint,
   badge,
   footer,
-  extra,
 }: {
   profile: IndexProfile
   name: string
   hint?: string | null
   badge?: string
   footer?: React.ReactNode
-  extra?: React.ReactNode
 }) {
   return (
     <div
-      className={`flex h-full flex-col rounded-2xl bg-white p-5 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] ${
+      className={`flex flex-col rounded-2xl bg-white p-5 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] ${
         badge ? 'ring-2 ring-forest-500' : ''
       }`}
     >
@@ -96,8 +141,6 @@ function ProfileCard({
         <ProfileWeights profile={profile} limit={5} />
       </div>
 
-      {extra}
-
       {footer && (
         <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-ink-100 pt-4 text-[14px]">
           {footer}
@@ -106,8 +149,6 @@ function ProfileCard({
     </div>
   )
 }
-
-const CARD_GRID = 'grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3'
 
 export default async function IndexProfilesPage() {
   const user = await getCurrentUser()
@@ -186,13 +227,13 @@ export default async function IndexProfilesPage() {
         </section>
 
         {/* --------------------------- Свои профили -------------------------- */}
-        <Band
+        <Section
           title="Профили хозяйства"
-          hint="Видны только вашему хозяйству: набор весов выдаёт вашу экономику. Настраивает главный генетик, работают с готовым все"
+          hint="Видны только вашему хозяйству: набор весов выдаёт вашу экономику"
           action={org ? <CreateProfile /> : undefined}
         >
           {!org ? (
-            <p className="rounded-2xl bg-white p-5 text-[15px] leading-relaxed text-ink-700 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)]">
+            <p className="rounded-2xl border border-ink-100 p-5 text-[15px] leading-relaxed text-ink-700 sm:col-span-2 xl:col-span-3">
               Профиль принадлежит хозяйству, а ваша учётная запись пока не привязана
               к организации. Заполните реквизиты в{' '}
               <Link href="/account/profile" className="underline underline-offset-4">
@@ -201,92 +242,108 @@ export default async function IndexProfilesPage() {
               .
             </p>
           ) : docs.length === 0 ? (
-            <p className="rounded-2xl bg-white p-5 text-[15px] leading-relaxed text-ink-700 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)]">
+            <p className="rounded-2xl border border-ink-100 p-5 text-[15px] leading-relaxed text-ink-700 sm:col-span-2 xl:col-span-3">
               Своих профилей пока нет — индекс считается по стандартному профилю Ассоциации.
               Проще начать не с чистого листа, а взять за основу готовый профиль ниже
               и поправить в нём два-три веса.
             </p>
           ) : (
-            <ul className={CARD_GRID}>
-              {docs.map((doc) => {
-                const p = profileOfDoc(doc)
-                const isActive = activeKey === ownKey(doc.id)
-                return (
-                  <li key={doc.id}>
-                    <ProfileCard
-                      profile={p}
-                      name={doc.name}
-                      hint={doc.hint}
-                      badge={isActive ? 'основной' : undefined}
-                      extra={p.kind === 'economic' ? <EconomicAssumptions /> : undefined}
-                      footer={
-                        <>
-                          <Link
-                            href={`/account/indices/${doc.id}`}
+            docs.map((doc) => {
+              const p = profileOfDoc(doc)
+              const isActive = activeKey === ownKey(doc.id)
+              return (
+                <ProfileCard
+                  key={doc.id}
+                  profile={p}
+                  name={doc.name}
+                  hint={doc.hint}
+                  badge={isActive ? 'основной' : undefined}
+                  footer={
+                    <>
+                      <Link
+                        href={`/account/indices/${doc.id}`}
+                        className="underline underline-offset-4 hover:text-forest-500"
+                      >
+                        Изменить веса
+                      </Link>
+                      {!isActive && (
+                        <form action={setDefaultProfileAction}>
+                          <input type="hidden" name="key" value={ownKey(doc.id)} />
+                          <button
+                            type="submit"
                             className="underline underline-offset-4 hover:text-forest-500"
                           >
-                            Изменить веса
-                          </Link>
-                          {!isActive && (
-                            <form action={setDefaultProfileAction}>
-                              <input type="hidden" name="key" value={ownKey(doc.id)} />
-                              <button
-                                type="submit"
-                                className="underline underline-offset-4 hover:text-forest-500"
-                              >
-                                Сделать основным
-                              </button>
-                            </form>
-                          )}
-                        </>
-                      }
-                    />
-                  </li>
-                )
-              })}
-            </ul>
+                            Сделать основным
+                          </button>
+                        </form>
+                      )}
+                    </>
+                  }
+                />
+              )
+            })
           )}
-        </Band>
+        </Section>
 
         {/* ------------------------- Готовые профили ------------------------- */}
         {PROFILE_GROUPS.map((group) => (
-          <Band key={group.key} title={group.title} hint={group.hint}>
-            <ul className={CARD_GRID}>
-              {group.profiles.map((p) => (
-                <li key={p.key}>
-                  <ProfileCard
-                    profile={p}
-                    name={p.name}
-                    hint={p.hint}
-                    badge={activeKey === p.key ? 'основной' : undefined}
-                    extra={p.kind === 'economic' ? <EconomicAssumptions /> : undefined}
-                    footer={
-                      org ? (
-                        <CreateProfile
-                          from={p.key}
-                          label="Взять за основу"
-                          name={`${p.name} — наш вариант`}
-                        />
-                      ) : undefined
-                    }
-                  />
-                </li>
-              ))}
-            </ul>
+          <Section key={group.key} title={group.title} hint={group.hint}>
+            {group.profiles.map((p) => (
+              <ProfileCard
+                key={p.key}
+                profile={p}
+                name={p.name}
+                hint={p.hint}
+                badge={activeKey === p.key ? 'основной' : undefined}
+                footer={
+                  org ? (
+                    <CreateProfile
+                      from={p.key}
+                      label="Взять за основу"
+                      name={`${p.name} — наш вариант`}
+                    />
+                  ) : undefined
+                }
+              />
+            ))}
 
             {/*
-               Оговорка живёт внутри своего раздела. Вынесенная в конец
-               страницы, она читалась как примечание ко всему списку профилей,
-               хотя относится только к двум карточкам над ней.
+               Пояснения стоят в свободных ячейках сетки — рядом с карточками,
+               к которым относятся. Внизу страницы они читались как примечание
+               ко всему списку профилей, а в ряду с одной карточкой закрывают
+               собой пустоту, которая иначе выглядит как ошибка вёрстки.
             */}
-            {group.key === 'national' && (
-              <p className="mt-4 max-w-[75ch] text-[13px] leading-relaxed text-ink-500">
-                Пересчитать NM$ и TPI один в один нельзя: в оригиналах есть признаки, которых
-                в системе нет — остаточное потребление корма, стельность тёлок, живучесть коров.
-                Сравнивать по ним животных между собой можно, сверять число с официальным — нет.
-              </p>
+            {group.key === 'association' && (
+              <Note title="Что значит «стандартный»" wide>
+                <p>
+                  По этому профилю считается индекс у всех, кто не завёл своего: у гостя книги,
+                  у хозяйства без собственных весов, в публичных списках.
+                </p>
+                <p>
+                  Относительное влияние повторяет Net Merit 2025 с поправкой на состав признаков.
+                  Отрицательный вес композита тела — не ошибка: крупная корова дороже
+                  в содержании, и селекция на рост тела снижает пожизненную прибыль.
+                </p>
+              </Note>
             )}
-          </Band>
+
+            {group.key === 'profit' && <EconomicAssumptions wide />}
+
+            {group.key === 'national' && (
+              <Note title="Почему «приближение»">
+                <p>
+                  Пересчитать NM$ и TPI один в один нельзя: в оригиналах есть признаки, которых
+                  в системе нет — остаточное потребление корма, стельность тёлок, живучесть
+                  коров.
+                </p>
+                <p>
+                  Сравнивать по ним животных между собой можно, сверять число с официальным —
+                  нет. Настоящее значение по импортированному животному правильнее привозить
+                  вместе с остальными его данными.
+                </p>
+              </Note>
+            )}
+          </Section>
         ))}
 
         {/* --------------------------- Сравнение ----------------------------- */}

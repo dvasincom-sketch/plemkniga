@@ -139,11 +139,15 @@ export const ECONOMIC_WEIGHTS: Partial<Record<TraitKey, number>> = {
   ),
 }
 
+/** Русская запись числа: разделитель дробной части — запятая. */
+const ru = (n: number, digits = 1) =>
+  n.toLocaleString('ru-RU', { minimumFractionDigits: digits, maximumFractionDigits: digits })
+
 /** Строки для показа допущений в интерфейсе и в документации. */
 export const ECONOMIC_ASSUMPTIONS: { label: string; value: string; note: string }[] = [
   {
     label: 'Молоко, базисное',
-    value: `${MILK_BASE_PRICE} ₽/кг`,
+    value: `${ru(MILK_BASE_PRICE)} ₽/кг`,
     note: 'апрель 2026, без НДС, при 3,4 % жира и 3,0 % белка',
   },
   {
@@ -158,7 +162,7 @@ export const ECONOMIC_ASSUMPTIONS: { label: string; value: string; note: string 
   },
   {
     label: 'Объём молока',
-    value: `${MILK_VOLUME_PRICE} ₽/кг`,
+    value: `${ru(MILK_VOLUME_PRICE)} ₽/кг`,
     note: 'остаток цены сверх жира и белка',
   },
   {
@@ -193,7 +197,7 @@ export const ECONOMIC_ASSUMPTIONS: { label: string; value: string; note: string 
   },
   {
     label: 'Горизонт',
-    value: `${LIFETIME_LACTATIONS} лактации`,
+    value: `${ru(LIFETIME_LACTATIONS)} лактации`,
     note: 'на столько умножаются признаки лактации, чтобы получить «за жизнь»',
   },
 ]
