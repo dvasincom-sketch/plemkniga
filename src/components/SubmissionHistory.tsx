@@ -129,22 +129,34 @@ export function SubmissionHistory({ submissions }: { submissions: DataSubmission
         }
 
         return (
+          /*
+             На телефоне строка перестраивается в столбик.
+             
+             Раньше здесь была одна горизонтальная раскладка на все ширины:
+             значок, номер фиксированными 130 пикселями, описание и кнопка
+             в ряд. На узком экране описанию оставалось сантиметра полтора,
+             и оно рассыпалось по одному слову в строку, а кнопка не влезала
+             и вылезала за карточку. Ширина у телефона одна — вертикаль,
+             её и используем.
+          */
           <li
             key={e.key}
-            className={`flex items-center gap-6 rounded-2xl pl-4 pr-4 transition-shadow sm:pl-2 sm:pr-2 ${
+            className={`flex flex-col gap-3 rounded-2xl p-4 transition-shadow sm:flex-row sm:items-center sm:gap-6 sm:py-0 sm:pl-2 sm:pr-2 ${
               e.isCurrent
                 ? 'bg-white shadow-[0_2px_10px_rgb(23_24_26_/_0.06)]'
                 : 'bg-white/55 hover:bg-white'
             }`}
           >
-            <StatusIcon tone={view.tone} />
+            <div className="flex min-w-0 items-center gap-4 sm:contents">
+              <StatusIcon tone={view.tone} />
 
-            <div className="w-[130px] flex-none py-4">
-              <p className="text-[15px] font-medium">№ {e.number}</p>
-              <p className="mt-1 text-sm text-ink-500">{dateRu(e.at)}</p>
+              <div className="min-w-0 sm:w-[130px] sm:flex-none sm:py-4">
+                <p className="text-[15px] font-medium">№ {e.number}</p>
+                <p className="mt-1 text-sm text-ink-500">{dateRu(e.at)}</p>
+              </div>
             </div>
 
-            <div className="min-w-0 flex-1 py-4">
+            <div className="min-w-0 sm:flex-1 sm:py-4">
               <p className="text-[15px]">{labelOf(SUBMISSION_KINDS, e.kind)}</p>
               <p className="mt-1 text-sm text-ink-500">{view.text}</p>
             </div>
@@ -152,7 +164,7 @@ export function SubmissionHistory({ submissions }: { submissions: DataSubmission
             {e.isCurrent && (
               <Link
                 href={`/account/submissions/${e.submissionId}`}
-                className="btn btn-accent flex-none"
+                className="btn btn-accent w-full justify-center sm:w-auto sm:flex-none"
               >
                 Подробнее
                 <svg width="16" height="14" viewBox="0 0 20 14" fill="none" aria-hidden="true">

@@ -18,6 +18,12 @@ import { ACCOUNT_TABS } from './AccountNav'
  * не показываются — здесь важна краткость, развёрнутый вид остаётся
  * в основном меню кабинета.
  */
+/** Минимальная ширина списка — по самой длинной подписи раздела. */
+const MIN_WIDTH = 232
+
+/** Отступ от края экрана, чтобы список не прилипал к нему на телефоне. */
+const SCREEN_GAP = 8
+
 export function HeaderAccountMenu({
   displayName,
   orgName,
@@ -39,10 +45,19 @@ export function HeaderAccountMenu({
     const el = anchorRef.current
     if (!el) return
     const r = el.getBoundingClientRect()
-    // Ширина списка в точности равна ширине блока имени: любое расхождение
-    // даёт ступеньку на стыке, и силуэт перестаёт читаться как одна плашка.
-    // Минимальную ширину задаёт сам блок имени, а не список.
-    setRect({ top: r.bottom - 1, right: window.innerWidth - r.right, width: r.width })
+    /*
+     * На широком экране список повторяет ширину блока имени: любое расхождение
+     * даёт ступеньку на стыке, и силуэт перестаёт читаться как одна плашка.
+     *
+     * На телефоне имя и организация скрыты, от блока остаётся один кружок
+     * с аватаром — сорок с небольшим пикселей. Список такой ширины обрезал
+     * подписи по буквам: «Мои живот…», «Настр…». Поэтому ширина не меньше
+     * MIN_WIDTH и не шире экрана: смыкание в одну плашку — приём для
+     * просторного экрана, читаемость важнее.
+     */
+    const width = Math.min(Math.max(r.width, MIN_WIDTH), window.innerWidth - 2 * SCREEN_GAP)
+    const right = Math.min(Math.max(window.innerWidth - r.right, SCREEN_GAP), window.innerWidth - width - SCREEN_GAP)
+    setRect({ top: r.bottom - 1, right, width })
   }, [])
 
   // Небольшая задержка на закрытие: иначе меню исчезает, пока курсор
@@ -127,7 +142,7 @@ export function HeaderAccountMenu({
             onMouseEnter={show}
             onMouseLeave={hide}
             style={{ top: rect.top, right: rect.right, width: rect.width }}
-            className="account-menu fixed z-[100] overflow-hidden rounded-b-2xl bg-forest-500 pb-1.5 shadow-[0_16px_40px_rgb(23_24_26_/_0.22)]"
+            className="account-menu fixed z-[100] overflow-hidden rounded-2xl bg-forest-500 pb-1.5 shadow-[0_16px_40px_rgb(23_24_26_/_0.22)] sm:rounded-b-2xl sm:rounded-t-none"
           >
             <ul>
               {ACCOUNT_TABS.map((t) => (
