@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 import type { AncestryReport } from '@/lib/ancestry'
 import { InfoTip } from './InfoTip'
+import { TableRowNav } from './TableRowNav'
 import { nf } from '@/lib/format'
 
 /**
@@ -114,7 +115,7 @@ export function KeyAncestors({ report }: { report: AncestryReport }) {
 
       <CoverageBar report={report} />
 
-      <div className="table-scroll mt-7">
+      <TableRowNav className="table-scroll mt-7">
         <table className="data-table w-full">
           <thead>
             <tr>
@@ -155,9 +156,13 @@ export function KeyAncestors({ report }: { report: AncestryReport }) {
 
           <tbody>
             {rows.map((a) => (
-              <tr key={a.id} className={a.onBothSides ? 'bg-[#fffaf0]' : undefined}>
+              <tr
+                key={a.id}
+                data-href={`/animals/${a.id}`}
+                className={a.onBothSides ? 'bg-[#fffaf0]' : undefined}
+              >
                 <td className="cell-truncate font-medium" title={a.name ?? undefined}>
-                  <Link href={`/animals/${a.id}`} className="row-link">
+                  <Link href={`/animals/${a.id}`} className="cell-link">
                     {a.name ?? '—'}
                   </Link>
                   {a.onBothSides && (
@@ -180,7 +185,7 @@ export function KeyAncestors({ report }: { report: AncestryReport }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </TableRowNav>
 
       {shown < report.ancestors.length && (
         <div className="mt-5 text-center">

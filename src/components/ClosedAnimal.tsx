@@ -205,15 +205,18 @@ export function ClosedAnimal({
                 typeof a.owner === 'object' && a.owner ? a.owner.shortName || a.owner.name : '—'
               const ipc = a.ipc ?? null
               return (
-                <li
-                  key={a.id}
-                  className="relative rounded-2xl bg-white p-5 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] transition-shadow hover:shadow-[0_6px_18px_rgb(23_24_26_/_0.12)]"
-                >
+                <li key={a.id}>
+                  {/* Ссылкой сделана вся карточка: у блочной ссылки клик
+                      работает по всей площади без невидимых слоёв поверх */}
+                  <Link
+                    href={`/animals/${a.id}`}
+                    className="block rounded-2xl bg-white p-5 text-inherit no-underline shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] transition-shadow hover:shadow-[0_6px_18px_rgb(23_24_26_/_0.12)]"
+                  >
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
-                      <Link href={`/animals/${a.id}`} className="row-link text-[17px] font-medium leading-tight">
+                      <p className="text-[17px] font-medium leading-tight">
                         {a.name ?? `№ ${a.identNumber}`}
-                      </Link>
+                      </p>
                       <p className="mt-0.5 text-[13px] tabular-nums text-ink-500">
                         № {a.identNumber}
                       </p>
@@ -247,9 +250,10 @@ export function ClosedAnimal({
                     </div>
                   </dl>
 
-                  <p className="mt-3 truncate text-[13px] text-ink-500" title={owner}>
-                    {owner}
-                  </p>
+                    <p className="mt-3 truncate text-[13px] text-ink-500" title={owner}>
+                      {owner}
+                    </p>
+                  </Link>
                 </li>
               )
             })}

@@ -3,6 +3,7 @@ import type { Animal } from '@/payload-types'
 import { AGE_GROUPS, SEXES, STATES } from '@/lib/dictionaries'
 import { nf, signed } from '@/lib/format'
 import { LockHint } from './LockHint'
+import { TableRowNav } from './TableRowNav'
 import { ANONYMOUS, LOCK_HINT, isAnimalLocked, type Viewer } from '@/lib/visibility'
 
 /**
@@ -14,9 +15,10 @@ import { ANONYMOUS, LOCK_HINT, isAnimalLocked, type Viewer } from '@/lib/visibil
  * для них есть место. Ничего не теряется — полный набор всегда в карточке
  * животного, а на широком экране видна и вся таблица.
  *
- * Строка кликабельна целиком: ссылка в первой ячейке растягивается на всю
- * строку невидимым слоем. Раньше кликались только номер и кличка, хотя
- * подсвечивалась вся строка — подсветка обещала больше, чем работало.
+ * Строка кликабельна целиком — обработчиком на таблице, см. `TableRowNav`.
+ * Раньше здесь был растянутый невидимый слой поверх строки; он держался
+ * на `position: relative` у `<tr>` и, когда это свойство не срабатывало,
+ * накрывал собой пол-страницы.
  */
 
 const ageShort = (v?: string | null) => AGE_GROUPS.find((o) => o.value === v)?.short ?? '—'
@@ -59,7 +61,7 @@ export function AnimalTable({
   emptyText?: React.ReactNode
 }) {
   return (
-    <div className="table-scroll">
+    <TableRowNav className="table-scroll">
       <table className="data-table w-full">
         <thead>
           <tr>
@@ -89,7 +91,9 @@ export function AnimalTable({
             const ipc = a.ipc ?? null
 
             return (
-              <tr key={a.id}>
+              // Адрес строки читает обработчик таблицы; сама ссылка
+              // остаётся в ячейке с номером
+              <tr key={a.id} data-href={`/animals/${a.id}`}>
                 <td className="tabular-nums">{startIndex + i + 1}</td>
                 <td className="w-6 pl-0 pr-0">
                   {locked && <LockHint href={`/animals/${a.id}`} text={LOCK_HINT} />}
@@ -99,7 +103,7 @@ export function AnimalTable({
                 <td className="tabular-nums">
                   <Link
                     href={`/animals/${a.id}`}
-                    className="row-link"
+                    className="cell-link"
                     title={
                       locked
                         ? `Доступ закрыт владельцем — открыть запись и запросить доступ: ${a.name ?? a.identNumber}`
@@ -141,6 +145,6 @@ export function AnimalTable({
           })}
         </tbody>
       </table>
-    </div>
+    </TableRowNav>
   )
 }
