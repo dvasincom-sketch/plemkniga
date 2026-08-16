@@ -32,6 +32,11 @@ import { maskUri, resolveDatabase } from '../lib/db-url'
 
 type Probe =
   | { kind: 'table'; name: string }
+  /**
+   * Признак наоборот: объекта быть не должно. Нужен для миграций, которые
+   * только удаляют, — у них «применена» значит «этого больше нет».
+   */
+  | { kind: 'absent-index'; name: string }
   | { kind: 'column'; table: string; column: string }
   /** Ограничение целостности: миграция может не добавлять ни таблиц, ни колонок. */
   | { kind: 'constraint'; name: string }
@@ -122,6 +127,12 @@ const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
     probe: { kind: 'index', name: 'profileKey_publicVisible_state_archived_value_idx' },
     note: 'составной индекс под страницу книги',
   },
+  {
+    name: '20260816_202140_index_cleanup',
+    // Миграция только удаляет: признак применённости — отсутствие индекса
+    probe: { kind: 'absent-index', name: 'identNumber_idx' },
+    note: 'убраны индексы, не пригодившиеся ни разу',
+  },
 ]
 
 const { driverUri, uri, source, sslConfig } = resolveDatabase()
@@ -139,6 +150,13 @@ const exists = async (probe: Probe): Promise<boolean> => {
   if (probe.kind === 'table') {
     const r = await pool.query(`select to_regclass($1) as t`, [`public.${probe.name}`])
     return r.rows[0]?.t !== null
+  }
+  if (probe.kind === 'absent-index') {
+    const r = await pool.query(
+      `select 1 from pg_indexes where schemaname = 'public' and indexname = $1`,
+      [probe.name],
+    )
+    return r.rowCount === 0
   }
   if (probe.kind === 'index') {
     const r = await pool.query(

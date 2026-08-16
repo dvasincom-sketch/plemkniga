@@ -13,6 +13,7 @@ import * as migration_20260816_172319_evaluation_history from './20260816_172319
 import * as migration_20260816_180908_index_value_scope from './20260816_180908_index_value_scope';
 import * as migration_20260816_182450_index_value_state from './20260816_182450_index_value_state';
 import * as migration_20260816_183242_index_value_page from './20260816_183242_index_value_page';
+import * as migration_20260816_202140_index_cleanup from './20260816_202140_index_cleanup';
 
 export const migrations = [
   {
@@ -88,6 +89,11 @@ export const migrations = [
   {
     up: migration_20260816_183242_index_value_page.up,
     down: migration_20260816_183242_index_value_page.down,
-    name: '20260816_183242_index_value_page'
+    name: '20260816_183242_index_value_page',
+  },
+  {
+    up: migration_20260816_202140_index_cleanup.up,
+    down: migration_20260816_202140_index_cleanup.down,
+    name: '20260816_202140_index_cleanup'
   },
 ];
