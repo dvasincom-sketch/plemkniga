@@ -142,7 +142,15 @@ export function HeaderAccountMenu({
             onMouseEnter={show}
             onMouseLeave={hide}
             style={{ top: rect.top, right: rect.right, width: rect.width }}
-            className="account-menu fixed z-[100] overflow-hidden rounded-2xl bg-forest-500 pb-1.5 shadow-[0_16px_40px_rgb(23_24_26_/_0.22)] sm:rounded-b-2xl sm:rounded-t-none"
+            /*
+               Правый верхний угол всегда прямой: этой стороной список
+               примыкает к блоку с аватаром, и любое скругление там читается
+               как щель между двумя разными плашками.
+               Левый верхний скругляется только на телефоне — там список шире
+               блока и торчит влево; на широком экране ширины совпадают,
+               и оба верхних угла должны быть прямыми.
+            */
+            className="account-menu fixed z-[100] overflow-hidden rounded-b-2xl rounded-tl-2xl bg-forest-500 pb-1.5 shadow-[0_16px_40px_rgb(23_24_26_/_0.22)] sm:rounded-tl-none"
           >
             <ul>
               {ACCOUNT_TABS.map((t) => (

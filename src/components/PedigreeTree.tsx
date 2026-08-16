@@ -248,7 +248,16 @@ export function PedigreeTree({
         )}
       </div>
 
-      <div className="overflow-x-auto">
+      {/*
+         Внутренний отступ у полосы прокрутки, снаружи скомпенсированный
+         отрицательным полем.
+
+         `overflow-x: auto` обрезает и по вертикали — второй оси браузер
+         сам ставит `auto`. Из-за этого подсветка выделенной карточки
+         (кольцо в два пикселя) срезалась по всем четырём краям, а верхний
+         и нижний ряды упирались в границу без единого просвета.
+      */}
+      <div className="-mx-2 -my-2 overflow-x-auto px-2 py-2">
         <div className="flex min-w-[900px] flex-col gap-6">
           {roots.map((r) => (
             <Branch
@@ -264,59 +273,89 @@ export function PedigreeTree({
       </div>
 
       {/* ------------------------------ Легенда ------------------------------ */}
-      <div className="mt-7 border-t border-ink-100 pt-5">
-        <div className="flex flex-wrap gap-x-7 gap-y-2 text-[13px] text-ink-700">
+      {/*
+         Легенда — не подпись мелким шрифтом, а ключ к схеме: без неё цветные
+         рамки на карточках ничего не значат. Раньше она шла в одну строку
+         тринадцатым кеглем серым по белому и читалась хуже всего остального
+         на странице. Теперь это отдельная панель со своим фоном, размер
+         как у основного текста, и каждый пункт — строка, а не обрывок ряда.
+      */}
+      <div className="mt-7 rounded-2xl bg-canvas p-5 sm:p-6">
+        <p className="mb-4 text-[14px] font-medium text-ink-900">Как читать схему</p>
+
+        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {LEGEND.filter((l) => states.has(l.state as never)).map((l) => (
-            <span key={l.state} className="flex items-center gap-2">
-              {l.state === 'common' && (
-                <span
-                  className="h-3.5 w-6 rounded border"
-                  style={{ background: GROUP_COLORS[0].fill, borderColor: GROUP_COLORS[0].border }}
-                />
-              )}
-              {l.state === 'repeated' && (
-                <span
-                  className="h-3.5 w-6 rounded border border-dashed"
-                  style={{ background: GROUP_COLORS[1].fill, borderColor: GROUP_COLORS[1].border }}
-                />
-              )}
-              {l.state === 'unverified' && (
-                <span className="h-2 w-2 rounded-full bg-accent-500" />
-              )}
-              {l.state === 'missing' && (
-                <span className="h-3.5 w-6 rounded border border-dashed border-ink-300" />
-              )}
-              {l.label}
-            </span>
+            <li key={l.state} className="flex items-start gap-3 text-[14px] leading-snug">
+              <span className="mt-0.5 flex-none">
+                {l.state === 'common' && (
+                  <span
+                    className="block h-4 w-7 rounded border-2"
+                    style={{
+                      background: GROUP_COLORS[0].fill,
+                      borderColor: GROUP_COLORS[0].border,
+                    }}
+                  />
+                )}
+                {l.state === 'repeated' && (
+                  <span
+                    className="block h-4 w-7 rounded border-2 border-dashed"
+                    style={{
+                      background: GROUP_COLORS[1].fill,
+                      borderColor: GROUP_COLORS[1].border,
+                    }}
+                  />
+                )}
+                {l.state === 'unverified' && (
+                  <span className="block h-4 w-7 rounded bg-[#e9e9e9] ring-1 ring-inset ring-accent-500" />
+                )}
+                {l.state === 'missing' && (
+                  <span className="block h-4 w-7 rounded border-2 border-dashed border-ink-300" />
+                )}
+              </span>
+              <span className="text-ink-900">{l.label}</span>
+            </li>
           ))}
-        </div>
+        </ul>
 
         {analysis.groups.length > 0 && (
-          <ul className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-[13px]">
-            {analysis.groups.map((g) => {
-              const c = GROUP_COLORS[g.group % GROUP_COLORS.length]
-              return (
-                <li
-                  key={g.animalId}
-                  className="flex cursor-default items-center gap-2"
-                  onMouseEnter={() => setHovered(g.animalId)}
-                  onMouseLeave={() => setHovered(undefined)}
-                >
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: c.dot }} />
-                  <span className="text-ink-900">{g.name ?? g.identNumber}</span>
-                  <span className="text-ink-500">
-                    {g.codes.join(', ')} ·{' '}
-                    {g.kind === 'common' ? 'общий предок' : 'повтор в одной стороне'}
-                  </span>
-                </li>
-              )
-            })}
-          </ul>
+          <>
+            <p className="mb-3 mt-6 text-[14px] font-medium text-ink-900">
+              Предки, встречающиеся не один раз
+            </p>
+            <ul className="grid gap-2.5 sm:grid-cols-2">
+              {analysis.groups.map((g) => {
+                const c = GROUP_COLORS[g.group % GROUP_COLORS.length]
+                return (
+                  <li
+                    key={g.animalId}
+                    className="flex cursor-default items-start gap-3 rounded-lg bg-white px-3 py-2 text-[14px] leading-snug transition-shadow hover:shadow-[0_1px_6px_rgb(23_24_26_/_0.1)]"
+                    onMouseEnter={() => setHovered(g.animalId)}
+                    onMouseLeave={() => setHovered(undefined)}
+                  >
+                    <span
+                      className="mt-1 h-3 w-3 flex-none rounded-full"
+                      style={{ background: c.dot }}
+                    />
+                    <span className="min-w-0">
+                      <span className="block font-medium text-ink-900">
+                        {g.name ?? g.identNumber}
+                      </span>
+                      <span className="block text-ink-700">
+                        {g.kind === 'common' ? 'общий предок' : 'повтор в одной стороне'} ·{' '}
+                        <span className="tabular-nums">{g.codes.join(', ')}</span>
+                      </span>
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          </>
         )}
 
-        <p className="mt-4 text-[13px] leading-relaxed text-ink-500">
-          Обозначения: О — отец, М — мать; код читается справа налево (ОМ — отец матери, МОО — мать
-          отца отца). Предки, заведённые в системе, кликабельны.
+        <p className="mt-5 max-w-[85ch] text-[14px] leading-relaxed text-ink-700">
+          <span className="font-medium text-ink-900">Обозначения кодов.</span> О — отец, М — мать.
+          Код читается справа налево: ОМ — отец матери, МОО — мать отца отца. Предки, заведённые
+          в системе, кликабельны.
         </p>
       </div>
     </div>
