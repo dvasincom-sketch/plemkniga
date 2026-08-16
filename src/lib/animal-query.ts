@@ -133,10 +133,25 @@ export const SORT_OPTIONS = [
   { value: 'id', label: 'По индивидуальному №', payload: 'identNumber' },
 ] as const
 
-export type SortValue = (typeof SORT_OPTIONS)[number]['value']
+export type SortValue = (typeof SORT_OPTIONS)[number]['value'] | 'profile'
 
-export const resolveSort = (sp: SearchParams): { value: SortValue; payload: string } => {
+/**
+ * Порядок по индексу выбранного профиля.
+ *
+ * Варианта нет в общем списке: он появляется, только когда профиль выбран, —
+ * иначе половина книги видела бы сортировку по тому, чего у неё нет.
+ * Поля `payload` у него тоже нет: этот порядок база построить не может,
+ * он собирается в памяти (`findRankedByProfile`).
+ */
+export const PROFILE_SORT = { value: 'profile' as const, label: 'Сначала лучшие по профилю' }
+
+export const resolveSort = (
+  sp: SearchParams,
+  /** Профиль выбран — тогда порядок по нему становится и возможным, и стандартным. */
+  profileActive = false,
+): { value: SortValue; payload: string } => {
   const raw = one(sp.sort)
+  if (profileActive && (raw === 'profile' || !raw)) return { value: 'profile', payload: '' }
   const found = SORT_OPTIONS.find((o) => o.value === raw)
   const chosen = found ?? SORT_OPTIONS[0]
   return { value: chosen.value, payload: chosen.payload }
@@ -154,7 +169,7 @@ export const resolveSort = (sp: SearchParams): { value: SortValue; payload: stri
  * Без этого выбор «по 100» считался бы отбором, и пустая таблица объясняла бы
  * себя ссылкой «сбросить отбор», которая ничего не меняет.
  */
-const NON_FILTER_KEYS = new Set(['page', 'sort', 'tab', 'perPage'])
+const NON_FILTER_KEYS = new Set(['page', 'sort', 'tab', 'perPage', 'shown', 'profile'])
 
 /** Ключи всех условий отбора в порядке показа. */
 export const FILTER_KEYS = [
@@ -191,7 +206,13 @@ export const queryWithout = (sp: SearchParams, drop: string): string => {
   return qs ? `/?${qs}` : '/'
 }
 
-/** Строка запроса с изменённой сортировкой, отбор сохраняется. */
+/**
+ * Строка запроса с изменённой сортировкой, отбор сохраняется.
+ *
+ * Порядок по умолчанию из адреса убирается — кроме случая, когда выбран
+ * профиль: там стандартным становится порядок по профилю, и «сначала лучшие
+ * по ИПЦ» без явного параметра тут же вернулось бы обратно к профилю.
+ */
 export const queryWithSort = (sp: SearchParams, sort: SortValue): string => {
   const params = new URLSearchParams()
   for (const [k, v] of Object.entries(sp)) {
@@ -199,7 +220,36 @@ export const queryWithSort = (sp: SearchParams, sort: SortValue): string => {
     const value = one(v)
     if (value) params.set(k, value)
   }
-  if (sort !== SORT_OPTIONS[0].value) params.set('sort', sort)
+  const implicit = one(sp.profile) ? PROFILE_SORT.value : SORT_OPTIONS[0].value
+  if (sort !== implicit) params.set('sort', sort)
+  const qs = params.toString()
+  return qs ? `/?${qs}` : '/'
+}
+
+/**
+ * Значение параметра `profile`, означающее «считать только официальный ИПЦ».
+ *
+ * Живёт рядом с остальными параметрами адреса, а не в модуле профилей:
+ * тот тянет за собой Payload, а переключатель профиля — клиентский компонент,
+ * и вся серверная машинерия уехала бы вместе с константой в браузер.
+ */
+export const NO_PROFILE = 'none'
+
+/**
+ * Строка запроса со сменой профиля расчёта.
+ *
+ * Сортировка при смене профиля сбрасывается: «сначала лучшие по профилю»
+ * относится к прежнему профилю, а сохранять порядок, который человек выбирал
+ * для другого набора весов, — обманывать его ожидания.
+ */
+export const queryWithProfile = (sp: SearchParams, profile: string): string => {
+  const params = new URLSearchParams()
+  for (const [k, v] of Object.entries(sp)) {
+    if (k === 'page' || k === 'sort' || k === 'profile') continue
+    const value = one(v)
+    if (value) params.set(k, value)
+  }
+  if (profile) params.set('profile', profile)
   const qs = params.toString()
   return qs ? `/?${qs}` : '/'
 }
@@ -271,7 +321,11 @@ export const presetHref = (
 ): string => {
   const params = new URLSearchParams(preset.params as Record<string, string>)
   const sort = one(sp.sort)
-  if (sort && SORT_OPTIONS.some((o) => o.value === sort)) params.set('sort', sort)
+  if (sort && (sort === PROFILE_SORT.value || SORT_OPTIONS.some((o) => o.value === sort)))
+    params.set('sort', sort)
+  // Профиль — способ смотреть, а не условие: быстрый отбор его не сбрасывает
+  const profile = one(sp.profile)
+  if (profile) params.set('profile', profile)
   return `/?${params.toString()}#results`
 }
 

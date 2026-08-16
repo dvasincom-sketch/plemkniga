@@ -1,4 +1,5 @@
 import { getClient } from '@/lib/payload'
+import { NO_PROFILE } from '@/lib/animal-query'
 import {
   ASSOCIATION_PROFILE,
   BUILTIN_PROFILES,
@@ -97,6 +98,69 @@ export async function loadOwnProfiles(orgId?: number | string | null): Promise<{
     profiles: docs.map(profileOfDoc),
     defaultDoc: docs.find((d) => d.isDefault) ?? null,
   }
+}
+
+export type ProfileChoice = {
+  key: string
+  label: string
+  /** Профиль хозяйства, а не встроенный. */
+  own?: boolean
+  isDefault?: boolean
+}
+
+/**
+ * Список профилей для переключателя над таблицей.
+ *
+ * Встроенные видны всем, включая гостя: национальные индексы и наборы под
+ * узкое место — это витрина возможности, а не чья-то собственность. Свои
+ * профили добавляются только своему хозяйству и помечаются, иначе «Молоко
+ * на сыр» Ассоциации и одноимённый доработанный профиль хозяйства
+ * не различить.
+ */
+export async function loadProfileChoices(orgId?: number | string | null): Promise<ProfileChoice[]> {
+  const builtin = BUILTIN_PROFILES.map((p) => ({ key: p.key, label: p.name }))
+  if (!orgId) return builtin
+  const { docs } = await loadOwnProfiles(orgId)
+  return [
+    ...builtin,
+    ...docs.map((d) => ({
+      key: ownKey(d.id),
+      label: `${d.name} · наш`,
+      own: true,
+      isDefault: Boolean(d.isDefault),
+    })),
+  ]
+}
+
+/**
+ * Профиль для колонки в списке — или его отсутствие.
+ *
+ * Отличается от `resolveProfile` тем, что умеет вернуть «никакой». В карточке
+ * животного индекс нужен всегда, и там уместен откат к профилю Ассоциации.
+ * В списке — нет: рядом уже стоит колонка официального ИПЦ, и вторая колонка
+ * с почти тем же смыслом, но другими числами, только сбивала бы с толку.
+ * Колонка появляется, когда для неё есть повод: профиль выбран явно
+ * или у хозяйства задан основной.
+ */
+export async function selectProfile(
+  requested: string,
+  orgId?: number | string | null,
+): Promise<IndexProfile | null> {
+  if (requested === NO_PROFILE) return null
+
+  if (requested) {
+    const builtin = builtinByKey(requested)
+    if (builtin) return builtin
+    if (isOwnKey(requested) && orgId) {
+      const { docs } = await loadOwnProfiles(orgId)
+      const doc = docs.find((d) => String(d.id) === ownIdOf(requested))
+      return doc ? profileOfDoc(doc) : null
+    }
+    return null
+  }
+
+  const { defaultDoc } = await loadOwnProfiles(orgId)
+  return defaultDoc ? profileOfDoc(defaultDoc) : null
 }
 
 /**

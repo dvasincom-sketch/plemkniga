@@ -26,8 +26,9 @@ import {
 import { DOCUMENT_TYPES, EVENT_TYPES, ROLES, labelOf } from '@/lib/dictionaries'
 import { SubmissionHistory } from '@/components/SubmissionHistory'
 import { dateRu } from '@/lib/format'
+import { RANKING_CAP, findRankedByProfile } from '@/lib/index-column'
 import { ASSOCIATION_PROFILE } from '@/lib/breeding-index'
-import { loadOwnProfiles } from '@/lib/index-profiles'
+import { loadOwnProfiles, selectProfile } from '@/lib/index-profiles'
 import type { Where } from 'payload'
 import type { Animal, Organization } from '@/payload-types'
 
@@ -161,18 +162,37 @@ async function AnimalsTab({
   const page = currentPage(sp)
   const perPage = resolvePageSize(sp)
   const scope: Where = orgId ? { owner: { equals: orgId } } : { author: { equals: userId } }
+  const where = buildAnimalWhere(sp, scope)
+
+  /*
+   * В своём стаде порядок строит основной профиль хозяйства — в этом и смысл
+   * слова «основной». Переключателя здесь нет намеренно: книга открыта для
+   * сравнения животных под разными наборами весов, а свой список — рабочий,
+   * и он должен отвечать на вопрос «кого оставлять» одним ответом,
+   * тем самым, который хозяйство себе назначило.
+   */
+  const profile = await selectProfile(one(sp.profile), orgId)
 
   const [result, herdsResult, total] = await Promise.all([
-    payload.find({
-      collection: 'animals',
-      where: buildAnimalWhere(sp, scope),
-      depth: 1,
-      page,
-      // 0 означает «без разбивки»: Payload отдаёт всё найденное одним ответом
-      limit: perPage,
-      sort: '-ipcRank',
-      overrideAccess: true,
-    }),
+    profile
+      ? findRankedByProfile({
+          payload,
+          where,
+          profile,
+          offset: (page - 1) * (perPage || 0),
+          limit: perPage,
+          overrideAccess: true,
+        })
+      : payload.find({
+          collection: 'animals',
+          where,
+          depth: 1,
+          page,
+          // 0 означает «без разбивки»: Payload отдаёт всё найденное одним ответом
+          limit: perPage,
+          sort: '-ipcRank',
+          overrideAccess: true,
+        }),
     payload.find({
       collection: 'herds',
       where: orgId ? { organization: { equals: orgId } } : {},
@@ -264,11 +284,28 @@ async function AnimalsTab({
           </div>
         </div>
 
+        {profile && (
+          <p className="mb-4 text-[14px] leading-relaxed text-ink-500">
+            Порядок и колонка «{profile.name}» — по основному профилю хозяйства.{' '}
+            <Link href="/account/indices" className="underline underline-offset-4">
+              Настроить профили
+            </Link>
+            {'capped' in result && result.capped && (
+              <>
+                {' '}· ранжирование охватывает {RANKING_CAP.toLocaleString('ru-RU')} записей
+                с наибольшим ИПЦ из {(result.totalDocs ?? 0).toLocaleString('ru-RU')}
+              </>
+            )}
+          </p>
+        )}
+
         <AnimalTable
           animals={result.docs as Animal[]}
           startIndex={(page - 1) * (perPage || 0)}
           viewer={viewer}
           emptyText={emptyText}
+          indexLabel={profile?.name}
+          indexValues={'values' in result ? result.values : undefined}
         />
         {/*
            Подвал таблицы: слева — сколько показано и по сколько показывать,

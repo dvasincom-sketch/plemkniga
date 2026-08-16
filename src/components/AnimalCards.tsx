@@ -15,9 +15,14 @@ import { ANONYMOUS, LOCK_HINT, isAnimalLocked, type Viewer } from '@/lib/visibil
 export function AnimalCards({
   animals,
   viewer = ANONYMOUS,
+  indexLabel,
+  indexValues,
 }: {
   animals: Animal[]
   viewer?: Viewer
+  /** Подпись значения по профилю. Пусто — показывается только ИПЦ. */
+  indexLabel?: string
+  indexValues?: Record<number, number>
 }) {
   return (
     <ul className="space-y-3">
@@ -54,11 +59,40 @@ export function AnimalCards({
                 </Link>
               </div>
 
-              <div className="flex-none text-right">
-                <p className="text-[12px] text-ink-500">ИПЦ</p>
-                <p className={`text-[17px] font-medium tabular-nums ${ipc !== null && ipc < 0 ? 'text-[#c0392b]' : 'text-forest-600'}`}>
-                  {signed(ipc)}
-                </p>
+              {/* Значение по профилю крупнее официального ИПЦ: если хозяйство
+                  выбрало свой профиль, смотрит оно на него, а ИПЦ остаётся
+                  точкой отсчёта рядом */}
+              <div className="flex flex-none items-start gap-4 text-right">
+                <div>
+                  <p className="text-[12px] text-ink-500">ИПЦ</p>
+                  <p
+                    className={`${indexLabel ? 'text-[15px]' : 'text-[17px] font-medium'} tabular-nums ${
+                      ipc !== null && ipc < 0 ? 'text-[#c0392b]' : 'text-forest-600'
+                    }`}
+                  >
+                    {signed(ipc)}
+                  </p>
+                </div>
+
+                {indexLabel && (
+                  <div>
+                    <p className="max-w-[110px] truncate text-[12px] text-ink-500" title={indexLabel}>
+                      {indexLabel}
+                    </p>
+                    {(() => {
+                      const v = indexValues?.[a.id as number]
+                      return (
+                        <p
+                          className={`text-[17px] font-medium tabular-nums ${
+                            v !== undefined && v < 0 ? 'text-[#c0392b]' : 'text-forest-600'
+                          }`}
+                        >
+                          {v === undefined ? '—' : signed(Math.round(v))}
+                        </p>
+                      )
+                    })()}
+                  </div>
+                )}
               </div>
             </div>
 

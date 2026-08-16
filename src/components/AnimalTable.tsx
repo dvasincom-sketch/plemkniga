@@ -24,7 +24,7 @@ import { ANONYMOUS, LOCK_HINT, isAnimalLocked, type Viewer } from '@/lib/visibil
 const ageShort = (v?: string | null) => AGE_GROUPS.find((o) => o.value === v)?.short ?? '—'
 
 /** `hide` — класс, скрывающий колонку на тесных ширинах. */
-const COLUMNS: { key: string; label: string; hide?: string }[] = [
+const BASE_COLUMNS: { key: string; label: string; hide?: string }[] = [
   { key: 'num', label: '№' },
   // Замок относится к конкретному животному, а не к его владельцу: у одного
   // хозяйства часть записей может быть открыта, часть закрыта. Поэтому
@@ -45,13 +45,34 @@ const COLUMNS: { key: string; label: string; hide?: string }[] = [
   { key: 'owner', label: 'Владелец' },
 ]
 
-const cls = (key: string) => COLUMNS.find((c) => c.key === key)?.hide ?? ''
+const cls = (key: string) => BASE_COLUMNS.find((c) => c.key === key)?.hide ?? ''
+
+/**
+ * Колонка профиля встаёт рядом с ИПЦ, а не вместо него.
+ *
+ * ИПЦ — оценка Ассоциации, единая для всех; индекс по профилю — взгляд
+ * конкретного хозяйства на тех же животных. Подменять одно другим значило бы
+ * лишить пользователя точки отсчёта: «плюс восемьсот по нашему профилю»
+ * говорит что-то только рядом с официальным числом. Так же устроена таблица
+ * персонального индекса у Lactanet — своя колонка рядом с официальной.
+ */
+const columnsFor = (indexLabel?: string) => {
+  if (!indexLabel) return BASE_COLUMNS
+  const at = BASE_COLUMNS.findIndex((c) => c.key === 'ipc')
+  return [
+    ...BASE_COLUMNS.slice(0, at + 1),
+    { key: 'profileIndex', label: indexLabel },
+    ...BASE_COLUMNS.slice(at + 1),
+  ]
+}
 
 export function AnimalTable({
   animals,
   startIndex = 0,
   viewer = ANONYMOUS,
   emptyText = 'По заданным условиям животных не найдено',
+  indexLabel,
+  indexValues,
 }: {
   animals: Animal[]
   startIndex?: number
@@ -59,7 +80,13 @@ export function AnimalTable({
   viewer?: Viewer
   /** Узел, а не строка: в подсказке об отсутствии записей уместна ссылка. */
   emptyText?: React.ReactNode
+  /** Подпись колонки профиля. Пусто — колонки нет. */
+  indexLabel?: string
+  /** Значение индекса по id животного. */
+  indexValues?: Record<number, number>
 }) {
+  const COLUMNS = columnsFor(indexLabel)
+
   return (
     <TableRowNav className="table-scroll">
       <table className="data-table w-full">
@@ -137,6 +164,19 @@ export function AnimalTable({
                     {signed(ipc)}
                   </span>
                 </td>
+                {indexLabel && (
+                  <td className="tabular-nums font-medium">
+                    {(() => {
+                      const v = indexValues?.[a.id as number]
+                      if (v === undefined) return '—'
+                      return (
+                        <span className={v < 0 ? 'ipc-negative' : 'ipc-positive'}>
+                          {signed(Math.round(v))}
+                        </span>
+                      )
+                    })()}
+                  </td>
+                )}
                 <td className="cell-truncate" title={owner}>
                   {owner}
                 </td>

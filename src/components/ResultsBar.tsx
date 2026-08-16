@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import {
   FILTER_KEYS,
+  PROFILE_SORT,
   SORT_OPTIONS,
   one,
   queryWithSort,
@@ -9,6 +10,8 @@ import {
   type SortValue,
 } from '@/lib/animal-query'
 import { describeFilter } from '@/lib/filter-labels'
+import { ProfilePicker } from './ProfilePicker'
+import type { ProfileChoice } from '@/lib/index-profiles'
 
 /**
  * Шапка результатов: сколько найдено, какие условия действуют и как отсортировано.
@@ -38,13 +41,24 @@ export function ResultsBar({
   sort,
   hasActive,
   herds,
+  profiles = [],
+  profileKey = '',
 }: {
   sp: SearchParams
   total: number
   sort: SortValue
   hasActive: boolean
   herds: { id: number; name: string }[]
+  /** Профили расчёта индекса; пустой список — переключатель не показывается. */
+  profiles?: ProfileChoice[]
+  profileKey?: string
 }) {
+  /*
+   * Порядок по профилю предлагается только когда профиль выбран: без него
+   * это была бы сортировка по колонке, которой нет на экране.
+   */
+  const sortOptions = profileKey ? [PROFILE_SORT, ...SORT_OPTIONS] : SORT_OPTIONS
+
   const chips = FILTER_KEYS.map((key) => {
     const value = one(sp[key])
     if (!value) return null
@@ -66,8 +80,15 @@ export function ResultsBar({
 
         {total > 0 && (
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[14px]">
+            {profiles.length > 0 && (
+              <div className="mr-2 flex items-center gap-2">
+                <span className="text-ink-500">Индекс по профилю:</span>
+                <ProfilePicker sp={sp} profiles={profiles} value={profileKey} />
+              </div>
+            )}
+
             <span className="text-ink-500">Сортировка:</span>
-            {SORT_OPTIONS.map((o) => {
+            {sortOptions.map((o) => {
               const active = o.value === sort
               return (
                 <Link

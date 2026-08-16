@@ -23,10 +23,13 @@ import {
   one,
   presetHref,
   resolveSort,
+  NO_PROFILE,
   type SearchParams,
 } from '@/lib/animal-query'
 import { describeFilter } from '@/lib/filter-labels'
-import type { Animal } from '@/payload-types'
+import { loadProfileChoices, selectProfile } from '@/lib/index-profiles'
+import { RANKING_CAP, findRankedByProfile, indexValues } from '@/lib/index-column'
+import type { Animal, Organization } from '@/payload-types'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,20 +45,48 @@ export default async function HerdbookPage({
   const payload = await getClient()
 
   const where = buildAnimalWhere(sp)
-  const sort = resolveSort(sp)
   const hasActive = hasActiveFilters(sp)
 
+  /*
+   * Профиль расчёта: явный выбор в адресе, иначе основной профиль хозяйства.
+   *
+   * Гость и хозяйство без своего профиля видят книгу ровно как раньше —
+   * с одной колонкой официального ИПЦ. Колонка индекса появляется, когда
+   * есть чей взгляд показывать, и переключатель над таблицей всегда говорит,
+   * чей именно: молчаливой пересортировки быть не должно.
+   */
+  const orgId =
+    typeof user?.organization === 'object' && user.organization
+      ? (user.organization as Organization).id
+      : (user?.organization as number | undefined)
+
+  const [profile, profileChoices] = await Promise.all([
+    selectProfile(one(sp.profile), orgId),
+    loadProfileChoices(orgId),
+  ])
+  const profileKey = profile?.key ?? NO_PROFILE
+  const sort = resolveSort(sp, Boolean(profile))
+  const rankByProfile = Boolean(profile) && sort.value === 'profile'
+
   const [result, herdsResult, totalAll, orgsResult, presetCounts] = await Promise.all([
-    payload.find({
-      collection: 'animals',
-      where,
-      depth: 1,
-      page: 1,
-      limit: shown,
-      sort: sort.payload,
-      overrideAccess: false,
-      user,
-    }),
+    rankByProfile
+      ? findRankedByProfile({
+          payload,
+          where,
+          profile: profile!,
+          limit: shown,
+          user,
+        })
+      : payload.find({
+          collection: 'animals',
+          where,
+          depth: 1,
+          page: 1,
+          limit: shown,
+          sort: sort.payload,
+          overrideAccess: false,
+          user,
+        }),
     payload.find({ collection: 'herds', limit: 500, sort: 'name', overrideAccess: true }),
     payload.count({ collection: 'animals', where: NOT_ARCHIVED, overrideAccess: false, user }),
     payload.find({
@@ -110,6 +141,17 @@ export default async function HerdbookPage({
 
   const animals = result.docs as Animal[]
   const found = result.totalDocs ?? 0
+  /*
+   * Значения колонки. Когда порядок строит база, индекс считается только
+   * для показанной страницы — считать его для всей книги ради одной ширмы
+   * незачем.
+   */
+  const columnValues = profile
+    ? 'values' in result
+      ? result.values
+      : indexValues(animals, profile)
+    : undefined
+  const rankingCapped = 'capped' in result ? result.capped : false
   const hasMore = found > animals.length
   // Гостю книга открыта на три экрана, дальше предлагаем бесплатную регистрацию
   const canShowMore = Boolean(user) || shown < ANON_SHOW_LIMIT
@@ -249,7 +291,24 @@ export default async function HerdbookPage({
               sort={sort.value}
               hasActive={hasActive}
               herds={herds}
+              profiles={profileChoices}
+              profileKey={profileKey}
             />
+
+            {/*
+               Усечение проговаривается вслух. Порядок по профилю строится
+               в памяти, и когда отбор шире потолка, наверху оказываются лучшие
+               из порции, а не из всей книги. Промолчать здесь — показать
+               неполный список как полный.
+            */}
+            {rankingCapped && (
+              <p className="mb-4 rounded-xl bg-[#fff6e5] px-4 py-3 text-[14px] leading-relaxed">
+                Порядок по профилю «{profile?.name}» построен по{' '}
+                {RANKING_CAP.toLocaleString('ru-RU')} записям отбора с наибольшим ИПЦ — всего
+                в отборе {found.toLocaleString('ru-RU')}. Сузьте отбор, чтобы охватить весь
+                список.
+              </p>
+            )}
 
             {animals.length === 0 ? (
               <EmptyResults sp={sp} hasActive={hasActive} labels={filterLabels} />
@@ -263,11 +322,21 @@ export default async function HerdbookPage({
                 */}
                 <div className={`relative ${hasMore ? 'pb-2' : ''}`}>
                   <div className="hidden lg:block">
-                    <AnimalTable animals={animals} viewer={viewer} />
+                    <AnimalTable
+                      animals={animals}
+                      viewer={viewer}
+                      indexLabel={profile?.name}
+                      indexValues={columnValues}
+                    />
                   </div>
 
                   <div className="lg:hidden">
-                    <AnimalCards animals={animals} viewer={viewer} />
+                    <AnimalCards
+                      animals={animals}
+                      viewer={viewer}
+                      indexLabel={profile?.name}
+                      indexValues={columnValues}
+                    />
                   </div>
 
                   {hasMore && (
