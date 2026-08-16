@@ -21,6 +21,7 @@ import { DataSubmissions } from '@/collections/DataSubmissions'
 import { AccessRequests } from '@/collections/AccessRequests'
 import { IndexProfiles } from '@/collections/IndexProfiles'
 import { IndexValues } from '@/collections/IndexValues'
+import { IndexBases } from '@/collections/IndexBases'
 import { DICTIONARY_COLLECTIONS } from '@/collections/dictionaries'
 import { databaseEnvKeys, maskUri, resolveDatabase } from '@/lib/db-url'
 import { migrations } from '@/migrations'
@@ -62,6 +63,7 @@ export default buildConfig({
     AccessRequests,
     IndexProfiles,
     IndexValues,
+    IndexBases,
     Events,
     Documents,
     Media,

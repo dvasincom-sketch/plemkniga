@@ -31,6 +31,11 @@ import {
   labelOf,
 } from '@/lib/dictionaries'
 import { dateRu, nf, signed } from '@/lib/format'
+import { IndexBreakdown } from '@/components/IndexBreakdown'
+import { computeIndex } from '@/lib/breeding-index'
+import { loadActiveBase } from '@/lib/index-base'
+import { resolveProfile } from '@/lib/index-profiles'
+import { percentileFromStored } from '@/lib/index-values'
 import type { AccessRequest, Animal } from '@/payload-types'
 
 export const dynamic = 'force-dynamic'
@@ -288,6 +293,34 @@ export default async function AnimalPage({
 
   const readiness = tab === 'documents' ? await certificateReadiness(payload, animal) : null
 
+  /*
+   * Индекс считается по профилю смотрящего: хозяйство со своим набором весов
+   * должно видеть карточку своими глазами. У гостя и у хозяйства без своего
+   * профиля это стандартный профиль Ассоциации.
+   *
+   * Число считается здесь, а не берётся хранимым, потому что рядом показывается
+   * разбор вклада признаков — а он живёт только в расчёте. Хранимое значение
+   * даёт другое: место в группе сравнения, для которого нужна вся популяция.
+   */
+  const indexBlock =
+    tab === 'evaluation'
+      ? await (async () => {
+          const [profile, base] = await Promise.all([
+            resolveProfile(undefined, userOrgId ?? undefined),
+            loadActiveBase(payload),
+          ])
+          const result = computeIndex(animal!, profile, base)
+          const birthYear = animal!.birthDate ? new Date(animal!.birthDate).getFullYear() : null
+          const percentile = await percentileFromStored(
+            payload,
+            profile.key,
+            Math.round(result.value * 100) / 100,
+            birthYear,
+          )
+          return { result, percentile }
+        })()
+      : null
+
   const crumbs = isMine
     ? [
         { label: 'Личный кабинет', href: '/account' },
@@ -403,10 +436,30 @@ export default async function AnimalPage({
         {/* ------------------------------ Оценка ----------------------------- */}
         {tab === 'evaluation' && (
           <>
+            {indexBlock && (
+              <section className="mt-8">
+                <IndexBreakdown
+                  result={indexBlock.result}
+                  percentile={indexBlock.percentile}
+                  href={isMine ? '/account/indices' : undefined}
+                />
+              </section>
+            )}
+
             <section className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
               <div className="space-y-6">
                 <div className="card">
-                  <h2 className="panel-heading">Общий индекс племенной ценности</h2>
+                  {/*
+                     Привезённая оценка и рассчитанная — разные числа, и путать
+                     их нельзя. Эта пришла из расчётного центра вместе с данными
+                     о животном; та, что выше, посчитана системой по профилю
+                     весов и разложена на вклады признаков.
+                  */}
+                  <h2 className="panel-heading !mb-1">Оценка расчётного центра</h2>
+                  <p className="mb-4 text-[13px] leading-relaxed text-ink-500">
+                    Привезена вместе с данными о животном. Индекс выше система считает сама —
+                    числа не совпадают, потому что это разные оценки на разных базах.
+                  </p>
                   <table className="metric-table">
                     <thead>
                       <tr>

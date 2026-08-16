@@ -202,6 +202,19 @@ export const TRAIT_BASE: TraitBase[] = [
 
 const BY_KEY = new Map(TRAIT_BASE.map((t) => [t.key, t]))
 
+/**
+ * База сравнения, по которой считается индекс.
+ *
+ * По умолчанию — таблица из кода (Net Merit 2025, переведённая в метрические
+ * единицы). Ассоциация может пересчитать средние и отклонения по собственной
+ * популяции; тогда сюда передаётся её база, а версия уходит вместе
+ * с результатом. Без версии число в выпущенном документе через полгода
+ * нечем объяснить: те же оценки на другой базе дают другой индекс.
+ */
+export type Base = { traits: TraitBase[]; version: string }
+
+export const DEFAULT_BASE: Base = { traits: TRAIT_BASE, version: BASE_VERSION }
+
 /* ------------------------------------------------------------------ *
  *                            Профили весов                            *
  * ------------------------------------------------------------------ */
@@ -465,9 +478,14 @@ const normalize = (profile: IndexProfile): Partial<Record<TraitKey, number>> => 
   return out
 }
 
-export function computeIndex(animal: Animal, profile: IndexProfile): IndexResult {
+export function computeIndex(
+  animal: Animal,
+  profile: IndexProfile,
+  base: Base = DEFAULT_BASE,
+): IndexResult {
   const weights = normalize(profile)
   const contributions: Contribution[] = []
+  const byKey = base === DEFAULT_BASE ? BY_KEY : new Map(base.traits.map((t) => [t.key, t]))
 
   let value = 0
   let total = 0
@@ -477,7 +495,7 @@ export function computeIndex(animal: Animal, profile: IndexProfile): IndexResult
     if (!weight) continue
     total++
 
-    const trait = BY_KEY.get(key as TraitKey)
+    const trait = byKey.get(key as TraitKey)
     if (!trait) continue
 
     const { forecast, r } = readTrait(animal, trait.path)
@@ -514,9 +532,9 @@ export function computeIndex(animal: Animal, profile: IndexProfile): IndexResult
 
   return {
     profile,
-    baseVersion: BASE_VERSION,
+    baseVersion: base.version,
     value: Math.round(value * 10) / 10,
-    reliability: indexReliability(contributions, weights),
+    reliability: indexReliability(contributions, weights, byKey),
     used: contributions.length,
     total,
     contributions,
@@ -587,13 +605,14 @@ export function traitReliability(
 function indexReliability(
   contributions: Contribution[],
   weights: Partial<Record<TraitKey, number>>,
+  byKey: Map<TraitKey, TraitBase> = BY_KEY,
 ): number {
   let num = 0
   let den = 0
 
   for (const c of contributions) {
     if (c.reliability === null) continue
-    const trait = BY_KEY.get(c.key)
+    const trait = byKey.get(c.key)
     if (!trait) continue
     const share = Math.abs(weights[c.key] ?? 0) * trait.sd
     num += share * c.reliability

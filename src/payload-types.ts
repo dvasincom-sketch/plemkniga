@@ -79,6 +79,7 @@ export interface Config {
     'access-requests': AccessRequest;
     'index-profiles': IndexProfile;
     'index-values': IndexValue;
+    'index-bases': IndexBase;
     events: Event;
     documents: Document;
     media: Media;
@@ -116,6 +117,7 @@ export interface Config {
     'access-requests': AccessRequestsSelect<false> | AccessRequestsSelect<true>;
     'index-profiles': IndexProfilesSelect<false> | IndexProfilesSelect<true>;
     'index-values': IndexValuesSelect<false> | IndexValuesSelect<true>;
+    'index-bases': IndexBasesSelect<false> | IndexBasesSelect<true>;
     events: EventsSelect<false> | EventsSelect<true>;
     documents: DocumentsSelect<false> | DocumentsSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
@@ -1137,6 +1139,47 @@ export interface IndexValue {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "index-bases".
+ */
+export interface IndexBase {
+  id: number;
+  /**
+   * Например, АПГ-2026-08 — попадает в каждое рассчитанное значение
+   */
+  version: string;
+  source?: ('own' | 'borrowed') | null;
+  note?: string | null;
+  isActive?: boolean | null;
+  animalsUsed?: number | null;
+  computedAt?: string | null;
+  traits?:
+    | {
+        trait:
+          | 'milk'
+          | 'fatKg'
+          | 'proteinKg'
+          | 'productiveLongevity'
+          | 'udderHealth'
+          | 'fertility'
+          | 'calvingEase'
+          | 'calfMortality'
+          | 'bodyComposite'
+          | 'udderComposite'
+          | 'legsComposite';
+        mean: number;
+        sd: number;
+        /**
+         * По скольким животным посчитано
+         */
+        n?: number | null;
+        id?: string | null;
+      }[]
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "events".
  */
 export interface Event {
@@ -1239,6 +1282,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'index-values';
         value: number | IndexValue;
+      } | null)
+    | ({
+        relationTo: 'index-bases';
+        value: number | IndexBase;
       } | null)
     | ({
         relationTo: 'events';
@@ -1844,6 +1891,29 @@ export interface IndexValuesSelect<T extends boolean = true> {
   reliability?: T;
   used?: T;
   computedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "index-bases_select".
+ */
+export interface IndexBasesSelect<T extends boolean = true> {
+  version?: T;
+  source?: T;
+  note?: T;
+  isActive?: T;
+  animalsUsed?: T;
+  computedAt?: T;
+  traits?:
+    | T
+    | {
+        trait?: T;
+        mean?: T;
+        sd?: T;
+        n?: T;
+        id?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
 }

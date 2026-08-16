@@ -1,5 +1,12 @@
 import type { Payload, PayloadRequest, Where } from 'payload'
-import { BASE_VERSION, BUILTIN_PROFILES, computeIndex, type IndexProfile } from '@/lib/breeding-index'
+import {
+  BUILTIN_PROFILES,
+  DEFAULT_BASE,
+  computeIndex,
+  type Base,
+  type IndexProfile,
+} from '@/lib/breeding-index'
+import { loadActiveBase } from '@/lib/index-base'
 import { profileOfDoc } from '@/lib/index-profiles'
 import type { Animal, IndexProfile as IndexProfileDoc } from '@/payload-types'
 
@@ -40,8 +47,8 @@ export async function profilesInUse(payload: Payload): Promise<IndexProfile[]> {
   return [...BUILTIN_PROFILES, ...(own.docs as IndexProfileDoc[]).map(profileOfDoc)]
 }
 
-const rowOf = (animal: Animal, profile: IndexProfile) => {
-  const r = computeIndex(animal, profile)
+const rowOf = (animal: Animal, profile: IndexProfile, base: Base) => {
+  const r = computeIndex(animal, profile, base)
   return {
     animal: animal.id as number,
     profileKey: profile.key,
@@ -50,7 +57,7 @@ const rowOf = (animal: Animal, profile: IndexProfile) => {
     // Снимок весов: профиль переименуют и перенастроят, а выпущенный
     // документ с этим числом останется
     weights: profile.weights,
-    baseVersion: BASE_VERSION,
+    baseVersion: r.baseVersion,
     value: Math.round(r.value * 100) / 100,
     reliability: Math.round(r.reliability),
     used: r.used,
@@ -135,10 +142,11 @@ async function insertRows(payload: Payload, rows: Row[]): Promise<void> {
 export async function recomputeAnimal(
   payload: Payload,
   animal: Animal,
-  opts: { profiles?: IndexProfile[]; req?: PayloadRequest } = {},
+  opts: { profiles?: IndexProfile[]; base?: Base; req?: PayloadRequest } = {},
 ): Promise<number> {
   const { req } = opts
   const list = opts.profiles ?? (await profilesInUse(payload))
+  const base = opts.base ?? (await loadActiveBase(payload))
   const scope = req ? { req } : {}
 
   /*
@@ -156,7 +164,7 @@ export async function recomputeAnimal(
   if (!req) {
     await insertRows(
       payload,
-      list.map((profile) => rowOf(animal, profile)),
+      list.map((profile) => rowOf(animal, profile, base)),
     )
     return list.length
   }
@@ -164,7 +172,7 @@ export async function recomputeAnimal(
   for (const profile of list) {
     await payload.create({
       collection: 'index-values',
-      data: rowOf(animal, profile),
+      data: rowOf(animal, profile, base),
       overrideAccess: true,
       req,
     })
@@ -189,8 +197,9 @@ export async function recomputeAnimal(
 export async function recomputeProfile(
   payload: Payload,
   profile: IndexProfile,
-  onProgress?: (done: number, total: number) => void,
+  opts: { base?: Base; onProgress?: (done: number, total: number) => void } = {},
 ): Promise<number> {
+  const base = opts.base ?? (await loadActiveBase(payload))
   await dropProfileValues(payload, profile.key)
 
   const PAGE = 200
@@ -210,10 +219,10 @@ export async function recomputeProfile(
     total = batch.totalDocs ?? 0
     await insertRows(
       payload,
-      (batch.docs as Animal[]).map((a) => rowOf(a, profile)),
+      (batch.docs as Animal[]).map((a) => rowOf(a, profile, base)),
     )
     done += batch.docs.length
-    onProgress?.(done, total)
+    opts.onProgress?.(done, total)
     if (!batch.hasNextPage) break
     page += 1
   }
@@ -247,9 +256,11 @@ export async function recomputeAll(
   log: (msg: string) => void = () => {},
 ): Promise<{ profiles: number; rows: number; orphans: number }> {
   const profiles = await profilesInUse(payload)
+  const base = await loadActiveBase(payload)
+  log(`база сравнения: ${base.version}${base === DEFAULT_BASE ? ' (заимствованная)' : ''}`)
   let rows = 0
   for (const profile of profiles) {
-    const n = await recomputeProfile(payload, profile)
+    const n = await recomputeProfile(payload, profile, { base })
     rows += n
     log(`${profile.name}: ${n}`)
   }
@@ -272,6 +283,61 @@ export async function recomputeAll(
   if (orphans > 0) log(`убрано значений исчезнувших профилей: ${orphans}`)
 
   return { profiles: profiles.length, rows, orphans }
+}
+
+/**
+ * Место животного в группе сравнения — по хранимым значениям.
+ *
+ * Считается запросами к базе, а не выгрузкой всей популяции в память:
+ * нужны только два числа — сколько значений ниже и сколько равных.
+ * Полуцелая поправка на равные — обычная практика: при большом числе
+ * одинаковых оценок без неё все они получили бы процентиль нижней границы.
+ *
+ * Группа сравнения — ровесники: сравнивать первотёлку с быком 2010 года
+ * бессмысленно, за пятнадцать лет база сдвинулась. Если ровесников мало,
+ * группа расширяется до всей книги — процентиль по десятку животных
+ * не значит ничего, и лучше честно сравнить со всеми.
+ */
+export async function percentileFromStored(
+  payload: Payload,
+  profileKey: string,
+  value: number,
+  birthYear?: number | null,
+): Promise<{ percentile: number; group: number; sameYear: boolean } | null> {
+  const MIN_COHORT = 20
+
+  const scope = (year?: number | null): Where => ({
+    and: [
+      { profileKey: { equals: profileKey } },
+      { 'animal.archived': { not_equals: true } },
+      ...(year
+        ? [
+            { 'animal.birthDate': { greater_than_equal: `${year}-01-01` } },
+            { 'animal.birthDate': { less_than: `${year + 1}-01-01` } },
+          ]
+        : []),
+    ],
+  })
+
+  const count = async (where: Where) =>
+    (await payload.count({ collection: 'index-values', where, overrideAccess: true })).totalDocs ?? 0
+
+  let sameYear = Boolean(birthYear)
+  let group = await count(scope(sameYear ? birthYear : null))
+  if (sameYear && group < MIN_COHORT) {
+    sameYear = false
+    group = await count(scope(null))
+  }
+  if (group < 2) return null
+
+  const base = scope(sameYear ? birthYear : null)
+  const [below, equal] = await Promise.all([
+    count({ and: [base, { value: { less_than: value } }] }),
+    count({ and: [base, { value: { equals: value } }] }),
+  ])
+
+  const p = ((below + equal / 2) / group) * 100
+  return { percentile: Math.max(0, Math.min(99, Math.round(p))), group, sameYear }
 }
 
 /**
