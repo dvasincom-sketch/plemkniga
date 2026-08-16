@@ -18,7 +18,14 @@ import { ACCOUNT_TABS } from './AccountNav'
  * не показываются — здесь важна краткость, развёрнутый вид остаётся
  * в основном меню кабинета.
  */
-/** Минимальная ширина списка — по самой длинной подписи раздела. */
+/**
+ * Минимальная ширина списка — по самой длинной подписи раздела.
+ *
+ * То же число стоит минимальной шириной у блока с именем (класс
+ * `sm:min-w-[232px]`). Совпадение обязательно: на широком экране список
+ * и блок имени смыкаются в одну плашку, и стоит списку оказаться хоть
+ * немного шире, как он вылезает слева ступенькой.
+ */
 const MIN_WIDTH = 232
 
 /** Отступ от края экрана, чтобы список не прилипал к нему на телефоне. */
@@ -96,7 +103,7 @@ export function HeaderAccountMenu({
   const isProfile = active === '/account/profile'
 
   return (
-    <div ref={anchorRef} className="sm:min-w-[210px]" onMouseEnter={show} onMouseLeave={hide}>
+    <div ref={anchorRef} className="sm:min-w-[232px]" onMouseEnter={show} onMouseLeave={hide}>
       <Link
         href="/account/profile"
         aria-expanded={open}

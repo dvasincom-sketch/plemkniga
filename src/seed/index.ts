@@ -30,6 +30,40 @@ const between = (min: number, max: number, digits = 1) =>
   Math.round((min + rnd() * (max - min)) * 10 ** digits) / 10 ** digits
 const int = (min: number, max: number) => Math.floor(min + rnd() * (max - min + 1))
 
+/**
+ * Нормальное отклонение — для племенных оценок.
+ *
+ * Равномерное `between(min, max)` для EBV не годится: племенная ценность
+ * распределена нормально вокруг базы породы, и равномерная выборка даёт
+ * неправдоподобную картину — одинаково часто встречаются средние животные
+ * и рекордисты, а стандартизованное отклонение вылезает за пять сигм,
+ * чего в популяции не бывает.
+ *
+ * Преобразование Бокса — Мюллера поверх того же детерминированного
+ * генератора: сид остаётся воспроизводимым.
+ */
+const gauss = (mean = 0, sd = 1): number => {
+  const u = Math.max(rnd(), 1e-9)
+  const v = rnd()
+  const z = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v)
+  return mean + z * sd
+}
+
+/**
+ * Племенная оценка по признаку: отклонение от базы в единицах признака.
+ *
+ * `shift` — сдвиг в долях генетического σ. Быки-производители отобраны
+ * по индексу, поэтому их оценки смещены вверх примерно на сигму; коровы
+ * товарного стада держатся около базы.
+ */
+const ebv = (sd: number, shift = 0, digits = 1, limit?: [number, number]) => {
+  let v = gauss(shift * sd, sd)
+  // У признаков экстерьера в схеме заданы границы шкалы: нормальное
+  // распределение изредка выходит за три сигмы, и запись не проходит валидацию
+  if (limit) v = Math.min(Math.max(v, limit[0]), limit[1])
+  return Math.round(v * 10 ** digits) / 10 ** digits
+}
+
 /* --------------------------------- Данные -------------------------------- */
 const FARMS = [
   { name: 'ЗАО «Назаровское»', short: 'ЗАО Назаровское', inn: '2456000101', region: REGIONS[4] },
@@ -332,24 +366,26 @@ const run = async () => {
           evaluationDate: new Date(2025, 2, 12).toISOString(),
           production: {
             reliabilityLevel: 4,
-            milk: { forecast: between(200, 1400, 0), r: between(80, 95, 1) },
-            fatPercent: { forecast: between(-0.05, 0.25, 2), r: between(40, 70, 1) },
-            proteinPercent: { forecast: between(-0.04, 0.14, 2), r: between(45, 75, 1) },
-            fatKg: { forecast: between(10, 60, 1), r: between(78, 92, 1) },
-            proteinKg: { forecast: between(8, 45, 1), r: between(80, 94, 1) },
+            // Оценки в долях генетического σ из TRAIT_BASE: быки отобраны
+            // по индексу, поэтому распределение смещено вверх на сигму
+            milk: { forecast: ebv(257.1, 1, 0), r: between(80, 95, 1) },
+            fatPercent: { forecast: ebv(0.09, 0.6, 2), r: between(40, 70, 1) },
+            proteinPercent: { forecast: ebv(0.05, 0.5, 2), r: between(45, 75, 1) },
+            fatKg: { forecast: ebv(11.29, 1, 1), r: between(78, 92, 1) },
+            proteinKg: { forecast: ebv(6.93, 1, 1), r: between(80, 94, 1) },
             productionIndex: { forecast: between(90, 130, 1), r: between(70, 90, 1) },
           },
-          reproduction: { fertility: { forecast: between(-1.5, 2.5, 1), r: between(50, 80, 1) } },
+          reproduction: { fertility: { forecast: ebv(1.37, 0.4, 1), r: between(50, 80, 1) } },
           health: {
             reliabilityLevel: 3,
-            productiveLongevity: { forecast: between(-0.5, 3, 1), r: between(45, 75, 1) },
-            udderHealth: { forecast: between(-1, 2.5, 1), r: between(50, 78, 1) },
-            calfMortality: { forecast: between(-2, 2, 1), r: between(40, 70, 1) },
-            calvingEase: { forecast: between(-1, 2, 1), r: between(45, 72, 1) },
+            productiveLongevity: { forecast: ebv(1.7, 0.8, 1), r: between(45, 75, 1) },
+            udderHealth: { forecast: ebv(1.0, 0.5, 1), r: between(50, 78, 1) },
+            calfMortality: { forecast: ebv(1.62, -0.4, 1), r: between(40, 70, 1) },
+            calvingEase: { forecast: ebv(1.3, 0.5, 1), r: between(45, 72, 1) },
           },
           exterior: Object.fromEntries([
-            ...EXTERIOR_TRAITS.map((t) => [t.key, between(-2, 2, 2)]),
-            ...EXTERIOR_COMPOSITES.map((t) => [t.key, between(-1.5, 1.8, 2)]),
+            ...EXTERIOR_TRAITS.map((t) => [t.key, ebv(1.0, 0.3, 2, [-3, 3])]),
+            ...EXTERIOR_COMPOSITES.map((t) => [t.key, ebv(0.65, 0.4, 2, [-3, 3])]),
           ]),
         },
       })) as never,
@@ -402,7 +438,10 @@ const run = async () => {
       collection: 'animals',
       overrideAccess: true,
       data: {
-        identNumber: `${int(30, 39)}${String(int(10000000, 99999999))}${String(int(10, 99))}`,
+        // Порядковый номер в конце гарантирует уникальность: при случайной
+        // генерации двенадцатизначных номеров совпадения всё-таки случаются,
+        // и сид падал на валидации в середине наполнения
+        identNumber: `${int(30, 39)}${String(int(1000000, 9999999))}${String(i).padStart(4, '0')}`,
         idFormat: 'rf',
         name: pick(COW_NAMES),
         kind: isHeifer ? 'heifer' : 'cow',
@@ -464,24 +503,25 @@ const run = async () => {
         evaluationDate: new Date(2025, 2, 12).toISOString(),
         production: {
           reliabilityLevel: int(2, 4),
-          milk: { forecast: between(-600, 900, 0), r: between(55, 92, 1) },
-          fatPercent: { forecast: between(-0.12, 0.2, 2), r: between(30, 60, 1) },
-          proteinPercent: { forecast: between(-0.09, 0.12, 2), r: between(38, 68, 1) },
-          fatKg: { forecast: between(-10, 42, 1), r: between(60, 88, 1) },
-          proteinKg: { forecast: between(-8, 34, 1), r: between(65, 94, 1) },
+          // Товарное стадо держится около базы породы: сдвиг близок к нулю
+          milk: { forecast: ebv(257.1, 0.15, 0), r: between(55, 92, 1) },
+          fatPercent: { forecast: ebv(0.09, 0.1, 2), r: between(30, 60, 1) },
+          proteinPercent: { forecast: ebv(0.05, 0.1, 2), r: between(38, 68, 1) },
+          fatKg: { forecast: ebv(11.29, 0.15, 1), r: between(60, 88, 1) },
+          proteinKg: { forecast: ebv(6.93, 0.15, 1), r: between(65, 94, 1) },
           productionIndex: { forecast: between(85, 122, 1), r: between(50, 84, 1) },
         },
-        reproduction: { fertility: { forecast: between(-2, 2.4, 1), r: between(30, 65, 1) } },
+        reproduction: { fertility: { forecast: ebv(1.37, 0, 1), r: between(30, 65, 1) } },
         health: {
           reliabilityLevel: int(2, 4),
-          productiveLongevity: { forecast: between(-1.2, 2.6, 1), r: between(28, 62, 1) },
-          udderHealth: { forecast: between(-1.6, 2.2, 1), r: between(32, 70, 1) },
-          calfMortality: { forecast: between(-2.4, 1.8, 1), r: between(25, 58, 1) },
-          calvingEase: { forecast: between(-1.4, 2.1, 1), r: between(30, 64, 1) },
+          productiveLongevity: { forecast: ebv(1.7, 0.1, 1), r: between(28, 62, 1) },
+          udderHealth: { forecast: ebv(1.0, 0, 1), r: between(32, 70, 1) },
+          calfMortality: { forecast: ebv(1.62, 0, 1), r: between(25, 58, 1) },
+          calvingEase: { forecast: ebv(1.3, 0, 1), r: between(30, 64, 1) },
         },
         exterior: Object.fromEntries([
-          ...EXTERIOR_TRAITS.map((t) => [t.key, between(-2, 2, 2)]),
-          ...EXTERIOR_COMPOSITES.map((t) => [t.key, between(-1.6, 1.6, 2)]),
+          ...EXTERIOR_TRAITS.map((t) => [t.key, ebv(1.0, 0, 2, [-3, 3])]),
+          ...EXTERIOR_COMPOSITES.map((t) => [t.key, ebv(0.65, 0, 2, [-3, 3])]),
         ]),
         summary: {
           milkYield: milk,
