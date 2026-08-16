@@ -87,6 +87,14 @@ export default async function SubmissionPage({
   const protocol =
     typeof submission.review?.errorProtocol === 'object' ? submission.review.errorProtocol : null
 
+  /*
+   * Показываем первые записи пакета, а не все: в файле их могут быть сотни,
+   * а вопрос у человека один — те ли это животные.
+   */
+  const packageAnimals = (submission.animals ?? [])
+    .filter((a): a is Exclude<typeof a, number> => typeof a === 'object' && a !== null)
+    .slice(0, 12)
+
   const isChecked = submission.status === 'checked'
   const isAccepted = submission.status === 'accepted'
 
@@ -150,6 +158,92 @@ export default async function SubmissionPage({
                 {submission.review?.acceptedRows ?? 0}, с ошибками{' '}
                 {submission.review?.rejectedRows ?? 0}.
               </p>
+            )}
+
+            {/*
+               Что сделал импорт — отдельно от того, что нашла проверка.
+               Первое сделала машина при разборе файла, второе человек
+               при разборе содержания, и путать их нельзя.
+            */}
+            {(submission.intake?.rows ?? 0) > 0 && (
+              <p className="mt-1 text-sm text-ink-500">
+                Приёмка файла: строк {submission.intake?.rows}, создано{' '}
+                {submission.intake?.created ?? 0}, обновлено {submission.intake?.updated ?? 0},
+                пропущено {submission.intake?.skipped ?? 0}.
+              </p>
+            )}
+
+            {/*
+               Записи пакета: именно им проверка поднимет уровень достоверности.
+               Без списка «данные приняты» остаётся отвлечённой фразой — непонятно,
+               о каких животных речь.
+            */}
+            {packageAnimals.length > 0 && (
+              <div className="mt-6 rounded-xl border border-ink-100 p-5">
+                <h3 className="text-[15px] font-medium">
+                  Записи пакета: {submission.animals?.length ?? packageAnimals.length}
+                </h3>
+                <p className="mt-1 text-[13px] leading-relaxed text-ink-500">
+                  {isAccepted
+                    ? 'Этим записям выставлен уровень «Верифицировано ассоциацией».'
+                    : 'После проверки и вашего согласия эти записи получат уровень «Верифицировано ассоциацией». Остального стада проверка не касается.'}
+                </p>
+                <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-[14px]">
+                  {packageAnimals.map((a) => (
+                    <li key={a.id}>
+                      <Link
+                        href={`/animals/${a.id}`}
+                        className="underline underline-offset-4 hover:text-forest-500"
+                      >
+                        {a.name ?? `№ ${a.identNumber}`}
+                      </Link>
+                    </li>
+                  ))}
+                  {(submission.animals?.length ?? 0) > packageAnimals.length && (
+                    <li className="text-ink-500">
+                      и ещё {(submission.animals?.length ?? 0) - packageAnimals.length}
+                    </li>
+                  )}
+                </ul>
+              </div>
+            )}
+
+            {/*
+               Непринятые строки. Пакет — единственное место, где они
+               сохраняются: страница загрузки покажет их один раз и забудет,
+               а вернуться к разбору файла человек может через неделю.
+            */}
+            {!!submission.intake?.issues?.length && (
+              <div className="mt-6 rounded-xl border border-ink-100 p-5">
+                <h3 className="text-[15px] font-medium">
+                  Непринятые строки: {submission.intake.issues.length}
+                </h3>
+                <p className="mt-1 text-[13px] leading-relaxed text-ink-500">
+                  Эти строки файла в книгу не попали
+                  {isAccepted ? '' : ' — остальные загружены и ждут проверки'}. Чтобы добавить
+                  их, поправьте причину и загрузите файл заново.
+                </p>
+                <div className="mt-3 overflow-x-auto">
+                  <table className="metric-table w-full">
+                    <thead>
+                      <tr>
+                        <th className="text-right">Строка</th>
+                        <th>Индивидуальный номер</th>
+                        <th>Причина</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {submission.intake.issues.map((it) => (
+                        <tr key={it.id ?? `${it.row}-${it.ident}`}>
+                          <td className="text-right tabular-nums">{it.row}</td>
+                          <td>{it.ident || <span className="text-ink-500">не указан</span>}</td>
+                          <td className="text-[13px] leading-snug">{it.reason}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             )}
 
             {protocol && (

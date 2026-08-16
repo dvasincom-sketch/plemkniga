@@ -6,6 +6,8 @@ import * as migration_20260816_071534_index_profiles from './20260816_071534_ind
 import * as migration_20260816_081002_index_values from './20260816_081002_index_values';
 import * as migration_20260816_084421_index_bases from './20260816_084421_index_bases';
 import * as migration_20260816_091110_index_base_sd from './20260816_091110_index_base_sd';
+import * as migration_20260816_105109_submission_animals from './20260816_105109_submission_animals';
+import * as migration_20260816_110132_submission_issues from './20260816_110132_submission_issues';
 
 export const migrations = [
   {
@@ -46,6 +48,16 @@ export const migrations = [
   {
     up: migration_20260816_091110_index_base_sd.up,
     down: migration_20260816_091110_index_base_sd.down,
-    name: '20260816_091110_index_base_sd'
+    name: '20260816_091110_index_base_sd',
+  },
+  {
+    up: migration_20260816_105109_submission_animals.up,
+    down: migration_20260816_105109_submission_animals.down,
+    name: '20260816_105109_submission_animals',
+  },
+  {
+    up: migration_20260816_110132_submission_issues.up,
+    down: migration_20260816_110132_submission_issues.down,
+    name: '20260816_110132_submission_issues'
   },
 ];

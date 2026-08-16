@@ -1,5 +1,7 @@
 'use client'
 
+import Link from 'next/link'
+
 import { useActionState, useState } from 'react'
 import { importAnimalsAction, type ImportState } from '@/actions/data'
 
@@ -88,10 +90,65 @@ export function ImportCard() {
 
               {state.error && <p className="text-sm text-red-700">{state.error}</p>}
               {state.ok && (
-                <p className="text-sm text-forest-600">
-                  Готово: создано {state.created}, обновлено {state.updated}, пропущено{' '}
-                  {state.skipped}
-                </p>
+                <div className="text-sm text-forest-600">
+                  <p>
+                    Готово: создано {state.created}, обновлено {state.updated}, пропущено{' '}
+                    {state.skipped}
+                  </p>
+
+                  {/*
+                     Причины отказа — прямо здесь, а не только в пакете.
+                     Человек ещё не ушёл со страницы и держит файл открытым:
+                     это единственный момент, когда опечатку исправить дёшево.
+                  */}
+                  {!!state.issues?.length && (
+                    <div className="mt-2 rounded-lg border border-ink-200 bg-ink-50 px-3 py-2 text-ink-700">
+                      <p className="font-medium">Не приняты строки:</p>
+                      <ul className="mt-1 space-y-0.5">
+                        {state.issues.slice(0, 3).map((it) => (
+                          <li key={it.row} className="leading-snug">
+                            строка {it.row}
+                            {it.ident ? ` (${it.ident})` : ''} — {it.reason}
+                          </li>
+                        ))}
+                      </ul>
+                      {state.issues.length > 3 && (
+                        <p className="mt-1 text-ink-500">
+                          и ещё {state.issues.length - 3}
+                          {state.submissionId && (
+                            <>
+                              {' — '}
+                              <Link
+                                href={`/account/submissions/${state.submissionId}`}
+                                className="underline underline-offset-4"
+                              >
+                                весь список в пакете
+                              </Link>
+                            </>
+                          )}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {/*
+                     Ссылка на пакет — не украшение: загруженные записи остаются
+                     черновиком, пока Ассоциация не проверит пакет, и человек
+                     должен понимать, что дело не кончилось загрузкой файла.
+                  */}
+                  {state.submissionId && (
+                    <p className="mt-1 text-ink-700">
+                      Заведён пакет{' '}
+                      <Link
+                        href={`/account/submissions/${state.submissionId}`}
+                        className="underline underline-offset-4 hover:text-forest-500"
+                      >
+                        № {state.submissionNumber}
+                      </Link>{' '}
+                      — записи получат уровень «Верифицировано ассоциацией» после проверки
+                      и вашего согласия.
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           )}

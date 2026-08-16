@@ -1078,7 +1078,25 @@ const run = async () => {
     },
   ]
 
+  /*
+   * Пакетам нужны записи: публикация поднимает уровень достоверности именно
+   * им, и пакет без записей демонстрировал бы половину сценария.
+   */
+  const packAnimals = await payload.find({
+    collection: 'animals',
+    where: { and: [{ owner: { equals: orgs[0].id } }, { archived: { not_equals: true } }] },
+    limit: 60,
+    depth: 0,
+    sort: 'id',
+    overrideAccess: true,
+  })
+  const packIds = packAnimals.docs.map((a) => a.id as number)
+  let packAt = 0
+
   for (const sp of submissionPlan) {
+    const slice = packIds.slice(packAt, packAt + 20)
+    packAt += 20
+
     await payload.create({
       collection: 'data-submissions',
       overrideAccess: true,
@@ -1089,6 +1107,13 @@ const run = async () => {
         organization: orgs[0].id,
         submittedBy: farmer.id,
         submittedAt: sp.submittedAt.toISOString(),
+        animals: slice,
+        intake: {
+          rows: sp.total,
+          created: Math.round(sp.total * 0.3),
+          updated: sp.total - Math.round(sp.total * 0.3),
+          skipped: 0,
+        },
         review: {
           checkedAt: sp.checkedAt ? sp.checkedAt.toISOString() : undefined,
           comment: sp.comment || undefined,

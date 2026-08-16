@@ -1011,6 +1011,30 @@ export interface DataSubmission {
   submittedBy?: (number | null) | User;
   submittedAt?: string | null;
   sourceFile?: (number | null) | Media;
+  /**
+   * Заполняется импортом; вручную менять не нужно
+   */
+  animals?: (number | Animal)[] | null;
+  /**
+   * Заполняется импортом
+   */
+  intake?: {
+    rows?: number | null;
+    created?: number | null;
+    updated?: number | null;
+    skipped?: number | null;
+    /**
+     * Заполняется импортом, до 50 первых
+     */
+    issues?:
+      | {
+          row?: number | null;
+          ident?: string | null;
+          reason?: string | null;
+          id?: string | null;
+        }[]
+      | null;
+  };
   review?: {
     checkedBy?: (number | null) | User;
     checkedAt?: string | null;
@@ -1809,6 +1833,23 @@ export interface DataSubmissionsSelect<T extends boolean = true> {
   submittedBy?: T;
   submittedAt?: T;
   sourceFile?: T;
+  animals?: T;
+  intake?:
+    | T
+    | {
+        rows?: T;
+        created?: T;
+        updated?: T;
+        skipped?: T;
+        issues?:
+          | T
+          | {
+              row?: T;
+              ident?: T;
+              reason?: T;
+              id?: T;
+            };
+      };
   review?:
     | T
     | {

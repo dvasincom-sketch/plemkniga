@@ -76,6 +76,16 @@ const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
     probe: { kind: 'column', table: 'index_bases_traits', column: 'sd_observed' },
     note: 'разброс оценок и достоверность в базе',
   },
+  {
+    name: '20260816_105109_submission_animals',
+    probe: { kind: 'column', table: 'data_submissions', column: 'intake_rows' },
+    note: 'записи пакета и итоги приёмки',
+  },
+  {
+    name: '20260816_110132_submission_issues',
+    probe: { kind: 'table', name: 'data_submissions_intake_issues' },
+    note: 'причины непринятых строк',
+  },
 ]
 
 const { driverUri, uri, source, sslConfig } = resolveDatabase()

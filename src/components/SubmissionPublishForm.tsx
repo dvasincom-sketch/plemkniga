@@ -20,7 +20,10 @@ export function SubmissionPublishForm({
   if (alreadyPublished) {
     return (
       <p className="mt-6 rounded-xl bg-brand-50 px-5 py-4 text-sm text-forest-600">
-        Данные приняты и опубликованы. Записи организации получили статус
+        {/* «Записи пакета», а не «записи организации»: уровень поднимается
+            тем животным, что были в проверенном файле, — остальное стадо
+            проверка не затрагивает. */}
+        Данные приняты и опубликованы. Записи этого пакета получили уровень
         «Верифицировано ассоциацией».
       </p>
     )
@@ -46,7 +49,10 @@ export function SubmissionPublishForm({
       {state.message && <p className="mt-4 text-sm text-forest-600">{state.message}</p>}
 
       <button type="submit" className="btn btn-accent mt-6" disabled={pending || disabled}>
-        {pending ? 'Публикуем…' : 'Загрузить данные'}
+        {/* Кнопка не грузит файл, а подтверждает согласие с проверкой —
+            прежняя подпись «Загрузить данные» отправляла читателя обратно
+            к импорту. */}
+        {pending ? 'Публикуем…' : 'Опубликовать данные'}
       </button>
 
       {disabled && (

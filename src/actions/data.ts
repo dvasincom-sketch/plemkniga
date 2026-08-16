@@ -10,6 +10,11 @@ export type ImportState = {
   updated?: number
   skipped?: number
   ok?: boolean
+  /** Пакет загрузки, заведённый этим импортом. */
+  submissionId?: number | string
+  submissionNumber?: string
+  /** Непринятые строки с причинами — чтобы «пропущено 4» можно было понять. */
+  issues?: { row: number; ident?: string; reason: string }[]
 }
 
 /** Заголовки CSV, которые понимает импорт (регистр не важен). */
@@ -78,16 +83,36 @@ export async function importAnimalsAction(
   let created = 0
   let updated = 0
   let skipped = 0
+  /*
+   * Записи, которых коснулся файл. Нужны пакету: проверка Ассоциации
+   * и последующая публикация касаются именно их, а не всего стада.
+   */
+  const touched: number[] = []
+  /*
+   * Причины отказа. Проверки живут в коллекции животных — формат номера,
+   * даты, родословная, — и сообщение об ошибке возникает ровно здесь,
+   * в момент разбора строки. Не записав его сейчас, мы теряем его совсем
+   * и оставляем человека с числом «пропущено 4» без объяснения.
+   * Первых пятидесяти хватает: дальше это уже не разбор, а другой файл.
+   */
+  const issues: { row: number; ident?: string; reason: string }[] = []
+  const skip = (line: number, reason: string, ident?: string) => {
+    skipped++
+    if (issues.length < 50) issues.push({ row: line, ident, reason })
+  }
 
-  for (const row of rows.slice(1)) {
+  for (const [i, row] of rows.slice(1).entries()) {
+    // Номер строки, как его видит человек в редакторе: заголовок — первая
+    const line = i + 2
+
     const get = (key: string) => {
-      const i = header.indexOf(key)
-      return i === -1 ? undefined : row[i]?.trim()
+      const idx = header.indexOf(key)
+      return idx === -1 ? undefined : row[idx]?.trim()
     }
 
     const identNumber = row[idIdx]?.trim()
     if (!identNumber) {
-      skipped++
+      skip(line, 'Пустой индивидуальный номер')
       continue
     }
 
@@ -121,7 +146,7 @@ export async function importAnimalsAction(
         const doc = existing.docs[0]
         const docOwner = typeof doc.owner === 'object' ? doc.owner.id : doc.owner
         if (docOwner !== orgId) {
-          skipped++
+          skip(line, 'Запись принадлежит другой организации', identNumber)
           continue
         }
         await payload.update({
@@ -130,16 +155,78 @@ export async function importAnimalsAction(
           data: data as never,
           overrideAccess: true,
         })
+        touched.push(doc.id as number)
         updated++
       } else {
-        await payload.create({ collection: 'animals', data: data as never, overrideAccess: true })
+        const doc = await payload.create({
+          collection: 'animals',
+          data: data as never,
+          overrideAccess: true,
+        })
+        touched.push(doc.id as number)
         created++
       }
-    } catch {
-      skipped++
+    } catch (e) {
+      /*
+       * Сообщения проверок написаны для человека («Некорректный
+       * индивидуальный номер. Национальный номер РФ: от 6 до 15 цифр…»),
+       * поэтому показываем их как есть, а не подменяем общей фразой.
+       */
+      const message = e instanceof Error ? e.message : String(e)
+      skip(line, message.slice(0, 200) || 'Запись не сохранилась', identNumber)
     }
   }
 
+  /*
+   * Пакет загрузки — не бюрократия, а условие доверия к данным.
+   *
+   * Записи попадают в стадо сразу: это данные владельца, и держать их
+   * взаперти до чужой проверки незачем. Но уровень достоверности у них
+   * остаётся черновиком, пока Ассоциация не посмотрит пакет и владелец
+   * не согласится с результатом. Раньше пакета из импорта не возникало
+   * вовсе, и «проверено Ассоциацией» было обещанием, которое система
+   * не могла выполнить: поднять уровень было нечем и не на чём.
+   *
+   * Сбой на этом шаге не отменяет уже загруженные записи: данные важнее
+   * сопроводительной записи о них, и терять их из-за неё нельзя.
+   */
+  let submissionId: number | string | undefined
+  let submissionNumber: string | undefined
+  try {
+    const media = await payload.create({
+      collection: 'media',
+      overrideAccess: true,
+      data: { alt: `Файл импорта ${file.name}` },
+      file: {
+        data: Buffer.from(await file.arrayBuffer()),
+        name: file.name,
+        mimetype: file.type || 'text/csv',
+        size: file.size,
+      },
+    })
+
+    const submission = await payload.create({
+      collection: 'data-submissions',
+      overrideAccess: true,
+      data: {
+        kind: 'animals',
+        status: 'uploaded',
+        organization: orgId,
+        submittedBy: user.id,
+        submittedAt: new Date().toISOString(),
+        sourceFile: media.id,
+        animals: touched,
+        intake: { rows: rows.length - 1, created, updated, skipped, issues },
+        consent: { agreed: false },
+      },
+    })
+    submissionId = submission.id
+    submissionNumber = submission.number ?? undefined
+  } catch (e) {
+    // Пакет не завёлся — данные всё равно загружены, о чём и сообщаем
+    console.error('[import] не удалось создать пакет загрузки:', e)
+  }
+
   revalidatePath('/account')
-  return { ok: true, created, updated, skipped }
+  return { ok: true, created, updated, skipped, submissionId, submissionNumber, issues }
 }
