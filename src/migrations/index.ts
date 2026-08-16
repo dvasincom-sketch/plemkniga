@@ -15,6 +15,8 @@ import * as migration_20260816_182450_index_value_state from './20260816_182450_
 import * as migration_20260816_183242_index_value_page from './20260816_183242_index_value_page';
 import * as migration_20260816_202140_index_cleanup from './20260816_202140_index_cleanup';
 import * as migration_20260816_202627_index_value_cohort from './20260816_202627_index_value_cohort';
+import * as migration_20260816_204622_index_value_percentile from './20260816_204622_index_value_percentile';
+import * as migration_20260816_211410_index_value_types from './20260816_211410_index_value_types';
 
 export const migrations = [
   {
@@ -100,6 +102,16 @@ export const migrations = [
   {
     up: migration_20260816_202627_index_value_cohort.up,
     down: migration_20260816_202627_index_value_cohort.down,
-    name: '20260816_202627_index_value_cohort'
+    name: '20260816_202627_index_value_cohort',
+  },
+  {
+    up: migration_20260816_204622_index_value_percentile.up,
+    down: migration_20260816_204622_index_value_percentile.down,
+    name: '20260816_204622_index_value_percentile',
+  },
+  {
+    up: migration_20260816_211410_index_value_types.up,
+    down: migration_20260816_211410_index_value_types.down,
+    name: '20260816_211410_index_value_types'
   },
 ];

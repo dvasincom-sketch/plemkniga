@@ -333,10 +333,19 @@ export async function recomputeProfile(
   const base = opts.base ?? (await loadActiveBase(payload))
   await dropProfileValues(payload, profile.key)
 
-  return eachAnimal(payload, BATCH, async (batch, scanned, total) => {
+  const done = await eachAnimal(payload, BATCH, async (batch, scanned, total) => {
     await insertRows(payload, batch.map((a) => rowOf(a, profile, base)))
     opts.onProgress?.(scanned, total)
   })
+
+  /*
+   * Место в группе сравнения зависит от всех значений профиля сразу, поэтому
+   * пересчитывается после записи, а не вместе с ней. Ограничиваем профилем:
+   * правка его весов чужих строк не касается.
+   */
+  await updatePercentiles(payload, { profileKey: profile.key })
+
+  return done
 }
 
 /** Сколько животных читать за раз. Подобрано по памяти на строку, не по вкусу. */
@@ -412,6 +421,8 @@ export async function recomputeAll(
   const orphans = cleaned.rowCount ?? 0
   if (orphans > 0) log(`убрано значений исчезнувших профилей: ${orphans}`)
 
+  await updatePercentiles(payload, { log })
+
   forgetIndexValuesLag()
   forgetCohorts()
 
@@ -437,6 +448,110 @@ export async function recomputeAll(
  * занимал около секунды. Карточка животного из-за этого открывалась 2,8 с
  * и была самой медленной страницей системы.
  */
+/**
+ * Пересчитать процентили одним проходом по таблице.
+ *
+ * Процентиль — не свойство строки, а её место среди остальных, поэтому
+ * считать его построчно бессмысленно: нужен весь набор. Оконные функции
+ * PostgreSQL делают это ровно за один проход, и на двух миллионах строк
+ * он занимает секунды.
+ *
+ * Формула та же, что была в расчёте на лету: доля тех, кто ниже, плюс
+ * половина равных. Полуцелая поправка — обычная практика: при большом числе
+ * одинаковых оценок без неё все они получили бы процентиль нижней границы.
+ *
+ * Группа сравнения — ровесники по году рождения; если их меньше двадцати,
+ * группой становится вся книга по этому профилю. Процентиль по десятку
+ * животных не значит ничего, и честнее сравнить со всеми, о чём карточка
+ * и сообщает подписью.
+ *
+ * Архивные записи в расчёт не входят и своего процентиля не получают:
+ * они не участвуют в сравнении живого поголовья.
+ */
+export async function updatePercentiles(
+  payload: Payload,
+  opts: { profileKey?: string; log?: (m: string) => void } = {},
+): Promise<number> {
+  const log = opts.log ?? (() => {})
+  const started = Date.now()
+
+  /*
+   * Прогон стоит времени: около трёх минут на два миллиона строк. Дорого
+   * не столько считать, сколько отсортировать книгу дважды — по профилю
+   * с годом и по профилю целиком. Пробовал выразить то же через `cume_dist`
+   * вместо подсчёта равных рамкой: короче на две строки и вдвое медленнее,
+   * потому что сортировок всё равно две. Оставлено как было.
+   *
+   * Отсюда же ограничение по профилю: правка весов одного профиля трогает
+   * его строки, и сортировать ради этого всю таблицу незачем.
+   */
+  const scope = opts.profileKey ? `and profile_key = $1` : ''
+  const params = opts.profileKey ? [opts.profileKey] : []
+
+  const res = await poolOf(payload).query(
+    `
+    with ranked as (
+      select
+        id,
+        count(*)  over (partition by profile_key, birth_year)                   as cohort_year,
+        count(*)  over (partition by profile_key)                               as cohort_all,
+        rank()    over (partition by profile_key, birth_year order by value)    as rank_year,
+        rank()    over (partition by profile_key order by value)                as rank_all,
+        count(*)  over (partition by profile_key, birth_year order by value
+                        range between unbounded preceding and current row)      as le_year,
+        count(*)  over (partition by profile_key order by value
+                        range between unbounded preceding and current row)      as le_all
+      from index_values
+      where archived is not true ${scope}
+    ),
+    computed as (
+      select
+        id,
+        (cohort_year >= 20) as same_year,
+        case when cohort_year >= 20 then cohort_year else cohort_all end as cohort,
+        -- Доля тех, кто ниже, плюс половина равных
+        case when cohort_year >= 20
+             then ((rank_year - 1) + (le_year - (rank_year - 1)) / 2.0) / cohort_year
+             else ((rank_all  - 1) + (le_all  - (rank_all  - 1)) / 2.0) / cohort_all
+        end as share
+      from ranked
+    )
+    update index_values v
+       set percentile = least(99, greatest(0, round(c.share * 100))),
+           cohort = c.cohort,
+           cohort_same_year = c.same_year
+      from computed c
+     where c.id = v.id
+  `,
+    params,
+  )
+
+  /*
+   * Уборка после себя — не гигиена, а необходимость.
+   *
+   * Проход переписывает каждую строку таблицы, а PostgreSQL при обновлении
+   * не меняет строку на месте, а пишет новую версию рядом. После прогона
+   * в таблице вдвое больше строк, чем нужно, и половина из них мёртвые:
+   * замеренные два миллиона живых строк превратились в два миллиона живых
+   * плюс два миллиона мёртвых, таблица выросла с 900 МБ до 2,7 ГБ, а всякий
+   * счёт по ней стал вдвое дороже. Автоочистка добралась бы до этого сама,
+   * но не сразу, и всё это время книга работала бы медленнее без видимой
+   * причины.
+   *
+   * `VACUUM` возвращает место под повторное использование, но файл не сжимает
+   * — для этого нужен `VACUUM FULL` с блокировкой таблицы, и решение о нём
+   * принимает человек в спокойное время, а не скрипт посреди пересчёта.
+   */
+  await poolOf(payload).query('vacuum analyze index_values')
+
+  log(
+    `процентили${opts.profileKey ? ` (${opts.profileKey})` : ''}: ` +
+      `${res.rowCount ?? 0} строк за ${((Date.now() - started) / 1000).toFixed(1)} с`,
+  )
+  forgetCohorts()
+  return res.rowCount ?? 0
+}
+
 /** Размеры групп сравнения: свойство книги, а не животного. */
 const COHORT_TTL_MS = 5 * 60_000
 const cohortCache = new Map<string, { at: number; value: number }>()
@@ -449,8 +564,37 @@ export async function percentileFromStored(
   profileKey: string,
   value: number,
   birthYear?: number | null,
+  animalId?: number | null,
 ): Promise<{ percentile: number; group: number; sameYear: boolean } | null> {
   const MIN_COHORT = 20
+
+  /*
+   * Сначала — готовое. Полный пересчёт проставляет процентиль каждой строке,
+   * и в обычном случае карточке остаётся его прочитать: один запрос по
+   * уникальному ключу вместо трёх счётов по двум миллионам строк.
+   *
+   * Пусто он бывает у животного, сохранённого поодиночке после последнего
+   * прогона: его строка пересчитана, а место среди остальных — нет, для этого
+   * нужна вся популяция. Тогда работает расчёт ниже, прежним способом.
+   */
+  if (animalId) {
+    const stored = await payload.find({
+      collection: 'index-values',
+      where: { and: [{ animal: { equals: animalId } }, { profileKey: { equals: profileKey } }] },
+      limit: 1,
+      depth: 0,
+      overrideAccess: true,
+    })
+
+    const row = stored.docs[0]
+    if (row && typeof row.percentile === 'number' && typeof row.cohort === 'number') {
+      return {
+        percentile: row.percentile,
+        group: row.cohort,
+        sameYear: Boolean(row.cohortSameYear),
+      }
+    }
+  }
 
   const scope = (year?: number | null): Where => ({
     and: [

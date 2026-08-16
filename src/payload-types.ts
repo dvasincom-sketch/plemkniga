@@ -1253,6 +1253,12 @@ export interface IndexValue {
   evaluation?: (number | null) | AnimalEvaluation;
   value: number;
   reliability?: number | null;
+  percentile?: number | null;
+  /**
+   * Ровесники по книге либо вся книга, если ровесников мало
+   */
+  cohort?: number | null;
+  cohortSameYear?: boolean | null;
   used?: number | null;
   computedAt?: string | null;
   updatedAt: string;
@@ -2119,6 +2125,9 @@ export interface IndexValuesSelect<T extends boolean = true> {
   evaluation?: T;
   value?: T;
   reliability?: T;
+  percentile?: T;
+  cohort?: T;
+  cohortSameYear?: T;
   used?: T;
   computedAt?: T;
   updatedAt?: T;

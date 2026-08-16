@@ -241,6 +241,18 @@ export const DOMAIN_RULES: DomainRule[] = [
     note: 'учтено признаков не отрицательно',
   },
   {
+    table: 'index_values',
+    name: 'chk_index_values_percentile',
+    expr: range('percentile', 0, 100),
+    note: 'процентиль 0…100',
+  },
+  {
+    table: 'index_values',
+    name: 'chk_index_values_cohort',
+    expr: positive('cohort'),
+    note: 'размер группы сравнения больше нуля',
+  },
+  {
     table: 'index_bases_traits',
     name: 'chk_index_bases_sd',
     // На σ делят при стандартизации — ноль превратил бы индекс в бесконечность
@@ -278,6 +290,9 @@ export const INTEGER_COLUMNS: { table: string; key: string; column: string; note
   { table: 'inseminations', key: 'lactationNumber', column: 'lactation_number', note: 'номер отёла' },
   { table: 'milk_tests', key: 'lactationNumber', column: 'lactation_number', note: 'номер лактации' },
   { table: 'index_values', key: 'used', column: 'used', note: 'учтено признаков' },
+  { table: 'index_values', key: 'birthYear', column: 'birth_year', note: 'год рождения' },
+  { table: 'index_values', key: 'percentile', column: 'percentile', note: 'процентиль' },
+  { table: 'index_values', key: 'cohort', column: 'cohort', note: 'размер группы' },
   { table: 'index_bases_traits', key: 'n', column: 'n', note: 'объём выборки' },
 ]
 

@@ -318,6 +318,7 @@ export default async function AnimalPage({
             profile.key,
             Math.round(result.value * 100) / 100,
             birthYear,
+            animal!.id as number,
           )
           return { result, percentile }
         })()

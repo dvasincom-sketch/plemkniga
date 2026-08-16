@@ -149,6 +149,16 @@ const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
     probe: { kind: 'column', table: 'index_values', column: 'birth_year' },
     note: 'год рождения для группы сравнения',
   },
+  {
+    name: '20260816_204622_index_value_percentile',
+    probe: { kind: 'column', table: 'index_values', column: 'percentile' },
+    note: 'хранимый процентиль и размер группы',
+  },
+  {
+    name: '20260816_211410_index_value_types',
+    probe: { kind: 'constraint', name: 'chk_index_values_percentile' },
+    note: 'целые типы и границы для процентиля',
+  },
 ]
 
 const { driverUri, uri, source, sslConfig } = resolveDatabase()
