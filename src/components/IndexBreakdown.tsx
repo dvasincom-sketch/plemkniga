@@ -35,9 +35,18 @@ export function IndexBreakdown({
   const max = Math.max(...contributions.map((c) => Math.abs(c.points)), 1)
 
   return (
-    <div className="card">
+    /*
+       Зелёная рамка — не украшение. Всё остальное на вкладке привезено извне,
+       а это число система посчитала сама и умеет разложить на слагаемые.
+       Разница в происхождении данных важнее разницы в их содержании,
+       и она должна быть видна до чтения заголовков.
+    */
+    <div className="card ring-2 ring-forest-500">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
         <div>
+          <p className="mb-1 text-[12px] uppercase tracking-wide text-forest-600">
+            Расчёт системы
+          </p>
           <h2 className="panel-heading !mb-1">Индекс племенной ценности</h2>
           <p className="text-[13px] text-ink-500">
             Профиль «{profile.name}»
@@ -111,7 +120,33 @@ export function IndexBreakdown({
           По признакам этого профиля у животного нет ни одной оценки — считать нечего.
         </p>
       ) : (
-        <>
+        /*
+           Разбор складывается. Открыт по умолчанию: ради него блок и сделан,
+           а закрытый он превращает индекс обратно в число без объяснения.
+           Но одиннадцать строк — половина экрана, и тому, кто пришёл за одним
+           значением, их можно убрать одним щелчком.
+        */
+        <details open className="group">
+          <summary className="mb-3 flex cursor-pointer list-none items-center gap-2 text-[14px] text-ink-700">
+            <span className="underline underline-offset-4">Разбор по признакам</span>
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+              className="text-ink-500 transition-transform group-open:rotate-180"
+            >
+              <polyline
+                points="6 9 12 15 18 9"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </summary>
+
           <div className="overflow-x-auto">
             <table className="metric-table w-full">
               <thead>
@@ -174,7 +209,7 @@ export function IndexBreakdown({
               : ' Веса — проценты влияния, они приводятся к сумме 100 перед расчётом.'}{' '}
             Сумма вкладов и есть индекс.
           </p>
-        </>
+        </details>
       )}
     </div>
   )

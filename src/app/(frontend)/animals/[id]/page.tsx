@@ -32,6 +32,7 @@ import {
 } from '@/lib/dictionaries'
 import { dateRu, nf, signed } from '@/lib/format'
 import { IndexBreakdown } from '@/components/IndexBreakdown'
+import { Collapsible } from '@/components/Collapsible'
 import { computeIndex } from '@/lib/breeding-index'
 import { loadActiveBase } from '@/lib/index-base'
 import { resolveProfile } from '@/lib/index-profiles'
@@ -446,20 +447,26 @@ export default async function AnimalPage({
               </section>
             )}
 
-            <section className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {/*
+               Граница между расчётом и первоисточником проведена явно.
+               Выше — то, что система посчитала сама и умеет разложить
+               на слагаемые. Ниже — то, что пришло извне: из документов,
+               выгрузок и протоколов оценки. Смешивать их в один поток
+               карточек значило бы уравнять «мы посчитали» и «нам прислали».
+            */}
+            <h2 className="section-title mt-10">Данные из документов</h2>
+            <p className="-mt-2 mb-6 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
+              Оценки по признакам, экстерьер и лактации привезены вместе с животным. Индекс выше
+              считается из них.
+            </p>
+
+            <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <div className="space-y-6">
-                <div className="card">
-                  {/*
-                     Привезённая оценка и рассчитанная — разные числа, и путать
-                     их нельзя. Эта пришла из расчётного центра вместе с данными
-                     о животном; та, что выше, посчитана системой по профилю
-                     весов и разложена на вклады признаков.
-                  */}
-                  <h2 className="panel-heading !mb-1">Оценка расчётного центра</h2>
-                  <p className="mb-4 text-[13px] leading-relaxed text-ink-500">
-                    Привезена вместе с данными о животном. Индекс выше система считает сама —
-                    числа не совпадают, потому что это разные оценки на разных базах.
-                  </p>
+                <Collapsible
+                  title="Оценка расчётного центра"
+                  note="Привезена вместе с данными о животном. Индекс выше система считает сама — числа не совпадают, потому что это разные оценки на разных базах."
+                  defaultOpen
+                >
                   <table className="metric-table">
                     <thead>
                       <tr>
@@ -482,13 +489,13 @@ export default async function AnimalPage({
                       </tr>
                     </tbody>
                   </table>
-                </div>
+                </Collapsible>
 
-                <div className="card">
-                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                    <h2 className="panel-heading mb-0">Продуктивные признаки</h2>
-                    <ReliabilityNote value={animal.production?.reliabilityLevel} />
-                  </div>
+                <Collapsible
+                  title="Продуктивные признаки"
+                  aside={<ReliabilityNote value={animal.production?.reliabilityLevel} />}
+                  defaultOpen
+                >
                   <MetricTable
                     head={['Селекционный признак', 'Прогноз', 'R, %']}
                     rows={PRODUCTION_TRAITS.map((t) => {
@@ -502,10 +509,9 @@ export default async function AnimalPage({
                       }
                     })}
                   />
-                </div>
+                </Collapsible>
 
-                <div className="card">
-                  <h2 className="panel-heading">Воспроизводительные качества</h2>
+                <Collapsible title="Воспроизводительные качества" defaultOpen>
                   <MetricTable
                     head={['Индексы', 'Прогноз', 'R, %']}
                     rows={[
@@ -518,13 +524,13 @@ export default async function AnimalPage({
                       },
                     ]}
                   />
-                </div>
+                </Collapsible>
 
-                <div className="card">
-                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                    <h2 className="panel-heading mb-0">Признаки здоровья животного</h2>
-                    <ReliabilityNote value={animal.health?.reliabilityLevel} />
-                  </div>
+                <Collapsible
+                  title="Признаки здоровья животного"
+                  aside={<ReliabilityNote value={animal.health?.reliabilityLevel} />}
+                  defaultOpen
+                >
                   <MetricTable
                     head={['Индексы', 'Прогноз', 'R, %']}
                     rows={HEALTH_TRAITS.map((t) => {
@@ -532,11 +538,10 @@ export default async function AnimalPage({
                       return { label: t.label, unit: t.unit, forecast: v?.forecast, r: v?.r, digits: 1 }
                     })}
                   />
-                </div>
+                </Collapsible>
               </div>
 
-              <div className="card">
-                <h2 className="panel-heading">Экстерьер</h2>
+              <Collapsible title="Экстерьер" note="Двадцать линейных признаков и три композита" defaultOpen>
                 <ExteriorChart
                   traits={EXTERIOR_TRAITS.map((t) => ({
                     key: t.key,
@@ -549,13 +554,16 @@ export default async function AnimalPage({
                     value: exteriorRaw[t.key],
                   }))}
                 />
-              </div>
+              </Collapsible>
             </section>
 
             {/* ----------------------------- Фенотип ---------------------------- */}
             <section className="mt-6">
-              <div className="card">
-                <h2 className="panel-heading">Фенотип:</h2>
+              <Collapsible
+                title="Фенотип по лактациям"
+                note="Фактические показатели, а не оценки: что животное дало в каждую лактацию"
+                defaultOpen
+              >
                 <div className="overflow-x-auto">
                   <table className="metric-table min-w-[900px]">
                     <thead>
@@ -599,7 +607,7 @@ export default async function AnimalPage({
                     </tbody>
                   </table>
                 </div>
-              </div>
+              </Collapsible>
             </section>
           </>
         )}

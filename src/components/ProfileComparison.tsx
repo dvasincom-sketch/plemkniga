@@ -40,8 +40,10 @@ export function ProfileComparison({
   const cell = (share: number | undefined) => {
     const v = share ?? 0
     if (Math.abs(v) < 0.5) return <span className="text-ink-300">—</span>
+    // Класс, а не утилита цвета: при наведении на строку он становится белым
+    // вместе с остальным текстом — правило подсветки уже это умеет
     return (
-      <span className={v < 0 ? 'text-[#c0392b]' : undefined}>
+      <span className={v < 0 ? 'ipc-negative' : undefined}>
         {v > 0 ? '+' : '−'}
         {Math.abs(v).toFixed(0)}
       </span>
@@ -107,7 +109,7 @@ export function ProfileComparison({
                     <td
                       key={c.profile.key}
                       className={`text-right tabular-nums ${notable ? 'font-medium' : ''} ${
-                        c.profile.key === activeKey ? 'bg-brand-50' : ''
+                        c.profile.key === activeKey ? 'col-active' : ''
                       }`}
                     >
                       {cell(v)}

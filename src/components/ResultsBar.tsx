@@ -1,24 +1,24 @@
 import Link from 'next/link'
-import {
-  FILTER_KEYS,
-  PROFILE_SORT,
-  SORT_OPTIONS,
-  one,
-  queryWithSort,
-  queryWithout,
-  type SearchParams,
-  type SortValue,
-} from '@/lib/animal-query'
+import { FILTER_KEYS, one, queryWithout, type SearchParams, type SortValue } from '@/lib/animal-query'
 import { describeFilter } from '@/lib/filter-labels'
 import { ProfilePicker } from './ProfilePicker'
+import { SortPicker } from './SortPicker'
 import type { ProfileChoice } from '@/lib/index-profiles'
 
 /**
- * Шапка результатов: сколько найдено, какие условия действуют и как отсортировано.
+ * Шапка результатов: сколько найдено, по каким условиям и как показано.
  *
- * Условия показаны «фишками» с крестиком — пользователь видит, почему выдача
- * именно такая, и может снять любое условие одним кликом, не разыскивая его
- * в форме. Это же делает состояние поиска очевидным при переходе по ссылке.
+ * Три вопроса стоят в одном порядке сверху вниз: сколько нашлось, почему
+ * именно столько, как на это смотреть. Раньше настройки показа — профиль
+ * индекса и порядок строк — были разной природы: один выпадающим списком,
+ * другой рядом из пяти ссылок, который переносился на вторую строку. Теперь
+ * это два одинаковых списка в одном ряду: обе настройки отвечают на один
+ * вопрос и должны выглядеть одинаково.
+ *
+ * Условия отбора показаны «фишками» с крестиком — пользователь видит, почему
+ * выдача именно такая, и снимает любое условие одним кликом, не разыскивая
+ * его в форме. Это же делает состояние поиска очевидным при переходе
+ * по ссылке.
  */
 
 const plural = (n: number, one_: string, few: string, many: string) => {
@@ -53,12 +53,6 @@ export function ResultsBar({
   profiles?: ProfileChoice[]
   profileKey?: string
 }) {
-  /*
-   * Порядок по профилю предлагается только когда профиль выбран: без него
-   * это была бы сортировка по колонке, которой нет на экране.
-   */
-  const sortOptions = profileKey ? [PROFILE_SORT, ...SORT_OPTIONS] : SORT_OPTIONS
-
   const chips = FILTER_KEYS.map((key) => {
     const value = one(sp[key])
     if (!value) return null
@@ -69,48 +63,34 @@ export function ResultsBar({
 
   return (
     <div className="mb-5">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4">
         <h2 className="text-[22px] font-medium sm:text-[26px]">
-          {hasActive ? 'Результаты отбора' : 'Все животные книги'}
+          {hasActive ? 'Найдено' : 'Все животные книги'}
           <span className="ml-3 text-[15px] font-normal text-ink-500">
-            {total.toLocaleString('ru-RU')}{' '}
-            {plural(total, 'запись', 'записи', 'записей')}
+            {total.toLocaleString('ru-RU')} {plural(total, 'запись', 'записи', 'записей')}
           </span>
         </h2>
 
         {total > 0 && (
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[14px]">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[14px]">
             {profiles.length > 0 && (
-              <div className="mr-2 flex items-center gap-2">
-                <span className="text-ink-500">Индекс по профилю:</span>
+              <label className="flex items-center gap-2">
+                <span className="text-ink-500">Индекс</span>
                 <ProfilePicker sp={sp} profiles={profiles} value={profileKey} />
-              </div>
+              </label>
             )}
 
-            <span className="text-ink-500">Сортировка:</span>
-            {sortOptions.map((o) => {
-              const active = o.value === sort
-              return (
-                <Link
-                  key={o.value}
-                  href={`${queryWithSort(sp, o.value)}#results`}
-                  aria-current={active ? 'true' : undefined}
-                  className={`rounded-lg px-2.5 py-1 transition-colors ${
-                    active
-                      ? 'bg-brand-50 font-medium text-forest-600'
-                      : 'text-ink-700 hover:bg-[#ededed]'
-                  }`}
-                >
-                  {o.label}
-                </Link>
-              )
-            })}
+            <label className="flex items-center gap-2">
+              <span className="text-ink-500">Порядок</span>
+              <SortPicker sp={sp} value={sort} withProfile={profiles.length > 0 && Boolean(profileKey) && profileKey !== 'none'} />
+            </label>
           </div>
         )}
       </div>
 
       {chips.length > 0 && (
         <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="text-[13px] text-ink-500">Условия:</span>
           {chips.map((c) => (
             <Link
               key={c.key}

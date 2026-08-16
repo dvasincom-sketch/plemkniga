@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { ImageSlot } from '@/components/ImageSlot'
-import { HerdbookFilterBar } from '@/components/HerdbookFilterBar'
+import { SearchPanel } from '@/components/SearchPanel'
 import { ResultsBar } from '@/components/ResultsBar'
 import { EmptyResults } from '@/components/EmptyResults'
 import { AnimalTable } from '@/components/AnimalTable'
@@ -20,6 +20,7 @@ import {
   activePreset,
   buildAnimalWhere,
   hasActiveFilters,
+  hasAdvancedValues,
   one,
   presetHref,
   resolveSort,
@@ -126,9 +127,6 @@ export default async function HerdbookPage({
   for (const key of Object.keys(sp)) defaults[key] = one(sp[key])
 
   const herds = herdsResult.docs.map((h) => ({ id: h.id as number, name: h.name }))
-  const herdOptions = herds.map((h) => ({ value: String(h.id), label: h.name }))
-  // Значение — название хозяйства: отбор идёт по нему, и в «фишке» видно то же
-  const ownerOptions = orgsResult.docs.map((o) => ({ value: o.name, label: o.name }))
   const farmCount = orgsResult.docs.filter((o) => o.type === 'farm').length
 
   // Названия активных условий — для подсказок в пустой выдаче
@@ -252,7 +250,34 @@ export default async function HerdbookPage({
              Развёрнутый фильтр по продуктивности живёт в личном кабинете —
              там он нужен для работы со своим стадом.
           */}
-          <div className="mb-4 flex flex-wrap items-center gap-2">
+          {/*
+             Поиск первым, готовые подборки под ним.
+             Раньше отбор жил в трёх местах: чипы сверху, три поля в зелёной
+             панели и настройки показа врассыпную над таблицей. Каждый блок
+             отвечал за свой кусок одной задачи — сузить выдачу, — и человек
+             не знал, где искать нужное условие. Теперь порядок один: где
+             искать, чем сузить, как посмотреть.
+          */}
+          <SearchPanel
+            action="/#results"
+            title="Поиск по книге"
+            total={totalAll.totalDocs}
+            totalLabel="Животных в книге"
+            herds={herds}
+            withOwner
+            owners={orgsResult.docs.map((o) => ({ value: o.name, label: o.name }))}
+            withAuthor={false}
+            defaults={defaults}
+            openAdvanced={hasAdvancedValues(sp)}
+            hidden={{
+              // Способ смотреть на выдачу переживает поиск: иначе выбранный
+              // профиль и порядок строк сбрасывались бы при каждом уточнении
+              ...(one(sp.sort) ? { sort: one(sp.sort) } : {}),
+              ...(one(sp.profile) ? { profile: one(sp.profile) } : {}),
+            }}
+          />
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
             <span className="mr-1 text-[14px] text-ink-500">Быстрый отбор:</span>
             {PRESETS.map((p, i) => {
               const isActive = preset === p.key
@@ -287,13 +312,6 @@ export default async function HerdbookPage({
               )
             })}
           </div>
-
-          <HerdbookFilterBar
-            defaults={defaults}
-            owners={ownerOptions}
-            herds={herdOptions}
-            sort={one(sp.sort)}
-          />
 
           <div className="mt-7">
             <ResultsBar

@@ -11,6 +11,7 @@ import {
 } from '@/lib/dictionaries'
 import { ADVANCED_FIELDS } from '@/lib/animal-query'
 import { Select } from './Select'
+import { ComboBox, type Option } from './ComboBox'
 
 type Herd = { id: number; name: string }
 
@@ -20,6 +21,17 @@ export type SearchPanelProps = {
   herds: Herd[]
   /** Показывать поле «Владелец» (только в публичной книге). */
   withOwner?: boolean
+  /**
+   * Список хозяйств для подсказок в поле «Владелец».
+   *
+   * В книге посетитель не знает точных названий, и поле без подсказок
+   * заставляет угадывать. В кабинете список не нужен: там хозяйство одно.
+   */
+  owners?: Option[]
+  /** Показывать поле «Автор записи» — внутренняя работа, в книге не нужна. */
+  withAuthor?: boolean
+  /** Заголовок панели. */
+  title?: string
   defaults: Record<string, string>
   /** Подпись счётчика: в книге это вся база, в кабинете — одно хозяйство. */
   totalLabel?: string
@@ -59,6 +71,9 @@ export function SearchPanel({
   total,
   herds,
   withOwner = false,
+  owners,
+  withAuthor = true,
+  title = 'Поиск среди животных',
   defaults,
   totalLabel = 'Всего животных',
   openAdvanced = false,
@@ -78,7 +93,7 @@ export function SearchPanel({
           <input key={k} type="hidden" name={k} value={v} />
         ))}
       <div className="mb-6 flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className="text-[28px] font-medium sm:text-[32px]">Поиск среди животных</h2>
+        <h2 className="text-[28px] font-medium sm:text-[32px]">{title}</h2>
         <p className="text-sm text-white/85">
           {totalLabel}: <span className="font-medium">{total.toLocaleString('ru-RU')}</span>
         </p>
@@ -88,7 +103,7 @@ export function SearchPanel({
         <input
           name="id"
           defaultValue={d('id')}
-          placeholder="Поиск по ID"
+          placeholder="Индивидуальный номер"
           className="field md:col-span-5"
         />
         <Select
@@ -102,7 +117,7 @@ export function SearchPanel({
         <input
           name="name"
           defaultValue={d('name')}
-          placeholder="Поиск по кличке"
+          placeholder="Кличка"
           className="field md:col-span-4"
         />
 
@@ -125,7 +140,7 @@ export function SearchPanel({
         <Select
           name="state"
           ariaLabel="Статус"
-          placeholder="Статус"
+          placeholder="Состояние"
           defaultValue={d('state')}
           options={STATES.map((o) => ({ value: o.value, label: o.full }))}
           className="md:col-span-3"
@@ -133,7 +148,7 @@ export function SearchPanel({
         <Select
           name="relation"
           ariaLabel="Родственная связь"
-          placeholder="Родственная связь"
+          placeholder="Происхождение"
           defaultValue={d('relation')}
           options={RELATIONS.filter((r) => r.value !== 'any').map((o) => ({
             value: o.value,
@@ -142,29 +157,59 @@ export function SearchPanel({
           className="md:col-span-3"
         />
 
-        {withOwner && (
+        {withOwner &&
+          (owners?.length ? (
+            <ComboBox
+              name="owner"
+              ariaLabel="Владелец"
+              placeholder="Владелец"
+              defaultValue={d('owner')}
+              options={owners}
+              className="md:col-span-3"
+            />
+          ) : (
+            <input
+              name="owner"
+              defaultValue={d('owner')}
+              placeholder="Владелец"
+              className="field md:col-span-3"
+            />
+          ))}
+        {/*
+           Стад в книге сотни — список с поиском, а не простой выбор:
+           прокручивать пятьсот названий, чтобы найти своё, никто не станет.
+        */}
+        {owners?.length ? (
+          <ComboBox
+            name="herd"
+            ariaLabel="Стадо"
+            placeholder="Стадо"
+            defaultValue={d('herd')}
+            options={herds.map((h) => ({ value: String(h.id), label: h.name }))}
+            className={withOwner ? 'md:col-span-3' : 'md:col-span-6'}
+          />
+        ) : (
+          <Select
+            name="herd"
+            ariaLabel="Стадо"
+            placeholder="Стадо"
+            defaultValue={d('herd')}
+            options={herds.map((h) => ({ value: String(h.id), label: h.name }))}
+            className={withOwner ? 'md:col-span-3' : 'md:col-span-6'}
+          />
+        )}
+        {withAuthor && (
           <input
-            name="owner"
-            defaultValue={d('owner')}
-            placeholder="Владелец"
+            name="author"
+            defaultValue={d('author')}
+            placeholder="Автор записи"
             className="field md:col-span-3"
           />
         )}
-        <Select
-          name="herd"
-          ariaLabel="Стадо"
-          placeholder="Стадо"
-          defaultValue={d('herd')}
-          options={herds.map((h) => ({ value: String(h.id), label: h.name }))}
-          className={withOwner ? 'md:col-span-3' : 'md:col-span-6'}
-        />
-        <input
-          name="author"
-          defaultValue={d('author')}
-          placeholder="Автор записи"
-          className="field md:col-span-3"
-        />
-        <button type="submit" className="btn btn-accent w-full md:col-span-3">
+        <button
+          type="submit"
+          className={`btn btn-accent w-full ${withAuthor ? 'md:col-span-3' : 'md:col-span-6'}`}
+        >
           Искать
           <SearchIcon />
         </button>
