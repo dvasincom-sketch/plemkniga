@@ -55,33 +55,47 @@ export default async function AssociationQueuePage({
 
   const payload = await getClient()
 
+  /*
+   * Отбор идёт только по состоянию пакета — по пути внутри группы
+   * (`review.assignee`) здесь не спрашиваем ничего, и это осознанно.
+   *
+   * Такой путь Payload разбирает по своей копии схемы, построенной при
+   * запуске. Пока сервер разработки живёт с прежней копией — а живёт он
+   * долго, — только что добавленное поле для него не существует, и страница
+   * падает с «The following path cannot be queried». Лечится перезапуском,
+   * но лечить нечего: очередь и без этого запроса знает всё, что нужно.
+   * «Мои» отбираются из уже полученного списка, в памяти.
+   */
   const where: Where = closed
     ? { status: { in: ['accepted', 'rejected', 'checked'] } }
-    : mine === '1'
-      ? { and: [{ status: { in: [...OPEN] } }, { 'review.assignee': { equals: user.id } }] }
-      : { status: { in: [...OPEN] } }
+    : { status: { in: [...OPEN] } }
 
-  const { docs, totalDocs } = await payload.find({
+  const { docs: found, totalDocs } = await payload.find({
     collection: 'data-submissions',
     where,
     // Старые сверху: очередь, а не лента новостей
     sort: closed ? '-submittedAt' : 'submittedAt',
-    limit: 100,
+    limit: 200,
     depth: 1,
     overrideAccess: true,
   })
 
+  const assigneeOf = (s: { review?: { assignee?: unknown } | null }): number | string | null => {
+    const a = s.review?.assignee
+    if (!a) return null
+    return typeof a === 'object' ? ((a as { id?: number | string }).id ?? null) : (a as number)
+  }
+
+  const myOpen = closed ? [] : found.filter((s) => assigneeOf(s) === user.id)
+  const docs = mine === '1' ? myOpen : found
+
   const counts = await Promise.all([
     payload.count({ collection: 'data-submissions', where: { status: { equals: 'uploaded' } }, overrideAccess: true }),
     payload.count({ collection: 'data-submissions', where: { status: { equals: 'checking' } }, overrideAccess: true }),
-    payload.count({
-      collection: 'data-submissions',
-      where: { and: [{ status: { in: [...OPEN] } }, { 'review.assignee': { equals: user.id } }] },
-      overrideAccess: true,
-    }),
   ])
 
-  const [waiting, inWork, myWork] = counts.map((c) => c.totalDocs)
+  const [waiting, inWork] = counts.map((c) => c.totalDocs)
+  const myWork = myOpen.length
 
   return (
     <>
@@ -200,9 +214,10 @@ export default async function AssociationQueuePage({
               </table>
             </div>
 
-            {totalDocs > docs.length && (
+            {totalDocs > found.length && (
               <p className="mt-3 text-[13px] text-ink-500">
-                Показаны первые {docs.length} из {totalDocs.toLocaleString('ru-RU')}.
+                Показаны первые {found.length} из {totalDocs.toLocaleString('ru-RU')}; «мои»
+                считаются по этой же части списка.
               </p>
             )}
           </div>
