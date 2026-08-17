@@ -4,8 +4,31 @@ import Link from 'next/link'
 import { useActionState } from 'react'
 import { createAnimalAction, type AnimalFormState } from '@/actions/animals'
 import { AGE_GROUPS, ANIMAL_KINDS, ID_FORMATS, SEXES } from '@/lib/dictionaries'
+import { Select } from '@/components/Select'
 
 type Opt = { id: number; name: string }
+
+/**
+ * Списки здесь — свой `Select`, а не нативный `<select>`.
+ *
+ * Дело не только в единообразии. Нативный список каждая система рисует
+ * по-своему: на Windows это узкая серая полоса, на macOS — всплывающее меню
+ * в стиле системы, на телефоне — колесо во весь экран. Форма из десяти полей
+ * получалась собранной из двух разных наборов элементов, и это заметно
+ * даже тому, кто не думает про интерфейсы.
+ *
+ * Свой компонент к тому же умеет то, чего у нативного нет: поиск по первым
+ * буквам работает одинаково везде, а не по правилам системы.
+ *
+ * Обратная сторона — пустое значение не отправляется вовсе, тогда как
+ * нативный список прислал бы пустую строку. Для этой формы разницы нет:
+ * `collectFromForm` пропускает отсутствующие поля, и незаполненная порода
+ * означает «не указана» одинаково в обоих случаях.
+ */
+const asOptions = (list: readonly { value: string; label: string }[]) =>
+  list.map((o) => ({ value: o.value, label: o.label }))
+
+const fromRefs = (list: Opt[]) => list.map((o) => ({ value: String(o.id), label: o.name }))
 
 /**
  * Заведение животного вручную.
@@ -112,16 +135,17 @@ export function NewAnimalForm({ breeds, herds }: { breeds: Opt[]; herds: Opt[] }
           />
         </label>
 
-        <label className="block text-[14px]">
+        <div className="block text-[14px]">
           <span className="mb-1.5 block text-ink-700">Формат номера</span>
-          <select name="idFormat" defaultValue="rf" className="field field-on-light">
-            {ID_FORMATS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
+          <Select
+            name="idFormat"
+            options={asOptions(ID_FORMATS)}
+            defaultValue="rf"
+            placeholder=""
+            onLight
+            ariaLabel="Формат номера"
+          />
+        </div>
 
         <label className="block text-[14px]">
           <span className="mb-1.5 block text-ink-700">Кличка</span>
@@ -133,72 +157,75 @@ export function NewAnimalForm({ breeds, herds }: { breeds: Opt[]; herds: Opt[] }
           <input name="altIds.earTag" className="field field-on-light" />
         </label>
 
-        <label className="block text-[14px]">
+        <div className="block text-[14px]">
           <span className="mb-1.5 block text-ink-700">Пол</span>
-          <select name="sex" defaultValue="female" className="field field-on-light">
-            {SEXES.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.full}
-              </option>
-            ))}
-          </select>
-        </label>
+          <Select
+            name="sex"
+            // В справочнике `label` — однобуквенное «Ж»/«М» для таблиц,
+            // человеку в форме нужно полное слово
+            options={SEXES.map((o) => ({ value: o.value, label: o.full }))}
+            defaultValue="female"
+            placeholder=""
+            onLight
+            ariaLabel="Пол"
+          />
+        </div>
 
-        <label className="block text-[14px]">
+        <div className="block text-[14px]">
           <span className="mb-1.5 block text-ink-700">Тип животного</span>
-          <select name="kind" defaultValue="cow" className="field field-on-light">
-            {ANIMAL_KINDS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
+          <Select
+            name="kind"
+            options={asOptions(ANIMAL_KINDS)}
+            defaultValue="cow"
+            placeholder=""
+            onLight
+            ariaLabel="Тип животного"
+          />
+        </div>
 
-        <label className="block text-[14px]">
+        <div className="block text-[14px]">
           <span className="mb-1.5 block text-ink-700">Возрастная группа</span>
-          <select name="ageGroup" defaultValue="firstCalf" className="field field-on-light">
-            {AGE_GROUPS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
+          <Select
+            name="ageGroup"
+            options={asOptions(AGE_GROUPS)}
+            defaultValue="firstCalf"
+            placeholder=""
+            onLight
+            ariaLabel="Возрастная группа"
+          />
+        </div>
 
         <label className="block text-[14px]">
           <span className="mb-1.5 block text-ink-700">Дата рождения</span>
           <input type="date" name="birthDate" className="field field-on-light" />
         </label>
 
-        <label className="block text-[14px]">
+        <div className="block text-[14px]">
           <span className="mb-1.5 block text-ink-700">Порода</span>
-          <select name="breed" defaultValue="" className="field field-on-light">
-            <option value="">— не указана —</option>
-            {breeds.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-        </label>
+          <Select
+            name="breed"
+            options={fromRefs(breeds)}
+            placeholder="— не указана —"
+            onLight
+            ariaLabel="Порода"
+          />
+        </div>
 
         <label className="block text-[14px]">
           <span className="mb-1.5 block text-ink-700">Кровность по голштину, %</span>
           <input name="bloodPercent" inputMode="decimal" className="field field-on-light" />
         </label>
 
-        <label className="block text-[14px]">
+        <div className="block text-[14px]">
           <span className="mb-1.5 block text-ink-700">Стадо</span>
-          <select name="herd" defaultValue="" className="field field-on-light">
-            <option value="">— не указано —</option>
-            {herds.map((h) => (
-              <option key={h.id} value={h.id}>
-                {h.name}
-              </option>
-            ))}
-          </select>
-        </label>
+          <Select
+            name="herd"
+            options={fromRefs(herds)}
+            placeholder="— не указано —"
+            onLight
+            ariaLabel="Стадо"
+          />
+        </div>
       </div>
 
       <h2 className="panel-heading mt-8">Происхождение</h2>
