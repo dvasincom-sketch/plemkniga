@@ -30,6 +30,18 @@ export const CERTIFICATE_KINDS = {
 
 export type CertificateKind = keyof typeof CERTIFICATE_KINDS
 
+/**
+ * Какой тип документа отвечает виду бланка.
+ *
+ * Лежит здесь, а не в действии выпуска: сопоставление нужно и тому, кто
+ * выпускает, и тому, кто ищет уже выданный документ для печатной формы.
+ * Два одинаковых списка в двух файлах разошлись бы на первом же новом виде.
+ */
+export const DOCUMENT_TYPE_OF: Record<CertificateKind, string> = {
+  pedigree: 'pedigreeCertificate',
+  zootechnical: 'zootechnicalCertificate',
+}
+
 export type Requirement = {
   key: string
   label: string

@@ -3,8 +3,14 @@
 import { revalidatePath } from 'next/cache'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { isAssociationUser } from '@/lib/association'
-import { CERTIFICATE_KINDS, certificateReadiness, type CertificateKind } from '@/lib/certification'
+import {
+  CERTIFICATE_KINDS,
+  DOCUMENT_TYPE_OF,
+  certificateReadiness,
+  type CertificateKind,
+} from '@/lib/certification'
 import { relId } from '@/lib/visibility'
+import { buildCertificateView } from '@/lib/certificate-view'
 import type { Animal } from '@/payload-types'
 
 /**
@@ -19,10 +25,8 @@ import type { Animal } from '@/payload-types'
 
 export type DocumentState = { error?: string; message?: string; issuedId?: number | string }
 
-const TYPE_OF: Record<CertificateKind, string> = {
-  pedigree: 'pedigreeCertificate',
-  zootechnical: 'zootechnicalCertificate',
-}
+// Сопоставление живёт в `src/lib/certification.ts`: им пользуется и печатная форма
+const TYPE_OF = DOCUMENT_TYPE_OF
 
 /** Префикс номера: по нему документ узнают в разговоре и в бумагах. */
 const PREFIX_OF: Record<CertificateKind, string> = {
@@ -124,6 +128,16 @@ export async function issueDocumentAction(
     overrideAccess: true,
   })
   const number = `${prefix}-${year}-${String(totalDocs + 1).padStart(4, '0')}`
+  const issuedAt = new Date().toISOString()
+
+  /*
+   * Снимок собирается тем же сборщиком, которым страница рисует бланк.
+   *
+   * Два независимых сборщика одного документа разошлись бы, и расхождение
+   * обнаружилось бы на бумаге, которую уже отдали покупателю. Поэтому
+   * сборщик один, а здесь только его вызов.
+   */
+  const snapshot = await buildCertificateView(payload, animal, kind, issuedAt)
 
   try {
     const created = await payload.create({
@@ -134,10 +148,11 @@ export async function issueDocumentAction(
         title: `${CERTIFICATE_KINDS[kind].title} № ${number} — ${animal.identNumber}`,
         type: TYPE_OF[kind] as never,
         number,
-        issuedAt: new Date().toISOString(),
+        issuedAt,
         animal: animal.id,
         organization: relId(animal.owner) ?? undefined,
         issuedBy: user.id,
+        snapshot,
       } as never,
     })
 

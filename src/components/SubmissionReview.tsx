@@ -8,6 +8,7 @@ import {
   takeSubmissionAction,
   type ReviewState,
 } from '@/actions/review'
+import { Select } from '@/components/Select'
 
 type Finding = {
   id: string
@@ -227,15 +228,16 @@ export function Findings({
           <div className="grid gap-4 sm:grid-cols-3">
             <label className="block text-[14px]">
               <span className="mb-1.5 block text-ink-700">Животное</span>
-              <select name="animal" defaultValue="" className="field field-on-light">
-                <option value="">— весь пакет —</option>
-                {animals.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.identNumber}
-                    {a.name ? ` · ${a.name}` : ''}
-                  </option>
-                ))}
-              </select>
+              <Select
+                name="animal"
+                options={animals.map((a) => ({
+                  value: String(a.id),
+                  label: `${a.identNumber}${a.name ? ` · ${a.name}` : ''}`,
+                }))}
+                placeholder="— весь пакет —"
+                onLight
+                ariaLabel="Животное"
+              />
             </label>
 
             <label className="block text-[14px]">
@@ -245,10 +247,17 @@ export function Findings({
 
             <label className="block text-[14px]">
               <span className="mb-1.5 block text-ink-700">Насколько существенно</span>
-              <select name="severity" defaultValue="fix" className="field field-on-light">
-                <option value="fix">Требует исправления</option>
-                <option value="note">На усмотрение хозяйства</option>
-              </select>
+              <Select
+                name="severity"
+                options={[
+                  { value: 'fix', label: 'Требует исправления' },
+                  { value: 'note', label: 'На усмотрение хозяйства' },
+                ]}
+                defaultValue="fix"
+                placeholder=""
+                onLight
+                ariaLabel="Насколько существенно"
+              />
             </label>
           </div>
 

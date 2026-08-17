@@ -7,6 +7,7 @@ import { AssociationNav } from '@/components/AssociationNav'
 import { IssueDocument, RevokeDocument } from '@/components/DocumentIssue'
 import { StaleSchemaNotice } from '@/components/StaleSchemaNotice'
 import { getClient } from '@/lib/payload'
+import { relId } from '@/lib/visibility'
 import { isStaleSchemaError, requireAssociation } from '@/lib/association'
 import { DOCUMENT_TYPES, labelOf } from '@/lib/dictionaries'
 import { dateRu } from '@/lib/format'
@@ -169,7 +170,27 @@ export default async function AssociationDocumentsPage({
 
                         return (
                           <tr key={d.id}>
-                            <td className="whitespace-nowrap tabular-nums">{d.number ?? '—'}</td>
+                            <td className="whitespace-nowrap tabular-nums">
+                        {/*
+                          Номер ведёт на сам бланк — тот, что был выдан,
+                          со снимком данных на дату. Раньше журнал и печатная
+                          форма были двумя несвязанными вещами: номер стоял
+                          в журнале, а бланк собирался из сегодняшних данных
+                          и номера не знал вовсе.
+                        */}
+                        {d.number ? (
+                          <Link
+                            href={`/animals/${relId(d.animal)}/certificate/${
+                              d.type === 'zootechnicalCertificate' ? 'zootechnical' : 'pedigree'
+                            }?document=${d.id}`}
+                            className="underline underline-offset-4 hover:text-forest-500"
+                          >
+                            {d.number}
+                          </Link>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
                             <td>{labelOf(DOCUMENT_TYPES, d.type)}</td>
                             <td>
                               {animal ? (

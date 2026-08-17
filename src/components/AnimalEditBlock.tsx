@@ -3,6 +3,8 @@
 import { useActionState, useEffect, useState } from 'react'
 import { updateAnimalAction, type AnimalFormState } from '@/actions/animals'
 import type { BlockValue } from '@/lib/animal-edit'
+import { Select } from '@/components/Select'
+import { DateField } from '@/components/DateField'
 
 /**
  * Блок карточки, который можно поправить не уходя со страницы.
@@ -134,17 +136,19 @@ export function AnimalEditBlock({
                 <span className="text-ink-700">да</span>
               </span>
             ) : v.choices ? (
-              <select name={v.path} defaultValue={v.raw} className="field field-on-light">
-                <option value="">— не указано —</option>
-                {v.choices.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
+              <Select
+                name={v.path}
+                options={v.choices.map((c) => ({ value: c.value, label: c.label }))}
+                defaultValue={v.raw}
+                placeholder="— не указано —"
+                onLight
+                ariaLabel={v.label}
+              />
+            ) : v.kind === 'date' ? (
+              <DateField name={v.path} defaultValue={v.raw} ariaLabel={v.label} />
             ) : (
               <input
-                type={v.kind === 'date' ? 'date' : 'text'}
+                type="text"
                 inputMode={v.kind === 'number' ? 'decimal' : undefined}
                 name={v.path}
                 defaultValue={v.raw}

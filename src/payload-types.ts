@@ -1315,13 +1315,18 @@ export interface AccessGrant {
  */
 export interface AccessView {
   id: number;
-  grant: number | AccessGrant;
   animal: number | Animal;
-  viewer?: (number | null) | User;
-  viewerOrg?: (number | null) | Organization;
+  viewerOrg: number | Organization;
   owner: number | Organization;
+  grant?: (number | null) | AccessGrant;
+  /**
+   * Право у хозяйства, но открывал карточку человек
+   */
+  viewer?: (number | null) | User;
   scopes?: ('origin' | 'production' | 'evaluation' | 'documents')[] | null;
+  firstAt: string;
   at: string;
+  sessions?: number | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1488,6 +1493,15 @@ export interface Document {
   animal?: (number | null) | Animal;
   organization?: (number | null) | Organization;
   file?: (number | null) | Media;
+  snapshot?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   issuedBy?: (number | null) | User;
   revoked?: {
     at?: string | null;
@@ -2352,13 +2366,15 @@ export interface AccessGrantsSelect<T extends boolean = true> {
  * via the `definition` "access-views_select".
  */
 export interface AccessViewsSelect<T extends boolean = true> {
-  grant?: T;
   animal?: T;
-  viewer?: T;
   viewerOrg?: T;
   owner?: T;
+  grant?: T;
+  viewer?: T;
   scopes?: T;
+  firstAt?: T;
   at?: T;
+  sessions?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -2463,6 +2479,7 @@ export interface DocumentsSelect<T extends boolean = true> {
   animal?: T;
   organization?: T;
   file?: T;
+  snapshot?: T;
   issuedBy?: T;
   revoked?:
     | T

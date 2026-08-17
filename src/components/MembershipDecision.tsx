@@ -6,6 +6,7 @@ import {
   decideMembershipAction,
   type MembershipState,
 } from '@/actions/membership'
+import { Select } from '@/components/Select'
 
 /**
  * Решение по членству — раскрывается по требованию.
@@ -51,15 +52,18 @@ export function MembershipDecision({
 
       <p className="text-[13px] text-ink-500">{organizationName}</p>
 
-      <select
+      <Select
         name="decision"
+        options={[
+          { value: 'member', label: 'Принять в члены' },
+          { value: 'suspended', label: 'Приостановить членство' },
+          { value: 'none', label: 'Отказать / исключить' },
+        ]}
         defaultValue={membership === 'member' ? 'suspended' : 'member'}
-        className="field field-on-light text-[14px]"
-      >
-        <option value="member">Принять в члены</option>
-        <option value="suspended">Приостановить членство</option>
-        <option value="none">Отказать / исключить</option>
-      </select>
+        placeholder=""
+        onLight
+        ariaLabel="Решение по членству"
+      />
 
       <textarea
         name="comment"

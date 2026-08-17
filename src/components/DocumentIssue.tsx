@@ -6,6 +6,7 @@ import {
   revokeDocumentAction,
   type DocumentState,
 } from '@/actions/documents'
+import { Select } from '@/components/Select'
 
 /**
  * Выпуск документа — по индивидуальному номеру, а не выбором из списка.
@@ -43,10 +44,17 @@ export function IssueDocument() {
 
         <label className="block text-[14px]">
           <span className="mb-1.5 block text-ink-700">Что выпускаем</span>
-          <select name="kind" defaultValue="pedigree" className="field field-on-light">
-            <option value="pedigree">Племенное свидетельство</option>
-            <option value="zootechnical">Зоотехнический сертификат</option>
-          </select>
+          <Select
+            name="kind"
+            options={[
+              { value: 'pedigree', label: 'Племенное свидетельство' },
+              { value: 'zootechnical', label: 'Зоотехнический сертификат' },
+            ]}
+            defaultValue="pedigree"
+            placeholder=""
+            onLight
+            ariaLabel="Что выпускаем"
+          />
         </label>
 
         <button type="submit" className="btn btn-accent" disabled={pending}>

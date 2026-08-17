@@ -8,6 +8,7 @@ import {
   takeVerificationAction,
   type VerificationState,
 } from '@/actions/verification'
+import { Select } from '@/components/Select'
 
 type Finding = {
   id: string
@@ -227,15 +228,16 @@ export function VerificationFindings({
           <div className="grid gap-4 sm:grid-cols-3">
             <label className="block text-[14px]">
               <span className="mb-1.5 block text-ink-700">Животное</span>
-              <select name="animal" defaultValue="" className="field field-on-light">
-                <option value="">— вся заявка —</option>
-                {animals.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.identNumber}
-                    {a.name ? ` · ${a.name}` : ''}
-                  </option>
-                ))}
-              </select>
+              <Select
+                name="animal"
+                options={animals.map((a) => ({
+                  value: String(a.id),
+                  label: `${a.identNumber}${a.name ? ` · ${a.name}` : ''}`,
+                }))}
+                placeholder="— вся заявка —"
+                onLight
+                ariaLabel="Животное"
+              />
             </label>
 
             <label className="block text-[14px]">
@@ -245,10 +247,17 @@ export function VerificationFindings({
 
             <label className="block text-[14px]">
               <span className="mb-1.5 block text-ink-700">Последствие</span>
-              <select name="severity" defaultValue="fix" className="field field-on-light">
-                <option value="fix">Не подтверждать эту запись</option>
-                <option value="note">Подтвердить, но отметить</option>
-              </select>
+              <Select
+                name="severity"
+                options={[
+                  { value: 'fix', label: 'Не подтверждать эту запись' },
+                  { value: 'note', label: 'Подтвердить, но отметить' },
+                ]}
+                defaultValue="fix"
+                placeholder=""
+                onLight
+                ariaLabel="Насколько существенно"
+              />
             </label>
           </div>
 

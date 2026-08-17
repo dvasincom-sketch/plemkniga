@@ -5,6 +5,8 @@ import { useActionState } from 'react'
 import { createAnimalAction, type AnimalFormState } from '@/actions/animals'
 import { AGE_GROUPS, ANIMAL_KINDS, ID_FORMATS, SEXES } from '@/lib/dictionaries'
 import { Select } from '@/components/Select'
+import { DateField } from '@/components/DateField'
+import { ParentNumber } from '@/components/ParentNumber'
 
 type Opt = { id: number; name: string }
 
@@ -195,10 +197,16 @@ export function NewAnimalForm({ breeds, herds }: { breeds: Opt[]; herds: Opt[] }
           />
         </div>
 
-        <label className="block text-[14px]">
+        <div className="block text-[14px]">
           <span className="mb-1.5 block text-ink-700">Дата рождения</span>
-          <input type="date" name="birthDate" className="field field-on-light" />
-        </label>
+          {/* Предел сверху: животное не может родиться завтра. Та же проверка
+              стоит на сервере, здесь она только избавляет от лишней отправки */}
+          <DateField
+            name="birthDate"
+            ariaLabel="Дата рождения"
+            max={new Date().toISOString().slice(0, 10)}
+          />
+        </div>
 
         <div className="block text-[14px]">
           <span className="mb-1.5 block text-ink-700">Порода</span>
@@ -236,18 +244,27 @@ export function NewAnimalForm({ breeds, herds }: { breeds: Opt[]; herds: Opt[] }
       </p>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <label className="block text-[14px]">
-          <span className="mb-1.5 block text-ink-700">Отец, инд. №</span>
-          <input name="pedigreeText.fatherId" className="field field-on-light" />
-        </label>
+        {/*
+          Номер родителя проверяется по книге прямо при вводе.
+
+          Раньше два исхода выглядели одинаково: «карточки предка ещё нет,
+          свяжется потом» и «в номере опечатка, не свяжется никогда».
+          Второе обнаруживалось через месяцы, когда не строилась родословная.
+        */}
+        <ParentNumber
+          name="pedigreeText.fatherId"
+          label="Отец, инд. №"
+          placeholder="Например: HOUSA000012345678"
+        />
         <label className="block text-[14px]">
           <span className="mb-1.5 block text-ink-700">Отец, кличка</span>
           <input name="pedigreeText.fatherName" className="field field-on-light" />
         </label>
-        <label className="block text-[14px]">
-          <span className="mb-1.5 block text-ink-700">Мать, инд. №</span>
-          <input name="pedigreeText.motherId" className="field field-on-light" />
-        </label>
+        <ParentNumber
+          name="pedigreeText.motherId"
+          label="Мать, инд. №"
+          placeholder="Например: 112233445566778"
+        />
         <label className="block text-[14px]">
           <span className="mb-1.5 block text-ink-700">Мать, кличка</span>
           <input name="pedigreeText.motherName" className="field field-on-light" />

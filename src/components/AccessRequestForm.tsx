@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react'
 import { requestAccessAction, type AccessFormState } from '@/actions/access'
 import { ACCESS_REQUEST_PURPOSES } from '@/collections/AccessRequests'
 import { ACCESS_SCOPES, SCOPES_BY_PURPOSE } from '@/lib/dictionaries'
+import { Select } from '@/components/Select'
 
 /**
  * Запрос доступа к закрытой карточке.
@@ -62,19 +63,15 @@ export function AccessRequestForm({
 
       <label className="block text-[14px]">
         <span className="mb-1.5 block text-ink-700">Зачем нужен доступ</span>
-        <select
+        <Select
           name="purpose"
-          className="field field-on-light"
-          value={purpose}
-          onChange={(e) => changePurpose(e.target.value)}
-          disabled={sent}
-        >
-          {ACCESS_REQUEST_PURPOSES.map((p) => (
-            <option key={p.value} value={p.value}>
-              {p.label}
-            </option>
-          ))}
-        </select>
+          options={ACCESS_REQUEST_PURPOSES.map((p) => ({ value: p.value, label: p.label }))}
+          defaultValue={purpose}
+          placeholder=""
+          onLight
+          ariaLabel="Зачем нужен доступ"
+          onChange={changePurpose}
+        />
       </label>
 
       <fieldset className="mt-4">

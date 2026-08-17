@@ -26,6 +26,7 @@ import * as migration_20260817_133000_access_grants from './20260817_133000_acce
 import * as migration_20260817_150000_request_scopes from './20260817_150000_request_scopes';
 import * as migration_20260817_170000_view_journal from './20260817_170000_view_journal';
 import * as migration_20260817_180000_document_number from './20260817_180000_document_number';
+import * as migration_20260817_190000_document_snapshot from './20260817_190000_document_snapshot';
 
 export const migrations = [
   {
@@ -167,5 +168,10 @@ export const migrations = [
     up: migration_20260817_180000_document_number.up,
     down: migration_20260817_180000_document_number.down,
     name: '20260817_180000_document_number',
+  },
+  {
+    up: migration_20260817_190000_document_snapshot.up,
+    down: migration_20260817_190000_document_snapshot.down,
+    name: '20260817_190000_document_snapshot',
   },
 ];

@@ -3,33 +3,48 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { isAnimalLocked, viewerOf } from '@/lib/visibility'
-import { buildPedigree, type PedigreeNode } from '@/lib/pedigree'
-import { analyzeAncestry } from '@/lib/ancestry'
 import {
   CERTIFICATE_KINDS,
+  DOCUMENT_TYPE_OF,
   certificateReadiness,
   type CertificateKind,
 } from '@/lib/certification'
-import { AGE_GROUPS, SEXES, labelOf } from '@/lib/dictionaries'
+import {
+  buildCertificateView,
+  readSnapshot,
+  type CertificateNode,
+  type CertificateView,
+} from '@/lib/certificate-view'
 import { dateRu, nf, signed } from '@/lib/format'
 import { PrintButton } from '@/components/PrintButton'
-import type { Animal } from '@/payload-types'
+import type { Animal, Document } from '@/payload-types'
 
 export const dynamic = 'force-dynamic'
 
 /**
  * Документ животного как веб-страница.
  *
- * Формируется в момент открытия из текущих данных — никакого заранее
- * подготовленного файла нет. Сохранить в PDF можно печатью браузера:
- * служебные элементы скрыты правилами `@media print`.
+ * У страницы два состояния, и их нельзя путать.
  *
- * Выпуск разрешён только при уровне достоверности 3 и выполнении остальных
- * требований бланка; иначе пользователя возвращает в карточку, где показан
- * разбор, чего именно не хватает.
+ * **Предпросмотр.** Документа ещё нет, бланк собирается из живой записи
+ * в момент открытия. Он всегда актуален и ничего не удостоверяет — это
+ * заготовка, по которой смотрят, что получится.
+ *
+ * **Выданный документ.** Есть запись в `documents` со снимком данных
+ * на дату выпуска, и бланк рисуется **из снимка**. Пересчитали ИПЦ,
+ * поправили кличку, сменили владельца — выданная бумага не меняется.
+ * Иначе номер `ПС-2026-0001`, на который сослались в договоре, обозначал бы
+ * каждый день новое.
+ *
+ * Отличить одно от другого можно глазами: у выданного стоит номер и дата
+ * выдачи, у предпросмотра — предупреждение вместо них.
+ *
+ * Сохранить в PDF можно печатью браузера: служебные элементы скрыты
+ * правилами `@media print`.
  */
 
 type Params = { id: string; kind: string }
+type Query = { document?: string }
 
 export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
   const { kind } = await params
@@ -37,71 +52,54 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
   return { title: meta ? meta.title : 'Документ' }
 }
 
-const relName = (v: unknown): string => {
-  if (v && typeof v === 'object') {
-    const o = v as Record<string, unknown>
-    const n = o.name ?? o.fullName ?? o.shortName
-    if (typeof n === 'string' && n) return n
-  }
-  return '—'
-}
-
 const NOT_IN_MODEL = '—'
-
-/* ------------------------------- разметка ------------------------------- */
 
 function Row({ n, label, value }: { n?: string; label: string; value?: React.ReactNode }) {
   return (
-    <div className="flex gap-3 border-b border-ink-100 py-2 last:border-b-0">
-      {n && <span className="w-10 flex-none tabular-nums text-ink-500">{n}</span>}
-      <span className="w-[46%] flex-none text-ink-700">{label}</span>
-      <span className="min-w-0 flex-1 font-medium">{value ?? '—'}</span>
+    <div className="flex gap-3 border-b border-ink-100 py-1.5 text-[13px] last:border-b-0">
+      {n && <span className="w-6 flex-none tabular-nums text-ink-500">{n}</span>}
+      <span className="w-64 flex-none text-ink-700">{label}</span>
+      <span className="min-w-0 flex-1">{value ?? '—'}</span>
     </div>
   )
 }
 
 function Block({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="mt-7 break-inside-avoid">
-      <h2 className="mb-2 border-b-2 border-ink-900 pb-1 text-[15px] font-medium uppercase tracking-[0.04em]">
+    <section className="mt-6">
+      <h2 className="mb-2 border-b border-ink-900 pb-1 text-[14px] font-medium uppercase tracking-wide">
         {title}
       </h2>
-      <div className="text-[14px] leading-snug">{children}</div>
+      {children}
     </section>
   )
 }
 
-/** Один узел родословной в печатной форме. */
-function Node({ node }: { node?: PedigreeNode }) {
-  const ident = node?.animal?.identNumber ?? node?.text?.identNumber ?? null
-  const name = node?.animal?.name ?? node?.text?.name ?? null
-
+function Node({ node }: { node?: CertificateNode }) {
   return (
     <div className="flex min-h-[46px] flex-1 flex-col justify-center rounded border border-ink-100 px-2.5 py-1.5">
       <span className="text-[10px] uppercase tracking-wide text-ink-500">{node?.code ?? '—'}</span>
-      <span className="text-[13px] font-medium leading-tight">{name ?? '—'}</span>
-      <span className="text-[11px] tabular-nums text-ink-700">{ident ?? '—'}</span>
+      <span className="text-[13px] font-medium leading-tight">{node?.name ?? '—'}</span>
+      <span className="text-[11px] tabular-nums text-ink-700">{node?.identNumber ?? '—'}</span>
     </div>
   )
 }
 
-/** Плоский список узлов по коду — печатная родословная строится по сетке. */
-const byCode = (roots: PedigreeNode[]): Record<string, PedigreeNode> => {
-  const map: Record<string, PedigreeNode> = {}
-  const walk = (nodes: PedigreeNode[]) => {
-    for (const n of nodes) {
-      map[n.code] = n
-      walk(n.children)
-    }
-  }
-  walk(roots)
+const byCode = (nodes: CertificateNode[]): Record<string, CertificateNode> => {
+  const map: Record<string, CertificateNode> = {}
+  for (const n of nodes) map[n.code] = n
   return map
 }
 
-/* --------------------------------- страница ------------------------------ */
-
-export default async function CertificatePage({ params }: { params: Promise<Params> }) {
+export default async function CertificatePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<Params>
+  searchParams: Promise<Query>
+}) {
   const { id, kind } = await params
+  const { document: documentParam } = await searchParams
   const meta = CERTIFICATE_KINDS[kind as CertificateKind]
   if (!meta) notFound()
 
@@ -124,23 +122,65 @@ export default async function CertificatePage({ params }: { params: Promise<Para
   // Закрытая запись объясняет себя на своей странице, а не редиректом на вход
   if (isAnimalLocked(animal, viewerOf(user))) redirect(`/animals/${id}`)
 
-  const readiness = await certificateReadiness(payload, animal)
-  const state = readiness[kind as CertificateKind]
+  /*
+   * Выданный документ ищется по адресу, а если его не назвали — по животному
+   * и виду среди действующих.
+   *
+   * Второе нужно, чтобы ссылка из карточки не требовала знать номер записи,
+   * а первое — чтобы отозванный документ всё-таки можно было открыть
+   * по прямой ссылке: на него могли сослаться, и «страница не найдена»
+   * на такой ссылке хуже, чем бланк с отметкой об отзыве.
+   */
+  let issued: Document | null = null
+  if (documentParam) {
+    issued = (await payload
+      .findByID({ collection: 'documents', id: documentParam, depth: 0, overrideAccess: true })
+      .catch(() => null)) as Document | null
+    if (issued && String(issued.animal) !== String(animal.id) && typeof issued.animal === 'object') {
+      if (issued.animal?.id !== animal.id) issued = null
+    }
+  } else {
+    const found = await payload
+      .find({
+        collection: 'documents',
+        where: {
+          and: [
+            { animal: { equals: animal.id } },
+            { type: { equals: DOCUMENT_TYPE_OF[kind as CertificateKind] } },
+            { issuedBy: { exists: true } },
+            { 'revoked.at': { exists: false } },
+          ],
+        },
+        sort: '-issuedAt',
+        limit: 1,
+        depth: 0,
+        overrideAccess: true,
+      })
+      .catch(() => null)
+    issued = ((found?.docs[0] as Document | undefined) ?? null) as Document | null
+  }
 
-  // Документ не выпускается — возвращаем в карточку, там показан разбор причин
-  if (!state.ready) redirect(`/animals/${id}?tab=documents`)
+  const snapshot = issued ? readSnapshot(issued.snapshot) : null
 
-  const roots = await buildPedigree(payload, animal, 3)
-  const nodes = byCode(roots)
-  // Тот же расчёт, что и в карточке: два независимых считателя одного
-  // коэффициента рано или поздно разойдутся, и в документе это недопустимо
-  const coi = (await analyzeAncestry(payload, animal)).coi
+  /*
+   * Предпросмотр проверяет готовность, выданный документ — нет.
+   *
+   * Требования проверяют **перед выпуском**. Проверять их у выданной бумаги
+   * значит прятать её ровно тогда, когда данные животного изменились, —
+   * то есть в единственном случае, ради которого снимок и заведён.
+   */
+  if (!issued) {
+    const readiness = await certificateReadiness(payload, animal)
+    if (!readiness[kind as CertificateKind].ready) redirect(`/animals/${id}?tab=documents`)
+  }
 
-  const owner = relName(animal.owner)
-  const ownerAddress =
-    typeof animal.owner === 'object' && animal.owner ? (animal.owner.address ?? '') : ''
+  const view: CertificateView =
+    snapshot ?? (await buildCertificateView(payload, animal, kind as CertificateKind))
 
-  const lactations = animal.lactations ?? []
+  const nodes = byCode(view.nodes)
+  const revokedAt = issued?.revoked?.at ?? null
+  /** Документ выдан, но снимка у него нет — выпущен до появления снимков. */
+  const staleIssued = Boolean(issued && !snapshot)
 
   return (
     <main className="mx-auto max-w-[900px] px-5 py-8 print:max-w-none print:px-0 print:py-0">
@@ -155,6 +195,16 @@ export default async function CertificatePage({ params }: { params: Promise<Para
         <PrintButton />
       </div>
 
+      {revokedAt && (
+        <p className="no-print mb-4 rounded-xl bg-[#fdecea] px-5 py-3.5 text-[15px]">
+          <span className="font-medium">Документ отозван {dateRu(revokedAt)}.</span>{' '}
+          {issued?.revoked?.reason
+            ? `Причина: ${issued.revoked.reason}`
+            : 'Причина не указана.'}{' '}
+          Он показан таким, каким был выдан, — ссылаться на него нельзя.
+        </p>
+      )}
+
       <article className="doc-page rounded-card bg-white p-10 shadow-[0_2px_14px_rgb(23_24_26_/_0.08)] print:rounded-none print:p-0 print:shadow-none">
         {/* --------------------------- Шапка бланка -------------------------- */}
         <header className="border-b-2 border-ink-900 pb-4">
@@ -164,30 +214,59 @@ export default async function CertificatePage({ params }: { params: Promise<Para
             443109, Самарская обл., г. Самара, ул. Металлургическая, 92 · +7 846 931-25-95 ·
             info@holstein-russia.ru
           </p>
-          <h1 className="mt-4 text-[24px] font-medium leading-tight">{meta.title}</h1>
+
+          <div className="mt-4 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+            <h1 className="text-[24px] font-medium leading-tight">{meta.title}</h1>
+            {issued?.number && (
+              <p className="text-[16px] font-medium tabular-nums">№ {issued.number}</p>
+            )}
+          </div>
+
           <p className="mt-1 text-[13px] text-ink-700">{meta.subtitle}</p>
-          <p className="mt-3 text-[12px] text-ink-500">
-            Сформирован {dateRu(new Date().toISOString())} из данных информационной системы.
-            Уровень достоверности записи — {animal.trustLevel ?? 0}.
-          </p>
+
+          {issued ? (
+            <p className="mt-3 text-[12px] text-ink-500">
+              Выдан {dateRu(issued.issuedAt)}. Данные приведены на дату выдачи. Уровень
+              достоверности записи на тот момент — {view.trustLevel}.
+              {revokedAt && ` Документ отозван ${dateRu(revokedAt)}.`}
+            </p>
+          ) : (
+            <p className="mt-3 text-[12px] text-ink-500">
+              <span className="font-medium">Предпросмотр, не выданный документ.</span> Собран{' '}
+              {dateRu(view.builtAt)} из текущих данных и меняется вместе с ними. Уровень
+              достоверности записи — {view.trustLevel}.
+            </p>
+          )}
+
+          {staleIssued && (
+            <p className="no-print mt-2 text-[12px] leading-snug text-[#c0392b]">
+              У этого документа нет снимка данных — он выпущен до того, как снимки стали
+              сохраняться. Бланк собран из текущих данных и мог разойтись с тем, что было
+              напечатано при выдаче.
+            </p>
+          )}
         </header>
 
         {/* --------------------------- Идентификация ------------------------- */}
         <Block title="Идентификация животного">
-          <Row n="1" label="Кличка" value={animal.name ?? '—'} />
-          <Row n="2" label="Индивидуальный номер" value={animal.identNumber} />
-          <Row n="3" label="Порода" value={relName(animal.breed)} />
-          <Row n="4" label="Пол" value={SEXES.find((s) => s.value === animal.sex)?.full ?? '—'} />
-          <Row n="5" label="Возрастная группа" value={labelOf(AGE_GROUPS, animal.ageGroup)} />
-          <Row n="6" label="Дата рождения" value={dateRu(animal.birthDate)} />
+          <Row n="1" label="Кличка" value={view.name} />
+          <Row n="2" label="Индивидуальный номер" value={view.identNumber} />
+          <Row n="3" label="Порода" value={view.breed} />
+          <Row n="4" label="Пол" value={view.sex} />
+          <Row n="5" label="Возрастная группа" value={view.ageGroup} />
+          <Row n="6" label="Дата рождения" value={dateRu(view.birthDate)} />
           <Row n="7" label="Страна рождения" value={NOT_IN_MODEL} />
           <Row n="8" label="Номер и раздел племенной книги" value={NOT_IN_MODEL} />
-          <Row n="9" label="Бирка / чип" value={animal.altIds?.earTag || animal.altIds?.chipNumber || '—'} />
+          <Row n="9" label="Бирка / чип" value={view.tag} />
         </Block>
 
         {/* ---------------------------- Владелец ----------------------------- */}
         <Block title="Владелец и селекционер">
-          <Row n="10" label="Владелец" value={[owner, ownerAddress].filter(Boolean).join(', ')} />
+          <Row
+            n="10"
+            label="Владелец"
+            value={[view.owner, view.ownerAddress].filter(Boolean).join(', ')}
+          />
           <Row n="11" label="Селекционер" value={NOT_IN_MODEL} />
         </Block>
 
@@ -231,41 +310,27 @@ export default async function CertificatePage({ params }: { params: Promise<Para
           <div className="mt-4">
             <Row
               label="Коэффициент инбридинга (по Райту)"
-              value={coi === null || coi === undefined ? '—' : `${coi.toLocaleString('ru-RU')} %`}
+              value={view.coi === null ? '—' : `${view.coi.toLocaleString('ru-RU')} %`}
             />
-            <Row label="Линия" value={relName(animal.line)} />
+            <Row label="Линия" value={view.line} />
           </div>
         </Block>
 
         {/* ------------------------ Достоверность и генетика ----------------- */}
         <Block title="Тест на достоверность происхождения">
-          {(animal.dnaTests ?? []).length === 0 && <Row label="Данные" value="—" />}
-          {(animal.dnaTests ?? []).map((t, i) => (
-            <Row
-              key={t.id ?? i}
-              label={`${t.type ?? 'ДНК-тест'} · ${dateRu(t.date)}`}
-              value={`${t.result ?? '—'}${t.laboratory ? ` · ${relName(t.laboratory)}` : ''}`}
-            />
+          {view.dnaTests.length === 0 && <Row label="Данные" value="—" />}
+          {view.dnaTests.map((t, i) => (
+            <Row key={i} label={t.label} value={t.value} />
           ))}
-          <Row
-            label="Генетические маркеры"
-            value={[
-              animal.genetics?.cvm ? `CVM: ${animal.genetics.cvm}` : null,
-              animal.genetics?.blad ? `BLAD: ${animal.genetics.blad}` : null,
-              animal.genetics?.dumps ? `DUMPS: ${animal.genetics.dumps}` : null,
-              animal.genetics?.kappaCasein ? `κ-казеин: ${animal.genetics.kappaCasein}` : null,
-            ]
-              .filter(Boolean)
-              .join(' · ') || '—'}
-          />
+          <Row label="Генетические маркеры" value={view.markers} />
         </Block>
 
         {/* ------------------------------ Оценка ----------------------------- */}
         <Block title="Племенная ценность">
-          <Row label="ИПЦ" value={signed(animal.ipc)} />
-          <Row label="Дата генетической оценки" value={dateRu(animal.evaluationDate)} />
-          <Row label="Достоверность оценки, R %" value={nf(animal.ipcDetails?.r, 1)} />
-          <Row label="Процентиль" value={nf(animal.ipcDetails?.percentile, 0)} />
+          <Row label="ИПЦ" value={signed(view.ipc)} />
+          <Row label="Дата генетической оценки" value={dateRu(view.evaluationDate)} />
+          <Row label="Достоверность оценки, R %" value={nf(view.reliability, 1)} />
+          <Row label="Процентиль" value={nf(view.percentile, 0)} />
         </Block>
 
         {/* ------------------------ Продуктивность (для №3) ------------------ */}
@@ -285,21 +350,21 @@ export default async function CertificatePage({ params }: { params: Promise<Para
                 </tr>
               </thead>
               <tbody>
-                {lactations.length === 0 && (
+                {view.lactations.length === 0 && (
                   <tr>
                     <td colSpan={8} className="py-3 text-ink-500">
                       Данных о лактациях нет
                     </td>
                   </tr>
                 )}
-                {lactations.map((l, i) => (
-                  <tr key={l.id ?? i} className="border-b border-ink-100">
+                {view.lactations.map((l, i) => (
+                  <tr key={i} className="border-b border-ink-100">
                     <td className="py-1.5 tabular-nums">{l.number ?? i + 1}</td>
                     <td>{dateRu(l.calvingDate)}</td>
                     <td className="text-right tabular-nums">{l.dd ?? '—'}</td>
-                    <td className="text-right tabular-nums">{nf(l.milk305 ?? l.milkYield, 0)}</td>
-                    <td className="text-right tabular-nums">{nf(l.fat305, 2)}</td>
-                    <td className="text-right tabular-nums">{nf(l.protein305, 2)}</td>
+                    <td className="text-right tabular-nums">{nf(l.milk, 0)}</td>
+                    <td className="text-right tabular-nums">{nf(l.fat, 2)}</td>
+                    <td className="text-right tabular-nums">{nf(l.protein, 2)}</td>
                     <td className="text-right tabular-nums">{nf(l.fatKg, 1)}</td>
                     <td className="text-right tabular-nums">{nf(l.proteinKg, 1)}</td>
                   </tr>
@@ -312,7 +377,10 @@ export default async function CertificatePage({ params }: { params: Promise<Para
         {/* ---------------------------- Верификация -------------------------- */}
         <Block title="Верификация">
           <Row label="Выдано" value="г. Самара" />
-          <Row label="Дата выдачи" value={dateRu(new Date().toISOString())} />
+          <Row
+            label="Дата выдачи"
+            value={issued ? dateRu(issued.issuedAt) : 'документ не выдан'}
+          />
           <Row label="Руководитель" value={NOT_IN_MODEL} />
           <div className="mt-8 flex gap-16 text-[13px] text-ink-500">
             <span className="w-52 border-t border-ink-900 pt-1">подпись</span>
@@ -323,7 +391,9 @@ export default async function CertificatePage({ params }: { params: Promise<Para
         <footer className="mt-10 border-t border-ink-100 pt-4 text-[11px] leading-relaxed text-ink-500">
           Прочерк в поле означает, что показатель ещё не ведётся в системе — перечень таких полей
           и план их появления описаны в документе «Готовность системы к выпуску сертификатов».
-          Документ сформирован автоматически и действителен на дату формирования.
+          {issued
+            ? ' Документ выдан Ассоциацией; данные приведены на дату выдачи и позже не менялись.'
+            : ' Это предпросмотр: он собран из текущих данных и документом не является.'}
         </footer>
       </article>
     </main>

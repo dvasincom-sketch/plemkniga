@@ -5,6 +5,7 @@ import { useActionState, useState } from 'react'
 import { requestVerificationAction, type VerificationState } from '@/actions/verification'
 import { VERIFICATION_LIMIT } from '@/lib/verification-limit'
 import { trustLabel } from '@/lib/dictionaries'
+import { Select } from '@/components/Select'
 
 type Row = {
   id: number
@@ -140,11 +141,18 @@ export function VerificationForm({ rows }: { rows: Row[] }) {
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         <label className="block text-[14px]">
           <span className="mb-1.5 block text-ink-700">Зачем подаёте</span>
-          <select name="purpose" defaultValue="trust" className="field field-on-light">
-            <option value="trust">Повысить достоверность записей</option>
-            <option value="certificate">Подготовить к выпуску свидетельства</option>
-            <option value="membership">Подтвердить племенной статус хозяйства</option>
-          </select>
+          <Select
+            name="purpose"
+            options={[
+              { value: 'trust', label: 'Повысить достоверность записей' },
+              { value: 'certificate', label: 'Подготовить к выпуску свидетельства' },
+              { value: 'membership', label: 'Подтвердить племенной статус хозяйства' },
+            ]}
+            defaultValue="trust"
+            placeholder=""
+            onLight
+            ariaLabel="Цель заявки"
+          />
         </label>
 
         <label className="block text-[14px]">

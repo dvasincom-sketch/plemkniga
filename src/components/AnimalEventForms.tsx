@@ -3,6 +3,8 @@
 import { useActionState, useState } from 'react'
 import { addEventAction, addExteriorAction, type EventFormState } from '@/actions/events'
 import { EXTERIOR_COMPOSITES, EXTERIOR_TRAITS, STATES } from '@/lib/dictionaries'
+import { Select } from '@/components/Select'
+import { DateField } from '@/components/DateField'
 
 type Choice = { value: string; label: string }
 
@@ -109,34 +111,36 @@ function EventForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-[14px]">
           <span className="mb-1.5 block text-ink-700">Что произошло</span>
-          <select
+          <Select
             name="type"
-            value={type}
-            onChange={(e) => setType(e.target.value as typeof type)}
-            className="field field-on-light"
-          >
-            <option value="dryOff">Запуск</option>
-            <option value="move">Перемещение</option>
-            <option value="disposal">Выбытие</option>
-          </select>
+            options={[
+              { value: 'dryOff', label: 'Запуск' },
+              { value: 'move', label: 'Перемещение' },
+              { value: 'disposal', label: 'Выбытие' },
+            ]}
+            defaultValue={type}
+            placeholder=""
+            onLight
+            ariaLabel="Что произошло"
+            onChange={(v) => setType(v as typeof type)}
+          />
         </label>
 
         <label className="block text-[14px]">
           <span className="mb-1.5 block text-ink-700">Дата</span>
-          <input type="date" name="date" required className="field field-on-light" />
+          <DateField name="date" required ariaLabel="Дата события" />
         </label>
 
         {type === 'move' && (
           <label className="block text-[14px]">
             <span className="mb-1.5 block text-ink-700">Новое стадо</span>
-            <select name="herd" defaultValue="" className="field field-on-light">
-              <option value="">— не меняется —</option>
-              {herds.map((h) => (
-                <option key={h.value} value={h.value}>
-                  {h.label}
-                </option>
-              ))}
-            </select>
+            <Select
+              name="herd"
+              options={herds.map((h) => ({ value: h.value, label: h.label }))}
+              placeholder="— не меняется —"
+              onLight
+              ariaLabel="Новое стадо"
+            />
           </label>
         )}
 
@@ -144,25 +148,25 @@ function EventForm({
           <>
             <label className="block text-[14px]">
               <span className="mb-1.5 block text-ink-700">Как выбыло</span>
-              <select name="state" defaultValue="sold" className="field field-on-light">
-                {OUTCOMES.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.full}
-                  </option>
-                ))}
-              </select>
+              <Select
+                name="state"
+                options={OUTCOMES.map((s) => ({ value: s.value, label: s.full }))}
+                defaultValue="sold"
+                placeholder=""
+                onLight
+                ariaLabel="Как выбыло"
+              />
             </label>
 
             <label className="block text-[14px]">
               <span className="mb-1.5 block text-ink-700">Причина</span>
-              <select name="disposalReason" defaultValue="" className="field field-on-light">
-                <option value="">— не указана —</option>
-                {disposalReasons.map((r) => (
-                  <option key={r.value} value={r.value}>
-                    {r.label}
-                  </option>
-                ))}
-              </select>
+              <Select
+                name="disposalReason"
+                options={disposalReasons.map((r) => ({ value: r.value, label: r.label }))}
+                placeholder="— не указана —"
+                onLight
+                ariaLabel="Причина выбытия"
+              />
             </label>
           </>
         )}
@@ -243,19 +247,18 @@ function ExteriorForm({
       <div className="grid gap-4 sm:grid-cols-3">
         <label className="block text-[14px]">
           <span className="mb-1.5 block text-ink-700">Дата оценки</span>
-          <input type="date" name="assessedAt" required className="field field-on-light" />
+          <DateField name="assessedAt" required ariaLabel="Дата оценки" />
         </label>
 
         <label className="block text-[14px]">
           <span className="mb-1.5 block text-ink-700">Бонитёр</span>
-          <select name="assessor" defaultValue="" className="field field-on-light">
-            <option value="">— не указан —</option>
-            {technicians.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
+          <Select
+            name="assessor"
+            options={technicians.map((t) => ({ value: t.value, label: t.label }))}
+            placeholder="— не указан —"
+            onLight
+            ariaLabel="Бонитёр"
+          />
         </label>
 
         <label className="block text-[14px]">

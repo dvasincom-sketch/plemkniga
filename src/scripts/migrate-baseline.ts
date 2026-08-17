@@ -204,6 +204,11 @@ const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
     probe: { kind: 'index', name: 'documents_number_idx' },
     note: 'уникальный номер выданного документа',
   },
+  {
+    name: '20260817_190000_document_snapshot',
+    probe: { kind: 'column', table: 'documents', column: 'snapshot' },
+    note: 'снимок данных на момент выпуска документа',
+  },
 ]
 
 const { driverUri, uri, source, sslConfig } = resolveDatabase()
