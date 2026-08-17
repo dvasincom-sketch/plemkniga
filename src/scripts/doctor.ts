@@ -145,32 +145,112 @@ async function main() {
       '     на диске должно быть свободно не меньше размера крупнейшей.',
   })
 
-  /* -------------------------- 5. Раздутые таблицы ------------------------- */
+  /* ------------------------- 5. Долгие транзакции -------------------------- */
 
-  const bloat = await pool.query<{ relname: string; live: string; dead: string }>(`
-    select relname, n_live_tup::text as live, n_dead_tup::text as dead
+  /*
+   * Проверяется раньше раздутых таблиц не по важности, а по порядку действий:
+   * пока живёт старая транзакция, VACUUM почти ничего не уберёт. Она держит
+   * снимок, а строка, которая может понадобиться хоть кому-то из открытых
+   * снимков, мёртвой не считается. Убирать сначала мусор, потом транзакцию —
+   * значит проделать работу дважды.
+   *
+   * Активная транзакция и забытая — разные вещи, поэтому печатается состояние
+   * и начало запроса: `active` обычно означает, что скрипт всё ещё работает
+   * и его надо дождаться; `idle in transaction` — что кто-то открыл
+   * транзакцию и ушёл, и вот её снимать не жалко.
+   */
+  const stuck = await pool.query<{
+    pid: string
+    minutes: string
+    state: string
+    app: string | null
+    query: string | null
+  }>(`
+    select pid::text,
+           round(extract(epoch from now() - xact_start) / 60)::text as minutes,
+           state,
+           nullif(application_name, '') as app,
+           left(regexp_replace(query, '\\s+', ' ', 'g'), 90) as query
+      from pg_stat_activity
+     where datname = current_database() and xact_start is not null
+       and pid <> pg_backend_pid()
+       and now() - xact_start > interval '10 minutes'
+     order by xact_start limit 5
+  `)
+
+  if (stuck.rows.length) {
+    const idle = stuck.rows.filter((r) => r.state?.startsWith('idle')).length
+    add({
+      ok: false,
+      title: `Долгие транзакции: ${stuck.rows.length}`,
+      detail: stuck.rows
+        .map(
+          (r) =>
+            `pid ${r.pid}, ${r.minutes} мин, ${r.state}${r.app ? `, ${r.app}` : ''}\n` +
+            `       ${r.query ?? '—'}`,
+        )
+        .join('\n     '),
+      fix:
+        (idle
+          ? 'Состояние idle in transaction означает забытую транзакцию: работа\n' +
+            '     не идёт, а снимок держится. Такую можно снимать.\n     '
+          : 'Состояние active означает, что запрос всё ещё выполняется, —\n' +
+            '     посмотрите на текст выше и дождитесь, если это ваш скрипт.\n     ') +
+        'Пока транзакция жива, VACUUM не уберёт мёртвые строки: они могут\n' +
+        '     понадобиться её снимку. Снять принудительно, разобравшись, чья она:\n' +
+        '     psql … -c "select pg_terminate_backend(PID)"',
+    })
+  } else {
+    add({ ok: true, title: 'Долгих транзакций нет' })
+  }
+
+  /* -------------------------- 6. Раздутые таблицы ------------------------- */
+
+  const bloat = await pool.query<{ relname: string; live: string; dead: string; size: string }>(`
+    select relname, n_live_tup::text as live, n_dead_tup::text as dead,
+           pg_size_pretty(pg_total_relation_size(relid)) as size
       from pg_stat_user_tables
      where schemaname = 'public' and n_dead_tup > 100000 and n_dead_tup > n_live_tup / 2
      order by n_dead_tup desc limit 5
   `)
 
   if (bloat.rows.length) {
+    /*
+     * Полностью опустевшая таблица — отдельный случай. VACUUM вернёт её
+     * страницы под будущие вставки в неё же, но файл на диске не уменьшит:
+     * место останется занятым до следующего наполнения. Если наполнять
+     * нечем, короче и честнее TRUNCATE — он отдаёт файл системе сразу.
+     */
+    const emptied = bloat.rows.filter((r) => Number(r.live) === 0)
     add({
       ok: false,
       title: `Раздуты мёртвыми строками: ${bloat.rows.map((r) => r.relname).join(', ')}`,
       detail: bloat.rows
-        .map((r) => `${r.relname}: живых ${ru(Number(r.live))}, мёртвых ${ru(Number(r.dead))}`)
+        .map(
+          (r) =>
+            `${r.relname}: живых ${ru(Number(r.live))}, мёртвых ${ru(Number(r.dead))}, на диске ${r.size}`,
+        )
         .join('\n     '),
       fix:
+        (stuck.rows.length
+          ? 'Сначала разберитесь с долгими транзакциями выше — пока они живы,\n' +
+            '     уборка почти ничего не даст.\n     '
+          : '') +
         'psql … -c "vacuum analyze ИМЯ_ТАБЛИЦЫ" — вернёт место под повторное\n' +
-        '     использование. Чтобы сжать файл на диске, нужен VACUUM FULL,\n' +
-        '     он блокирует таблицу и требует запаса места.',
+        '     использование этой же таблицей; файл на диске не уменьшится.\n' +
+        '     Сжать файл: VACUUM FULL — он блокирует таблицу и требует запаса\n' +
+        '     места размером с неё.' +
+        (emptied.length
+          ? `\n     Пусты целиком: ${emptied.map((r) => r.relname).join(', ')}.\n` +
+            '     Если данные не вернутся, короче truncate — он отдаёт файл\n' +
+            '     системе сразу, не требуя ни блокировки, ни запаса места.'
+          : ''),
     })
   } else {
     add({ ok: true, title: 'Раздутых таблиц нет' })
   }
 
-  /* --------------------- 6. Ограничения против данных --------------------- */
+  /* --------------------- 7. Ограничения против данных --------------------- */
 
   const violating = await pool.query<{ conname: string; relname: string }>(`
     select conname, conrelid::regclass::text as relname
@@ -187,30 +267,6 @@ async function main() {
     })
   } else {
     add({ ok: true, title: 'Ограничения целостности в порядке' })
-  }
-
-  /* ------------------------- 7. Долгие транзакции ------------------------- */
-
-  const stuck = await pool.query<{ pid: string; minutes: string; state: string }>(`
-    select pid::text, round(extract(epoch from now() - xact_start) / 60)::text as minutes, state
-      from pg_stat_activity
-     where datname = current_database() and xact_start is not null
-       and now() - xact_start > interval '10 minutes'
-     order by xact_start limit 5
-  `)
-
-  if (stuck.rows.length) {
-    add({
-      ok: false,
-      title: `Долгие транзакции: ${stuck.rows.length}`,
-      detail: stuck.rows.map((r) => `pid ${r.pid}, ${r.minutes} мин, ${r.state}`).join('\n     '),
-      fix:
-        'Они держат снимок и не дают убирать мёртвые строки, а забытая\n' +
-        '     блокировка останавливает миграции. Разберитесь, чей это процесс,\n' +
-        '     прежде чем снимать: pg_terminate_backend(pid).',
-    })
-  } else {
-    add({ ok: true, title: 'Долгих транзакций нет' })
   }
 
   await pool.end()
