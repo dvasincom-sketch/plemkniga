@@ -89,6 +89,17 @@ export async function setHerdVisibilityAction(
   const details = formData.get('publicDetails') === 'on'
 
   const payload = await getClient()
+
+  /*
+   * Показ в общей книге — то, за что ручается Ассоциация, поэтому он
+   * доступен её членам. Скрыть свои записи можно всегда: запрет должен
+   * мешать выставлять данные, а не убирать их.
+   */
+  if (visible) {
+    const { membershipGate } = await import('@/lib/membership')
+    const gate = await membershipGate(payload, orgId)
+    if (!gate.allowed) return { error: gate.reason }
+  }
   const res = await payload.update({
     collection: 'animals',
     where: { owner: { equals: orgId } },

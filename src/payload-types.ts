@@ -253,7 +253,16 @@ export interface Organization {
   phone?: string | null;
   email?: string | null;
   address?: string | null;
-  membership?: ('none' | 'pending' | 'member') | null;
+  membership?: ('none' | 'pending' | 'member' | 'suspended') | null;
+  /**
+   * Заполняется кабинетом Ассоциации
+   */
+  membershipReview?: {
+    decidedBy?: (number | null) | User;
+    decidedAt?: string | null;
+    since?: string | null;
+    comment?: string | null;
+  };
   updatedAt: string;
   createdAt: string;
 }
@@ -1674,6 +1683,14 @@ export interface OrganizationsSelect<T extends boolean = true> {
   email?: T;
   address?: T;
   membership?: T;
+  membershipReview?:
+    | T
+    | {
+        decidedBy?: T;
+        decidedAt?: T;
+        since?: T;
+        comment?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
 }

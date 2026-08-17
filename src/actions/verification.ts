@@ -53,6 +53,15 @@ export async function requestVerificationAction(
   const payload = await getClient()
 
   /*
+   * Верификация — услуга Ассоциации своим членам: она ставит свою подпись
+   * под чужими данными. Хозяйству, которое ещё не приняли, подписывать
+   * нечего — но вести и выгружать свои записи оно может как прежде.
+   */
+  const { membershipGate } = await import('@/lib/membership')
+  const gate = await membershipGate(payload, orgId)
+  if (!gate.allowed) return { error: gate.reason }
+
+  /*
    * Подать можно только своих. Проверяется на сервере, а не только формой:
    * список приходит из браузера, и полагаться на то, что в нём окажутся
    * ровно те записи, которые мы показали, нельзя.

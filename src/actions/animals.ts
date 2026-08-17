@@ -162,6 +162,16 @@ export async function updateAnimalAction(
   delete data.trustLevel
   delete data.trustCheckedAt
 
+  /*
+   * Выставить одну карточку в общую книгу — то же самое, что выставить
+   * стадо, только по одной. Проверка та же; снять показ можно всегда.
+   */
+  if (data.publicVisible === true || data.publicDetails === true) {
+    const { membershipGate } = await import('@/lib/membership')
+    const gate = await membershipGate(payload, relId(animal.owner))
+    if (!gate.allowed) return { error: gate.reason }
+  }
+
   if (!Object.keys(data).length) return { message: 'Изменений нет' }
 
   try {

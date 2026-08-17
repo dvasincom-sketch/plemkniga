@@ -95,14 +95,55 @@ export const Organizations: CollectionConfig = {
     },
     { name: 'address', type: 'textarea', label: 'Адрес' },
     {
+      /*
+       * Членство — не справочная отметка, а состояние отношений
+       * с Ассоциацией, у которого есть последствия. Подтверждённое
+       * хозяйство может показывать животных в общей книге и подавать
+       * заявки на верификацию; неподтверждённое ведёт свои данные как
+       * прежде, но Ассоциация за них не ручается.
+       *
+       * Разбор — docs/kabinet-associacii.md, раздел 4.3.
+       */
       name: 'membership',
       type: 'select',
       label: 'Членство в Ассоциации',
       defaultValue: 'none',
+      index: true,
       options: [
         { value: 'none', label: 'Не является членом' },
         { value: 'pending', label: 'Заявка на рассмотрении' },
         { value: 'member', label: 'Действующий член' },
+        { value: 'suspended', label: 'Членство приостановлено' },
+      ],
+      access: {
+        /*
+         * Менять членство себе нельзя. Поле лежит в записи организации,
+         * а её правит само хозяйство — без этого ограничения подтверждение
+         * Ассоциации ставилось бы одним запросом из браузера.
+         */
+        update: () => false,
+      },
+    },
+    {
+      name: 'membershipReview',
+      type: 'group',
+      label: 'Решение по членству',
+      admin: { description: 'Заполняется кабинетом Ассоциации' },
+      fields: [
+        {
+          type: 'row',
+          fields: [
+            {
+              name: 'decidedBy',
+              type: 'relationship',
+              relationTo: 'users',
+              label: 'Кто решил',
+            },
+            { name: 'decidedAt', type: 'date', label: 'Когда' },
+            { name: 'since', type: 'date', label: 'Член с' },
+          ],
+        },
+        { name: 'comment', type: 'textarea', label: 'Основание или причина отказа' },
       ],
     },
   ],
