@@ -4,6 +4,8 @@ import { redirect } from 'next/navigation'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { AccountNav } from '@/components/AccountNav'
+import { AssociationNav } from '@/components/AssociationNav'
+import { isAssociationUser } from '@/lib/association'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { AccessDecision } from '@/components/AccessDecision'
 import { MarkNotificationsSeen } from '@/components/MarkNotificationsSeen'
@@ -51,6 +53,7 @@ export default async function NotificationsPage({
   searchParams: Promise<{ filter?: string }>
 }) {
   const user = await getCurrentUser()
+  const association = isAssociationUser(user)
   if (!user) redirect('/login?next=/account/notifications')
 
   const { filter: filterParam } = await searchParams
@@ -72,10 +75,20 @@ export default async function NotificationsPage({
       <SiteHeader active="/account/notifications" />
 
       <main className="container-page pb-8">
-        <AccountNav />
+        {/*
+           Уведомления — личная страница, она открыта обеим сторонам.
+           А меню над ней у каждой своё: сотруднику Ассоциации показывать
+           «Мои животные» незачем, у него нет своего стада. То же исправление,
+           что и на странице профиля.
+        */}
+        {association ? <AssociationNav /> : <AccountNav />}
 
         <Breadcrumbs
-          items={[{ label: 'Личный кабинет', href: '/account' }, { label: 'Уведомления' }]}
+          items={
+            association
+              ? [{ label: 'Кабинет Ассоциации', href: '/association' }, { label: 'Уведомления' }]
+              : [{ label: 'Личный кабинет', href: '/account' }, { label: 'Уведомления' }]
+          }
         />
 
         <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3">

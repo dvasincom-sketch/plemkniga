@@ -6,6 +6,7 @@ import { StaleSchemaNotice } from '@/components/StaleSchemaNotice'
 import { getClient } from '@/lib/payload'
 import { isStaleSchemaError, requireAssociation } from '@/lib/association'
 import { bookQuality, type BookQuality } from '@/lib/book-quality'
+import Link from 'next/link'
 
 export const metadata: Metadata = { title: 'Качество книги' }
 export const dynamic = 'force-dynamic'
@@ -24,6 +25,13 @@ export const dynamic = 'force-dynamic'
  */
 
 const ru = (v: number) => v.toLocaleString('ru-RU')
+
+/** Куда ведёт каждая очередь: подписи задаются в `book-quality.ts`. */
+const QUEUE_HREF: Record<string, string> = {
+  'Пакеты, ждущие проверки': '/association',
+  'Заявки на верификацию': '/association/verifications',
+  'Заявки на членство': '/association/farms?tab=waiting',
+}
 
 function Bar({ value, total, tone }: { value: number; total: number; tone: string }) {
   const pct = total ? Math.max(1, Math.round((value / total) * 100)) : 0
@@ -67,6 +75,21 @@ export default async function QualityPage() {
             животных, которых нельзя ни оценить, ни подтвердить, пока дату не дошлют.
           </p>
 
+          <p className="mt-2 max-w-[80ch] text-[14px] leading-relaxed text-ink-500">
+            Считается по всем хозяйствам книги, а не по какому-то одному: у сотрудника
+            Ассоциации своего стада нет, и раздел показывает ему всю базу — включая записи,
+            закрытые для посторонних.
+          </p>
+
+          {data?.missing.length ? (
+            <p className="mt-5 rounded-xl bg-[#f6f6f6] px-5 py-4 text-[14px] leading-relaxed text-ink-700">
+              Часть сводки посчитать не удалось: запрос не уложился в отведённое время либо
+              обратился к таблице, которой ещё нет в этой базе. Показано остальное — числа ниже
+              верны, но неполны. Если раздел новый, примените миграции:{' '}
+              <code className="rounded bg-canvas px-1.5 py-0.5">npm run payload migrate</code>.
+            </p>
+          ) : null}
+
           {stale ? (
             <div className="mt-8">
               <StaleSchemaNotice what="сводки по книге" />
@@ -83,20 +106,38 @@ export default async function QualityPage() {
               {/* --------------------------- Очереди --------------------------- */}
               <div className="card">
                 <h2 className="panel-heading">Что ждёт Ассоциацию</h2>
-                <div className="grid gap-6 sm:grid-cols-3">
-                  {data.queues.map((q) => (
-                    <div key={q.label}>
-                      <p className="text-[13px] text-ink-500">{q.label}</p>
-                      <p className="mt-1 text-[28px] font-medium leading-none tabular-nums">
-                        {ru(q.count)}
-                      </p>
-                      {q.late > 0 && (
-                        <p className="mt-1 text-[13px] text-amber-700">
-                          дольше недели: {ru(q.late)}
+
+                {/*
+                   Каждая цифра — ссылка в свою очередь. Панель, которая
+                   сообщает «пакетов семь» и не даёт их открыть, заставляет
+                   человека возвращаться в меню и искать раздел руками:
+                   она показывает работу, но не подводит к ней.
+                */}
+                <div className="grid gap-4 sm:grid-cols-3">
+                  {data.queues.map((q) => {
+                    const href = QUEUE_HREF[q.label] ?? '/association'
+                    return (
+                      <Link
+                        key={q.label}
+                        href={href}
+                        className="block rounded-xl bg-[#f6f6f6] px-5 py-4 transition-colors hover:bg-ink-100"
+                      >
+                        <p className="text-[13px] text-ink-500">{q.label}</p>
+                        <p className="mt-1 text-[28px] font-medium leading-none tabular-nums">
+                          {ru(q.count)}
                         </p>
-                      )}
-                    </div>
-                  ))}
+                        <p className="mt-1 text-[13px]">
+                          {q.late > 0 ? (
+                            <span className="text-amber-700">дольше недели: {ru(q.late)}</span>
+                          ) : (
+                            <span className="text-ink-500">
+                              {q.count > 0 ? 'открыть очередь' : 'очередь пуста'}
+                            </span>
+                          )}
+                        </p>
+                      </Link>
+                    )
+                  })}
                 </div>
               </div>
 
@@ -168,7 +209,18 @@ export default async function QualityPage() {
                               >
                                 {i.severity === 'fix' ? 'существенно' : 'неполнота'}
                               </span>
-                              {i.label}
+                              {/*
+                                 Число без возможности посмотреть, кто за ним
+                                 стоит, — не находка, а повод для беспокойства.
+                                 Отсюда открывается список записей, а от него
+                                 карточка.
+                              */}
+                              <Link
+                                href={`/association/quality/${i.key}`}
+                                className="underline underline-offset-4 hover:text-forest-500"
+                              >
+                                {i.label}
+                              </Link>
                             </td>
                             <td className="text-right tabular-nums">{ru(i.count)}</td>
                             <td className="text-right tabular-nums text-ink-500">

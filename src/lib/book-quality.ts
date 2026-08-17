@@ -30,6 +30,8 @@ export type QualityRow = {
 
 export type BookQuality = {
   animals: number
+  /** Части сводки, которые не удалось посчитать */
+  missing: ('issues' | 'trust' | 'queues')[]
   trust: { level: number; label: string; count: number }[]
   issues: QualityRow[]
   queues: { label: string; count: number; late: number }[]
@@ -37,10 +39,57 @@ export type BookQuality = {
 
 type SqlPool = {
   query: (q: string, p?: unknown[]) => Promise<{ rows?: Record<string, unknown>[] }>
+  connect?: () => Promise<{
+    query: (q: string, p?: unknown[]) => Promise<{ rows?: Record<string, unknown>[] }>
+    release: () => void
+  }>
 }
 
 const poolOf = (payload: Payload): SqlPool | null =>
   (payload.db as unknown as { pool?: SqlPool }).pool ?? null
+
+/**
+ * Потолок времени на запрос.
+ *
+ * Сводка — не то, ради чего стоит держать страницу открытой минуту.
+ * Если запрос не уложился, честнее показать остальное и сказать, что этой
+ * части нет, чем заставлять человека смотреть на пустой экран и гадать,
+ * загрузилось или повисло.
+ */
+const TIMEOUT_MS = 15_000
+
+/**
+ * Запрос с потолком по времени и без падения всей страницы.
+ *
+ * Каждый из трёх запросов сводки самостоятелен, и неудача одного не должна
+ * отменять два других. Отдельная причина беречься: таблица `verification_requests`
+ * молодая, и на базе, где миграции ещё не применены, её просто нет —
+ * страница из-за этого падать не должна.
+ */
+async function safeQuery(
+  pool: SqlPool,
+  sql: string,
+): Promise<Record<string, unknown>[] | null> {
+  if (!pool.connect) {
+    return await pool
+      .query(sql)
+      .then((r) => r.rows ?? [])
+      .catch(() => null)
+  }
+
+  const client = await pool.connect()
+  try {
+    await client.query('begin')
+    await client.query(`set local statement_timeout = ${TIMEOUT_MS}`)
+    const res = await client.query(sql)
+    return res.rows ?? []
+  } catch {
+    return null
+  } finally {
+    await client.query('rollback').catch(() => {})
+    client.release()
+  }
+}
 
 const TRUST_LABEL: Record<number, string> = {
   [-1]: 'Отклонено',
@@ -62,7 +111,9 @@ export async function bookQuality(payload: Payload): Promise<BookQuality | null>
    * каждая отдельная проверка; собранные вместе, они читают таблицу один раз.
    */
   const [issues, trust, queues] = await Promise.all([
-    pool.query(`
+    safeQuery(
+      pool,
+      `
       select
         count(*)                                                       as animals,
         count(*) filter (where a.birth_date is null)                   as no_birth_date,
@@ -100,15 +151,21 @@ export async function bookQuality(payload: Payload): Promise<BookQuality | null>
       left join animals f on f.id = a.father_id
       left join animals m on m.id = a.mother_id
       where a.archived is not true
-    `),
-    pool.query(`
+    `,
+    ),
+    safeQuery(
+      pool,
+      `
       select coalesce(trust_level, 0)::int as level, count(*) as total
         from animals
        where archived is not true
        group by 1
        order by 1
-    `),
-    pool.query(`
+    `,
+    ),
+    safeQuery(
+      pool,
+      `
       select 'submissions' as kind,
              count(*)                                                        as total,
              count(*) filter (where submitted_at < now() - interval '7 days') as late
@@ -126,10 +183,11 @@ export async function bookQuality(payload: Payload): Promise<BookQuality | null>
              0
         from organizations
        where membership = 'pending'
-    `),
+    `,
+    ),
   ])
 
-  const r = issues.rows?.[0] ?? {}
+  const r = issues?.[0] ?? {}
 
   const row = (
     key: string,
@@ -178,13 +236,19 @@ export async function bookQuality(payload: Payload): Promise<BookQuality | null>
 
   return {
     animals: n(r.animals),
-    trust: (trust.rows ?? []).map((t) => ({
+    /** Какие части сводки не сошлись — о них честно сказано на странице */
+    missing: [
+      issues === null ? ('issues' as const) : null,
+      trust === null ? ('trust' as const) : null,
+      queues === null ? ('queues' as const) : null,
+    ].filter((x): x is 'issues' | 'trust' | 'queues' => x !== null),
+    trust: (trust ?? []).map((t) => ({
       level: n(t.level),
       label: TRUST_LABEL[n(t.level)] ?? String(t.level),
       count: n(t.total),
     })),
     issues: rows,
-    queues: (queues.rows ?? []).map((q) => ({
+    queues: (queues ?? []).map((q) => ({
       label: QUEUE_LABEL[String(q.kind)] ?? String(q.kind),
       count: n(q.total),
       late: n(q.late),
