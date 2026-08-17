@@ -39,6 +39,45 @@ const findings: Finding[] = []
 const idOf = (v: unknown): number | null =>
   typeof v === 'number' ? v : typeof v === 'object' && v && 'id' in v ? (v as { id: number }).id : null
 
+/**
+ * Сообщение вместе со всеми вложенными причинами.
+ *
+ * Drizzle заворачивает ошибку драйвера в свою: наверху остаётся
+ * «Failed query: insert into …» со списком параметров, а настоящая причина —
+ * например, нарушение внешнего ключа — лежит в `cause`. Без разворачивания
+ * ревизия показывает симптом вместо причины, и разбираться приходится
+ * по номерам параметров. Тот же приём, что в `/healthz`.
+ */
+function describeError(e: unknown): string {
+  const parts: string[] = []
+  let current: unknown = e
+  const seen = new Set<unknown>()
+
+  while (current && typeof current === 'object' && !seen.has(current)) {
+    seen.add(current)
+    const err = current as {
+      message?: string
+      code?: string
+      detail?: string
+      constraint?: string
+      cause?: unknown
+    }
+    const own = [
+      err.message?.trim(),
+      err.code ? `код ${err.code}` : null,
+      err.constraint ? `ограничение ${err.constraint}` : null,
+      err.detail?.trim(),
+    ]
+      .filter(Boolean)
+      .join(' · ')
+
+    if (own && !parts.includes(own)) parts.push(own)
+    current = err.cause
+  }
+
+  return parts.join('\n  ← ') || String(e)
+}
+
 const ok = (line: string) => console.log(`  ✓  ${line}`)
 const bad = (step: string, detail: string) => {
   findings.push({ step, detail })
@@ -77,16 +116,51 @@ async function main() {
     return
   }
 
-  // Чужое закрытое животное: другой владелец, в книге не показано
-  const foreign = await payload.find({
+  /*
+   * Чужое закрытое животное — и по возможности живое, а не служебный предок.
+   *
+   * Первый запуск выбрал запись с номером `ANC-…`: такие заводятся ради
+   * построения родословных, в стаде никогда не стояли и висящих на них
+   * записей не имеют вовсе. Проверка на них проходит с «проверять нечего»
+   * почти на каждом шаге и ничего не доказывает. Поэтому архив исключён,
+   * а среди оставшихся ищется запись, у которой есть хотя бы дойка или отёл.
+   */
+  const candidates = await payload.find({
     collection: 'animals',
-    where: { and: [{ owner: { not_equals: myOrg } }, { publicVisible: { not_equals: true } }] },
-    limit: 1,
+    where: {
+      and: [
+        { owner: { not_equals: myOrg } },
+        { publicVisible: { not_equals: true } },
+        { or: [{ archived: { equals: false } }, { archived: { exists: false } }] },
+      ],
+    },
+    limit: 25,
     depth: 0,
     overrideAccess: true,
   })
 
-  const victim = foreign.docs[0]
+  const hasRows = async (id: number | string): Promise<boolean> => {
+    for (const collection of ['milk-tests', 'calvings', 'animal-evaluations'] as const) {
+      const res = await payload.find({
+        collection,
+        where: { animal: { equals: id } },
+        limit: 1,
+        depth: 0,
+        overrideAccess: true,
+      })
+      if (res.docs.length) return true
+    }
+    return false
+  }
+
+  let victim = candidates.docs[0]
+  for (const candidate of candidates.docs) {
+    if (await hasRows(candidate.id)) {
+      victim = candidate
+      break
+    }
+  }
+
   if (!victim) {
     console.log('\nЧужих закрытых записей в базе нет — проверять нечего.\n')
     return
@@ -97,9 +171,33 @@ async function main() {
     return
   }
 
-  console.log(`\nСмотрит: ${viewer.email} (организация ${myOrg})`)
-  console.log(`Чужая закрытая запись: № ${victim.identNumber} (владелец ${ownerOrg})`)
-  console.log(`Области: ${ACCESS_SCOPES.map((s) => s.value).join(', ')}\n`)
+  /*
+   * Грант выдаёт настоящий сотрудник хозяйства-владельца, а не выдуманный
+   * пользователь.
+   *
+   * В первой версии здесь стоял `{ id: 0, role: 'admin' }` — и вставка
+   * упала нарушением внешнего ключа: пользователя с нулевым идентификатором
+   * в базе нет. Настоящий сотрудник лучше не только этим: грант проходит
+   * ровно тот путь, которым его выдаёт живой человек, вместе с проверкой
+   * «открыть можно только свои данные» в хуке коллекции.
+   */
+  const issuers = await payload.find({
+    collection: 'users',
+    where: { organization: { equals: ownerOrg } },
+    limit: 1,
+    depth: 0,
+    overrideAccess: true,
+  })
+  const issuer = issuers.docs[0] as User | undefined
+  if (!issuer) {
+    console.log(`\nУ хозяйства ${ownerOrg} нет ни одного пользователя — выдавать грант некому.\n`)
+    return
+  }
+
+  console.log(`\nСмотрит:  ${viewer.email} (организация ${myOrg})`)
+  console.log(`Выдаёт:   ${issuer.email} (организация ${ownerOrg})`)
+  console.log(`Запись:   № ${victim.identNumber}, закрыта, владелец ${ownerOrg}`)
+  console.log(`Области:  ${ACCESS_SCOPES.map((s) => s.value).join(', ')}\n`)
 
   /** Пробуем прочитать документ по идентификатору от лица посетителя. */
   const readable = async (collection: string, id: number | string): Promise<boolean> => {
@@ -154,8 +252,8 @@ async function main() {
       note: 'Ревизия npm run audit:grants',
     },
     overrideAccess: true,
-    // Владельца подставит хук по животному; выдающим считаем администратора
-    user: { id: 0, role: 'admin' } as never,
+    // Владельца подставит хук по животному; выдаёт сотрудник этого хозяйства
+    user: issuer,
   })
   forgetGrants(myOrg)
 
@@ -279,7 +377,7 @@ async function main() {
       note: 'Ревизия npm run audit:grants — на стадо',
     },
     overrideAccess: true,
-    user: { id: 0, role: 'admin', organization: ownerOrg } as never,
+    user: issuer,
   })
   forgetGrants(myOrg)
 
@@ -318,6 +416,6 @@ async function main() {
 main()
   .then(() => process.exit(process.exitCode ?? 0))
   .catch((e) => {
-    console.error('\nОшибка:', e instanceof Error ? e.message : e)
+    console.error('\nОшибка:\n  ' + describeError(e) + '\n')
     process.exit(1)
   })

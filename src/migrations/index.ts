@@ -22,6 +22,7 @@ import * as migration_20260817_060327_expert_role_and_findings from './20260817_
 import * as migration_20260817_074414_verification_requests from './20260817_074414_verification_requests';
 import * as migration_20260817_090409_membership_review from './20260817_090409_membership_review';
 import * as migration_20260817_091349_document_issuance from './20260817_091349_document_issuance';
+import * as migration_20260817_133000_access_grants from './20260817_133000_access_grants';
 
 export const migrations = [
   {
@@ -143,5 +144,10 @@ export const migrations = [
     up: migration_20260817_091349_document_issuance.up,
     down: migration_20260817_091349_document_issuance.down,
     name: '20260817_091349_document_issuance'
+  },
+  {
+    up: migration_20260817_133000_access_grants.up,
+    down: migration_20260817_133000_access_grants.down,
+    name: '20260817_133000_access_grants',
   },
 ];
