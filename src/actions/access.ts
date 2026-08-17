@@ -4,11 +4,16 @@ import { revalidatePath } from 'next/cache'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { relId } from '@/lib/visibility'
 import { ACCESS_REQUEST_PURPOSES } from '@/collections/AccessRequests'
+import { ACCESS_SCOPES, type AccessScope } from '@/lib/dictionaries'
+import { forgetGrants } from '@/lib/grants'
 
 export type AccessFormState = { error?: string; message?: string }
 
 type Purpose = (typeof ACCESS_REQUEST_PURPOSES)[number]['value']
 const PURPOSES = new Set<string>(ACCESS_REQUEST_PURPOSES.map((p) => p.value))
+
+const SCOPE_VALUES = new Set<string>(ACCESS_SCOPES.map((s) => s.value))
+const DAY_MS = 24 * 60 * 60 * 1000
 
 /**
  * Запрос доступа к закрытой карточке.
@@ -48,9 +53,13 @@ export async function requestAccessAction(
     if (open?.status === 'new') {
       return { message: 'Запрос уже отправлен — ждём решения хозяйства' }
     }
-    if (open?.status === 'approved') {
-      return { message: 'Хозяйство уже открыло вам доступ к этой записи' }
-    }
+    /*
+     * Прежде здесь стояла ещё одна остановка: «хозяйство уже открыло вам
+     * доступ к этой записи». Она была верна, пока доступ был один на всех
+     * и открывался целиком. С областями просить второй раз — обычное дело:
+     * дали происхождение, а перед сделкой понадобилась продуктивность.
+     * Отказ в такой просьбе выглядел бы поломкой.
+     */
 
     await payload.create({
       collection: 'access-requests',
@@ -69,13 +78,18 @@ export async function requestAccessAction(
 }
 
 /**
- * Решение владельца по запросу.
+ * Решение владельца по запросу: отказ или выданный грант.
  *
- * Открытие доступа — это не только смена состояния запроса: оно должно
- * что-то менять для заявителя. Пока у системы одна степень свободы —
- * публичность самой записи, поэтому «открыть» снимает замок с животного
- * целиком. Точечный доступ «одному хозяйству» появится вместе с журналом
- * прав; до тех пор честнее показать владельцу, что именно произойдёт.
+ * Раньше одобрение выставляло животному `publicVisible` и `publicDetails` —
+ * то есть открывало карточку целиком, навсегда и всем посетителям книги,
+ * а не тому, кто просил. Другой степени свободы у системы не было.
+ * Теперь есть: решение создаёт запись в `access-grants` с областями,
+ * охватом и сроком, а флаги животного не трогает вовсе.
+ *
+ * Флаги остаются тем, чем были, — решением владельца о том, что видно
+ * **всем**. Грант отвечает на другой вопрос и живёт рядом.
+ *
+ * Разбор — `docs/tochechnyy-dostup.md`.
  */
 export async function decideAccessAction(
   _prev: AccessFormState,
@@ -91,9 +105,38 @@ export async function decideAccessAction(
   }
 
   const response = String(formData.get('response') || '').trim()
+
+  const scopes = formData
+    .getAll('scopes')
+    .map(String)
+    .filter((s) => SCOPE_VALUES.has(s)) as AccessScope[]
+
+  const wholeHerd = String(formData.get('coverage') || '') === 'herd'
+
+  /*
+   * Срок приходит числом дней, а пустая строка означает «бессрочно».
+   *
+   * Заготовки в форме — это заготовки даты, а не отдельные состояния:
+   * в базе лежит одно поле `expiresAt`. «До конца сделки» среди них нет
+   * намеренно — система не может узнать, что сделка закончилась, и такое
+   * состояние делало бы вид, будто обязанность отозвать выполняется сама.
+   */
+  const days = Number(formData.get('term'))
+  const expiresAt =
+    Number.isFinite(days) && days > 0 ? new Date(Date.now() + days * DAY_MS).toISOString() : null
+
+  if (decision === 'approved' && scopes.length === 0) {
+    return { error: 'Отметьте хотя бы одну область — без неё грант ничего не открывает' }
+  }
+
   const payload = await getClient()
 
   try {
+    /*
+     * Смена состояния запроса идёт с правами пользователя: правило
+     * `accessRequestDecide` пускает сюда только владельца животного
+     * (и администратора). Дальше по коду это уже проверено.
+     */
     const updated = await payload.update({
       collection: 'access-requests',
       id,
@@ -105,15 +148,41 @@ export async function decideAccessAction(
 
     if (decision === 'approved') {
       const animalId = relId((updated as { animal?: unknown }).animal)
-      if (animalId) {
-        await payload.update({
-          collection: 'animals',
-          id: animalId,
-          data: { publicVisible: true, publicDetails: true },
-          overrideAccess: true,
-        })
-        revalidatePath(`/animals/${animalId}`)
+      const owner = relId((updated as { owner?: unknown }).owner)
+      const grantee = relId((updated as { requesterOrg?: unknown }).requesterOrg)
+
+      if (!owner || !grantee) {
+        return {
+          error:
+            'Не удалось определить, кому выдать доступ: у заявителя нет организации. Решение сохранено',
+        }
       }
+
+      await payload.create({
+        collection: 'access-grants',
+        data: {
+          owner,
+          grantee,
+          // Пусто — открыто всё стадо владельца
+          animal: wholeHerd ? null : animalId,
+          scopes,
+          expiresAt,
+          request: id,
+        },
+        /*
+         * С `overrideAccess: true`, но с пользователем: правило создания
+         * у Payload ждёт булево и содержимое полей проверить не может,
+         * а хук коллекции сверяет владельца с организацией выдающего
+         * и не пустит открыть чужое. Пользователь передан именно затем,
+         * чтобы хуку было с чем сверять и кого записать в `issuedBy`.
+         */
+        user,
+        overrideAccess: true,
+      })
+
+      // Отзыв и выдача должны действовать сразу, а не через срок кэша
+      forgetGrants(grantee)
+      if (animalId) revalidatePath(`/animals/${animalId}`)
     }
   } catch {
     return { error: 'Не удалось сохранить решение' }
@@ -121,7 +190,10 @@ export async function decideAccessAction(
 
   revalidatePath('/account/notifications')
   return {
-    message: decision === 'approved' ? 'Доступ открыт, заявитель уведомлён' : 'Отказ отправлен',
+    message:
+      decision === 'approved'
+        ? 'Доступ выдан заявителю. Запись осталась закрытой для остальных'
+        : 'Отказ отправлен',
   }
 }
 

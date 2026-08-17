@@ -40,6 +40,16 @@ export type Notification = {
     fromOrg: string
     fromPerson: string
     purpose: string
+    /**
+     * Цель как значение, а не подпись.
+     *
+     * Рядом уже лежит `purpose` — готовая строка для показа. Значение нужно
+     * отдельно: по нему форма выдачи предлагает области доступа
+     * (`SCOPES_BY_PURPOSE`). Разбирать подпись обратно в значение было бы
+     * тем же самым, но хрупко: подпись меняют ради формулировки, и в этот
+     * день предзаполнение молча перестало бы работать.
+     */
+    purposeValue: string
     comment?: string | null
   }
 }
@@ -170,6 +180,7 @@ export async function loadNotifications(
               fromOrg,
               fromPerson: nameOf(raw.requester),
               purpose: label(ACCESS_REQUEST_PURPOSES, raw.purpose),
+              purposeValue: String(raw.purpose ?? 'other'),
               comment: raw.comment,
             }
           : undefined,

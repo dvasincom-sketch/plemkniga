@@ -19,6 +19,10 @@ import { blockValues, type Choice } from '@/lib/animal-edit'
 import { CertificateSection } from '@/components/CertificateSection'
 import { certificateReadiness } from '@/lib/certification'
 import { ClosedAnimal } from '@/components/ClosedAnimal'
+import { AccessRequestForm } from '@/components/AccessRequestForm'
+import { GrantBanner, ScopeLocked } from '@/components/AccessScope'
+import { grantsFor, scopesForAnimal } from '@/lib/grants'
+import type { AccessScope } from '@/lib/dictionaries'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { isAnimalLocked, viewerOf } from '@/lib/visibility'
 import {
@@ -340,7 +344,27 @@ export default async function AnimalPage({
    * закрытую запись. Теперь страница объясняет, кто закрыл данные, и даёт
    * два выхода — запрос владельцу и похожие открытые животные.
    */
-  if (isAnimalLocked(animal, viewer)) {
+  /*
+   * Что открыто этому посетителю точечно.
+   *
+   * Замок теперь снимается не только флажком `publicDetails`: у карточки
+   * появилось третье состояние — открыта частично. Запись при этом отдаётся
+   * (правило `animalRead` пропустило её по гранту), но половина вкладок
+   * закрыта, и закрыты они по-разному от человека к человеку.
+   *
+   * Пустое множество означает «грантов нет» и ничего не меняет: страница
+   * ведёт себя ровно как прежде.
+   */
+  const grants = await grantsFor(payload, userOrgId)
+  const grantedScopes = scopesForAnimal(grants, animal.id as number, ownerId as number | null)
+
+  const lockedByOwner = isAnimalLocked(animal, viewer)
+  /** Раздел показывается: карточка открыта целиком либо область выдана грантом. */
+  const maySee = (scope: AccessScope): boolean => !lockedByOwner || grantedScopes.has(scope)
+  /** Карточка открылась только благодаря гранту, и открылась не вся. */
+  const partial = lockedByOwner && grantedScopes.size > 0
+
+  if (lockedByOwner && grantedScopes.size === 0) {
     const [request, similar] = await Promise.all([
       user
         ? payload
@@ -445,6 +469,36 @@ export default async function AnimalPage({
         })()
       : null
 
+  /*
+   * Подробности гранта — только для показа и только на редком пути.
+   *
+   * Срок и охват в горячий загрузчик не попадают намеренно: он отвечает
+   * на вопрос «что открыто», и лишние поля в нём платились бы на каждой
+   * странице книги. Здесь же путь редкий — так ходят только те, кому
+   * действительно что-то выдали, — и один запрос по индексу дешевле,
+   * чем таскать эти поля везде.
+   */
+  const grantForBanner = partial
+    ? await payload
+        .find({
+          collection: 'access-grants',
+          where: {
+            and: [
+              { grantee: { equals: userOrgId } },
+              { owner: { equals: ownerId } },
+              { revokedAt: { exists: false } },
+              { or: [{ animal: { equals: animal.id } }, { animal: { exists: false } }] },
+            ],
+          },
+          sort: '-createdAt',
+          limit: 1,
+          depth: 0,
+          overrideAccess: true,
+        })
+        .then((r) => r.docs[0] ?? null)
+        .catch(() => null)
+    : null
+
   const crumbs = isMine
     ? [
         { label: 'Личный кабинет', href: '/account' },
@@ -470,6 +524,15 @@ export default async function AnimalPage({
             </span>
             {foreignNote.text}
           </p>
+        )}
+
+        {partial && (
+          <GrantBanner
+            ownerName={owner}
+            scopes={[...grantedScopes]}
+            expiresAt={grantForBanner?.expiresAt ?? null}
+            wholeHerd={!grantForBanner?.animal}
+          />
         )}
 
         <div>
@@ -558,7 +621,22 @@ export default async function AnimalPage({
         </nav>
 
         {/* ------------------------------ Оценка ----------------------------- */}
-        {tab === 'evaluation' && (
+        {/* Закрытая область показывает плашку, а не прочерки: прочерк читается
+            как «данных нет», и человек уходит искать животное в другом месте */}
+        {tab === 'evaluation' && !maySee('evaluation') && (
+          <ScopeLocked scope="evaluation" ownerName={owner} canAsk={Boolean(user)} />
+        )}
+        {tab === 'events' && !maySee('production') && (
+          <ScopeLocked scope="production" ownerName={owner} canAsk={Boolean(user)} />
+        )}
+        {tab === 'origin' && !maySee('origin') && (
+          <ScopeLocked scope="origin" ownerName={owner} canAsk={Boolean(user)} />
+        )}
+        {tab === 'documents' && !maySee('documents') && (
+          <ScopeLocked scope="documents" ownerName={owner} canAsk={Boolean(user)} />
+        )}
+
+        {tab === 'evaluation' && maySee('evaluation') && (
           <>
             {indexBlock && (
               <section className="mt-8">
@@ -839,7 +917,7 @@ export default async function AnimalPage({
         )}
 
         {/* ------------------------------ События ---------------------------- */}
-        {tab === 'events' && (
+        {tab === 'events' && maySee('production') && (
           <>
             <AnimalEventsTab animal={animal} />
 
@@ -858,7 +936,7 @@ export default async function AnimalPage({
         )}
 
         {/* -------------------------- Происхождение -------------------------- */}
-        {tab === 'origin' && (
+        {tab === 'origin' && maySee('origin') && (
           <>
             <AnimalOriginTab animal={animal} />
 
@@ -882,7 +960,7 @@ export default async function AnimalPage({
         )}
 
         {/* ---------------------------- Документы ---------------------------- */}
-        {tab === 'documents' && (
+        {tab === 'documents' && maySee('documents') && (
           <>
             {readiness && (
               <CertificateSection
@@ -918,6 +996,14 @@ export default async function AnimalPage({
               )}
             </div>
           </section>
+        )}
+        {/* Форма запроса живёт внизу страницы, а не на каждой закрытой
+            вкладке: плашки на неё только ссылаются якорем. Иначе одна и та же
+            форма рисовалась бы четырежды и вела бы четыре разных состояния */}
+        {partial && user && (
+          <div id="request" className="mt-10 scroll-mt-8">
+            <AccessRequestForm animalId={animal.id as number} ownerName={owner} />
+          </div>
         )}
           </div>
         </div>

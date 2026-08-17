@@ -186,7 +186,12 @@ export default async function NotificationsPage({
                 )}
 
                 {n.request ? (
-                  <AccessDecision requestId={n.request.id} />
+                  <AccessDecision
+                    requestId={n.request.id}
+                    purposeValue={n.request.purposeValue}
+                    animalLabel={n.request.animalLabel}
+                    granteeName={n.request.fromOrg}
+                  />
                 ) : (
                   n.href && (
                     <Link
