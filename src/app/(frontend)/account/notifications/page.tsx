@@ -32,6 +32,8 @@ const KIND_LABEL: Record<NotificationKind, string> = {
   'access-in': 'Запрос доступа',
   'access-out': 'Ответ на запрос',
   submission: 'Загрузка данных',
+  verification: 'Верификация',
+  document: 'Документ',
 }
 
 const FILTERS = [
@@ -40,6 +42,8 @@ const FILTERS = [
   { key: 'access-in', label: 'Запросы ко мне' },
   { key: 'access-out', label: 'Ответы мне' },
   { key: 'submission', label: 'Загрузки' },
+  { key: 'verification', label: 'Верификация' },
+  { key: 'document', label: 'Документы' },
 ] as const
 
 type FilterKey = (typeof FILTERS)[number]['key']

@@ -1,7 +1,9 @@
 import type { Payload, Where } from 'payload'
-import type { AccessRequest, DataSubmission, User } from '@/payload-types'
+import type { AccessRequest, DataSubmission, Document, User, VerificationRequest } from '@/payload-types'
 import { SUBMISSION_KINDS, SUBMISSION_STATUSES } from '@/collections/DataSubmissions'
 import { ACCESS_REQUEST_PURPOSES } from '@/collections/AccessRequests'
+import { VERIFICATION_STATUSES } from '@/collections/VerificationRequests'
+import { DOCUMENT_TYPES } from '@/lib/dictionaries'
 import { relId } from './visibility'
 
 /**
@@ -18,7 +20,12 @@ import { relId } from './visibility'
  * а новым считается всё, что случилось позже.
  */
 
-export type NotificationKind = 'access-in' | 'access-out' | 'submission'
+export type NotificationKind =
+  | 'access-in'
+  | 'access-out'
+  | 'submission'
+  | 'verification'
+  | 'document'
 
 export type Notification = {
   id: string
@@ -94,6 +101,15 @@ const ACCESS_REQUEST_STATUS_LABELS = [
 /** Пакеты, о которых есть что сказать: загруженный и «на проверке» — не новость. */
 const REPORTABLE_SUBMISSIONS = ['checked', 'accepted', 'rejected']
 
+/*
+ * Заявка на верификацию сообщается только решённая.
+ *
+ * «Подана» и «в работе» хозяйство и так видит на своей странице заявок,
+ * и уведомлять о том, что оно само сделало минуту назад, незачем.
+ * Лента — про то, что случилось на другой стороне.
+ */
+const REPORTABLE_VERIFICATIONS = ['approved', 'rejected']
+
 const isAfter = (at: string, since: string | null): boolean => {
   if (!since) return true
   const a = Date.parse(at)
@@ -112,7 +128,7 @@ export async function loadNotifications(
     ? { owner: { equals: orgId } }
     : { id: { equals: -1 } }
 
-  const [incoming, outgoing, submissions] = await Promise.all([
+  const [incoming, outgoing, submissions, verifications, documents] = await Promise.all([
     payload
       .find({
         collection: 'access-requests',
@@ -141,6 +157,56 @@ export async function loadNotifications(
               and: [
                 { organization: { equals: orgId } },
                 { status: { in: REPORTABLE_SUBMISSIONS } },
+              ],
+            },
+            sort: '-updatedAt',
+            limit: 50,
+            depth: 1,
+            overrideAccess: true,
+          })
+          .catch(() => null)
+      : Promise.resolve(null),
+
+    /* Решённые заявки на верификацию */
+    orgId
+      ? payload
+          .find({
+            collection: 'verification-requests',
+            where: {
+              and: [
+                { organization: { equals: orgId } },
+                { status: { in: REPORTABLE_VERIFICATIONS } },
+              ],
+            },
+            sort: '-updatedAt',
+            limit: 50,
+            depth: 0,
+            overrideAccess: true,
+          })
+          .catch(() => null)
+      : Promise.resolve(null),
+
+    /*
+     * Документы, выпущенные Ассоциацией на мои записи.
+     *
+     * Признак — заполненное `issuedBy`: бумаги, которые хозяйство загрузило
+     * само, событием для него не являются. Условие по владельцу животного
+     * идёт через связь, и это join — но лента строится на своей странице,
+     * а не на горячем пути книги.
+     */
+    orgId
+      ? payload
+          .find({
+            collection: 'documents',
+            where: {
+              and: [
+                { issuedBy: { exists: true } },
+                {
+                  or: [
+                    { organization: { equals: orgId } },
+                    { 'animal.owner': { equals: orgId } },
+                  ],
+                },
               ],
             },
             sort: '-updatedAt',
@@ -243,6 +309,69 @@ export async function loadNotifications(
     })
   }
 
+  /* ------------------ Решения по заявкам на верификацию ---------------- */
+  for (const raw of (verifications?.docs ?? []) as VerificationRequest[]) {
+    const at = (raw.review?.decidedAt ?? raw.updatedAt) as string
+    const approved = raw.status === 'approved'
+    const held = raw.review?.heldCount ?? 0
+    const ok = raw.review?.approvedCount ?? 0
+
+    /*
+     * В тексте — итог и следующий шаг, а не просто состояние.
+     *
+     * «Заявка рассмотрена» ничего не говорит человеку о том, что ему делать.
+     * Если часть записей не прошла, работа есть, и об этом надо сказать
+     * числом и ссылкой; если прошло всё — сказать, что делать нечего.
+     */
+    items.push({
+      id: `verification-${raw.id}`,
+      kind: 'verification',
+      at,
+      unread: isAfter(at, since),
+      pending: held > 0,
+      title: `Заявка ${raw.number ?? `#${raw.id}`}: ${label(VERIFICATION_STATUSES, raw.status)}`,
+      text: approved
+        ? held > 0
+          ? `Подтверждено записей: ${ok}. Не прошло: ${held} — по каждой указано, что исправить.`
+          : `Подтверждено записей: ${ok}. Замечаний нет.`
+        : raw.review?.comment
+          ? `Отклонено. ${raw.review.comment}`
+          : 'Отклонено без комментария.',
+      href: `/account/verification/${raw.id}`,
+      linkLabel: held > 0 ? 'Смотреть замечания' : 'Открыть заявку',
+    })
+  }
+
+  /* ----------------------- Документы Ассоциации ------------------------ */
+  for (const raw of (documents?.docs ?? []) as Document[]) {
+    const revokedAt = raw.revoked?.at ?? null
+    const at = (revokedAt ?? raw.issuedAt ?? raw.createdAt) as string
+    const animalId = relId(raw.animal)
+    const kind = label(DOCUMENT_TYPES, raw.type)
+    const number = raw.number ? `№ ${raw.number}` : ''
+
+    items.push({
+      id: `document-${raw.id}`,
+      kind: 'document',
+      at,
+      unread: isAfter(at, since),
+      /*
+       * Отзыв требует внимания, выпуск — нет. Выданный документ приятная
+       * новость и не более; отозванный означает, что бумага, на которую
+       * могли уже сослаться, больше не действует.
+       */
+      pending: Boolean(revokedAt),
+      title: revokedAt ? `Документ ${number} отозван` : `Выдан документ ${number}`,
+      text: revokedAt
+        ? raw.revoked?.reason
+          ? `${kind}. Причина: ${raw.revoked.reason}`
+          : `${kind}. Причина не указана.`
+        : `${kind}. Ассоциация выпустила документ на вашу запись.`,
+      href: animalId ? `/animals/${animalId}?tab=documents` : '/account?tab=documents',
+      linkLabel: 'К документам',
+    })
+  }
+
   items.sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
 
   return { items, unread: items.filter((i) => i.unread).length }
@@ -260,7 +389,7 @@ export async function countUnreadNotifications(payload: Payload, user: User): Pr
   const newer: Where[] = since ? [{ updatedAt: { greater_than: since } }] : []
 
   try {
-    const [incoming, outgoing, submissions] = await Promise.all([
+    const [incoming, outgoing, submissions, verifications, documents] = await Promise.all([
       orgId
         ? payload.count({
             collection: 'access-requests',
@@ -292,9 +421,46 @@ export async function countUnreadNotifications(payload: Payload, user: User): Pr
             overrideAccess: true,
           })
         : Promise.resolve({ totalDocs: 0 }),
+      orgId
+        ? payload.count({
+            collection: 'verification-requests',
+            where: {
+              and: [
+                { organization: { equals: orgId } },
+                { status: { in: REPORTABLE_VERIFICATIONS } },
+                ...newer,
+              ],
+            },
+            overrideAccess: true,
+          })
+        : Promise.resolve({ totalDocs: 0 }),
+      orgId
+        ? payload.count({
+            collection: 'documents',
+            where: {
+              and: [
+                { issuedBy: { exists: true } },
+                {
+                  or: [
+                    { organization: { equals: orgId } },
+                    { 'animal.owner': { equals: orgId } },
+                  ],
+                },
+                ...newer,
+              ],
+            },
+            overrideAccess: true,
+          })
+        : Promise.resolve({ totalDocs: 0 }),
     ])
 
-    return incoming.totalDocs + outgoing.totalDocs + submissions.totalDocs
+    return (
+      incoming.totalDocs +
+      outgoing.totalDocs +
+      submissions.totalDocs +
+      verifications.totalDocs +
+      documents.totalDocs
+    )
   } catch {
     // Колокольчик без цифры лучше, чем страница с ошибкой
     return 0

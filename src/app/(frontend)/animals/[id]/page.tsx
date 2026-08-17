@@ -1100,12 +1100,13 @@ async function DocumentsTab({ animalId }: { animalId: number | string }) {
               <th>Тип</th>
               <th>Номер</th>
               <th>Название</th>
+              <th>Состояние</th>
             </tr>
           </thead>
           <tbody>
             {docs.docs.length === 0 && (
               <tr>
-                <td colSpan={4} className="py-8 text-center text-ink-500">
+                <td colSpan={5} className="py-8 text-center text-ink-500">
                   Документов пока нет
                 </td>
               </tr>
@@ -1116,6 +1117,24 @@ async function DocumentsTab({ animalId }: { animalId: number | string }) {
                 <td>{labelOf(DOCUMENT_TYPES, d.type)}</td>
                 <td>{d.number || '—'}</td>
                 <td>{d.title}</td>
+                <td>
+                  {/*
+                    Отзыв показывается хозяйству, а не только Ассоциации.
+                    Отозванное свидетельство внешне ничем не отличалось
+                    от действующего — а сослаться на недействующую бумагу
+                    в сделке хуже, чем не иметь её вовсе.
+                  */}
+                  {d.revoked?.at ? (
+                    <span
+                      className="rounded-md bg-[#fdecea] px-2 py-0.5 text-[13px]"
+                      title={d.revoked.reason ?? undefined}
+                    >
+                      отозван {dateRu(d.revoked.at)}
+                    </span>
+                  ) : (
+                    <span className="text-ink-500">действует</span>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
