@@ -22,14 +22,13 @@ export function SiteFooter() {
     >
       <div className="container-page grid grid-cols-1 gap-10 md:grid-cols-[1.2fr_1fr_1fr_1fr]">
         <div className="flex flex-col items-start gap-4">
-          {/* Логотип на тёмном: инверсия подписи, знак остаётся цветным */}
+          {/*
+             Под логотипом раньше висела ссылка на политику конфиденциальности.
+             Она переехала в нижнюю строку, к её соседке по смыслу: два
+             правовых документа стоят рядом и читаются как пара, а не как
+             случайная ссылка под знаком Ассоциации.
+          */}
           <Logo onDark />
-          <Link
-            href="/privacy"
-            className="text-sm text-white/75 underline underline-offset-4 transition-colors hover:text-white"
-          >
-            Политика конфиденциальности
-          </Link>
         </div>
 
         <div>
@@ -77,7 +76,7 @@ export function SiteFooter() {
          авторство с адресом и телефоном Ассоциации, а это разные по весу
          сведения — контакты нужны каждый день, авторство нужно один раз.
       */}
-      <div className="container-page mt-10 border-t border-white/10 pt-6">
+      <div className="container-page mt-10 flex flex-col gap-3 border-t border-white/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-[13px] text-white/50">
           © 2026 Разработка и платформа:{' '}
           <a
@@ -89,6 +88,27 @@ export function SiteFooter() {
             Дмитрий Васин
           </a>
         </p>
+
+        {/*
+           Правовые документы — справа, той же приглушённостью, что и подпись
+           слева. На узком экране строка разворачивается в столбец: две
+           длинные ссылки рядом с копирайтом не помещаются, а переносить их
+           по словам — получить кашу из четырёх строк.
+        */}
+        <nav aria-label="Правовые документы" className="flex flex-wrap gap-x-6 gap-y-2">
+          <Link
+            href="/privacy"
+            className="text-[13px] text-white/50 underline underline-offset-4 transition-colors hover:text-white"
+          >
+            Политика конфиденциальности
+          </Link>
+          <Link
+            href="/data-policy"
+            className="text-[13px] text-white/50 underline underline-offset-4 transition-colors hover:text-white"
+          >
+            Политика обработки
+          </Link>
+        </nav>
       </div>
     </footer>
   )
