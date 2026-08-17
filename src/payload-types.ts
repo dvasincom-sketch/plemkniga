@@ -81,6 +81,8 @@ export interface Config {
     'data-submissions': DataSubmission;
     'verification-requests': VerificationRequest;
     'access-requests': AccessRequest;
+    'access-grants': AccessGrant;
+    'access-views': AccessView;
     'index-profiles': IndexProfile;
     'index-values': IndexValue;
     'index-bases': IndexBase;
@@ -123,6 +125,8 @@ export interface Config {
     'data-submissions': DataSubmissionsSelect<false> | DataSubmissionsSelect<true>;
     'verification-requests': VerificationRequestsSelect<false> | VerificationRequestsSelect<true>;
     'access-requests': AccessRequestsSelect<false> | AccessRequestsSelect<true>;
+    'access-grants': AccessGrantsSelect<false> | AccessGrantsSelect<true>;
+    'access-views': AccessViewsSelect<false> | AccessViewsSelect<true>;
     'index-profiles': IndexProfilesSelect<false> | IndexProfilesSelect<true>;
     'index-values': IndexValuesSelect<false> | IndexValuesSelect<true>;
     'index-bases': IndexBasesSelect<false> | IndexBasesSelect<true>;
@@ -1271,6 +1275,57 @@ export interface AccessRequest {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "access-grants".
+ */
+export interface AccessGrant {
+  id: number;
+  /**
+   * Подставляется по животному или по сессии
+   */
+  owner: number | Organization;
+  grantee: number | Organization;
+  /**
+   * Пусто — открыто всё стадо владельца
+   */
+  animal?: (number | null) | Animal;
+  scopes: ('origin' | 'production' | 'evaluation' | 'documents')[];
+  /**
+   * Пусто — бессрочно
+   */
+  expiresAt?: string | null;
+  issuedBy?: (number | null) | User;
+  revokedAt?: string | null;
+  revokedBy?: (number | null) | User;
+  /**
+   * Пусто — выдан по своей воле, без запроса
+   */
+  request?: (number | null) | AccessRequest;
+  /**
+   * Зачем выдан — вспомнить через полгода
+   */
+  note?: string | null;
+  lastSeenAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "access-views".
+ */
+export interface AccessView {
+  id: number;
+  grant: number | AccessGrant;
+  animal: number | Animal;
+  viewer?: (number | null) | User;
+  viewerOrg?: (number | null) | Organization;
+  owner: number | Organization;
+  scopes?: ('origin' | 'production' | 'evaluation' | 'documents')[] | null;
+  at: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "index-profiles".
  */
 export interface IndexProfile {
@@ -1520,6 +1575,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'access-requests';
         value: number | AccessRequest;
+      } | null)
+    | ({
+        relationTo: 'access-grants';
+        value: number | AccessGrant;
+      } | null)
+    | ({
+        relationTo: 'access-views';
+        value: number | AccessView;
       } | null)
     | ({
         relationTo: 'index-profiles';
@@ -2260,6 +2323,40 @@ export interface AccessRequestsSelect<T extends boolean = true> {
   response?: T;
   decidedAt?: T;
   decidedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "access-grants_select".
+ */
+export interface AccessGrantsSelect<T extends boolean = true> {
+  owner?: T;
+  grantee?: T;
+  animal?: T;
+  scopes?: T;
+  expiresAt?: T;
+  issuedBy?: T;
+  revokedAt?: T;
+  revokedBy?: T;
+  request?: T;
+  note?: T;
+  lastSeenAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "access-views_select".
+ */
+export interface AccessViewsSelect<T extends boolean = true> {
+  grant?: T;
+  animal?: T;
+  viewer?: T;
+  viewerOrg?: T;
+  owner?: T;
+  scopes?: T;
+  at?: T;
   updatedAt?: T;
   createdAt?: T;
 }

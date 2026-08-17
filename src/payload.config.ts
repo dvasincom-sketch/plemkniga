@@ -19,6 +19,8 @@ import { HealthEvents } from '@/collections/HealthEvents'
 import { Calvings } from '@/collections/Calvings'
 import { DataSubmissions } from '@/collections/DataSubmissions'
 import { AccessRequests } from '@/collections/AccessRequests'
+import { AccessGrants } from '@/collections/AccessGrants'
+import { AccessViews } from '@/collections/AccessViews'
 import { AnimalEvaluations } from '@/collections/AnimalEvaluations'
 import { AnimalExteriors } from '@/collections/AnimalExteriors'
 import { AnimalRevisions } from '@/collections/AnimalRevisions'
@@ -70,6 +72,8 @@ export default buildConfig({
     DataSubmissions,
     VerificationRequests,
     AccessRequests,
+    AccessGrants,
+    AccessViews,
     IndexProfiles,
     IndexValues,
     IndexBases,

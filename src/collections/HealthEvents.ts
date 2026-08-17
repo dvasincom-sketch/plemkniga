@@ -1,5 +1,5 @@
 import type { CollectionConfig } from 'payload'
-import { isAdmin, isAuthenticated, animalScopedRead } from '@/access'
+import { isAdmin, isAuthenticated, animalScopedReadFor } from '@/access'
 
 /**
  * События здоровья.
@@ -23,7 +23,7 @@ export const HealthEvents: CollectionConfig = {
      * как и карточка: показывать их соседям система не должна.
      * Разбор — docs/dostup-i-vidimost.md.
      */
-    read: animalScopedRead,
+    read: animalScopedReadFor('production'),
     create: isAuthenticated,
     update: isAuthenticated,
     delete: isAdmin,

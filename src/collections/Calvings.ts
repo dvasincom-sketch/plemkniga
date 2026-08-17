@@ -1,5 +1,5 @@
 import type { CollectionConfig } from 'payload'
-import { isAdmin, isAuthenticated, animalScopedRead } from '@/access'
+import { isAdmin, isAuthenticated, animalScopedReadFor } from '@/access'
 
 /** Результат отёла — колонка «Результат» в таблице межотельного цикла. */
 export const CALVING_RESULTS = [
@@ -32,7 +32,7 @@ export const Calvings: CollectionConfig = {
      * как и карточка: показывать их соседям система не должна.
      * Разбор — docs/dostup-i-vidimost.md.
      */
-    read: animalScopedRead,
+    read: animalScopedReadFor('production'),
     create: isAuthenticated,
     update: isAuthenticated,
     delete: isAdmin,

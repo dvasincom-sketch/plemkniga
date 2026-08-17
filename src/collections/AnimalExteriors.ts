@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import { EXTERIOR_COMPOSITES, EXTERIOR_TRAITS } from '@/lib/dictionaries'
-import { animalScopedRead, isAdmin } from '@/access'
+import { animalScopedReadFor, isAdmin } from '@/access'
 import { applyExteriorSnapshot, idOf } from '@/lib/evaluation-snapshot'
 
 /**
@@ -39,7 +39,7 @@ export const AnimalExteriors: CollectionConfig = {
     group: 'Племенная книга',
   },
   access: {
-    read: animalScopedRead,
+    read: animalScopedReadFor('evaluation'),
     create: isAdmin,
     update: isAdmin,
     delete: isAdmin,

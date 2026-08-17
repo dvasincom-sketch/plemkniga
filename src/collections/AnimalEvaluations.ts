@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import { HEALTH_TRAITS, PRODUCTION_TRAITS } from '@/lib/dictionaries'
-import { animalScopedRead, isAdmin } from '@/access'
+import { animalScopedReadFor, isAdmin } from '@/access'
 import { applyEvaluationSnapshot, idOf } from '@/lib/evaluation-snapshot'
 
 /**
@@ -51,7 +51,7 @@ export const AnimalEvaluations: CollectionConfig = {
   },
   access: {
     // Видимость повторяет видимость самого животного: оценка — часть карточки
-    read: animalScopedRead,
+    read: animalScopedReadFor('evaluation'),
     create: isAdmin,
     update: isAdmin,
     delete: isAdmin,

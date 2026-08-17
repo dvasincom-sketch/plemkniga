@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import { EVENT_TYPES, RETIRED_EVENT_TYPES, toOptions } from '@/lib/dictionaries'
-import { isAdmin, isAuthenticated, animalScopedRead } from '@/access'
+import { isAdmin, isAuthenticated, animalScopedReadFor } from '@/access'
 
 export const Events: CollectionConfig = {
   slug: 'events',
@@ -17,7 +17,7 @@ export const Events: CollectionConfig = {
      * как и карточка: показывать их соседям система не должна.
      * Разбор — docs/dostup-i-vidimost.md.
      */
-    read: animalScopedRead,
+    read: animalScopedReadFor('production'),
     create: isAuthenticated,
     update: isAuthenticated,
     delete: isAdmin,

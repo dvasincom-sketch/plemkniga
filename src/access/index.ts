@@ -1,6 +1,18 @@
 import type { Access, FieldAccess, Where } from 'payload'
+import type { AccessScope } from '@/lib/dictionaries'
+import { animalsWithScope, grantsForRequest, ownersWithScope } from '@/lib/grants'
 
 type U = { id: number | string; role?: string; organization?: number | string | { id: number } }
+
+/**
+ * Собрать условие из вариантов.
+ *
+ * Один вариант отдаётся как есть, а не завёрнутым в `or` из одного элемента:
+ * лишняя обёртка ничего не меняет по смыслу, но меняет план запроса, а книга
+ * на горячем пути.
+ */
+const anyOf = (variants: Where[]): Where =>
+  variants.length === 1 ? variants[0]! : { or: variants }
 
 const orgId = (user: U | null | undefined): number | string | undefined => {
   if (!user?.organization) return undefined
@@ -39,18 +51,39 @@ export const isAuthenticated: Access = ({ req: { user } }) => Boolean(user)
  * Чтение животных:
  *  - админ видит всё;
  *  - авторизованный видит своих (по организации) + все публичные;
- *  - аноним видит только те, где владелец разрешил публичный показ.
+ *  - аноним видит только те, где владелец разрешил публичный показ;
+ *  - плюс всё, что открыто точечным доступом.
+ *
+ * Область здесь не проверяется намеренно: любой действующий грант делает
+ * запись видимой целиком в её базовой части — номер, кличка, пол, порода,
+ * состояние, владелец. Что показать внутри карточки, решают правила
+ * связанных коллекций и сборка страницы.
+ *
+ * Грант поднимает **обе** ступени публичности: запись с `publicVisible: false`
+ * получателю отдаётся. Иначе хозяйство, которое держит стадо вне книги, лишено
+ * среднего варианта вовсе — а именно ему он нужнее всех.
+ *
+ * Оба условия от грантов — по колонкам самой строки животных: `id` — первичный
+ * ключ, `owner` — индексированная колонка. Ни одного join. Разбор —
+ * `src/lib/grants.ts` и `docs/tochechnyy-dostup.md`, раздел 5.
  */
-export const animalRead: Access = ({ req: { user } }) => {
-  const u = user as U | null
+export const animalRead: Access = async ({ req }) => {
+  const u = req.user as U | null
   if (isAssociation(u)) return true
+
   const org = orgId(u)
-  if (u && org) {
-    const w: Where = { or: [{ owner: { equals: org } }, { publicVisible: { equals: true } }] }
-    return w
+  const variants: Where[] = [{ publicVisible: { equals: true } }]
+  if (u && org) variants.unshift({ owner: { equals: org } })
+
+  const grants = await grantsForRequest(req)
+  if (!grants.empty) {
+    const animals = animalsWithScope(grants)
+    const owners = ownersWithScope(grants)
+    if (animals.length) variants.push({ id: { in: animals } })
+    if (owners.length) variants.push({ owner: { in: owners } })
   }
-  const w: Where = { publicVisible: { equals: true } }
-  return w
+
+  return anyOf(variants)
 }
 
 /** Изменять животное может админ или пользователь той же организации. */
@@ -103,19 +136,58 @@ export const accessRequestDecide: Access = ({ req: { user } }) => {
  * Отсюда читают значения индекса, история оценок и линейные оценки
  * экстерьера — всё это части карточки, а не самостоятельные сущности.
  */
-export const animalScopedRead: Access = ({ req: { user } }) => {
-  const u = user as U | null
-  if (isAssociation(u)) return true
-  const org = orgId(u)
-  if (u && org) {
-    const w: Where = {
-      or: [{ 'animal.owner': { equals: org } }, { 'animal.publicVisible': { equals: true } }],
+const scopedRead =
+  (scope?: AccessScope): Access =>
+  async ({ req }) => {
+    const u = req.user as U | null
+    if (isAssociation(u)) return true
+
+    const org = orgId(u)
+    const variants: Where[] = [{ 'animal.publicVisible': { equals: true } }]
+    if (u && org) variants.unshift({ 'animal.owner': { equals: org } })
+
+    const grants = await grantsForRequest(req)
+    if (!grants.empty) {
+      const animals = animalsWithScope(grants, scope)
+      const owners = ownersWithScope(grants, scope)
+      // Условие по колонке `animal_id`, а не по полю связанной записи
+      if (animals.length) variants.push({ animal: { in: animals } })
+      /*
+       * А вот это — join, и он здесь осознан. Владельца в строке события нет,
+       * а грант на стадо задан именно владельцем. Хуже не становится: точно
+       * такой же join стоит в первом условии этого правила с решения №24.
+       * Важнее другое — эти коллекции читаются на карточке, по одному
+       * животному, а не на странице книги. Если замер покажет, что и здесь
+       * дорого, владельца надо продублировать в строках событий, как уже
+       * сделано в `index-values` (решение №22). Заранее денормализовать пять
+       * коллекций ради предположения не будем.
+       */
+      if (owners.length) variants.push({ 'animal.owner': { in: owners } })
     }
-    return w
+
+    return anyOf(variants)
   }
-  const w: Where = { 'animal.publicVisible': { equals: true } }
-  return w
-}
+
+/**
+ * Чтение записи, привязанной к животному, с оглядкой на область гранта.
+ *
+ * Без аргумента — прежнее поведение плюс любой действующий грант. Так открыт
+ * журнал правок: он показывает, кто и когда трогал запись, но не значения
+ * полей сверх тех, что и так видны. Скрывать историю изменений от того, кому
+ * показали данные, — способ показать данные, умолчав об их надёжности.
+ */
+export const animalScopedRead: Access = scopedRead()
+
+/**
+ * То же, но грант учитывается только с нужной областью.
+ *
+ * Область — свойство коллекции, а не экрана. Если бы области жили только
+ * в интерфейсе, получатель гранта на происхождение прочитал бы надои через
+ * `/api/milk-tests`, и обещание «открыто только происхождение» оказалось бы
+ * обещанием вёрстки. Ровно эта ошибка разобрана в решении №24: карточку
+ * закрыли, а данные, висящие на ней, оставили открытыми.
+ */
+export const animalScopedReadFor = (scope: AccessScope): Access => scopedRead(scope)
 
 /**
  * Профиль индекса виден своей организации и всем — если он без владельца.
@@ -136,18 +208,29 @@ export const animalScopedRead: Access = ({ req: { user } }) => {
  * страницы занимал 1,2 секунды. Копии полей живут в строке значения
  * и обновляются вместе с ним (`src/collections/IndexValues.ts`).
  */
-export const indexValueRead: Access = ({ req: { user } }) => {
-  const u = user as U | null
+export const indexValueRead: Access = async ({ req }) => {
+  const u = req.user as U | null
   if (isAssociation(u)) return true
 
   const org = orgId(u)
-  if (u && org) {
-    const w: Where = { or: [{ owner: { equals: org } }, { publicVisible: { equals: true } }] }
-    return w
+  const variants: Where[] = [{ publicVisible: { equals: true } }]
+  if (u && org) variants.unshift({ owner: { equals: org } })
+
+  /*
+   * Здесь join недопустим ни в каком виде: значения индекса читаются
+   * на странице книги при сортировке по профилю. Оба условия от грантов идут
+   * по колонкам самой строки: `animal_id` — связь по идентификатору,
+   * `owner` — копия поля животного, заведённая решением №22.
+   */
+  const grants = await grantsForRequest(req)
+  if (!grants.empty) {
+    const animals = animalsWithScope(grants, 'evaluation')
+    const owners = ownersWithScope(grants, 'evaluation')
+    if (animals.length) variants.push({ animal: { in: animals } })
+    if (owners.length) variants.push({ owner: { in: owners } })
   }
 
-  const w: Where = { publicVisible: { equals: true } }
-  return w
+  return anyOf(variants)
 }
 
 export const indexProfileRead: Access = ({ req: { user } }) => {
@@ -199,13 +282,74 @@ export const organizationScopedRead: Access = ({ req: { user } }) => {
  * карточке. Племенное свидетельство на открытое животное показывают вместе
  * с карточкой, в этом и смысл публикации.
  */
-export const documentRead: Access = ({ req: { user } }) => {
-  const u = user as U | null
+export const documentRead: Access = async ({ req }) => {
+  const u = req.user as U | null
   if (isAssociation(u)) return true
 
   const or: Where[] = [{ 'animal.publicVisible': { equals: true } }]
   const org = orgId(u)
   if (u && org) or.push({ organization: { equals: org } }, { 'animal.owner': { equals: org } })
+
+  const grants = await grantsForRequest(req)
+  if (!grants.empty) {
+    const animals = animalsWithScope(grants, 'documents')
+    const owners = ownersWithScope(grants, 'documents')
+    if (animals.length) or.push({ animal: { in: animals } })
+    if (owners.length) or.push({ 'animal.owner': { in: owners } })
+  }
+
+  return anyOf(or)
+}
+
+/**
+ * Точечный доступ виден обеим сторонам: тому, кто открыл, и тому, кому открыли.
+ *
+ * Ассоциация видит все — спорные случаи разбирать ей, как и с запросами
+ * доступа. Выдавать и отзывать чужие гранты она при этом не может: данные
+ * принадлежат хозяйству.
+ */
+export const accessGrantRead: Access = ({ req: { user } }) => {
+  const u = user as U | null
+  if (!u) return false
+  if (isAssociation(u)) return true
+  const org = orgId(u)
+  if (!org) return false
+  const or: Where[] = [{ owner: { equals: org } }, { grantee: { equals: org } }]
+  return { or }
+}
+
+/**
+ * Выдать и отозвать может только владелец данных.
+ *
+ * На изменении это правило работает как условие и отсекает чужие гранты.
+ * На создании Payload ждёт булево, и содержимое полей правилом не проверить —
+ * поэтому владелец подставляется хуком коллекции по животному или по сессии
+ * и сверяется с организацией выдающего. Правило пускает к форме, хук решает,
+ * что именно записать.
+ */
+export const accessGrantIssue: Access = ({ req: { user } }) => {
+  const u = user as U | null
+  if (!u) return false
+  if (u.role === 'admin') return true
+  const org = orgId(u)
+  if (!org) return false
+  return { owner: { equals: org } }
+}
+
+/**
+ * Журнал просмотров: владелец данных, тот, кто смотрел, и Ассоциация.
+ *
+ * Получателю свои же обращения показываются намеренно. Журнал ведётся ради
+ * доверия между хозяйствами, а односторонняя запись — то, о чём одна сторона
+ * знает, а другая нет, — доверия не прибавляет. Пусть видят оба одно и то же.
+ */
+export const accessViewRead: Access = ({ req: { user } }) => {
+  const u = user as U | null
+  if (!u) return false
+  if (isAssociation(u)) return true
+  const org = orgId(u)
+  if (!org) return false
+  const or: Where[] = [{ owner: { equals: org } }, { viewerOrg: { equals: org } }]
   return { or }
 }
 
