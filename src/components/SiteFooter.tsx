@@ -95,7 +95,20 @@ export function SiteFooter() {
            длинные ссылки рядом с копирайтом не помещаются, а переносить их
            по словам — получить кашу из четырёх строк.
         */}
-        <nav aria-label="Правовые документы" className="flex flex-wrap gap-x-6 gap-y-2">
+        <nav aria-label="О продукте и правовые документы" className="flex flex-wrap gap-x-6 gap-y-2">
+          {/*
+             «Эволюция продукта» стоит рядом с правовыми документами
+             намеренно: это тоже обещание, только не юридическое.
+             Страница говорит, чего от системы ждать сегодня и чего пока
+             ждать рано, — и место такому в подвале, а не в основном меню,
+             где ей пришлось бы соперничать с рабочими разделами.
+          */}
+          <Link
+            href="/evolution"
+            className="text-[13px] text-white/50 underline underline-offset-4 transition-colors hover:text-white"
+          >
+            Эволюция продукта
+          </Link>
           <Link
             href="/privacy"
             className="text-[13px] text-white/50 underline underline-offset-4 transition-colors hover:text-white"
