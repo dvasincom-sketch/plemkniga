@@ -23,6 +23,7 @@
     "seed:history": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/seed-history.ts",
     "migrate:baseline": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/migrate-baseline.ts",
     "doctor": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/doctor.ts",
+    "db:psql": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/psql.ts",
     "db:precheck": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/db-precheck.ts",
     "backfill:evaluations": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/backfill-evaluations.ts",
     "seed:bulk": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/seed-bulk.ts",

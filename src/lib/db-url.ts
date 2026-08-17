@@ -166,7 +166,6 @@ export function resolveDatabase(env: Env = process.env as Env): ResolvedDatabase
   }
 }
 
-/** Строка подключения без пароля — можно показывать и писать в лог. */
 /**
  * Локальная ли база — то есть можно ли по ней ходить `drizzle push`.
  *
@@ -198,6 +197,7 @@ export function isLocalDatabase(uri?: string | null): boolean {
   }
 }
 
+/** Строка подключения без пароля — можно показывать и писать в лог. */
 export function maskUri(uri: string): string {
   if (!uri) return ''
   return uri.replace(/(:\/\/[^:/@]+):[^@]*@/, '$1:***@')
