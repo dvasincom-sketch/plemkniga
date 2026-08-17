@@ -12,22 +12,20 @@ import { AccountNav } from '@/components/AccountNav'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { LactationDynamics } from '@/components/LactationDynamics'
 import { AnimalPassport } from '@/components/AnimalPassport'
+import { AnimalEditBlock } from '@/components/AnimalEditBlock'
+import { blockValues, type Choice } from '@/lib/animal-edit'
 import { CertificateSection } from '@/components/CertificateSection'
 import { certificateReadiness } from '@/lib/certification'
 import { ClosedAnimal } from '@/components/ClosedAnimal'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { isAnimalLocked, viewerOf } from '@/lib/visibility'
 import {
-  AGE_GROUPS,
   ANIMAL_KINDS,
   DOCUMENT_TYPES,
   EXTERIOR_COMPOSITES,
   EXTERIOR_TRAITS,
   HEALTH_TRAITS,
-  ID_FORMATS,
   PRODUCTION_TRAITS,
-  SEXES,
-  STATES,
   labelOf,
 } from '@/lib/dictionaries'
 import { dateRu, nf, signed } from '@/lib/format'
@@ -71,6 +69,48 @@ const relName = (v: unknown): string => {
   }
   return '—'
 }
+
+/*
+ * Что можно поправить на карточке и в каком блоке.
+ *
+ * Списки короткие намеренно. Правят руками паспорт и происхождение —
+ * то, что переписывают со свидетельства. Оценки сюда не входят: у них своя
+ * история (`animal_evaluations`), и правка «на глаз» в обход неё сделала бы
+ * снимок и историю разными вещами. Владелец и уровень достоверности тоже
+ * не правятся: первое — передача животного, второе — решение ассоциации.
+ */
+const IDENTITY_FIELDS = [
+  'identNumber',
+  'idFormat',
+  'name',
+  'kind',
+  'sex',
+  'state',
+  'ageGroup',
+  'birthDate',
+  'breed',
+  'bloodPercent',
+  'coatColor',
+  'bloodGroup',
+  'purpose',
+  'altIds.earTag',
+  'altIds.internationalId',
+] as const
+
+const ORIGIN_FIELDS = [
+  'category',
+  'registrationBasis',
+  'breedingClass',
+  'line',
+  'family',
+  'inbreeding',
+  'pedigreeText.fatherId',
+  'pedigreeText.fatherName',
+  'pedigreeText.motherId',
+  'pedigreeText.motherName',
+  'pedigreeText.fatherFatherId',
+  'pedigreeText.motherFatherId',
+] as const
 
 const CARRIER_LABEL: Record<string, string> = {
   unknown: 'не тестировано',
@@ -176,6 +216,44 @@ export default async function AnimalPage({
       : (user?.organization ?? null)
   const ownerId = typeof animal.owner === 'object' && animal.owner ? animal.owner.id : animal.owner
   const isMine = Boolean(user && userOrgId && ownerId && userOrgId === ownerId)
+
+  /*
+   * Списки для выпадающих полей правки грузятся только владельцу: постороннему
+   * они ни к чему, а это четыре запроса к справочникам на каждое открытие
+   * чужой карточки — а чужих открывают чаще своих.
+   */
+  const editChoices: Record<string, Choice[]> = {}
+  if (isMine) {
+    const dicts = [
+      ['breed', 'breeds'],
+      ['coatColor', 'coat-colors'],
+      ['bloodGroup', 'blood-groups'],
+      ['purpose', 'animal-purposes'],
+      ['category', 'breeding-categories'],
+      ['breedingClass', 'breeding-classes'],
+      ['line', 'lines'],
+      ['family', 'lines'],
+    ] as const
+
+    const loaded = await Promise.all(
+      dicts.map(([, collection]) =>
+        payload.find({
+          collection: collection as never,
+          limit: 300,
+          sort: 'name',
+          depth: 0,
+          overrideAccess: true,
+        }),
+      ),
+    )
+
+    dicts.forEach(([path], i) => {
+      editChoices[path] = (loaded[i]?.docs ?? []).map((d: Record<string, unknown>) => ({
+        value: String(d.id),
+        label: String(d.name ?? d.title ?? d.id),
+      }))
+    })
+  }
 
   /*
    * Не своё животное оформляется иначе — целиком.
@@ -629,36 +707,25 @@ export default async function AnimalPage({
           <section className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
             <AnimalPassport animal={animal} />
 
-            <div className="card">
-              <h2 className="panel-heading">Идентификация</h2>
-              <dl className="divide-y divide-[#ededed] text-sm">
-                {[
-                  ['Индивидуальный №', animal.identNumber],
-                  ['Формат ID', labelOf(ID_FORMATS, animal.idFormat)],
-                  ['Кличка', animal.name ?? '—'],
-                  ['Тип животного', kindLabel],
-                  ['Пол', SEXES.find((s) => s.value === animal!.sex)?.full ?? '—'],
-                  ['Состояние', STATES.find((s) => s.value === animal!.state)?.full ?? '—'],
-                  ['Возрастная группа', labelOf(AGE_GROUPS, animal.ageGroup)],
-                  ['Дата рождения', dateRu(animal.birthDate)],
-                  ['Порода', relName(animal.breed)],
-                  ['Кровность по голштину, %', animal.bloodPercent ?? '—'],
-                  ['Масть', relName(animal.coatColor)],
-                  ['Группа крови', relName(animal.bloodGroup)],
-                  ['Назначение', relName(animal.purpose)],
-                  ['Ушная бирка', animal.altIds?.earTag || '—'],
-                  ['Чип RFID', animal.altIds?.chipNumber || '—'],
-                  ['Номер в ГПК', animal.altIds?.gpkNumber || '—'],
-                  ['Международный ID', animal.altIds?.internationalId || '—'],
-                  ['GUID (ФГИАС ПР)', animal.uuid || '—'],
-                ].map(([k, v]) => (
-                  <div key={String(k)} className="flex justify-between gap-6 py-2.5">
-                    <dt className="text-ink-500">{k}</dt>
-                    <dd className="text-right">{v as string}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
+            {/*
+               Идентификация — единственный блок карточки, который правят
+               руками чаще прочего: сюда переписывают со свидетельства.
+               Поэтому он умеет превращаться в форму на месте, а не уводит
+               на отдельную страницу правки. Владельцу видна ссылка
+               «Править», остальным блок выглядит как обычная сводка.
+            */}
+            <AnimalEditBlock
+              animalId={animal.id as number}
+              title="Идентификация"
+              canEdit={isMine}
+              values={blockValues(animal, IDENTITY_FIELDS, editChoices)}
+              note="Индивидуальный номер меняйте только если в нём ошибка: по нему животное узнают другие системы и бумажные документы."
+              extras={[
+                { label: 'Чип RFID', value: animal.altIds?.chipNumber || '' },
+                { label: 'Номер в ГПК', value: animal.altIds?.gpkNumber || '' },
+                { label: 'GUID (ФГИАС ПР)', value: animal.uuid || '' },
+              ]}
+            />
 
             <div>
               <LactationDynamics animal={animal} />
@@ -732,7 +799,28 @@ export default async function AnimalPage({
         {tab === 'events' && <AnimalEventsTab animal={animal} />}
 
         {/* -------------------------- Происхождение -------------------------- */}
-        {tab === 'origin' && <AnimalOriginTab animal={animal} />}
+        {tab === 'origin' && (
+          <>
+            <AnimalOriginTab animal={animal} />
+
+            {/*
+               Блок правки стоит под родословной, а не над ней: сначала
+               смотрят, что уже известно, и только потом дописывают. Отец
+               и мать здесь записываются так, как стоят в свидетельстве, —
+               связь с карточками этих животных устанавливается отдельно
+               и по номеру, а не выбором из списка: быков в книге тысячи.
+            */}
+            <section className="mt-8 grid grid-cols-1 gap-6">
+              <AnimalEditBlock
+                animalId={animal.id as number}
+                title="Происхождение по документам"
+                canEdit={isMine}
+                values={blockValues(animal, ORIGIN_FIELDS, editChoices)}
+                note="Записывайте так, как стоит в свидетельстве. Если карточки родителей появятся в книге позже, связь установится по номеру — переписывать не придётся."
+              />
+            </section>
+          </>
+        )}
 
         {/* ---------------------------- Документы ---------------------------- */}
         {tab === 'documents' && (

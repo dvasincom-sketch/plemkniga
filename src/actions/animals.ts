@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { relId } from '@/lib/visibility'
-import { JOURNALLED } from '@/lib/animal-journal'
+import { collectFromForm } from '@/lib/animal-edit'
 
 /**
  * Ручной ввод и правка карточки животного (ТЗ, п. 1.4 и 1.6).
@@ -30,9 +30,6 @@ export type AnimalFormState = {
 
 const orgOf = (user: { organization?: unknown }) => relId(user.organization)
 
-/** Поля, которые разрешено править через формы карточки, — те же, что журналятся */
-const EDITABLE = new Set(JOURNALLED.map((f) => f.path))
-
 /*
  * Кто вправе править карточку.
  *
@@ -44,74 +41,6 @@ type Actor = { id: number; role?: string | null; organization?: unknown }
 
 const mayEdit = (user: Actor, ownerId: number | null): boolean =>
   user.role === 'admin' || (ownerId !== null && orgOf(user) === ownerId)
-
-/** Значение поля из формы в том виде, в каком его ждёт модель */
-const valueOf = (form: FormData, path: string): unknown => {
-  const raw = form.get(path)
-  if (raw === null) return undefined
-
-  const s = String(raw).trim()
-  if (s === '') return null
-
-  if (s === 'on') return true
-
-  const field = JOURNALLED.find((f) => f.path === path)
-  if (field?.kind === 'number') {
-    const n = Number(s.replace(',', '.'))
-    return Number.isFinite(n) ? n : null
-  }
-  if (field?.kind === 'relation') {
-    const n = Number(s)
-    return Number.isFinite(n) && n > 0 ? n : null
-  }
-  if (field?.kind === 'date') {
-    const d = new Date(s)
-    return Number.isNaN(d.getTime()) ? null : d.toISOString()
-  }
-  return s
-}
-
-/** Собирает вложенный объект из путей вида `altIds.earTag` */
-const nest = (flat: Record<string, unknown>): Record<string, unknown> => {
-  const out: Record<string, unknown> = {}
-  for (const [path, value] of Object.entries(flat)) {
-    const parts = path.split('.')
-    let node = out
-    for (const key of parts.slice(0, -1)) {
-      if (typeof node[key] !== 'object' || node[key] === null) node[key] = {}
-      node = node[key] as Record<string, unknown>
-    }
-    node[parts[parts.length - 1]!] = value
-  }
-  return out
-}
-
-/**
- * Что пришло из формы — с оглядкой на флажки.
- *
- * Невыключенный флажок браузер не присылает вовсе, поэтому отличить
- * «сняли галочку» от «этого поля в форме не было» по одному только FormData
- * нельзя. Форма перечисляет свои поля в скрытом `fields`, и по этому списку
- * снятый флажок превращается в `false`, а чужие поля остаются нетронутыми.
- */
-const collect = (form: FormData): Record<string, unknown> => {
-  const declared = String(form.get('fields') || '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter((s) => EDITABLE.has(s))
-
-  const flat: Record<string, unknown> = {}
-  for (const path of declared) {
-    const field = JOURNALLED.find((f) => f.path === path)
-    if (field?.kind === 'checkbox') {
-      flat[path] = form.get(path) !== null
-      continue
-    }
-    const value = valueOf(form, path)
-    if (value !== undefined) flat[path] = value
-  }
-  return nest(flat)
-}
 
 /** Ищет животное по индивидуальному номеру — мимо прав, иначе дубль не увидеть */
 async function findByIdent(identNumber: string) {
@@ -165,7 +94,7 @@ export async function createAnimalAction(
     }
   }
 
-  const data = collect(formData)
+  const data = collectFromForm(formData)
   data.identNumber = identNumber
   data.owner = orgId
   data.author = user.id
@@ -228,7 +157,7 @@ export async function updateAnimalAction(
     return { error: 'Править карточку может только хозяйство-владелец' }
   }
 
-  const data = collect(formData)
+  const data = collectFromForm(formData)
   delete data.owner
   delete data.trustLevel
   delete data.trustCheckedAt
