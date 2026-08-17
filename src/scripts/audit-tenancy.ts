@@ -202,6 +202,127 @@ async function main() {
     }
   }
 
+  /* --------------------- 3. Прицельная запись ----------------------------- */
+
+  /*
+   * Читать чужое и писать в чужое — разные права, и проверять их надо
+   * отдельно.
+   *
+   * Первая версия этой ревизии смотрела только чтение и объявляла «утечек
+   * не найдено», пока у отёлов, доек, осеменений, событий, документов
+   * и стад изменение стояло `isAuthenticated`: посторонний мог не прочитать
+   * чужую запись, а переписать её. Интерфейс так никогда не делал, но API
+   * работает в обход интерфейса — а ревизия ходит именно туда.
+   *
+   * Запись пробуется настоящая, но безвредная: в поле заметки кладётся
+   * строка проверки. Если запись прошла — это находка, и текст в базе
+   * остаётся как след; убирать его ревизия не станет, потому что уборка
+   * скрыла бы улику.
+   */
+  console.log('\nПрицельная запись в чужое\n' + '─'.repeat(74))
+
+  const MARK = 'ревизия мультиарендности: эта строка не должна была записаться'
+
+  const probeWrite = async (
+    collection: string,
+    id: number | string,
+    field: string,
+    what: string,
+  ) => {
+    try {
+      await payload.update({
+        collection: collection as never,
+        id,
+        data: { [field]: MARK } as never,
+        overrideAccess: false,
+        user,
+      })
+      findings.push({ collection, detail: `${what} — чужая запись переписана` })
+      console.log(`  ✗  ${collection} — ${what}: записалось`)
+    } catch {
+      // Отказ Payload возвращает исключением — ожидаемый исход
+      console.log(`  ✓  ${collection} — ${what}: отказано`)
+    }
+  }
+
+  if (victim) {
+    for (const collection of ['calvings', 'milk-tests', 'inseminations', 'health-events', 'events'] as const) {
+      const row = await payload.find({
+        collection,
+        where: { animal: { equals: victim.id } },
+        limit: 1,
+        depth: 0,
+        overrideAccess: true,
+      })
+      const first = row.docs[0] as { id: number | string } | undefined
+      if (!first) {
+        console.log(`  ·  ${collection} — у этой коровы записей нет, писать некуда`)
+        continue
+      }
+      await probeWrite(collection, first.id, 'comment', 'запись чужой коровы')
+    }
+
+    await probeWrite('animals', victim.id, 'notes', 'карточка чужой коровы')
+  }
+
+  // Чужое стадо: имя стоит в публичной таблице книги, но правит его хозяйство
+  const foreignHerd = await payload.find({
+    collection: 'herds',
+    where: { organization: { not_equals: myOrg } },
+    limit: 1,
+    depth: 0,
+    overrideAccess: true,
+  })
+  const herd = foreignHerd.docs[0] as { id: number | string } | undefined
+  if (herd) await probeWrite('herds', herd.id, 'name', 'чужое стадо')
+  else console.log('  ·  herds — чужих стад в базе нет')
+
+  // Чужая организация: сама запись и поля решения о членстве
+  const foreignOrg = await payload.find({
+    collection: 'organizations',
+    where: { id: { not_equals: myOrg } },
+    limit: 1,
+    depth: 0,
+    overrideAccess: true,
+  })
+  const org = foreignOrg.docs[0] as { id: number | string } | undefined
+  if (org) await probeWrite('organizations', org.id, 'name', 'чужая организация')
+
+  /*
+   * Своё членство — отдельная проверка и, пожалуй, самая показательная.
+   * Организацию хозяйство правит законно, поэтому запрос пройдёт; вопрос
+   * в том, изменится ли поле, которое хозяйство менять не вправе.
+   */
+  if (myOrg) {
+    try {
+      await payload.update({
+        collection: 'organizations',
+        id: myOrg,
+        data: { membershipReview: { comment: MARK, since: '2020-01-01T00:00:00.000Z' } } as never,
+        overrideAccess: false,
+        user,
+      })
+      const after = await payload.findByID({
+        collection: 'organizations',
+        id: myOrg,
+        depth: 0,
+        overrideAccess: true,
+      })
+      const wrote = (after as { membershipReview?: { comment?: string | null } })?.membershipReview
+      if (wrote?.comment === MARK) {
+        findings.push({
+          collection: 'organizations',
+          detail: 'хозяйство переписало себе решение Ассоциации о членстве',
+        })
+        console.log('  ✗  organizations — своё решение о членстве: записалось')
+      } else {
+        console.log('  ✓  organizations — своё решение о членстве: поле не изменилось')
+      }
+    } catch {
+      console.log('  ✓  organizations — своё решение о членстве: отказано')
+    }
+  }
+
   /* -------------------------------- Итог ---------------------------------- */
 
   console.log('\n' + '─'.repeat(74))

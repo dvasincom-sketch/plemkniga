@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { EVENT_TYPES, RETIRED_EVENT_TYPES, toOptions } from '@/lib/dictionaries'
-import { isAdmin, isAuthenticated, animalScopedReadFor } from '@/access'
+import { isAdmin, isAuthenticated, animalScopedReadFor, animalScopedMutate } from '@/access'
+import { requireOwnAnimal } from '@/access/guards'
 
 export const Events: CollectionConfig = {
   slug: 'events',
@@ -19,7 +20,7 @@ export const Events: CollectionConfig = {
      */
     read: animalScopedReadFor('production'),
     create: isAuthenticated,
-    update: isAuthenticated,
+    update: animalScopedMutate,
     delete: isAdmin,
   },
   fields: [
@@ -99,6 +100,7 @@ export const Events: CollectionConfig = {
       },
     ],
     beforeChange: [
+      requireOwnAnimal,
       ({ data, req, operation }) => {
         if (operation === 'create' && req.user && !data.author) data.author = req.user.id
         return data

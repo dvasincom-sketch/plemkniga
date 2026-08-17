@@ -86,6 +86,58 @@ export const animalRead: Access = async ({ req }) => {
   return anyOf(variants)
 }
 
+/**
+ * Изменять запись, привязанную к животному, может только его хозяйство.
+ *
+ * Раньше здесь стояло `isAuthenticated` — «любой вошедший», — и это была
+ * не оговорка прототипа, а дыра: посторонний мог переписать чужой отёл
+ * или чужую дойку через `/api/calvings`. Чтение мы сузили решением №24,
+ * запись осталась открытой, и в описании каждой коллекции по отдельности
+ * `isAuthenticated` читалось осмысленно: «данные о продуктивности доступны
+ * участникам системы».
+ *
+ * Условие идёт через связь — это join, и здесь он уместен: запись не на
+ * горячем пути, страницы книги через него не ходят.
+ *
+ * На создании условие не работает: Payload ждёт булево и содержимого будущей
+ * записи не видит. Там ту же проверку делает хук `requireOwnAnimal`
+ * (`src/access/guards.ts`).
+ */
+export const animalScopedMutate: Access = ({ req: { user } }) => {
+  const u = user as U | null
+  if (!u) return false
+  if (isAssociation(u)) return true
+  const org = orgId(u)
+  if (!org) return false
+  return { 'animal.owner': { equals: org } }
+}
+
+/** Стадо правит его хозяйство. Читают стада все — их названия стоят в книге. */
+export const herdMutate: Access = ({ req: { user } }) => {
+  const u = user as U | null
+  if (!u) return false
+  if (isAssociation(u)) return true
+  const org = orgId(u)
+  if (!org) return false
+  return { organization: { equals: org } }
+}
+
+/**
+ * Документ правит тот, чей он: своя организация или своё животное.
+ *
+ * Ассоциация тоже — она выпускает племенные свидетельства и отзывает их,
+ * и это её работа, а не вмешательство в чужие данные.
+ */
+export const documentMutate: Access = ({ req: { user } }) => {
+  const u = user as U | null
+  if (!u) return false
+  if (isAssociation(u)) return true
+  const org = orgId(u)
+  if (!org) return false
+  const or: Where[] = [{ organization: { equals: org } }, { 'animal.owner': { equals: org } }]
+  return { or }
+}
+
 /** Изменять животное может админ или пользователь той же организации. */
 export const animalMutate: Access = ({ req: { user } }) => {
   const u = user as U | null

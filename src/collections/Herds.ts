@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
-import { anyone, isAdmin, isAuthenticated } from '@/access'
+import { anyone, herdMutate, isAdmin, isAuthenticated } from '@/access'
+import { requireOwnOrganization } from '@/access/guards'
 
 export const Herds: CollectionConfig = {
   slug: 'herds',
@@ -10,11 +11,17 @@ export const Herds: CollectionConfig = {
     group: 'Справочники',
   },
   access: {
+    /*
+     * Названия стад стоят в публичной таблице книги, поэтому читают их все.
+     * Правит — только хозяйство: раньше здесь стояло `isAuthenticated`,
+     * и любой вошедший мог переименовать чужое стадо через API.
+     */
     read: anyone,
     create: isAuthenticated,
-    update: isAuthenticated,
+    update: herdMutate,
     delete: isAdmin,
   },
+  hooks: { beforeChange: [requireOwnOrganization] },
   fields: [
     { name: 'name', type: 'text', label: 'Название стада', required: true },
     { name: 'code', type: 'text', label: 'Код стада' },

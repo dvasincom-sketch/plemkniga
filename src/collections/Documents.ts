@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { DOCUMENT_TYPES, toOptions } from '@/lib/dictionaries'
-import { isAdmin, isAuthenticated, documentRead } from '@/access'
+import { documentMutate, documentRead, isAdmin, isAuthenticated } from '@/access'
+import { requireOwnOrganization } from '@/access/guards'
 
 export const Documents: CollectionConfig = {
   slug: 'documents',
@@ -13,9 +14,11 @@ export const Documents: CollectionConfig = {
   access: {
     read: documentRead,
     create: isAuthenticated,
-    update: isAuthenticated,
+    // Правит владелец документа и Ассоциация: свидетельства выпускает и отзывает она
+    update: documentMutate,
     delete: isAdmin,
   },
+  hooks: { beforeChange: [requireOwnOrganization] },
   fields: [
     { name: 'title', type: 'text', label: 'Название', required: true },
     {

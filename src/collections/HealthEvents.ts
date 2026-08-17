@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
-import { isAdmin, isAuthenticated, animalScopedReadFor } from '@/access'
+import { isAdmin, isAuthenticated, animalScopedReadFor, animalScopedMutate } from '@/access'
+import { requireOwnAnimal } from '@/access/guards'
 
 /**
  * События здоровья.
@@ -25,7 +26,7 @@ export const HealthEvents: CollectionConfig = {
      */
     read: animalScopedReadFor('production'),
     create: isAuthenticated,
-    update: isAuthenticated,
+    update: animalScopedMutate,
     delete: isAdmin,
   },
   indexes: [{ fields: ['animal', 'date'] }],
@@ -91,6 +92,7 @@ export const HealthEvents: CollectionConfig = {
   ],
   hooks: {
     beforeChange: [
+      requireOwnAnimal,
       ({ data, req, operation }) => {
         if (operation === 'create' && req.user && !data.reportedBy) data.reportedBy = req.user.id
         return data

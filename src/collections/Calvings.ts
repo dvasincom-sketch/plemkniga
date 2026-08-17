@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
-import { isAdmin, isAuthenticated, animalScopedReadFor } from '@/access'
+import { isAdmin, isAuthenticated, animalScopedReadFor, animalScopedMutate } from '@/access'
+import { requireOwnAnimal } from '@/access/guards'
 
 /** Результат отёла — колонка «Результат» в таблице межотельного цикла. */
 export const CALVING_RESULTS = [
@@ -34,9 +35,10 @@ export const Calvings: CollectionConfig = {
      */
     read: animalScopedReadFor('production'),
     create: isAuthenticated,
-    update: isAuthenticated,
+    update: animalScopedMutate,
     delete: isAdmin,
   },
+  hooks: { beforeChange: [requireOwnAnimal] },
   indexes: [{ fields: ['animal', 'number'] }],
   defaultSort: 'number',
   fields: [

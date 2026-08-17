@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
-import { isAdmin, isAuthenticated, animalScopedReadFor } from '@/access'
+import { isAdmin, isAuthenticated, animalScopedReadFor, animalScopedMutate } from '@/access'
+import { requireOwnAnimal } from '@/access/guards'
 
 /**
  * Контрольные дойки.
@@ -25,7 +26,7 @@ export const MilkTests: CollectionConfig = {
      */
     read: animalScopedReadFor('production'),
     create: isAuthenticated,
-    update: isAuthenticated,
+    update: animalScopedMutate,
     delete: isAdmin,
   },
   indexes: [{ fields: ['animal', 'date'] }],
@@ -83,6 +84,7 @@ export const MilkTests: CollectionConfig = {
     },
   ],
   hooks: {
+    beforeChange: [requireOwnAnimal],
     beforeValidate: [
       ({ data }) => {
         // ТЗ, Таблица №6: test_date не может быть будущей датой
