@@ -1417,12 +1417,27 @@ export interface Event {
 export interface Document {
   id: number;
   title: string;
-  type?: ('pedigreeCertificate' | 'genotypeReport' | 'vetCertificate' | 'saleContract' | 'other') | null;
+  type?:
+    | (
+        | 'pedigreeCertificate'
+        | 'zootechnicalCertificate'
+        | 'genotypeReport'
+        | 'vetCertificate'
+        | 'saleContract'
+        | 'other'
+      )
+    | null;
   number?: string | null;
   issuedAt?: string | null;
   animal?: (number | null) | Animal;
   organization?: (number | null) | Organization;
   file?: (number | null) | Media;
+  issuedBy?: (number | null) | User;
+  revoked?: {
+    at?: string | null;
+    by?: (number | null) | User;
+    reason?: string | null;
+  };
   updatedAt: string;
   createdAt: string;
 }
@@ -2349,6 +2364,14 @@ export interface DocumentsSelect<T extends boolean = true> {
   animal?: T;
   organization?: T;
   file?: T;
+  issuedBy?: T;
+  revoked?:
+    | T
+    | {
+        at?: T;
+        by?: T;
+        reason?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
 }

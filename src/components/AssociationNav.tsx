@@ -22,17 +22,35 @@ export const ASSOCIATION_TABS = [
     label: 'Верификации',
     hint: 'Заявки хозяйств по животным',
   },
-  { key: 'documents', href: '', label: 'Документы', hint: 'Выпуск и журнал выдачи' },
-  { key: 'quality', href: '', label: 'Качество книги', hint: 'Ревизии и достоверность' },
+  {
+    key: 'documents',
+    href: '/association/documents',
+    label: 'Документы',
+    hint: 'Выпуск и журнал выдачи',
+  },
+  {
+    key: 'quality',
+    href: '/association/quality',
+    label: 'Качество книги',
+    hint: 'Противоречия и достоверность',
+  },
 ] as const
 
 export type AssociationTabKey = (typeof ASSOCIATION_TABS)[number]['key']
+
+/*
+ * Пустой `href` означает «раздел ещё не сделан»: такая плашка показывается
+ * неактивной, а не прячется. Сейчас пустых нет — все пять разделов работают,
+ * — но ветка оставлена: следующий раздел появится сначала в этом списке,
+ * а уже потом в виде страницы, и в этот промежуток он должен быть виден.
+ */
+type Tab = { key: AssociationTabKey; href: string; label: string; hint: string }
 
 export function AssociationNav({ active }: { active?: AssociationTabKey }) {
   return (
     <nav aria-label="Разделы кабинета Ассоциации" className="mb-8">
       <ul className="flex gap-3 overflow-x-auto pb-1">
-        {ASSOCIATION_TABS.map((t) => {
+        {(ASSOCIATION_TABS as readonly Tab[]).map((t) => {
           const isActive = active === t.key
           const base = 'block rounded-xl px-5 py-3 transition-colors'
 

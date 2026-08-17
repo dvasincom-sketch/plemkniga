@@ -1,0 +1,193 @@
+import type { Payload } from 'payload'
+
+/**
+ * Качество книги — сводка по всей базе, а не по выборке.
+ *
+ * Те же вопросы, что задают автоматические проверки при разборе пакета,
+ * но заданные разом обо всех трёхстах тысячах записей. Разница
+ * принципиальная: там проверка помогает эксперту смотреть конкретный файл,
+ * здесь — показывает, куда вообще смотреть.
+ *
+ * Всё считается SQL-агрегатами. Прогнать `checkAnimals` по всей книге —
+ * это триста тысяч объектов в памяти и минуты ожидания; те же вопросы,
+ * заданные базе, укладываются в секунды, потому что база для этого
+ * и сделана. Проверки в `data-checks.ts` и запросы здесь намеренно
+ * повторяют друг друга по смыслу и не пытаются использовать общий код:
+ * одно работает над готовыми документами, другое — над таблицей,
+ * и попытка свести их дала бы медленный вариант обоих.
+ */
+
+export type QualityRow = {
+  key: string
+  label: string
+  /** Сколько записей затронуто */
+  count: number
+  /** Насколько это существенно */
+  severity: 'fix' | 'note'
+  /** Куда идти разбираться */
+  hint?: string
+}
+
+export type BookQuality = {
+  animals: number
+  trust: { level: number; label: string; count: number }[]
+  issues: QualityRow[]
+  queues: { label: string; count: number; late: number }[]
+}
+
+type SqlPool = {
+  query: (q: string, p?: unknown[]) => Promise<{ rows?: Record<string, unknown>[] }>
+}
+
+const poolOf = (payload: Payload): SqlPool | null =>
+  (payload.db as unknown as { pool?: SqlPool }).pool ?? null
+
+const TRUST_LABEL: Record<number, string> = {
+  [-1]: 'Отклонено',
+  0: 'Черновик',
+  1: 'Проверено собственником',
+  2: 'Подтверждено лабораторией',
+  3: 'Верифицировано ассоциацией',
+}
+
+const n = (v: unknown): number => Number(v ?? 0)
+
+export async function bookQuality(payload: Payload): Promise<BookQuality | null> {
+  const pool = poolOf(payload)
+  if (!pool) return null
+
+  /*
+   * Один запрос на все противоречия. Соединение с родителями идёт дважды —
+   * по отцу и по матери, — и это те же два соединения, которые сделала бы
+   * каждая отдельная проверка; собранные вместе, они читают таблицу один раз.
+   */
+  const [issues, trust, queues] = await Promise.all([
+    pool.query(`
+      select
+        count(*)                                                       as animals,
+        count(*) filter (where a.birth_date is null)                   as no_birth_date,
+        count(*) filter (where a.breed_id is null)                     as no_breed,
+        count(*) filter (
+          where a.father_id is null and a.mother_id is null
+            and coalesce(a.pedigree_text_father_id, '') = ''
+            and coalesce(a.pedigree_text_mother_id, '') = ''
+        )                                                              as no_parents,
+        count(*) filter (where f.id is not null and f.sex <> 'male')   as father_wrong_sex,
+        count(*) filter (where m.id is not null and m.sex <> 'female') as mother_wrong_sex,
+        count(*) filter (
+          where f.birth_date is not null and a.birth_date is not null
+            and f.birth_date >= a.birth_date
+        )                                                              as father_younger,
+        count(*) filter (
+          where m.birth_date is not null and a.birth_date is not null
+            and m.birth_date >= a.birth_date
+        )                                                              as mother_younger,
+        count(*) filter (where a.id = a.father_id or a.id = a.mother_id) as self_parent,
+        count(*) filter (
+          where a.summary_milk_yield is not null
+            and (a.summary_milk_yield < 500 or a.summary_milk_yield > 25000)
+        )                                                              as milk_implausible,
+        count(*) filter (
+          where a.blood_percent is not null
+            and (a.blood_percent < 0 or a.blood_percent > 100)
+        )                                                              as blood_out_of_range,
+        count(*) filter (where a.disposal_reason_id is not null and a.state = 'alive')
+                                                                       as disposal_vs_state,
+        count(*) filter (where a.inbreeding is not null and a.inbreeding > 25)
+                                                                       as high_inbreeding,
+        count(*) filter (where a.birth_date > now())                   as birth_in_future
+      from animals a
+      left join animals f on f.id = a.father_id
+      left join animals m on m.id = a.mother_id
+      where a.archived is not true
+    `),
+    pool.query(`
+      select coalesce(trust_level, 0)::int as level, count(*) as total
+        from animals
+       where archived is not true
+       group by 1
+       order by 1
+    `),
+    pool.query(`
+      select 'submissions' as kind,
+             count(*)                                                        as total,
+             count(*) filter (where submitted_at < now() - interval '7 days') as late
+        from data_submissions
+       where status in ('uploaded', 'checking')
+      union all
+      select 'verifications',
+             count(*),
+             count(*) filter (where requested_at < now() - interval '7 days')
+        from verification_requests
+       where status in ('new', 'checking')
+      union all
+      select 'membership',
+             count(*),
+             0
+        from organizations
+       where membership = 'pending'
+    `),
+  ])
+
+  const r = issues.rows?.[0] ?? {}
+
+  const row = (
+    key: string,
+    label: string,
+    value: unknown,
+    severity: QualityRow['severity'],
+    hint?: string,
+  ): QualityRow => ({ key, label, count: n(value), severity, hint })
+
+  const rows: QualityRow[] = [
+    row('self-parent', 'Животное записано собственным родителем', r.self_parent, 'fix'),
+    row('father-younger', 'Отец родился позже потомка или в тот же день', r.father_younger, 'fix'),
+    row('mother-younger', 'Мать родилась позже потомка или в тот же день', r.mother_younger, 'fix'),
+    row('father-wrong-sex', 'Отцом записано животное женского пола', r.father_wrong_sex, 'fix'),
+    row('mother-wrong-sex', 'Матерью записано животное мужского пола', r.mother_wrong_sex, 'fix'),
+    row('birth-in-future', 'Дата рождения в будущем', r.birth_in_future, 'fix'),
+    row('no-birth-date', 'Нет даты рождения', r.no_birth_date, 'fix'),
+    row(
+      'milk-implausible',
+      'Удой вне правдоподобных границ (500…25 000 кг)',
+      r.milk_implausible,
+      'fix',
+    ),
+    row('blood-out-of-range', 'Кровность вне диапазона 0…100 %', r.blood_out_of_range, 'fix'),
+    row(
+      'disposal-vs-state',
+      'Указана причина выбытия, но животное числится в стаде',
+      r.disposal_vs_state,
+      'fix',
+    ),
+    row(
+      'high-inbreeding',
+      'Инбридинг выше 25 % — требуется подтверждение происхождения',
+      r.high_inbreeding,
+      'note',
+    ),
+    row('no-parents', 'Не указан ни один родитель — ни ссылкой, ни по документам', r.no_parents, 'note'),
+    row('no-breed', 'Не указана порода', r.no_breed, 'note'),
+  ].filter((x) => x.count > 0)
+
+  const QUEUE_LABEL: Record<string, string> = {
+    submissions: 'Пакеты, ждущие проверки',
+    verifications: 'Заявки на верификацию',
+    membership: 'Заявки на членство',
+  }
+
+  return {
+    animals: n(r.animals),
+    trust: (trust.rows ?? []).map((t) => ({
+      level: n(t.level),
+      label: TRUST_LABEL[n(t.level)] ?? String(t.level),
+      count: n(t.total),
+    })),
+    issues: rows,
+    queues: (queues.rows ?? []).map((q) => ({
+      label: QUEUE_LABEL[String(q.kind)] ?? String(q.kind),
+      count: n(q.total),
+      late: n(q.late),
+    })),
+  }
+}

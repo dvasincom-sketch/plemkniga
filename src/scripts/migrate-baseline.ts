@@ -179,6 +179,11 @@ const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
     probe: { kind: 'column', table: 'organizations', column: 'membership_review_decided_at' },
     note: 'решение по членству хозяйства',
   },
+  {
+    name: '20260817_091349_document_issuance',
+    probe: { kind: 'column', table: 'documents', column: 'issued_by_id' },
+    note: 'журнал выдачи документов и отзыв',
+  },
 ]
 
 const { driverUri, uri, source, sslConfig } = resolveDatabase()
