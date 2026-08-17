@@ -1263,6 +1263,7 @@ export interface AccessRequest {
   requesterOrg?: (number | null) | Organization;
   purpose: 'purchase' | 'semen' | 'mating' | 'verification' | 'research' | 'other';
   status: 'new' | 'approved' | 'declined';
+  scopes?: ('origin' | 'production' | 'evaluation' | 'documents')[] | null;
   /**
    * Что именно нужно посмотреть и зачем
    */
@@ -2319,6 +2320,7 @@ export interface AccessRequestsSelect<T extends boolean = true> {
   requesterOrg?: T;
   purpose?: T;
   status?: T;
+  scopes?: T;
   comment?: T;
   response?: T;
   decidedAt?: T;

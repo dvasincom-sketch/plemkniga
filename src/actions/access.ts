@@ -35,6 +35,15 @@ export async function requestAccessAction(
   const purpose: Purpose = PURPOSES.has(purposeRaw) ? (purposeRaw as Purpose) : 'other'
   const comment = String(formData.get('comment') || '').trim()
 
+  const scopes = formData
+    .getAll('scopes')
+    .map(String)
+    .filter((s) => SCOPE_VALUES.has(s)) as AccessScope[]
+
+  if (scopes.length === 0) {
+    return { error: 'Отметьте хотя бы одну область — иначе непонятно, что открывать' }
+  }
+
   const payload = await getClient()
 
   try {
@@ -64,7 +73,7 @@ export async function requestAccessAction(
     await payload.create({
       collection: 'access-requests',
       // status обязателен по схеме; хук всё равно перезапишет его на 'new'
-      data: { animal: animalId, purpose, comment, status: 'new' },
+      data: { animal: animalId, purpose, comment, scopes, status: 'new' },
       user,
       overrideAccess: false,
     })

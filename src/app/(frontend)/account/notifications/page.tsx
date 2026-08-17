@@ -189,6 +189,7 @@ export default async function NotificationsPage({
                   <AccessDecision
                     requestId={n.request.id}
                     purposeValue={n.request.purposeValue}
+                    requestedScopes={n.request.scopes}
                     animalLabel={n.request.animalLabel}
                     granteeName={n.request.fromOrg}
                   />

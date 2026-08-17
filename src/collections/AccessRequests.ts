@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import { accessRequestDecide, accessRequestRead, isAdmin, isAuthenticated } from '@/access'
+import { ACCESS_SCOPES, toOptions } from '@/lib/dictionaries'
 
 /**
  * Запрос доступа к закрытой карточке животного.
@@ -103,6 +104,25 @@ export const AccessRequests: CollectionConfig = {
           index: true,
         },
       ],
+    },
+    {
+      /*
+       * Что именно просят открыть.
+       *
+       * Раньше заявитель называл только цель, а области предлагались
+       * владельцу по ней. Это работало, но разговор шёл в одну сторону:
+       * человек, которому нужна одна родословная, не мог этого сказать,
+       * и владелец видел просьбу крупнее, чем она есть.
+       *
+       * Поле необязательное, и пустота — не ошибка: у запросов, поданных
+       * до появления этого поля, областей нет вовсе, и форма выдачи в таком
+       * случае предлагает набор по цели, как и прежде.
+       */
+      name: 'scopes',
+      type: 'select',
+      hasMany: true,
+      label: 'Какие области просят',
+      options: toOptions(ACCESS_SCOPES),
     },
     {
       name: 'comment',

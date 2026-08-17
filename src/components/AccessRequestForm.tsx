@@ -1,15 +1,26 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import { requestAccessAction, type AccessFormState } from '@/actions/access'
 import { ACCESS_REQUEST_PURPOSES } from '@/collections/AccessRequests'
+import { ACCESS_SCOPES, SCOPES_BY_PURPOSE } from '@/lib/dictionaries'
 
 /**
  * Запрос доступа к закрытой карточке.
  *
- * Цель запроса спрашивается не для отчётности: владелец решает по ней.
- * «Хочу купить» и «пишу диссертацию» — разные разговоры, и без этой строки
- * хозяйству пришлось бы гадать или отказывать по умолчанию.
+ * Цель спрашивается не для отчётности: владелец решает по ней. «Хочу купить»
+ * и «пишу диссертацию» — разные разговоры, и без этой строки хозяйству
+ * пришлось бы гадать или отказывать по умолчанию.
+ *
+ * Области заявитель называет сам, но выбор цели их переставляет: «покупка»
+ * отмечает всё, «проверка происхождения» — одну родословную. Это не догадка
+ * за человека, а подсказка о соразмерности: просьба «откройте всё» на цели
+ * «проверка происхождения» будет заметна обоим.
+ *
+ * Смена цели перезаписывает отметки, и это осознанно. Порядок в форме
+ * сверху вниз: сначала зачем, потом что. Человек, который сперва наставил
+ * галочек, а потом поменял цель, скорее всего уточняет замысел, а не теряет
+ * работу — галочек четыре, поставить их заново стоит двух секунд.
  */
 export function AccessRequestForm({
   animalId,
@@ -23,7 +34,20 @@ export function AccessRequestForm({
     {},
   )
 
+  const [purpose, setPurpose] = useState('purchase')
+  const [scopes, setScopes] = useState<string[]>([...(SCOPES_BY_PURPOSE.purchase ?? [])])
+
   const sent = Boolean(state.message)
+
+  const changePurpose = (value: string) => {
+    setPurpose(value)
+    setScopes([...(SCOPES_BY_PURPOSE[value] ?? [])])
+  }
+
+  const toggle = (value: string) =>
+    setScopes((prev) =>
+      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value],
+    )
 
   return (
     <form action={formAction} className="card">
@@ -38,7 +62,13 @@ export function AccessRequestForm({
 
       <label className="block text-[14px]">
         <span className="mb-1.5 block text-ink-700">Зачем нужен доступ</span>
-        <select name="purpose" className="field field-on-light" defaultValue="purchase" disabled={sent}>
+        <select
+          name="purpose"
+          className="field field-on-light"
+          value={purpose}
+          onChange={(e) => changePurpose(e.target.value)}
+          disabled={sent}
+        >
           {ACCESS_REQUEST_PURPOSES.map((p) => (
             <option key={p.value} value={p.value}>
               {p.label}
@@ -46,6 +76,43 @@ export function AccessRequestForm({
           ))}
         </select>
       </label>
+
+      <fieldset className="mt-4">
+        <legend className="mb-2 text-[14px] text-ink-700">Что нужно посмотреть</legend>
+        <div className="flex flex-wrap gap-2">
+          {ACCESS_SCOPES.map((s) => {
+            const on = scopes.includes(s.value)
+            return (
+              <label
+                key={s.value}
+                title={s.hint}
+                className={`rounded-lg px-3 py-2 text-[14px] transition-colors ${
+                  sent ? 'cursor-default opacity-60' : 'cursor-pointer'
+                } ${
+                  on
+                    ? 'bg-forest-500 text-white'
+                    : 'bg-white text-ink-700 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] hover:bg-[#f6f6f6]'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  name="scopes"
+                  value={s.value}
+                  checked={on}
+                  onChange={() => toggle(s.value)}
+                  disabled={sent}
+                  className="sr-only"
+                />
+                {s.label}
+              </label>
+            )
+          })}
+        </div>
+        <p className="mt-2 text-[13px] leading-snug text-ink-500">
+          Отмечено то, что обычно нужно для выбранной цели. Просите столько, сколько
+          действительно посмотрите: соразмерную просьбу открывают охотнее.
+        </p>
+      </fieldset>
 
       <label className="mt-4 block text-[14px]">
         <span className="mb-1.5 block text-ink-700">
@@ -69,7 +136,11 @@ export function AccessRequestForm({
       )}
 
       {!sent && (
-        <button type="submit" className="btn btn-accent mt-6" disabled={pending}>
+        <button
+          type="submit"
+          className="btn btn-accent mt-6"
+          disabled={pending || scopes.length === 0}
+        >
           {pending ? 'Отправляем…' : 'Отправить запрос'}
         </button>
       )}

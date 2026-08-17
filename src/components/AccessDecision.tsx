@@ -27,11 +27,14 @@ import { ACCESS_SCOPES, GRANT_TERMS, SCOPES_BY_PURPOSE } from '@/lib/dictionarie
 export function AccessDecision({
   requestId,
   purposeValue,
+  requestedScopes,
   animalLabel,
   granteeName,
 }: {
   requestId: number
   purposeValue: string
+  /** Что заявитель попросил сам. Пусто — просил до появления областей. */
+  requestedScopes: string[]
   animalLabel: string
   granteeName: string
 }) {
@@ -40,7 +43,15 @@ export function AccessDecision({
     {},
   )
 
-  const suggested = SCOPES_BY_PURPOSE[purposeValue] ?? []
+  /*
+   * Что предложить владельцу отмеченным.
+   *
+   * Названное заявителем важнее выведенного из цели: он сказал прямо,
+   * и подменять сказанное догадкой — способ показать владельцу просьбу
+   * не той величины. Набор по цели остаётся для старых запросов, поданных
+   * до появления областей.
+   */
+  const suggested = requestedScopes.length ? requestedScopes : (SCOPES_BY_PURPOSE[purposeValue] ?? [])
   const [scopes, setScopes] = useState<string[]>([...suggested])
   const [coverage, setCoverage] = useState<'animal' | 'herd'>('animal')
   const [term, setTerm] = useState<string>('90')
@@ -85,7 +96,12 @@ export function AccessDecision({
       <input type="hidden" name="term" value={term} />
 
       <fieldset className="mb-4">
-        <legend className="mb-2 text-[14px] text-ink-700">Что открыть</legend>
+        <legend className="mb-2 text-[14px] text-ink-700">
+          Что открыть{' '}
+          <span className="text-ink-500">
+            {requestedScopes.length ? '— отмечено то, что просили' : '— отмечено по цели запроса'}
+          </span>
+        </legend>
         <div className="flex flex-wrap gap-2">
           {ACCESS_SCOPES.map((s) => {
             const on = scopes.includes(s.value)

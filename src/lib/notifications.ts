@@ -50,6 +50,12 @@ export type Notification = {
      * день предзаполнение молча перестало бы работать.
      */
     purposeValue: string
+    /**
+     * Что именно просят открыть. Пусто — запрос подан до появления областей
+     * либо заявитель их не отметил; форма выдачи тогда предложит набор
+     * по цели, как было раньше.
+     */
+    scopes: string[]
     comment?: string | null
   }
 }
@@ -181,6 +187,7 @@ export async function loadNotifications(
               fromPerson: nameOf(raw.requester),
               purpose: label(ACCESS_REQUEST_PURPOSES, raw.purpose),
               purposeValue: String(raw.purpose ?? 'other'),
+              scopes: Array.isArray(raw.scopes) ? raw.scopes.map(String) : [],
               comment: raw.comment,
             }
           : undefined,
