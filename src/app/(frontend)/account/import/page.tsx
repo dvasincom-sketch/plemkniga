@@ -9,6 +9,7 @@ import { ImportCard } from '@/components/ImportCard'
 import { ExportCard } from '@/components/ExportCard'
 import { IntegrationChannels } from '@/components/IntegrationChannels'
 import { getCurrentUser } from '@/lib/payload'
+import { denyAssociation } from '@/lib/association'
 
 export const metadata: Metadata = { title: 'Загрузка данных' }
 export const dynamic = 'force-dynamic'
@@ -22,6 +23,8 @@ export const dynamic = 'force-dynamic'
  */
 export default async function ImportPage() {
   const user = await getCurrentUser()
+  // Кабинет хозяйства — не для сотрудника Ассоциации: у него свой раздел
+  denyAssociation(user)
   if (!user) redirect('/login')
 
   return (

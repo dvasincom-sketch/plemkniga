@@ -5,9 +5,10 @@ import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { AssociationNav } from '@/components/AssociationNav'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
-import { Decision, Findings, TakeIntoWork } from '@/components/SubmissionReview'
+import { AutoIssues, Decision, Findings, TakeIntoWork } from '@/components/SubmissionReview'
 import { getClient } from '@/lib/payload'
 import { requireAssociation, waitingDays, waitingLabel } from '@/lib/association'
+import { checkAnimals } from '@/lib/data-checks'
 import { SUBMISSION_KINDS, SUBMISSION_STATUSES } from '@/collections/DataSubmissions'
 import { labelOf, trustLabel } from '@/lib/dictionaries'
 import { dateRu } from '@/lib/format'
@@ -84,10 +85,19 @@ export default async function ReviewSubmissionPage({
         : (f.animal ?? null),
   }))
 
+  /*
+   * Автоматические проверки гоняются при каждом открытии страницы, а не
+   * сохраняются в пакет. Причина простая: данные меняются. Хозяйство
+   * поправило дату рождения — находка должна исчезнуть сама, а не висеть
+   * до тех пор, пока кто-нибудь не пересчитает. Сохранять стоит только
+   * то, что сказал человек.
+   */
+  const issues = await checkAnimals(payload, animals)
+
   const blocking = findings.filter((f) => (f.severity ?? 'fix') === 'fix').length
   const decided = submission.status === 'checked' || submission.status === 'accepted' || submission.status === 'rejected'
   const assignee = personOf(submission.review?.assignee)
-  const issues = submission.intake?.issues ?? []
+  const intakeIssues = submission.intake?.issues ?? []
 
   return (
     <>
@@ -155,20 +165,20 @@ export default async function ReviewSubmissionPage({
                   <Fact label="Пропущено" value={submission.intake?.skipped ?? '—'} />
                 </div>
 
-                {issues.length > 0 && (
+                {intakeIssues.length > 0 && (
                   <div className="mt-5">
                     <p className="mb-2 text-[14px] font-medium">Непринятые строки</p>
                     <ul className="text-[14px] text-ink-700">
-                      {issues.slice(0, 20).map((i) => (
+                      {intakeIssues.slice(0, 20).map((i) => (
                         <li key={i.id} className="border-b border-[#ededed] py-1.5 last:border-0">
                           строка {i.row ?? '—'}
                           {i.ident ? `, № ${i.ident}` : ''} — {i.reason}
                         </li>
                       ))}
                     </ul>
-                    {issues.length > 20 && (
+                    {intakeIssues.length > 20 && (
                       <p className="mt-2 text-[13px] text-ink-500">
-                        и ещё {issues.length - 20}; полный список — в протоколе загрузки.
+                        и ещё {intakeIssues.length - 20}; полный список — в протоколе загрузки.
                       </p>
                     )}
                   </div>
@@ -229,6 +239,9 @@ export default async function ReviewSubmissionPage({
                 </table>
               </div>
             </div>
+
+            {/* --------------------- Автоматические проверки ------------------ */}
+            <AutoIssues id={submission.id} issues={issues} readOnly={decided} />
 
             {/* -------------------------- Находки ----------------------------- */}
             <Findings

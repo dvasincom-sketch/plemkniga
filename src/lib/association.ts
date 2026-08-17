@@ -24,6 +24,19 @@ export async function requireAssociation(): Promise<User> {
   return user
 }
 
+/**
+ * Обратная проверка: сотруднику Ассоциации здесь делать нечего.
+ *
+ * Ставится на страницы кабинета хозяйства. У эксперта нет своего стада,
+ * и «Мои животные» для него — не пустой список, а вопрос «в какой я сейчас
+ * роли», который он не должен себе задавать. Личные страницы — профиль
+ * и уведомления — под это правило не попадают: они не про хозяйство,
+ * а про человека.
+ */
+export function denyAssociation(user: { role?: string | null } | null): void {
+  if (isAssociationUser(user)) redirect('/association')
+}
+
 /** Сколько дней ждёт пакет — главная метрика очереди. */
 export const waitingDays = (since?: string | null): number => {
   if (!since) return 0

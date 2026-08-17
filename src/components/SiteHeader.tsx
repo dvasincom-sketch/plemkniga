@@ -34,23 +34,30 @@ export async function SiteHeader({ active }: { active?: string }) {
       ? (user.organization.shortName || user.organization.name)
       : null
 
+  /*
+   * Сотрудник Ассоциации: эксперт или администратор.
+   *
+   * У него нет своего стада, и разделы кабинета хозяйства ему не показываются
+   * вовсе — ни в шапке, ни в меню под именем. Сначала я сделал иначе: думал,
+   * что эксперт может состоять в хозяйстве и смотреть его данные заодно.
+   * Это ошибка: человек, у которого в меню и «Мои животные», и «Очередь
+   * проверки», каждый раз решает, в какой он сейчас роли, — а решать это
+   * должен не он.
+   */
+  const association = user?.role === 'expert' || user?.role === 'admin'
+
   const nav: NavItem[] = [
     { href: '/', label: 'Племенная книга' },
     { href: '/analytics', label: 'Аналитика', locked: !user },
     { href: '/auctions', label: 'Аукционы', locked: !user },
   ]
 
-  /*
-   * Сотруднику Ассоциации в шапке добавляется вход в его кабинет.
-   *
-   * Не вместо кабинета хозяйства, а рядом: эксперт может состоять
-   * в организации и смотреть её данные как обычный пользователь. Две роли
-   * у одного человека — нормальная ситуация, и прятать одну ради другой
-   * значит заставлять его выходить и входить заново.
-   */
-  if (user?.role === 'expert' || user?.role === 'admin') {
-    nav.push({ href: '/association', label: 'Проверка данных' })
-  }
+  if (association) nav.push({ href: '/association', label: 'Проверка данных' })
+
+  // Под именем — от чьего лица человек действует. У хозяйства это его
+  // организация, у сотрудника Ассоциации — сама Ассоциация и его роль в ней.
+  const associationLabel =
+    user?.role === 'admin' ? 'Ассоциация · администратор' : 'Ассоциация · эксперт'
 
   return (
     /*
@@ -127,6 +134,8 @@ export async function SiteHeader({ active }: { active?: string }) {
               orgName={orgName}
               active={active}
               unread={unread}
+              association={association}
+              associationLabel={associationLabel}
             />
 
             <LogoutButton compact />

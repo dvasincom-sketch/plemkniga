@@ -16,7 +16,12 @@ import Link from 'next/link'
 export const ASSOCIATION_TABS = [
   { key: 'queue', href: '/association', label: 'Очередь проверки', hint: 'Пакеты, ждущие разбора' },
   { key: 'farms', href: '', label: 'Хозяйства', hint: 'Членство и заявки' },
-  { key: 'verifications', href: '', label: 'Верификации', hint: 'Запросы по животным' },
+  {
+    key: 'verifications',
+    href: '/association/verifications',
+    label: 'Верификации',
+    hint: 'Заявки хозяйств по животным',
+  },
   { key: 'documents', href: '', label: 'Документы', hint: 'Выпуск и журнал выдачи' },
   { key: 'quality', href: '', label: 'Качество книги', hint: 'Ревизии и достоверность' },
 ] as const

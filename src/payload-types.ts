@@ -79,6 +79,7 @@ export interface Config {
     'animal-exteriors': AnimalExterior;
     'animal-revisions': AnimalRevision;
     'data-submissions': DataSubmission;
+    'verification-requests': VerificationRequest;
     'access-requests': AccessRequest;
     'index-profiles': IndexProfile;
     'index-values': IndexValue;
@@ -120,6 +121,7 @@ export interface Config {
     'animal-exteriors': AnimalExteriorsSelect<false> | AnimalExteriorsSelect<true>;
     'animal-revisions': AnimalRevisionsSelect<false> | AnimalRevisionsSelect<true>;
     'data-submissions': DataSubmissionsSelect<false> | DataSubmissionsSelect<true>;
+    'verification-requests': VerificationRequestsSelect<false> | VerificationRequestsSelect<true>;
     'access-requests': AccessRequestsSelect<false> | AccessRequestsSelect<true>;
     'index-profiles': IndexProfilesSelect<false> | IndexProfilesSelect<true>;
     'index-values': IndexValuesSelect<false> | IndexValuesSelect<true>;
@@ -1195,6 +1197,46 @@ export interface DataSubmission {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "verification-requests".
+ */
+export interface VerificationRequest {
+  id: number;
+  /**
+   * Присваивается автоматически
+   */
+  number?: string | null;
+  status: 'new' | 'checking' | 'approved' | 'rejected';
+  purpose?: ('trust' | 'certificate' | 'membership') | null;
+  organization?: (number | null) | Organization;
+  requestedBy?: (number | null) | User;
+  requestedAt?: string | null;
+  animals: (number | Animal)[];
+  /**
+   * Что хозяйство хочет пояснить о поданных записях
+   */
+  comment?: string | null;
+  review?: {
+    assignee?: (number | null) | User;
+    decidedBy?: (number | null) | User;
+    decidedAt?: string | null;
+    comment?: string | null;
+    approvedCount?: number | null;
+    heldCount?: number | null;
+    findings?:
+      | {
+          animal?: (number | null) | Animal;
+          field?: string | null;
+          severity?: ('fix' | 'note') | null;
+          text: string;
+          id?: string | null;
+        }[]
+      | null;
+  };
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "access-requests".
  */
 export interface AccessRequest {
@@ -1446,6 +1488,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'data-submissions';
         value: number | DataSubmission;
+      } | null)
+    | ({
+        relationTo: 'verification-requests';
+        value: number | VerificationRequest;
       } | null)
     | ({
         relationTo: 'access-requests';
@@ -2128,6 +2174,41 @@ export interface DataSubmissionsSelect<T extends boolean = true> {
         actor?: T;
         note?: T;
         id?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "verification-requests_select".
+ */
+export interface VerificationRequestsSelect<T extends boolean = true> {
+  number?: T;
+  status?: T;
+  purpose?: T;
+  organization?: T;
+  requestedBy?: T;
+  requestedAt?: T;
+  animals?: T;
+  comment?: T;
+  review?:
+    | T
+    | {
+        assignee?: T;
+        decidedBy?: T;
+        decidedAt?: T;
+        comment?: T;
+        approvedCount?: T;
+        heldCount?: T;
+        findings?:
+          | T
+          | {
+              animal?: T;
+              field?: T;
+              severity?: T;
+              text?: T;
+              id?: T;
+            };
       };
   updatedAt?: T;
   createdAt?: T;

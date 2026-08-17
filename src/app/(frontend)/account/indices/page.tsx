@@ -10,6 +10,7 @@ import { ProfileComparison } from '@/components/ProfileComparison'
 import { EconomicAssumptions } from '@/components/EconomicAssumptions'
 import { CreateProfile } from '@/components/CreateProfile'
 import { getClient, getCurrentUser } from '@/lib/payload'
+import { denyAssociation } from '@/lib/association'
 import { ASSOCIATION_PROFILE, type IndexProfile } from '@/lib/breeding-index'
 import { loadActiveBase } from '@/lib/index-base'
 import { PROFILE_GROUPS, loadOwnProfiles, ownKey, profileOfDoc } from '@/lib/index-profiles'
@@ -152,6 +153,8 @@ function ProfileCard({
 
 export default async function IndexProfilesPage() {
   const user = await getCurrentUser()
+  // Кабинет хозяйства — не для сотрудника Ассоциации: у него свой раздел
+  denyAssociation(user)
   if (!user) redirect('/login?next=/account/indices')
 
   const org =

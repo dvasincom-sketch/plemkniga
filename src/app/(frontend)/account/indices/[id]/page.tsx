@@ -7,6 +7,7 @@ import { AccountNav } from '@/components/AccountNav'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { ProfileEditor } from '@/components/ProfileEditor'
 import { getClient, getCurrentUser } from '@/lib/payload'
+import { denyAssociation } from '@/lib/association'
 import { ASSOCIATION_PROFILE, computeIndex } from '@/lib/breeding-index'
 import { loadActiveBase } from '@/lib/index-base'
 import { CorrelatedResponse } from '@/components/CorrelatedResponse'
@@ -27,6 +28,8 @@ export default async function EditIndexProfilePage({
 }) {
   const { id } = await params
   const user = await getCurrentUser()
+  // Кабинет хозяйства — не для сотрудника Ассоциации: у него свой раздел
+  denyAssociation(user)
   if (!user) redirect(`/login?next=/account/indices/${id}`)
 
   const org =

@@ -10,6 +10,7 @@ import { Pagination } from '@/components/Pagination'
 import { ProfileForm } from '@/components/ProfileForm'
 import { VisibilityForm } from '@/components/VisibilityForm'
 import { getClient, getCurrentUser } from '@/lib/payload'
+import { denyAssociation } from '@/lib/association'
 import { viewerOf, type Viewer } from '@/lib/visibility'
 import {
   NOT_ARCHIVED,
@@ -43,6 +44,8 @@ export default async function AccountPage({
 }) {
   const sp = await searchParams
   const user = await getCurrentUser()
+  // Кабинет хозяйства — не для сотрудника Ассоциации: у него свой раздел
+  denyAssociation(user)
   const viewer = viewerOf(user)
   if (!user) redirect('/login')
 
@@ -415,6 +418,26 @@ async function EventsTab({ orgId }: { orgId?: number }) {
       <section className="mt-8">
         <h2 className="section-title mb-6">История загрузок</h2>
         <SubmissionHistory submissions={submissions.docs} />
+      </section>
+
+      {/*
+         Верификация стоит рядом с загрузками, потому что это второй путь
+         к тому же результату — уровню «Верифицировано ассоциацией».
+         Загрузкой его получают записи из проверенного файла; заявкой —
+         любые свои, независимо от того, когда они попали в систему.
+      */}
+      <section className="mt-10">
+        <h2 className="section-title mb-6">Верификация записей</h2>
+        <div className="card">
+          <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
+            Подайте свои записи в Ассоциацию, чтобы она подтвердила их по документам. Это
+            не загрузка данных: подавать можно любые записи стада, в том числе те, что лежат
+            в системе давно. Подтверждение требуется перед выпуском племенного свидетельства.
+          </p>
+          <Link href="/account/verification" className="btn btn-accent mt-5">
+            Подать на верификацию
+          </Link>
+        </div>
       </section>
 
       <section className="mt-10">

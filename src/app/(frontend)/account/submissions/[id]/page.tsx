@@ -7,6 +7,7 @@ import { AccountNav } from '@/components/AccountNav'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { SubmissionPublishForm } from '@/components/SubmissionPublishForm'
 import { getClient, getCurrentUser } from '@/lib/payload'
+import { denyAssociation } from '@/lib/association'
 import { SUBMISSION_KINDS, SUBMISSION_STATUSES } from '@/collections/DataSubmissions'
 import { labelOf } from '@/lib/dictionaries'
 
@@ -56,6 +57,8 @@ export default async function SubmissionPage({
   const { history: showHistory } = await searchParams
 
   const user = await getCurrentUser()
+  // Кабинет хозяйства — не для сотрудника Ассоциации: у него свой раздел
+  denyAssociation(user)
   if (!user) redirect('/login')
 
   const payload = await getClient()

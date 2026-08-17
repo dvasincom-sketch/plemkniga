@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ACCOUNT_TABS } from './AccountNav'
+import { ASSOCIATION_TABS } from './AssociationNav'
 
 /**
  * Меню кабинета в шапке — раскрывается при наведении на имя пользователя.
@@ -36,11 +37,23 @@ export function HeaderAccountMenu({
   orgName,
   active,
   unread = 0,
+  association = false,
+  associationLabel,
 }: {
   displayName: string
   orgName: string | null
   active?: string
   unread?: number
+  /**
+   * Сотрудник Ассоциации.
+   *
+   * У него нет своего стада, поэтому нет и разделов кабинета хозяйства:
+   * меню показывает его собственные — очередь проверки и остальное.
+   * Под именем вместо организации стоит «Ассоциация»: человек должен
+   * видеть, от чьего лица он сейчас действует, не открывая профиль.
+   */
+  association?: boolean
+  associationLabel?: string
 }) {
   const [open, setOpen] = useState(false)
   const [rect, setRect] = useState<{ top: number; right: number; width: number } | null>(null)
@@ -102,6 +115,14 @@ export function HeaderAccountMenu({
 
   const isProfile = active === '/account/profile'
 
+  // Разделы меню — свои для каждой стороны; у Ассоциации показываются только
+  // готовые, будущие висят неактивными в её собственной навигации, а не здесь
+  const tabs = association
+    ? ASSOCIATION_TABS.filter((t) => t.href).map((t) => ({ key: t.key, href: t.href, label: t.label }))
+    : ACCOUNT_TABS.map((t) => ({ key: t.key, href: `/account?tab=${t.key}`, label: t.label }))
+
+  const subtitle = association ? (associationLabel ?? 'Ассоциация') : orgName
+
   return (
     <div ref={anchorRef} className="sm:min-w-[232px]" onMouseEnter={show} onMouseLeave={hide}>
       <Link
@@ -132,9 +153,9 @@ export function HeaderAccountMenu({
         </span>
         <span className="hidden leading-tight sm:block">
           <span className="block text-[15px]">{displayName}</span>
-          {orgName && (
+          {subtitle && (
             <span className={`block text-[12px] ${open ? 'text-white/75' : 'text-ink-500'}`}>
-              {orgName}
+              {subtitle}
             </span>
           )}
         </span>
@@ -160,10 +181,10 @@ export function HeaderAccountMenu({
             className="account-menu fixed z-[100] overflow-hidden rounded-b-2xl rounded-tl-2xl bg-forest-500 pb-1.5 shadow-[0_16px_40px_rgb(23_24_26_/_0.22)] sm:rounded-tl-none"
           >
             <ul>
-              {ACCOUNT_TABS.map((t) => (
+              {tabs.map((t) => (
                 <li key={t.key}>
                   <Link
-                    href={`/account?tab=${t.key}`}
+                    href={t.href}
                     onClick={() => setOpen(false)}
                     className="block px-4 py-2.5 text-[15px] text-white/95 transition-colors hover:bg-white/10 active:bg-white/15"
                   >

@@ -7,6 +7,7 @@ import { AccountNav } from '@/components/AccountNav'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { NewAnimalForm } from '@/components/NewAnimalForm'
 import { getClient, getCurrentUser } from '@/lib/payload'
+import { denyAssociation } from '@/lib/association'
 import { relId } from '@/lib/visibility'
 
 export const metadata: Metadata = { title: 'Новое животное' }
@@ -22,6 +23,8 @@ export const dynamic = 'force-dynamic'
  */
 export default async function NewAnimalPage() {
   const user = await getCurrentUser()
+  // Кабинет хозяйства — не для сотрудника Ассоциации: у него свой раздел
+  denyAssociation(user)
   if (!user) redirect('/login')
 
   const orgId = relId(user.organization)
