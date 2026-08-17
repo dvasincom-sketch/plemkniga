@@ -93,6 +93,33 @@ const HERD_GRANT_LIMIT = 200
  */
 const MEMO_TTL_MS = 2000
 
+/**
+ * Выключатель на время замера — и только вне прода.
+ *
+ * Вопрос «сколько стоит точечный доступ» невозможно решить сравнением
+ * с прошлыми замерами: те снимались на продовой сборке, а мерить удобно
+ * на своей машине, где `next dev` компилирует по требованию и цифры кратно
+ * другие. Сравнивать надо одну и ту же сборку с собой: поднять с этой
+ * переменной и без неё, разница и есть цена слоя.
+ *
+ *   PLEMKNIGA_GRANTS_OFF=1 npm run dev
+ *
+ * На проде переменная не действует ни при каких значениях. Выключатель прав
+ * доступа, который можно случайно оставить включённым в боевом окружении, —
+ * это не инструмент, а мина: точечный доступ молча перестал бы работать,
+ * и никто бы не понял почему. Поэтому проверка `NODE_ENV` стоит здесь,
+ * а не в документации.
+ */
+const GRANTS_OFF =
+  process.env.NODE_ENV !== 'production' && process.env.PLEMKNIGA_GRANTS_OFF === '1'
+
+if (GRANTS_OFF) {
+  console.warn(
+    '[plemkniga] PLEMKNIGA_GRANTS_OFF=1 — точечный доступ выключен. ' +
+      'Гранты не читаются и ничего не открывают. Это режим замера, не забудьте убрать',
+  )
+}
+
 type Row = {
   animal?: unknown
   owner?: unknown
@@ -199,7 +226,7 @@ export async function grantsFor(
   payload: BasePayload,
   org: number | null | undefined,
 ): Promise<Grants> {
-  if (!org) return NO_GRANTS
+  if (!org || GRANTS_OFF) return NO_GRANTS
 
   const { rows, truncated } = await read(payload, org)
   if (!rows.length) return NO_GRANTS
@@ -237,6 +264,7 @@ type UserLike = { organization?: unknown } | null | undefined
  * ради своей работы вызывает правило доступа, даёт рекурсию на ровном месте.
  */
 export async function grantsForRequest(req: PayloadRequest): Promise<Grants> {
+  if (GRANTS_OFF) return NO_GRANTS
   const org = relId((req.user as UserLike)?.organization)
   if (org === null) return NO_GRANTS
   return grantsFor(req.payload, org)
