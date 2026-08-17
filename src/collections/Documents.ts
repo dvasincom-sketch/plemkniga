@@ -1,7 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { DOCUMENT_TYPES, toOptions } from '@/lib/dictionaries'
 import { documentMutate, documentRead, isAdmin, isAuthenticated } from '@/access'
-import { requireOwnOrganization } from '@/access/guards'
+import { associationIssuesOnly, requireOwnOrganization } from '@/access/guards'
 
 export const Documents: CollectionConfig = {
   slug: 'documents',
@@ -18,7 +18,7 @@ export const Documents: CollectionConfig = {
     update: documentMutate,
     delete: isAdmin,
   },
-  hooks: { beforeChange: [requireOwnOrganization] },
+  hooks: { beforeChange: [requireOwnOrganization, associationIssuesOnly] },
   fields: [
     { name: 'title', type: 'text', label: 'Название', required: true },
     {
@@ -31,7 +31,21 @@ export const Documents: CollectionConfig = {
           options: toOptions(DOCUMENT_TYPES),
           defaultValue: 'pedigreeCertificate',
         },
-        { name: 'number', type: 'text', label: 'Номер' },
+        {
+          /*
+           * Номер уникален. Он считался как «сколько уже выдано за год
+           * плюс один», и без уникальности два одновременных выпуска
+           * или одна удалённая строка давали два документа с одним
+           * номером — молча. Номер свидетельства на него ссылаются
+           * снаружи, и совпадение здесь не опечатка, а два разных
+           * животных под одной бумагой.
+           */
+          name: 'number',
+          type: 'text',
+          label: 'Номер',
+          unique: true,
+          index: true,
+        },
         { name: 'issuedAt', type: 'date', label: 'Дата выдачи' },
       ],
     },

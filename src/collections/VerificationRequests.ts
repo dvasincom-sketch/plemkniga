@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
-import { isAdmin, isAuthenticated, organizationScopedRead } from '@/access'
+import { isAdmin, isAssociationAccess, isAuthenticated, organizationScopedRead } from '@/access'
+import { requireOwnOrganization } from '@/access/guards'
 
 export const VERIFICATION_STATUSES = [
   { value: 'new', label: 'Подано' },
@@ -47,7 +48,21 @@ export const VerificationRequests: CollectionConfig = {
     // Заявка — дело хозяйства и Ассоциации; соседям не показывается
     read: organizationScopedRead,
     create: isAuthenticated,
-    update: isAuthenticated,
+    /*
+     * Решение по заявке принимает Ассоциация, и только она.
+     *
+     * Раньше здесь стояло `isAuthenticated`, как когда-то у отёлов и стад
+     * (решение №45). Последствие было хуже: через API любой вошедший мог
+     * выставить чужой заявке `status: approved`, дописать или снести
+     * замечания — то есть подделать результат проверки, ради которой
+     * Ассоциация и существует. Проверки жили только в серверных действиях,
+     * а API работает в обход действий.
+     *
+     * Хозяйство свою заявку не правит вовсе: подать её можно, отозвать —
+     * нет. Заявка на проверку, которую заявитель может переписать после
+     * подачи, ничего не доказывает.
+     */
+    update: isAssociationAccess,
     delete: isAdmin,
   },
   defaultSort: '-requestedAt',
@@ -190,6 +205,12 @@ export const VerificationRequests: CollectionConfig = {
 
   hooks: {
     beforeChange: [
+      /*
+       * На создании правило доступа отдаёт булево и содержимого записи
+       * не видит: хук сверяет организацию заявки с организацией
+       * подающего, иначе заявку можно подать от чужого имени.
+       */
+      requireOwnOrganization,
       async ({ data, req, operation }) => {
         if (operation !== 'create') return data
 

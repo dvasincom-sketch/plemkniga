@@ -173,6 +173,25 @@ export async function revokeDocumentAction(
   const reason = String(formData.get('reason') || '').trim()
   if (!reason) return { error: 'Укажите причину отзыва — она останется в журнале' }
 
+  /*
+   * Отозвать дважды нельзя.
+   *
+   * Кнопка в интерфейсе у отозванного документа скрыта, но действие
+   * принимает любой идентификатор, и повторный отзыв переписывал бы дату,
+   * автора и причину первого. Отзыв — событие, случившееся однажды;
+   * переписать его значит подменить запись о прошлом, ровно то, ради чего
+   * документы не удаляют, а отзывают.
+   */
+  const current = await payload.findByID({
+    collection: 'documents',
+    id,
+    depth: 0,
+    overrideAccess: true,
+  })
+  if ((current as { revoked?: { at?: string | null } })?.revoked?.at) {
+    return { error: 'Документ уже отозван — повторно отозвать его нельзя' }
+  }
+
   try {
     await payload.update({
       collection: 'documents',

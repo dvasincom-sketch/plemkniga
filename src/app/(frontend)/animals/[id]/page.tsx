@@ -20,6 +20,7 @@ import { CertificateSection } from '@/components/CertificateSection'
 import { certificateReadiness } from '@/lib/certification'
 import { ClosedAnimal } from '@/components/ClosedAnimal'
 import { AccessRequestForm } from '@/components/AccessRequestForm'
+import { AnimalVisibility } from '@/components/AnimalVisibility'
 import { GrantBanner, ScopeLocked } from '@/components/AccessScope'
 import { grantsFor, scopesForAnimal } from '@/lib/grants'
 import { recordAnimalView, uniqueViews } from '@/lib/access-log'
@@ -1051,6 +1052,16 @@ export default async function AnimalPage({
             </div>
           </section>
         )}
+        {/* Публичность записи — на вкладке общих данных: там же лежат
+            остальные свойства самой записи, а не её измерений */}
+        {isMine && tab === 'general' && (
+          <AnimalVisibility
+            animalId={animal.id as number}
+            publicVisible={Boolean(animal.publicVisible)}
+            publicDetails={Boolean(animal.publicDetails)}
+          />
+        )}
+
         {/* Форма запроса живёт внизу страницы, а не на каждой закрытой
             вкладке: плашки на неё только ссылаются якорем. Иначе одна и та же
             форма рисовалась бы четырежды и вела бы четыре разных состояния */}

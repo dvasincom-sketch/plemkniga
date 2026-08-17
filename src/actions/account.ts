@@ -111,3 +111,73 @@ export async function setHerdVisibilityAction(
   revalidatePath('/')
   return { message: `Обновлено записей: ${res.docs.length}` }
 }
+
+/**
+ * Публичность одной записи.
+ *
+ * Переключатель на всё стадо остаётся: заводя хозяйство, публичность решают
+ * оптом, и гонять человека по тысяче животных незачем. Но оптом решается
+ * не всё — одного быка выставляют на продажу и открывают, пока остальное
+ * стадо закрыто, одну корову закрывают перед сделкой.
+ *
+ * С появлением точечного доступа несоответствие стало заметным: грант
+ * выдаётся по одному животному, а публичность — только всему стаду сразу.
+ *
+ * Запись идёт с правами пользователя: правило `animalMutate` само отсекает
+ * чужих животных. Проверять владельца здесь второй раз — значит завести
+ * то же правило в двух местах, и однажды они разойдутся.
+ */
+export async function setAnimalVisibilityAction(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const user = await getCurrentUser()
+  if (!user) return { error: 'Требуется авторизация' }
+
+  const animalId = Number(formData.get('animal'))
+  if (!Number.isFinite(animalId) || animalId <= 0) return { error: 'Животное не определено' }
+
+  const visible = formData.get('publicVisible') === 'on'
+  const details = formData.get('publicDetails') === 'on'
+
+  const payload = await getClient()
+
+  /*
+   * Показ в общей книге — то, за что ручается Ассоциация, поэтому он открыт
+   * её членам. Скрыть свою запись можно всегда: запрет должен мешать
+   * выставлять данные, а не убирать их. То же правило, что у настройки
+   * на всё стадо.
+   */
+  if (visible) {
+    const orgId = orgOf(user)
+    if (!orgId) return { error: 'У пользователя не заполнена организация' }
+    const { membershipGate } = await import('@/lib/membership')
+    const gate = await membershipGate(payload, orgId)
+    if (!gate.allowed) return { error: gate.reason }
+  }
+
+  try {
+    await payload.update({
+      collection: 'animals',
+      id: animalId,
+      // Вторая ступень без первой не значит ничего: карточка записи,
+      // которой нет в книге, не откроется всё равно
+      data: { publicVisible: visible, publicDetails: visible && details },
+      user,
+      overrideAccess: false,
+    })
+  } catch {
+    return { error: 'Не удалось сохранить: запись не ваша или недоступна' }
+  }
+
+  revalidatePath(`/animals/${animalId}`)
+  revalidatePath('/account')
+  revalidatePath('/')
+  return {
+    message: visible
+      ? details
+        ? 'Запись видна в книге, карточка открыта'
+        : 'Запись видна в книге, карточка закрыта'
+      : 'Запись убрана из книги',
+  }
+}

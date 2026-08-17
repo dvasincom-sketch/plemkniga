@@ -119,3 +119,31 @@ export const requireOwnOrganization: CollectionBeforeChangeHook = async ({
 
   throw new Error('Не указано, к какой организации относится запись')
 }
+
+/**
+ * «Кто выдал» проставляет только Ассоциация.
+ *
+ * Журнал выдачи документов на `/association/documents` отбирает строки
+ * по заполненному `issuedBy` — это и есть признак «документ выпустила
+ * Ассоциация». Пустое поле означает бумагу, которую хозяйство загрузило
+ * само: ветеринарную справку, договор.
+ *
+ * Без этой проверки хозяйство через API заводило документ на своё животное,
+ * подставляло себя в `issuedBy` и попадало в журнал Ассоциации. Журнал,
+ * в который можно вписаться снаружи, ничего не удостоверяет — тот же довод,
+ * что у журнала правок и журнала просмотров.
+ */
+export const associationIssuesOnly: CollectionBeforeChangeHook = ({ data, req, originalDoc }) => {
+  const user = req.user as U | null
+  if (!user) return data
+  if (isAssociation(user)) return data
+
+  const before = relId((originalDoc as { issuedBy?: unknown })?.issuedBy)
+  const after = relId(data?.issuedBy)
+
+  if (after !== before) {
+    throw new Error('Поле «кто выдал» заполняет Ассоциация, а не хозяйство')
+  }
+
+  return data
+}
