@@ -86,7 +86,7 @@ export function DocsNav({ items }: { items: NavItem[] }) {
                 } ${
                   isActive
                     ? 'border-l-forest-500 text-forest-600'
-                    : 'border-l-transparent text-ink-700 hover:border-l-ink-200 hover:text-ink-900'
+                    : 'border-l-transparent text-ink-700 hover:border-l-ink-100 hover:text-ink-900'
                 }`}
               >
                 {item.title}
