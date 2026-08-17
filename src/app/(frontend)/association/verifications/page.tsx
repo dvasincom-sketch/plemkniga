@@ -7,13 +7,16 @@ import { getClient } from '@/lib/payload'
 import {
   WAITING_LATE_DAYS,
   WAITING_WARN_DAYS,
+  isStaleSchemaError,
   requireAssociation,
   waitingDays,
   waitingLabel,
 } from '@/lib/association'
+import { StaleSchemaNotice } from '@/components/StaleSchemaNotice'
 import { VERIFICATION_PURPOSES, VERIFICATION_STATUSES } from '@/collections/VerificationRequests'
 import { labelOf } from '@/lib/dictionaries'
 import { dateRu } from '@/lib/format'
+import type { VerificationRequest } from '@/payload-types'
 
 export const metadata: Metadata = { title: 'Заявки на верификацию' }
 export const dynamic = 'force-dynamic'
@@ -47,16 +50,32 @@ export default async function VerificationQueuePage({
 
   const payload = await getClient()
 
-  const { docs, totalDocs } = await payload.find({
-    collection: 'verification-requests',
-    where: closed
-      ? { status: { in: ['approved', 'rejected'] } }
-      : { status: { in: ['new', 'checking'] } },
-    sort: closed ? '-requestedAt' : 'requestedAt',
-    limit: 100,
-    depth: 1,
-    overrideAccess: true,
-  })
+  /*
+   * Коллекция молодая, и сервер разработки, запущенный до её появления,
+   * о ней не знает. Отвечаем на это инструкцией, а не стеком: см.
+   * `isStaleSchemaError`.
+   */
+  let docs: VerificationRequest[] = []
+  let totalDocs = 0
+  let stale = false
+
+  try {
+    const res = await payload.find({
+      collection: 'verification-requests',
+      where: closed
+        ? { status: { in: ['approved', 'rejected'] } }
+        : { status: { in: ['new', 'checking'] } },
+      sort: closed ? '-requestedAt' : 'requestedAt',
+      limit: 100,
+      depth: 1,
+      overrideAccess: true,
+    })
+    docs = res.docs as VerificationRequest[]
+    totalDocs = res.totalDocs
+  } catch (e) {
+    if (!isStaleSchemaError(e)) throw e
+    stale = true
+  }
 
   return (
     <>
@@ -99,7 +118,13 @@ export default async function VerificationQueuePage({
             </Link>
           </div>
 
-          <div className="card mt-6">
+          {stale && (
+            <div className="mt-6">
+              <StaleSchemaNotice what="заявок на верификацию" />
+            </div>
+          )}
+
+          <div className={`card mt-6 ${stale ? 'hidden' : ''}`}>
             <div className="overflow-x-auto">
               <table className="metric-table">
                 <thead>

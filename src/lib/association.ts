@@ -37,6 +37,30 @@ export function denyAssociation(user: { role?: string | null } | null): void {
   if (isAssociationUser(user)) redirect('/association')
 }
 
+/**
+ * Признак того, что сервер работает со старой схемой.
+ *
+ * Payload строит свою копию конфигурации при запуске и держит её в памяти
+ * всё время жизни процесса. Сервер разработки живёт долго — днями, — и всё,
+ * что появилось в коллекциях после его старта, для него не существует:
+ * новое поле нельзя запросить, новую коллекцию нельзя найти. Горячая
+ * перезагрузка Next этого не меняет: перестраивается код страниц,
+ * а не конфигурация Payload.
+ *
+ * Ошибка при этом выглядит пугающе — «коллекция не найдена», «путь нельзя
+ * запросить», — и читается как поломка данных, хотя данные в порядке.
+ * Поэтому её узнаём в лицо и отвечаем инструкцией вместо стека.
+ *
+ * На боевом сервере такого не бывает: там каждый выпуск — новый процесс.
+ */
+export function isStaleSchemaError(e: unknown): boolean {
+  const message = e instanceof Error ? e.message : String(e)
+  return (
+    /collection with slug .* can't be found/i.test(message) ||
+    /following path cannot be queried/i.test(message)
+  )
+}
+
 /** Сколько дней ждёт пакет — главная метрика очереди. */
 export const waitingDays = (since?: string | null): number => {
   if (!since) return 0

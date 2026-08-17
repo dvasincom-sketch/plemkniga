@@ -12,7 +12,8 @@ import {
   VerificationFindings,
 } from '@/components/VerificationReview'
 import { getClient } from '@/lib/payload'
-import { requireAssociation, waitingDays, waitingLabel } from '@/lib/association'
+import { isStaleSchemaError, requireAssociation, waitingDays, waitingLabel } from '@/lib/association'
+import { StaleSchemaNotice } from '@/components/StaleSchemaNotice'
 import { checkAnimals } from '@/lib/data-checks'
 import { VERIFICATION_PURPOSES, VERIFICATION_STATUSES } from '@/collections/VerificationRequests'
 import { labelOf, trustLabel } from '@/lib/dictionaries'
@@ -50,6 +51,11 @@ export default async function ReviewVerificationPage({
 
   const payload = await getClient()
 
+  /*
+   * Сервер разработки, запущенный до появления этой коллекции, о ней
+   * не знает — отвечаем инструкцией, а не стеком (см. `isStaleSchemaError`).
+   * Всё остальное — обычное «не найдено».
+   */
   let request
   try {
     request = await payload.findByID({
@@ -58,7 +64,19 @@ export default async function ReviewVerificationPage({
       depth: 2,
       overrideAccess: true,
     })
-  } catch {
+  } catch (e) {
+    if (isStaleSchemaError(e)) {
+      return (
+        <>
+          <SiteHeader active="/association" />
+          <main className="container-page pb-8">
+            <AssociationNav active="verifications" />
+            <StaleSchemaNotice what="заявок на верификацию" />
+          </main>
+          <SiteFooter />
+        </>
+      )
+    }
     notFound()
   }
   if (!request) notFound()
