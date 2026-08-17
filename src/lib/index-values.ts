@@ -430,7 +430,13 @@ export async function recomputeAll(
 }
 
 /**
- * Место животного в группе сравнения — по хранимым значениям.
+ * Место животного в группе сравнения.
+ *
+ * В обычном случае это чтение готового: полный пересчёт проставляет
+ * процентиль каждой строке, и карточке остаётся забрать его по ключу.
+ * Расчёт ниже — запасной путь для животного, сохранённого поодиночке
+ * после последнего прогона: его значение пересчитано, а место среди
+ * остальных — нет, для этого нужна вся популяция.
  *
  * Считается запросами к базе, а не выгрузкой всей популяции в память:
  * нужны только два числа — сколько значений ниже и сколько равных.
@@ -596,56 +602,68 @@ export async function percentileFromStored(
     }
   }
 
-  const scope = (year?: number | null): Where => ({
-    and: [
-      { profileKey: { equals: profileKey } },
-      { archived: { not_equals: true } },
-      ...(year ? [{ birthYear: { equals: year } }] : []),
-    ],
-  })
+  /*
+   * Запасной путь — прямым запросом, а не через Payload.
+   *
+   * Причина не в скорости, а в хрупкости. Отбор здесь идёт по колонкам-копиям
+   * (`birth_year`, `archived`), и Payload разрешает запрашивать только те пути,
+   * которые видит в своей разобранной схеме. Стоило конфигурации разойтись
+   * с кодом — например, сервер разработки поднялся до появления поля, —
+   * и страница падала с «The following path cannot be queried: birthYear».
+   * Для служебного пересчёта, который и так знает про эти колонки всё,
+   * посредник только добавляет способ сломаться.
+   *
+   * Заодно три счёта превратились в один запрос: размер группы, сколько ниже
+   * и сколько равных считаются одним проходом.
+   */
+  const pool = poolOf(payload)
 
-  const count = async (where: Where) =>
-    (await payload.count({ collection: 'index-values', where, overrideAccess: true })).totalDocs ?? 0
+  const measure = async (year: number | null) => {
+    const params: unknown[] = [profileKey, value]
+    const yearClause = year ? ` and birth_year = $3` : ''
+    if (year) params.push(year)
+
+    const res = await pool.query(
+      `select
+         count(*)::int                                    as total,
+         count(*) filter (where value < $2)::int          as below,
+         count(*) filter (where value = $2)::int          as equal
+       from index_values
+      where profile_key = $1 and archived is not true${yearClause}`,
+      params,
+    )
+
+    const row = (res.rows?.[0] ?? {}) as { total?: number; below?: number; equal?: number }
+    return { total: Number(row.total ?? 0), below: Number(row.below ?? 0), equal: Number(row.equal ?? 0) }
+  }
 
   /*
-   * Размер группы сравнения кэшируется, а «ниже» и «равных» — нет.
-   *
-   * Разница в том, от чего они зависят. Размер группы — свойство книги:
-   * для всех животных одного года и профиля он один и тот же, и меняется
-   * только когда книга пополняется. «Ниже» зависит от конкретного значения,
-   * и кэшировать его пришлось бы на каждое животное отдельно — то есть
-   * никак.
-   *
-   * Особенно дорог случай, когда ровесников мало и группа расширяется
-   * до всей книги: это счёт по двум миллионам строк, примерно 360 мс,
-   * и он повторялся на каждой карточке старого животного заново.
+   * Кэшируется только размер группы: он свойство книги, для всех ровесников
+   * одного профиля один и тот же и меняется лишь при пополнении. «Ниже»
+   * зависит от конкретного значения — кэш пришлось бы держать на каждое
+   * животное, то есть никак. Но раз запрос всё равно один, из него берётся
+   * и то и другое, а кэш служит только для решения «хватает ли ровесников».
    */
-  const groupCount = async (year: number | null): Promise<number> => {
+  const cohortSize = async (year: number | null): Promise<number> => {
     const key = `${profileKey}|${year ?? 'all'}`
     const hit = cohortCache.get(key)
     if (hit && Date.now() - hit.at < COHORT_TTL_MS) return hit.value
 
-    const value = await count(scope(year))
-    cohortCache.set(key, { at: Date.now(), value })
-    return value
+    const { total } = await measure(year)
+    cohortCache.set(key, { at: Date.now(), value: total })
+    return total
   }
 
-  let sameYear = Boolean(birthYear)
-  let group = await groupCount(sameYear ? birthYear! : null)
-  if (sameYear && group < MIN_COHORT) {
-    sameYear = false
-    group = await groupCount(null)
+  const sameYear = Boolean(birthYear) && (await cohortSize(birthYear!)) >= MIN_COHORT
+  const { total, below, equal } = await measure(sameYear ? birthYear! : null)
+  if (total < 2) return null
+
+  const p = ((below + equal / 2) / total) * 100
+  return {
+    percentile: Math.max(0, Math.min(99, Math.round(p))),
+    group: total,
+    sameYear,
   }
-  if (group < 2) return null
-
-  const base = scope(sameYear ? birthYear : null)
-  const [below, equal] = await Promise.all([
-    count({ and: [base, { value: { less_than: value } }] }),
-    count({ and: [base, { value: { equals: value } }] }),
-  ])
-
-  const p = ((below + equal / 2) / group) * 100
-  return { percentile: Math.max(0, Math.min(99, Math.round(p))), group, sameYear }
 }
 
 /**
