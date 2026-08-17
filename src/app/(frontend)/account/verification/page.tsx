@@ -142,21 +142,50 @@ export default async function VerificationPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {requests.docs.map((r) => (
-                      <tr key={r.id}>
-                        <td>{r.number ?? `#${r.id}`}</td>
-                        <td>{dateRu(r.requestedAt)}</td>
-                        <td className="text-right tabular-nums">{(r.animals ?? []).length}</td>
-                        <td>{labelOf(VERIFICATION_STATUSES, r.status)}</td>
-                        <td className="text-ink-500">
-                          {r.status === 'approved'
-                            ? `подтверждено ${r.review?.approvedCount ?? 0}${
-                                r.review?.heldCount ? `, с замечаниями ${r.review.heldCount}` : ''
-                              }`
-                            : (r.review?.comment ?? '—')}
-                        </td>
-                      </tr>
-                    ))}
+                    {requests.docs.map((r) => {
+                      const held = r.review?.heldCount ?? 0
+                      return (
+                        <tr key={r.id}>
+                          <td>
+                            {/*
+                              Номер заявки — ссылка на разбор. Раньше строка
+                              заканчивалась счётчиком, и «с замечаниями 3»
+                              было тупиком: какие именно три, узнать было
+                              негде.
+                            */}
+                            <Link
+                              href={`/account/verification/${r.id}`}
+                              className="underline underline-offset-4 hover:text-forest-500"
+                            >
+                              {r.number ?? `#${r.id}`}
+                            </Link>
+                          </td>
+                          <td>{dateRu(r.requestedAt)}</td>
+                          <td className="text-right tabular-nums">{(r.animals ?? []).length}</td>
+                          <td>{labelOf(VERIFICATION_STATUSES, r.status)}</td>
+                          <td className="text-ink-500">
+                            {r.status === 'approved' ? (
+                              <>
+                                подтверждено {r.review?.approvedCount ?? 0}
+                                {held > 0 && (
+                                  <>
+                                    , не прошло {held} —{' '}
+                                    <Link
+                                      href={`/account/verification/${r.id}`}
+                                      className="underline underline-offset-4 hover:text-forest-500"
+                                    >
+                                      смотреть замечания
+                                    </Link>
+                                  </>
+                                )}
+                              </>
+                            ) : (
+                              (r.review?.comment ?? '—')
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
