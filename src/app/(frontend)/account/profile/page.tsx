@@ -4,6 +4,8 @@ import { redirect } from 'next/navigation'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { AccountNav } from '@/components/AccountNav'
+import { AssociationNav } from '@/components/AssociationNav'
+import { isAssociationUser } from '@/lib/association'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { ProfileForm } from '@/components/ProfileForm'
 import { getCurrentUser } from '@/lib/payload'
@@ -50,20 +52,42 @@ export default async function ProfilePage({
       : null
 
   const roleLabel = labelOf(ROLES, user.role)
+  const association = isAssociationUser(user)
+
+  /*
+   * У сотрудника Ассоциации нет ни организации, ни платных услуг: реквизиты
+   * хозяйства и биллинг ему показывать нечем. Вкладки не прячутся «на всякий
+   * случай» — они просто не про него.
+   */
+  const tabs = association ? TABS.filter((t) => t.key === 'notifications' || t.key === 'user') : TABS
 
   return (
     <>
       <SiteHeader active="/account/profile" />
 
       <main className="container-page pb-8">
-        <AccountNav />
+        {/*
+           Профиль — личная страница, она открыта обеим сторонам. А вот меню
+           над ней у каждой своё: сотруднику Ассоциации показывать «Мои
+           животные» незачем, у него нет своего стада. Раньше здесь всегда
+           стояли разделы хозяйства, и на профиле эксперта они выглядели
+           приглашением, которое никуда не ведёт.
+        */}
+        {association ? <AssociationNav /> : <AccountNav />}
 
         <Breadcrumbs
-          items={[
-            { label: 'Личный кабинет', href: '/account' },
-            { label: 'Настройки', href: '/account?tab=settings' },
-            { label: 'Профиль пользователя' },
-          ]}
+          items={
+            association
+              ? [
+                  { label: 'Кабинет Ассоциации', href: '/association' },
+                  { label: 'Профиль пользователя' },
+                ]
+              : [
+                  { label: 'Личный кабинет', href: '/account' },
+                  { label: 'Настройки', href: '/account?tab=settings' },
+                  { label: 'Профиль пользователя' },
+                ]
+          }
         />
 
         <h1 className="text-[30px] font-medium leading-tight sm:text-[36px]">
@@ -74,30 +98,36 @@ export default async function ProfilePage({
           {org && <> · {org.name}</>}
         </p>
 
-        {/* ------------------------------ Вкладки ----------------------------- */}
+        {/*
+           Вкладки профиля — третий уровень навигации, и выглядеть он должен
+           третьим. Раньше плашки повторяли разделы кабинета: та же высота,
+           та же подпись под названием, — и два ряда читались как один
+           двухэтажный переключатель, в котором непонятно, что чему
+           подчинено.
+
+           Подписи убраны, плашки стали в полтора раза ниже. Название
+           раздела и так объясняет себя: «Уведомления», «Организация»,
+           «Биллинг» — подписывать их «что присылать на почту» значит
+           объяснять очевидное там, где место дороже. Подсказка осталась
+           в `title`: она нужна раз в жизни, при первом знакомстве.
+        */}
         <nav aria-label="Разделы профиля" className="mt-7">
           <ul className="flex flex-wrap gap-2">
-            {TABS.map((t) => {
+            {tabs.map((t) => {
               const isActive = tab === t.key
               return (
                 <li key={t.key}>
                   <Link
                     href={`/account/profile?tab=${t.key}`}
                     aria-current={isActive ? 'page' : undefined}
-                    className={`block rounded-xl px-4 py-2.5 transition-colors ${
+                    title={t.hint}
+                    className={`block rounded-lg px-3.5 py-1.5 text-[14px] leading-6 transition-colors ${
                       isActive
                         ? 'bg-forest-500 text-white'
                         : 'bg-white text-ink-900 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] hover:bg-[#f6f6f6]'
                     }`}
                   >
-                    <span className="block text-[15px] font-medium">{t.label}</span>
-                    <span
-                      className={`mt-0.5 block text-[12px] leading-snug ${
-                        isActive ? 'text-white/75' : 'text-ink-500'
-                      }`}
-                    >
-                      {t.hint}
-                    </span>
+                    {t.label}
                   </Link>
                 </li>
               )

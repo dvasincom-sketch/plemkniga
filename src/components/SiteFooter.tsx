@@ -70,6 +70,26 @@ export function SiteFooter() {
           </a>
         </div>
       </div>
+
+      {/*
+         Нижняя строка отделена чертой и приглушена: это не раздел подвала,
+         а подпись под ним. Ставить её пятой колонкой значило бы уравнять
+         авторство с адресом и телефоном Ассоциации, а это разные по весу
+         сведения — контакты нужны каждый день, авторство нужно один раз.
+      */}
+      <div className="container-page mt-10 border-t border-white/10 pt-6">
+        <p className="text-[13px] text-white/50">
+          © 2026 Разработка и платформа:{' '}
+          <a
+            href="https://t.me/dvasin"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-white/75 underline underline-offset-4 transition-colors hover:text-brand-400"
+          >
+            Дмитрий Васин
+          </a>
+        </p>
+      </div>
     </footer>
   )
 }
