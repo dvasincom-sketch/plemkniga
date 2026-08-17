@@ -22,9 +22,12 @@ import { ClosedAnimal } from '@/components/ClosedAnimal'
 import { AccessRequestForm } from '@/components/AccessRequestForm'
 import { GrantBanner, ScopeLocked } from '@/components/AccessScope'
 import { grantsFor, scopesForAnimal } from '@/lib/grants'
+import { recordAnimalView, uniqueViews } from '@/lib/access-log'
+import { isAssociation } from '@/access'
 import type { AccessScope } from '@/lib/dictionaries'
+import { after } from 'next/server'
 import { getClient, getCurrentUser } from '@/lib/payload'
-import { isAnimalLocked, viewerOf } from '@/lib/visibility'
+import { isAnimalLocked, relId, viewerOf } from '@/lib/visibility'
 import {
   ANIMAL_KINDS,
   DOCUMENT_TYPES,
@@ -499,6 +502,40 @@ export default async function AnimalPage({
         .catch(() => null)
     : null
 
+  /*
+   * Просмотр записывается после отдачи страницы.
+   *
+   * `after()` выполняет это, когда ответ уже ушёл: запись в журнал не должна
+   * стоить посетителю миллисекунд на горячем пути (карточка — 0,10 с),
+   * а сбой записи не должен ронять страницу. Тот же принцип, что у отметки
+   * «ленту посмотрели».
+   *
+   * Кого не считаем — решает `recordAnimalView`: себя, анонимов
+   * и Ассоциацию. Здесь это не повторяется, чтобы правило жило в одном месте.
+   */
+  after(async () => {
+    await recordAnimalView(payload, {
+      animalId: animal!.id as number,
+      ownerId: ownerId as number | null,
+      viewerOrgId: userOrgId as number | null,
+      viewerUserId: user?.id ?? null,
+      grantId: partial ? relId(grantForBanner) : null,
+      scopes: [...grantedScopes],
+      isAssociation: isAssociation(user),
+    })
+  })
+
+  /*
+   * Счётчик уникальных просмотров — только тому, чьи это данные,
+   * и Ассоциации.
+   *
+   * Число отвечает на вопрос «сколько хозяйств интересовалось моим быком»,
+   * и это сведение для владельца. Показывать его всем — значит сообщать
+   * соседу, чем интересуются в чужом стаде; ни одна сторона об этом
+   * не просила.
+   */
+  const views = isMine || isAssociation(user) ? await uniqueViews(payload, animal.id as number) : null
+
   const crumbs = isMine
     ? [
         { label: 'Личный кабинет', href: '/account' },
@@ -533,6 +570,23 @@ export default async function AnimalPage({
             expiresAt={grantForBanner?.expiresAt ?? null}
             wholeHerd={!grantForBanner?.animal}
           />
+        )}
+
+        {/* Счётчик виден только владельцу и Ассоциации. Ноль показывается
+            словами: «0 хозяйств» читается как поломка, «пока никто» — как
+            ответ на вопрос */}
+        {views !== null && (
+          <p className="mb-5 text-[13px] text-ink-500">
+            {views === 0
+              ? 'Эту карточку пока не открывало ни одно хозяйство'
+              : `Карточку смотрели ${views} ${
+                  views % 10 === 1 && views % 100 !== 11
+                    ? 'хозяйство'
+                    : [2, 3, 4].includes(views % 10) && ![12, 13, 14].includes(views % 100)
+                      ? 'хозяйства'
+                      : 'хозяйств'
+                } — считаются вошедшие, кроме вашего и Ассоциации`}
+          </p>
         )}
 
         <div>

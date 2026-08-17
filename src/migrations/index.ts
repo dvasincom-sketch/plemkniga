@@ -24,6 +24,7 @@ import * as migration_20260817_090409_membership_review from './20260817_090409_
 import * as migration_20260817_091349_document_issuance from './20260817_091349_document_issuance';
 import * as migration_20260817_133000_access_grants from './20260817_133000_access_grants';
 import * as migration_20260817_150000_request_scopes from './20260817_150000_request_scopes';
+import * as migration_20260817_170000_view_journal from './20260817_170000_view_journal';
 
 export const migrations = [
   {
@@ -155,5 +156,10 @@ export const migrations = [
     up: migration_20260817_150000_request_scopes.up,
     down: migration_20260817_150000_request_scopes.down,
     name: '20260817_150000_request_scopes',
+  },
+  {
+    up: migration_20260817_170000_view_journal.up,
+    down: migration_20260817_170000_view_journal.down,
+    name: '20260817_170000_view_journal',
   },
 ];

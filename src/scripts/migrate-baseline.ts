@@ -194,6 +194,11 @@ const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
     probe: { kind: 'table', name: 'access_requests_scopes' },
     note: 'области в самом запросе доступа',
   },
+  {
+    name: '20260817_170000_view_journal',
+    probe: { kind: 'column', table: 'access_views', column: 'first_at' },
+    note: 'журнал просмотров: строка на пару животное + хозяйство',
+  },
 ]
 
 const { driverUri, uri, source, sslConfig } = resolveDatabase()
