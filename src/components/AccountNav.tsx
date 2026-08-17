@@ -14,10 +14,22 @@ import Link from 'next/link'
  * всегда понятно, в каком разделе вы находитесь.
  */
 
+/**
+ * У большинства разделов адрес один и тот же — `/account?tab=…`, они живут
+ * на одной странице. «Доступы» — отдельный маршрут: там три списка, свои
+ * запросы и свои серверные действия, и складывать это в общую страницу
+ * значило бы тянуть их на каждое открытие кабинета.
+ */
 export const ACCOUNT_TABS = [
   { key: 'animals', label: 'Мои животные', hint: 'Стадо и поиск по нему' },
   { key: 'events', label: 'События', hint: 'Загрузки данных и их проверка' },
   { key: 'documents', label: 'Документы', hint: 'Файлы организации' },
+  {
+    key: 'access',
+    label: 'Доступы',
+    hint: 'Кому открыты ваши данные',
+    href: '/account/access',
+  },
   { key: 'settings', label: 'Настройки', hint: 'Личные данные и видимость' },
 ] as const
 
@@ -32,7 +44,7 @@ export function AccountNav({ active }: { active?: AccountTabKey }) {
           return (
             <li key={t.key} className="flex-none">
               <Link
-                href={`/account?tab=${t.key}`}
+                href={'href' in t ? t.href : `/account?tab=${t.key}`}
                 aria-current={isActive ? 'page' : undefined}
                 className={`block rounded-xl px-5 py-3 transition-colors ${
                   isActive
