@@ -584,3 +584,69 @@
   color: inherit;
   text-decoration: none;
 }
+
+/*
+ * Тихая прокрутка для липкого оглавления.
+ *
+ * Блок с собственной прокруткой рисует системную полосу — серую колонку
+ * во всю высоту рядом с содержимым. На странице документации она попадала
+ * ровно между оглавлением и текстом и читалась как граница колонок,
+ * которой там нет.
+ *
+ * Полоса не убрана совсем, а спрятана до наведения: убрать её полностью
+ * значило бы скрыть от читателя, что список вообще прокручивается.
+ * Firefox управляет этим одним свойством, WebKit — псевдоэлементом,
+ * поэтому правил два.
+ */
+.scroll-quiet {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.scroll-quiet:hover {
+  scrollbar-color: var(--color-ink-100) transparent;
+}
+.scroll-quiet::-webkit-scrollbar {
+  width: 6px;
+}
+.scroll-quiet::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scroll-quiet::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 9999px;
+}
+.scroll-quiet:hover::-webkit-scrollbar-thumb {
+  background: var(--color-ink-100);
+}
+
+/*
+ * Появление боковой панели.
+ *
+ * Панель управляется адресной строкой, то есть возникает сразу и целиком.
+ * Без движения это читается как подмена страницы: только что был список —
+ * и вдруг поверх него окно. Короткий выезд справа объясняет, откуда оно
+ * взялось и куда денется.
+ *
+ * Длительность намеренно маленькая: панель открывают, чтобы прочитать,
+ * а не чтобы посмотреть на анимацию.
+ */
+@keyframes panel-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+.panel-in {
+  animation: panel-in 0.18s ease-out;
+}
+
+/* Тем, кто отключил анимации в системе, движение не показываем */
+@media (prefers-reduced-motion: reduce) {
+  .panel-in {
+    animation: none;
+  }
+}

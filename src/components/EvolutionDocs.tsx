@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { DocsNav, type NavItem } from './DocsNav'
+import { DocsNav, type NavPart } from './DocsNav'
 import { CURRENT_VERSION } from '@/lib/product-versions'
 
 /**
@@ -1628,17 +1628,16 @@ npm run db:precheck  # что произойдёт до того, как оно 
 
 /* --------------------------------- сборка --------------------------------- */
 
-function outline(): NavItem[] {
-  const items: NavItem[] = []
-  for (const part of DOC) {
-    items.push({ id: part.id, title: part.title, level: 0 })
-    for (const chapter of part.chapters) {
-      items.push({ id: chapter.id, title: chapter.title, level: 1 })
-      for (const sub of chapter.subs) {
-        items.push({ id: sub.id, title: sub.title, level: 2 })
-      }
-    }
-  }
+function docsTree(): NavPart[] {
+  const tree: NavPart[] = DOC.map((part) => ({
+    id: part.id,
+    title: part.title,
+    chapters: part.chapters.map((chapter) => ({
+      id: chapter.id,
+      title: chapter.title,
+      subs: chapter.subs.map((sub) => ({ id: sub.id, title: sub.title })),
+    })),
+  }))
 
   // Повтор идентификатора ломает навигацию тихо: якорь уводит к первому
   // совпадению, подсветка мигает между двумя разделами, и на глаз это
@@ -1647,30 +1646,60 @@ function outline(): NavItem[] {
   // падаем сразу, на бою страница важнее аккуратности оглавления.
   if (process.env.NODE_ENV !== 'production') {
     const seen = new Set<string>()
-    for (const item of items) {
-      if (seen.has(item.id)) throw new Error(`Документация: повторный идентификатор «${item.id}»`)
-      seen.add(item.id)
+    const check = (id: string) => {
+      if (seen.has(id)) throw new Error(`Документация: повторный идентификатор «${id}»`)
+      seen.add(id)
+    }
+    for (const part of tree) {
+      check(part.id)
+      for (const chapter of part.chapters) {
+        check(chapter.id)
+        chapter.subs.forEach((sub) => check(sub.id))
+      }
     }
   }
 
-  return items
+  return tree
+}
+
+/**
+ * Заголовок со ссылкой на себя.
+ *
+ * Не ради красоты: разговор об интеграции идёт в переписке, и «смотри
+ * раздел 13.2» проверять руками дольше, чем открыть присланную ссылку.
+ * Значок проявляется по наведению — постоянная решётка у каждого заголовка
+ * шумит, а нужна она раз в сессию.
+ */
+function Anchor({ id }: { id: string }) {
+  return (
+    <a
+      href={`#${id}`}
+      aria-label="Ссылка на этот раздел"
+      className="ml-2 align-middle text-[15px] text-ink-300 opacity-0 transition-opacity group-hover:opacity-100 hover:text-forest-500 focus-visible:opacity-100"
+    >
+      #
+    </a>
+  )
 }
 
 export function EvolutionDocs() {
   return (
-    <div className="grid gap-10 md:grid-cols-[240px_minmax(0,1fr)] lg:grid-cols-[270px_minmax(0,1fr)]">
+    <div className="grid gap-10 md:grid-cols-[240px_minmax(0,1fr)] lg:grid-cols-[280px_minmax(0,1fr)]">
       {/*
-         Оглавление липкое и со своей прокруткой: документ длиннее экрана
-         в разы, и навигация, уезжающая вверх вместе с текстом, перестаёт
-         быть навигацией уже на второй главе.
+         Оглавление липкое: документ длиннее экрана в разы, и навигация,
+         уезжающая вверх вместе с текстом, перестаёт быть навигацией уже
+         на второй главе.
 
          Порог — md, а не lg. При lg окно шириной 1000–1023 точки (обычный
          ноутбук с открытой панелью или окно в половину экрана) роняло
          оглавление наверх широкой простынёй, и документ начинался
          с двух экранов содержания. 240 точек колонке хватает.
+
+         Прокрутка тихая (см. `.scroll-quiet`): системная полоса вставала
+         ровно между колонками и читалась как граница, которой там нет.
       */}
-      <aside className="md:sticky md:top-6 md:max-h-[calc(100vh-3rem)] md:self-start md:overflow-y-auto md:pr-2">
-        <DocsNav items={outline()} />
+      <aside className="scroll-quiet md:sticky md:top-6 md:max-h-[calc(100vh-3rem)] md:self-start md:overflow-y-auto md:pr-3">
+        <DocsNav parts={docsTree()} />
       </aside>
 
       {/*
@@ -1680,19 +1709,28 @@ export function EvolutionDocs() {
       */}
       <div className="min-w-0">
         {DOC.map((part) => (
-          <section key={part.id} id={part.id} className="mt-14 scroll-mt-6 first:mt-0">
-            <h2 className="border-b border-ink-100 pb-3 text-[13px] font-bold uppercase tracking-wide text-ink-500">
+          <section key={part.id} id={part.id} className="mt-16 scroll-mt-8 first:mt-0">
+            <h2
+              data-doc-heading={part.id}
+              className="border-b border-ink-100 pb-3 text-[12px] font-bold uppercase tracking-[0.08em] text-ink-500"
+            >
               {part.title}
             </h2>
 
             {part.chapters.map((chapter) => (
-              <div key={chapter.id} id={chapter.id} className="mt-10 scroll-mt-6">
-                <h3 className="text-[24px] font-medium leading-tight">{chapter.title}</h3>
+              <div key={chapter.id} id={chapter.id} className="group mt-12 scroll-mt-8">
+                <h3 data-doc-heading={chapter.id} className="text-[26px] font-medium leading-tight">
+                  {chapter.title}
+                  <Anchor id={chapter.id} />
+                </h3>
                 {chapter.lead}
 
                 {chapter.subs.map((sub) => (
-                  <div key={sub.id} id={sub.id} className="mt-7 scroll-mt-6">
-                    <h4 className="text-[17px] font-medium text-ink-900">{sub.title}</h4>
+                  <div key={sub.id} id={sub.id} className="group mt-8 scroll-mt-8">
+                    <h4 data-doc-heading={sub.id} className="text-[17px] font-medium text-ink-900">
+                      {sub.title}
+                      <Anchor id={sub.id} />
+                    </h4>
                     {sub.body}
                   </div>
                 ))}
@@ -1700,6 +1738,17 @@ export function EvolutionDocs() {
             ))}
           </section>
         ))}
+
+        {/*
+           Возврат к началу в конце документа. Семьдесят восемь разделов
+           прокручиваются обратно долго, а оглавление в этот момент
+           показывает последнюю главу — идти в нём наверх некуда.
+        */}
+        <p className="mt-16 border-t border-ink-100 pt-6 text-[14px] text-ink-500">
+          <a href="#p1" className="underline underline-offset-4 hover:text-forest-500">
+            Вернуться к началу документа
+          </a>
+        </p>
       </div>
     </div>
   )

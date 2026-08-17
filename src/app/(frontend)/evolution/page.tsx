@@ -53,9 +53,9 @@ const LEAD: Record<TabKey, string> = {
 export default async function EvolutionPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>
+  searchParams: Promise<{ tab?: string; change?: string }>
 }) {
-  const { tab: tabParam } = await searchParams
+  const { tab: tabParam, change } = await searchParams
   const tab: TabKey = TABS.some((t) => t.key === tabParam) ? (tabParam as TabKey) : 'versions'
 
   return (
@@ -86,7 +86,7 @@ export default async function EvolutionPage({
         </div>
 
         <div className="mt-10">
-          {tab === 'versions' && <EvolutionVersions />}
+          {tab === 'versions' && <EvolutionVersions openVersion={change} />}
           {tab === 'stages' && <EvolutionStages />}
           {tab === 'docs' && <EvolutionDocs />}
         </div>
