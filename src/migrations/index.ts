@@ -18,6 +18,7 @@ import * as migration_20260816_202627_index_value_cohort from './20260816_202627
 import * as migration_20260816_204622_index_value_percentile from './20260816_204622_index_value_percentile';
 import * as migration_20260816_211410_index_value_types from './20260816_211410_index_value_types';
 import * as migration_20260817_051437_animal_revisions from './20260817_051437_animal_revisions';
+import * as migration_20260817_060327_expert_role_and_findings from './20260817_060327_expert_role_and_findings';
 
 export const migrations = [
   {
@@ -118,6 +119,11 @@ export const migrations = [
   {
     up: migration_20260817_051437_animal_revisions.up,
     down: migration_20260817_051437_animal_revisions.down,
-    name: '20260817_051437_animal_revisions'
+    name: '20260817_051437_animal_revisions',
+  },
+  {
+    up: migration_20260817_060327_expert_role_and_findings.up,
+    down: migration_20260817_060327_expert_role_and_findings.down,
+    name: '20260817_060327_expert_role_and_findings'
   },
 ];

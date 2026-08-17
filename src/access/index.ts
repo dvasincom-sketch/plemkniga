@@ -7,7 +7,27 @@ const orgId = (user: U | null | undefined): number | string | undefined => {
   return typeof user.organization === 'object' ? user.organization.id : user.organization
 }
 
+/**
+ * Сотрудник Ассоциации: администратор или эксперт.
+ *
+ * Роли две, и это не дублирование. `admin` — технический администратор:
+ * справочники, удаление, поля вроде `users.confirmed`. `expert` — тот, кто
+ * проверяет чужие данные: видит всё, но не правит ничего чужого. Разница
+ * в цене ошибки, поэтому и в правах.
+ *
+ * Там, где в правиле имелось в виду «Ассоциация видит всё» — берётся эта
+ * проверка. Там, где «технический администратор» — остаётся `isAdmin`.
+ * Разбор — `docs/kabinet-associacii.md`, раздел 3.
+ */
+export const isAssociation = (user: unknown): boolean => {
+  const role = (user as U | null)?.role
+  return role === 'admin' || role === 'expert'
+}
+
 export const isAdmin: Access = ({ req: { user } }) => (user as U | null)?.role === 'admin'
+
+/** Проверяющий или администратор — для действий кабинета Ассоциации. */
+export const isAssociationAccess: Access = ({ req: { user } }) => isAssociation(user)
 
 export const isAdminField: FieldAccess = ({ req: { user } }) => (user as U | null)?.role === 'admin'
 
@@ -23,7 +43,7 @@ export const isAuthenticated: Access = ({ req: { user } }) => Boolean(user)
  */
 export const animalRead: Access = ({ req: { user } }) => {
   const u = user as U | null
-  if (u?.role === 'admin') return true
+  if (isAssociation(u)) return true
   const org = orgId(u)
   if (u && org) {
     const w: Where = { or: [{ owner: { equals: org } }, { publicVisible: { equals: true } }] }
@@ -51,7 +71,7 @@ export const animalMutate: Access = ({ req: { user } }) => {
 export const accessRequestRead: Access = ({ req: { user } }) => {
   const u = user as U | null
   if (!u) return false
-  if (u.role === 'admin') return true
+  if (isAssociation(u)) return true
   const org = orgId(u)
   const or: Where[] = [{ requester: { equals: u.id } }]
   if (org) or.push({ owner: { equals: org } })
@@ -85,7 +105,7 @@ export const accessRequestDecide: Access = ({ req: { user } }) => {
  */
 export const animalScopedRead: Access = ({ req: { user } }) => {
   const u = user as U | null
-  if (u?.role === 'admin') return true
+  if (isAssociation(u)) return true
   const org = orgId(u)
   if (u && org) {
     const w: Where = {
@@ -118,7 +138,7 @@ export const animalScopedRead: Access = ({ req: { user } }) => {
  */
 export const indexValueRead: Access = ({ req: { user } }) => {
   const u = user as U | null
-  if (u?.role === 'admin') return true
+  if (isAssociation(u)) return true
 
   const org = orgId(u)
   if (u && org) {
@@ -168,7 +188,7 @@ export const indexProfileMutate: Access = ({ req: { user } }) => {
 export const organizationScopedRead: Access = ({ req: { user } }) => {
   const u = user as U | null
   if (!u) return false
-  if (u.role === 'admin') return true
+  if (isAssociation(u)) return true
   const org = orgId(u)
   if (!org) return false
   return { organization: { equals: org } }
@@ -181,7 +201,7 @@ export const organizationScopedRead: Access = ({ req: { user } }) => {
  */
 export const documentRead: Access = ({ req: { user } }) => {
   const u = user as U | null
-  if (u?.role === 'admin') return true
+  if (isAssociation(u)) return true
 
   const or: Where[] = [{ 'animal.publicVisible': { equals: true } }]
   const org = orgId(u)
@@ -189,6 +209,21 @@ export const documentRead: Access = ({ req: { user } }) => {
   return { or }
 }
 
+/**
+ * Своя учётная запись — или любая, если ты Ассоциация.
+ *
+ * Только на чтение. Правило намеренно разведено с `selfOrAdmin`: эксперту
+ * нужно видеть, кто подал заявку от хозяйства, но не нужно право переписать
+ * чужую учётную запись — а одно правило на чтение и запись дало бы ровно это.
+ */
+export const selfOrAssociation: Access = ({ req: { user } }) => {
+  const u = user as U | null
+  if (!u) return false
+  if (isAssociation(u)) return true
+  return { id: { equals: u.id } }
+}
+
+/** Своя учётная запись — или любая, если ты администратор. Для записи. */
 export const selfOrAdmin: Access = ({ req: { user } }) => {
   const u = user as U | null
   if (!u) return false

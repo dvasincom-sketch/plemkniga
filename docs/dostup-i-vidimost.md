@@ -190,6 +190,20 @@
 | `data-submissions` | `organizationScopedRead` | `isAuthenticated` | `isAuthenticated` | `isAdmin` |
 | Справочники НСИ: `breeds`, `lines`, `breeding-categories`, `breeding-classes`, `animal-purposes`, `disposal-reasons`, `coat-colors`, `blood-groups`, `reproduction-methods`, `semen-types`, `insemination-results`, `dna-test-types`, `haplotype-types`, `health-event-types`, `technicians` | `anyone` | `isAdmin` | `isAdmin` | `isAdmin` |
 
+> **Роль `expert` — сотрудник Ассоциации, который проверяет чужие данные.**
+> Она видит закрытые карточки, пакеты загрузки и учётные записи любого
+> хозяйства — иначе проверять нечего. Это единственное в системе сквозное
+> право чтения помимо администраторского, и оно осознанное, а не побочный
+> эффект: правило `isAssociation` в `src/access/index.ts` называет его прямо.
+>
+> Чего эксперт **не может**: править чужие данные (`animalMutate` его
+> не пропускает — проверено), заходить в админку Payload (`access.admin`
+> проверяет `admin`), удалять что-либо, менять справочники и поля вроде
+> `users.confirmed`. Правило `selfOrAssociation` разведено с `selfOrAdmin`
+> ровно за этим: читать учётные записи эксперту нужно, переписывать — нет.
+>
+> Разбор — `docs/kabinet-associacii.md`, раздел 3.
+
 > **Право видеть — не право править.** В таблице выше видно, что чтение
 > карточки и её изменение расходятся: видеть запись может любой, кому её
 > открыли, включая одобренный запрос доступа; менять — только хозяйство-владелец

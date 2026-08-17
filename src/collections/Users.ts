@@ -1,6 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import { ROLES, toOptions } from '@/lib/dictionaries'
-import { anyone, isAdmin, isAdminField, selfOrAdmin } from '@/access'
+import { anyone, isAdmin, isAdminField, selfOrAdmin, selfOrAssociation } from '@/access'
 
 export const Users: CollectionConfig = {
   slug: 'users',
@@ -19,7 +19,8 @@ export const Users: CollectionConfig = {
   access: {
     // Регистрация открыта — форма на /register создаёт пользователя.
     create: anyone,
-    read: selfOrAdmin,
+    // Читать — Ассоциации (кто подал заявку от хозяйства), править — только себя
+    read: selfOrAssociation,
     update: selfOrAdmin,
     delete: isAdmin,
     admin: ({ req: { user } }) => (user as { role?: string } | null)?.role === 'admin',

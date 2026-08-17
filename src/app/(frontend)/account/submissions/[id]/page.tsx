@@ -161,6 +161,51 @@ export default async function SubmissionPage({
             )}
 
             {/*
+               Находки проверки — то, ради чего вообще нужна проверка.
+               Прежде хозяйство получало «часть данных не прошла проверку»
+               и шло искать, какая именно. Это не результат проверки,
+               а способ переложить работу обратно.
+            */}
+            {(submission.review?.findings ?? []).length > 0 && (
+              <div className="mt-6 rounded-xl border border-ink-100 p-5">
+                <h3 className="text-[15px] font-medium">
+                  Замечания Ассоциации: {submission.review?.findings?.length}
+                </h3>
+                <p className="mt-1 text-[13px] text-ink-500">
+                  Исправить их можно в карточках животных; после исправления загрузите файл
+                  заново или сообщите Ассоциации.
+                </p>
+                <ul className="mt-3 divide-y divide-[#ededed] text-[15px]">
+                  {(submission.review?.findings ?? []).map((f) => {
+                    const animal = typeof f.animal === 'object' && f.animal ? f.animal : null
+                    return (
+                      <li key={f.id} className="py-3">
+                        <p className="leading-snug">{f.text}</p>
+                        <p className="mt-1 text-[13px] text-ink-500">
+                          {animal ? (
+                            <Link
+                              href={`/animals/${animal.id}`}
+                              className="underline underline-offset-4 hover:text-forest-500"
+                            >
+                              {animal.identNumber}
+                            </Link>
+                          ) : (
+                            'весь пакет'
+                          )}
+                          {f.field ? ` · ${f.field}` : ''}
+                          {' · '}
+                          {(f.severity ?? 'fix') === 'fix'
+                            ? 'требует исправления'
+                            : 'на усмотрение хозяйства'}
+                        </p>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            )}
+
+            {/*
                Что сделал импорт — отдельно от того, что нашла проверка.
                Первое сделала машина при разборе файла, второе человек
                при разборе содержания, и путать их нельзя.

@@ -2,14 +2,22 @@
 
 import { useActionState, useState } from 'react'
 import { registerAction, type AuthState } from '@/actions/auth'
-import { REGIONS, ROLES } from '@/lib/dictionaries'
+import { ASSOCIATION_ROLES, REGIONS, ROLES } from '@/lib/dictionaries'
 import { Select } from './Select'
 
 const STEPS = ['Роль', 'Организация', 'Контактное лицо', 'Доступ'] as const
 
 type Role = 'farmer' | 'service' | 'individual'
 
-const roleOptions = ROLES.filter((r) => r.value !== 'admin') as unknown as {
+/*
+ * Роли Ассоциации при регистрации не предлагаются: их не выбирают, их
+ * назначает администратор. Раньше отсеивался только `admin`; с появлением
+ * эксперта отбор идёт по списку ролей Ассоциации, чтобы следующая такая роль
+ * не просочилась в форму регистрации сама собой.
+ */
+const roleOptions = ROLES.filter(
+  (r) => !(ASSOCIATION_ROLES as readonly string[]).includes(r.value),
+) as unknown as {
   value: Role
   label: string
   hint: string

@@ -190,7 +190,7 @@ export interface User {
   lastName: string;
   firstName: string;
   middleName?: string | null;
-  role: 'farmer' | 'service' | 'individual' | 'admin';
+  role: 'farmer' | 'service' | 'individual' | 'expert' | 'admin';
   phone?: string | null;
   /**
    * Хозяйство или сервисная организация, к которой привязан пользователь
@@ -1151,6 +1151,19 @@ export interface DataSubmission {
   review?: {
     checkedBy?: (number | null) | User;
     checkedAt?: string | null;
+    assignee?: (number | null) | User;
+    /**
+     * Заполняется экспертом при разборе пакета
+     */
+    findings?:
+      | {
+          animal?: (number | null) | Animal;
+          field?: string | null;
+          severity?: ('fix' | 'note') | null;
+          text: string;
+          id?: string | null;
+        }[]
+      | null;
     /**
      * Например: «Все данные прошли успешную проверку» или «Часть данных не прошла проверку»
      */
@@ -1335,7 +1348,7 @@ export interface IndexBase {
  */
 export interface Event {
   id: number;
-  type: 'dryOff' | 'exteriorScore' | 'move' | 'disposal' | 'calving' | 'insemination' | 'milkTest' | 'vetTreatment';
+  type: 'dryOff' | 'move' | 'disposal' | 'exteriorScore' | 'calving' | 'insemination' | 'milkTest' | 'vetTreatment';
   date: string;
   animal: number | Animal;
   title?: string | null;
@@ -2084,6 +2097,16 @@ export interface DataSubmissionsSelect<T extends boolean = true> {
     | {
         checkedBy?: T;
         checkedAt?: T;
+        assignee?: T;
+        findings?:
+          | T
+          | {
+              animal?: T;
+              field?: T;
+              severity?: T;
+              text?: T;
+              id?: T;
+            };
         comment?: T;
         totalRows?: T;
         acceptedRows?: T;
