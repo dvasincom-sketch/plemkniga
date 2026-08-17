@@ -38,6 +38,48 @@ function describeError(e: unknown): string {
   return parts.join(' ← ') || String(e)
 }
 
+/**
+ * Сколько проба ждёт базу, прежде чем ответить без неё.
+ *
+ * Больше, чем срок соединения у пула (`connectionTimeoutMillis`, 5 с
+ * в `payload.config.ts`), — чтобы обычная недоступность успела дойти сюда
+ * настоящей ошибкой драйвера с её текстом и кодом, а не безликим «не успела».
+ */
+const PROBE_DEADLINE_MS = 8000
+
+/**
+ * Проба, которая может не ответить, бесполезна.
+ *
+ * Это не теория. Когда база замолчала — не отказала, а перестала отвечать, —
+ * у пула не было срока на соединение, запрос висел, и `/healthz` не отдавал
+ * ничего: ни `ok`, ни `error`, ни подсказок. Диагностика оказалась недоступна
+ * ровно в том случае, ради которого написана, и причину пришлось искать
+ * в архиве логов вместо одного запроса.
+ *
+ * Срок у пула эту дыру закрывает, но проба не должна зависеть от того, что
+ * кто-то ниже настроен правильно. Своё ограничение здесь — на случай любого
+ * другого зависания: медленного рукопожатия TLS, запроса, который не вернулся,
+ * будущей правки в конфигурации.
+ */
+function withDeadline<T>(work: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () =>
+        reject(
+          new Error(
+            `база не ответила за ${ms} мс — проба прекратила ожидание, чтобы ответить. ` +
+              'Молчание вместо отказа обычно означает, что пакеты до базы не доходят',
+          ),
+        ),
+      ms,
+    )
+  })
+
+  return Promise.race([work, deadline]).finally(() => clearTimeout(timer)) as Promise<T>
+}
+
 export async function GET() {
   const started = Date.now()
   const db = resolveDatabase()
@@ -66,8 +108,10 @@ export async function GET() {
     })
 
   try {
-    const payload = await getClient()
-    const { totalDocs } = await payload.count({ collection: 'animals', overrideAccess: true })
+    const { totalDocs } = await withDeadline(
+      getClient().then((payload) => payload.count({ collection: 'animals', overrideAccess: true })),
+      PROBE_DEADLINE_MS,
+    )
 
     return json({
       status: 'ok',
@@ -108,8 +152,29 @@ export async function GET() {
     if (/no pg_hba|SSL off|sslmode/i.test(message)) {
       hints.push('База требует TLS — добавьте ?sslmode=require в конец строки подключения')
     }
-    if (/ENOTFOUND|EAI_AGAIN|timeout/i.test(message)) {
+    if (/ENOTFOUND|EAI_AGAIN/i.test(message)) {
       hints.push('Хост базы не резолвится из контейнера — проверьте адрес и сетевые правила')
+    }
+    /*
+     * Тишина и отказ — разные диагнозы, и путать их дорого.
+     *
+     * `ECONNREFUSED` означает, что до сервера дошли и он ответил «нельзя»:
+     * порт закрыт, служба не поднята. `ETIMEDOUT` означает, что ответа
+     * не было вовсе, — так ведёт себя файрвол и список доверенных IP:
+     * они не отказывают, они выбрасывают пакеты. Отсюда и проверка:
+     * порт с рабочей машины может быть открыт, а из контейнера — нет,
+     * и это не «база лежит», а «база не пускает именно отсюда».
+     */
+    if (/ETIMEDOUT|ETIMEOUT|не ответила за|timeout/i.test(message)) {
+      hints.push(
+        'База молчит, а не отказывает: пакеты до неё не доходят. Обычно это список доверенных IP базы или файрвол — адрес контейнера в списке не значится либо сменился при перезапуске',
+      )
+      hints.push(
+        'Проверить можно с любой машины: `nc -vz <хост> 5432`. Отвечает «succeeded» — база жива и пускает эту машину, значит дело в адресе контейнера. Висит без ответа — закрыто для всех',
+      )
+      hints.push(
+        'Если приложение и база у одного провайдера, надёжнее строка подключения по внутреннему адресу — тогда список доверенных IP ни при чём',
+      )
     }
     if (/ECONNREFUSED 127\.0\.0\.1|ECONNREFUSED ::1|ECONNREFUSED localhost/i.test(message)) {
       hints.push(
