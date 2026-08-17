@@ -127,7 +127,6 @@ export const trustLabel = (v?: number | null): string =>
  */
 export const EVENT_TYPES = [
   { value: 'dryOff', label: 'Запуск' },
-  { value: 'exteriorScore', label: 'Оценка экстерьера' },
   { value: 'move', label: 'Перемещение' },
   { value: 'disposal', label: 'Выбытие' },
 ] as const
@@ -148,6 +147,14 @@ export const EVENT_TYPES = [
  * `instead` — куда записывать вместо; попадает в текст ошибки.
  */
 export const RETIRED_EVENT_TYPES = [
+  /*
+   * Оценка экстерьера переехала сюда позже прочих. В ленте она была
+   * отметкой с датой и без единой цифры — это лучше, чем ничего, пока
+   * цифры хранить негде. Теперь есть `animal_exteriors` с восемнадцатью
+   * линейными признаками, композитами, бонитёром и номером лактации,
+   * и отметка в ленте стала худшей из двух записей об одном факте.
+   */
+  { value: 'exteriorScore', label: 'Оценка экстерьера', instead: 'Экстерьер' },
   { value: 'calving', label: 'Отёл', instead: 'Отёлы' },
   { value: 'insemination', label: 'Осеменение', instead: 'Осеменения' },
   { value: 'milkTest', label: 'Контрольная дойка', instead: 'Контрольные дойки' },

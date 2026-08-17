@@ -327,21 +327,11 @@ async function main() {
         counts.events += 1
       }
     }
-    if (chance(0.3)) {
-      await payload.create({
-        collection: 'events',
-        overrideAccess: true,
-        data: {
-          type: 'exteriorScore',
-          date: daysAgo(today, int(30, 350)).toISOString(),
-          animal: animal.id,
-          title: 'Линейная оценка экстерьера',
-          value: between(76, 89, 0),
-          status: 'accepted',
-        },
-      })
-      counts.events += 1
-    }
+    /*
+     * Оценка экстерьера больше не заводится событием: у неё своя таблица
+     * со всеми линейными признаками. Демонстрационные оценки создаёт
+     * `backfill:evaluations`, здесь дублировать их отметкой без цифр незачем.
+     */
     if (chance(0.18)) {
       await payload.create({
         collection: 'events',

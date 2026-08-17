@@ -184,10 +184,23 @@
 | `events` | `animalScopedRead` | `isAuthenticated` | `isAuthenticated` | `isAdmin` |
 | `animal-evaluations` | `animalScopedRead` | `isAdmin` | `isAdmin` | `isAdmin` |
 | `animal-exteriors` | `animalScopedRead` | `isAdmin` | `isAdmin` | `isAdmin` |
+| `animal-revisions` | `animalScopedRead` | — | — | `isAdmin` |
 | `index-values` | `indexValueRead` | — | — | — |
 | `documents` | `documentRead` | `isAuthenticated` | `isAuthenticated` | `isAdmin` |
 | `data-submissions` | `organizationScopedRead` | `isAuthenticated` | `isAuthenticated` | `isAdmin` |
 | Справочники НСИ: `breeds`, `lines`, `breeding-categories`, `breeding-classes`, `animal-purposes`, `disposal-reasons`, `coat-colors`, `blood-groups`, `reproduction-methods`, `semen-types`, `insemination-results`, `dna-test-types`, `haplotype-types`, `health-event-types`, `technicians` | `anyone` | `isAdmin` | `isAdmin` | `isAdmin` |
+
+> **Право видеть — не право править.** В таблице выше видно, что чтение
+> карточки и её изменение расходятся: видеть запись может любой, кому её
+> открыли, включая одобренный запрос доступа; менять — только хозяйство-владелец
+> и администратор. Формы правки на карточке проверяют это отдельно
+> (`mayEdit` в `src/actions/animals.ts`), не полагаясь на то, что страница
+> просто не покажет ссылку «Править». Иначе одобренный доступ к чужой карточке
+> означал бы разрешение её переписать.
+>
+> Строки журнала правок (`animal-revisions`) не создаются и не меняются
+> через API вовсе: их пишет хук коллекции `animals`. Журнал, который можно
+> пополнить или поправить снаружи, ничего не доказывает.
 
 ### Что делают правила
 

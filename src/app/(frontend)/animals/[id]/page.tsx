@@ -13,6 +13,8 @@ import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { LactationDynamics } from '@/components/LactationDynamics'
 import { AnimalPassport } from '@/components/AnimalPassport'
 import { AnimalEditBlock } from '@/components/AnimalEditBlock'
+import { AnimalEventForms } from '@/components/AnimalEventForms'
+import { AnimalRevisionsPanel } from '@/components/AnimalRevisionsPanel'
 import { blockValues, type Choice } from '@/lib/animal-edit'
 import { CertificateSection } from '@/components/CertificateSection'
 import { certificateReadiness } from '@/lib/certification'
@@ -253,6 +255,47 @@ export default async function AnimalPage({
         label: String(d.name ?? d.title ?? d.id),
       }))
     })
+  }
+
+  /*
+   * Списки для форм событий — только на вкладке «События» и только владельцу.
+   * Стада берутся его собственные: перемещение внутри хозяйства не должно
+   * предлагать чужие площадки, а передача животного другому хозяйству —
+   * не перемещение, а отдельная операция.
+   */
+  const eventChoices: Record<string, Choice[]> = {}
+  if (isMine && tab === 'events') {
+    const [herds, reasons, technicians] = await Promise.all([
+      payload.find({
+        collection: 'herds',
+        where: { organization: { equals: userOrgId } },
+        limit: 100,
+        sort: 'name',
+        depth: 0,
+        overrideAccess: true,
+      }),
+      payload.find({
+        collection: 'disposal-reasons',
+        limit: 100,
+        sort: 'name',
+        depth: 0,
+        overrideAccess: true,
+      }),
+      payload.find({
+        collection: 'technicians',
+        limit: 200,
+        sort: 'fullName',
+        depth: 0,
+        overrideAccess: true,
+      }),
+    ])
+
+    const asChoices = (docs: { id: number | string; name?: string; fullName?: string }[]) =>
+      docs.map((d) => ({ value: String(d.id), label: String(d.name ?? d.fullName ?? d.id) }))
+
+    eventChoices.herds = asChoices(herds.docs)
+    eventChoices.disposalReasons = asChoices(reasons.docs)
+    eventChoices.technicians = asChoices(technicians.docs)
   }
 
   /*
@@ -796,7 +839,23 @@ export default async function AnimalPage({
         )}
 
         {/* ------------------------------ События ---------------------------- */}
-        {tab === 'events' && <AnimalEventsTab animal={animal} />}
+        {tab === 'events' && (
+          <>
+            <AnimalEventsTab animal={animal} />
+
+            <section className="mt-8 grid grid-cols-1 gap-6">
+              {isMine && (
+                <AnimalEventForms
+                  animalId={animal.id as number}
+                  herds={eventChoices.herds ?? []}
+                  disposalReasons={eventChoices.disposalReasons ?? []}
+                  technicians={eventChoices.technicians ?? []}
+                />
+              )}
+              <AnimalRevisionsPanel animalId={animal.id as number} />
+            </section>
+          </>
+        )}
 
         {/* -------------------------- Происхождение -------------------------- */}
         {tab === 'origin' && (

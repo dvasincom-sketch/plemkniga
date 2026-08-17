@@ -1165,7 +1165,6 @@ const run = async () => {
   log('Создание событий и документов…')
   const eventSamples = [
     { type: 'move', title: 'Перевод в группу раздоя', date: new Date(2025, 0, 14) },
-    { type: 'exteriorScore', title: 'Линейная оценка экстерьера', date: new Date(2025, 5, 3) },
     { type: 'dryOff', title: 'Запуск', date: new Date(2025, 7, 2) },
   ] as const
 
