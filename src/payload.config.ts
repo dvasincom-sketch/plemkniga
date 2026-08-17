@@ -21,6 +21,7 @@ import { DataSubmissions } from '@/collections/DataSubmissions'
 import { AccessRequests } from '@/collections/AccessRequests'
 import { AnimalEvaluations } from '@/collections/AnimalEvaluations'
 import { AnimalExteriors } from '@/collections/AnimalExteriors'
+import { AnimalRevisions } from '@/collections/AnimalRevisions'
 import { IndexProfiles } from '@/collections/IndexProfiles'
 import { IndexValues } from '@/collections/IndexValues'
 import { IndexBases } from '@/collections/IndexBases'
@@ -64,6 +65,7 @@ export default buildConfig({
     HealthEvents,
     AnimalEvaluations,
     AnimalExteriors,
+    AnimalRevisions,
     DataSubmissions,
     AccessRequests,
     IndexProfiles,

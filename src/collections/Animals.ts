@@ -833,6 +833,16 @@ export const Animals: CollectionConfig = {
           'health-events',
           'events',
           'index-values',
+          /*
+           * Журнал правок тоже уходит вместе с животным. Спорно — история
+           * изменений выглядит как то, что стоило бы пережить запись, —
+           * но `animal_revisions.animal_id` объявлена `NOT NULL`, а внешний
+           * ключ Payload делает `ON DELETE SET NULL`: оставленный журнал
+           * не даст удалить животное вовсе. И держать правки животного,
+           * которого нет, незачем: без карточки они не восстановимы
+           * и ничего не значат.
+           */
+          'animal-revisions',
         ] as const
 
         for (const collection of dependents) {
@@ -1025,7 +1035,57 @@ export const Animals: CollectionConfig = {
      * в списке и чинится `npm run backfill:index`.
      */
     afterChange: [
-      async ({ doc, req }) => {
+      /*
+       * Журнал правок (ТЗ, п. 1.6).
+       *
+       * Пишется после сохранения и намеренно не в транзакции карточки:
+       * упавшая запись в журнал не должна отменять принятую правку. Обратное
+       * — правка принята, а следа нет — тоже плохо, но чинится пересчётом
+       * из истории, тогда как потерянная правка не чинится ничем.
+       *
+       * Что не журналится:
+       *  • создание — правок ещё не было, вся карточка и есть первая версия;
+       *  • загрузка файлом — у неё свой след, пакет данных с исходником;
+       *    построчное дублирование дало бы сорок тысяч записей на импорт
+       *    и утопило бы в них те несколько, что ввели руками;
+       *  • пересчёт индекса и снимки оценок — это следствия, а не правки.
+       *
+       * Различает их `req.context`: тот, кто правит не от имени человека,
+       * ставит флаг сам. Полагаться на «есть ли req.user» нельзя — импорт
+       * идёт как раз от имени приславшего файл.
+       */
+      async ({ doc, req, previousDoc, operation, context }) => {
+        if (operation === 'update' && !context?.skipJournal) {
+          try {
+            const { diffAnimal } = await import('@/lib/animal-journal')
+            const changes = await diffAnimal(req, previousDoc, doc)
+
+            for (const change of changes) {
+              await req.payload.create({
+                collection: 'animal-revisions',
+                overrideAccess: true,
+                req,
+                data: {
+                  animal: doc.id,
+                  at: new Date().toISOString(),
+                  user: req.user?.id ?? null,
+                  path: change.path,
+                  label: change.label,
+                  before: change.before,
+                  after: change.after,
+                  source: context?.journalSource === 'admin' ? 'admin' : 'manual',
+                },
+              })
+            }
+          } catch (e) {
+            req.payload.logger.error(
+              `Не удалось записать правки животного ${doc.identNumber}: ${
+                e instanceof Error ? e.message : e
+              }`,
+            )
+          }
+        }
+
         const { skipRecompute, recomputeAnimal } = await import('@/lib/index-values')
         if (skipRecompute()) return doc
         try {

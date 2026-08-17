@@ -17,6 +17,7 @@ import * as migration_20260816_202140_index_cleanup from './20260816_202140_inde
 import * as migration_20260816_202627_index_value_cohort from './20260816_202627_index_value_cohort';
 import * as migration_20260816_204622_index_value_percentile from './20260816_204622_index_value_percentile';
 import * as migration_20260816_211410_index_value_types from './20260816_211410_index_value_types';
+import * as migration_20260817_051437_animal_revisions from './20260817_051437_animal_revisions';
 
 export const migrations = [
   {
@@ -112,6 +113,11 @@ export const migrations = [
   {
     up: migration_20260816_211410_index_value_types.up,
     down: migration_20260816_211410_index_value_types.down,
-    name: '20260816_211410_index_value_types'
+    name: '20260816_211410_index_value_types',
+  },
+  {
+    up: migration_20260817_051437_animal_revisions.up,
+    down: migration_20260817_051437_animal_revisions.down,
+    name: '20260817_051437_animal_revisions'
   },
 ];

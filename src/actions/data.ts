@@ -154,6 +154,13 @@ export async function importAnimalsAction(
           id: doc.id,
           data: data as never,
           overrideAccess: true,
+          /*
+           * Загрузка файлом в журнал правок не идёт: её след — сам пакет
+           * с исходным файлом и протоколом приёмки. Иначе один импорт
+           * оставлял бы десятки тысяч строк и топил в них те несколько,
+           * что человек действительно ввёл руками.
+           */
+          context: { skipJournal: true },
         })
         touched.push(doc.id as number)
         updated++

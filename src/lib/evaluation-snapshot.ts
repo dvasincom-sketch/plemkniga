@@ -92,6 +92,8 @@ export const applyEvaluationSnapshot = async (
     data: snapshotOfEvaluation(evaluation) as never,
     overrideAccess: true,
     req,
+    // Снимок — следствие записи в истории, а не правка карточки
+    context: { skipJournal: true },
   })
 }
 
@@ -106,6 +108,8 @@ export const applyExteriorSnapshot = async (
     data: snapshotOfExterior(exterior) as never,
     overrideAccess: true,
     req,
+    // Снимок — следствие записи в истории, а не правка карточки
+    context: { skipJournal: true },
   })
 }
 

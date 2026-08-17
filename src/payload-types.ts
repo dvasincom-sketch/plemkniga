@@ -77,6 +77,7 @@ export interface Config {
     'health-events': HealthEvent;
     'animal-evaluations': AnimalEvaluation;
     'animal-exteriors': AnimalExterior;
+    'animal-revisions': AnimalRevision;
     'data-submissions': DataSubmission;
     'access-requests': AccessRequest;
     'index-profiles': IndexProfile;
@@ -117,6 +118,7 @@ export interface Config {
     'health-events': HealthEventsSelect<false> | HealthEventsSelect<true>;
     'animal-evaluations': AnimalEvaluationsSelect<false> | AnimalEvaluationsSelect<true>;
     'animal-exteriors': AnimalExteriorsSelect<false> | AnimalExteriorsSelect<true>;
+    'animal-revisions': AnimalRevisionsSelect<false> | AnimalRevisionsSelect<true>;
     'data-submissions': DataSubmissionsSelect<false> | DataSubmissionsSelect<true>;
     'access-requests': AccessRequestsSelect<false> | AccessRequestsSelect<true>;
     'index-profiles': IndexProfilesSelect<false> | IndexProfilesSelect<true>;
@@ -1088,6 +1090,26 @@ export interface AnimalExterior {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "animal-revisions".
+ */
+export interface AnimalRevision {
+  id: number;
+  animal: number | Animal;
+  at: string;
+  user?: (number | null) | User;
+  /**
+   * Путь в модели: birthDate, summary.milkYield
+   */
+  path: string;
+  label?: string | null;
+  before?: string | null;
+  after?: string | null;
+  source?: ('manual' | 'admin' | 'system') | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "data-submissions".
  */
 export interface DataSubmission {
@@ -1403,6 +1425,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'animal-exteriors';
         value: number | AnimalExterior;
+      } | null)
+    | ({
+        relationTo: 'animal-revisions';
+        value: number | AnimalRevision;
       } | null)
     | ({
         relationTo: 'data-submissions';
@@ -2005,6 +2031,22 @@ export interface AnimalExteriorsSelect<T extends boolean = true> {
   udderComposite?: T;
   legsComposite?: T;
   note?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "animal-revisions_select".
+ */
+export interface AnimalRevisionsSelect<T extends boolean = true> {
+  animal?: T;
+  at?: T;
+  user?: T;
+  path?: T;
+  label?: T;
+  before?: T;
+  after?: T;
+  source?: T;
   updatedAt?: T;
   createdAt?: T;
 }

@@ -92,6 +92,8 @@ export async function publishSubmissionAction(
       where: { and: [{ id: { in: ids } }, { trustLevel: { less_than: 3 } }] },
       overrideAccess: true,
       data: { trustLevel: 3, trustCheckedAt: now },
+      // Публикация пакета — не правка карточки: её след в самом пакете
+      context: { skipJournal: true },
     })
     raised = res.docs?.length ?? 0
   }

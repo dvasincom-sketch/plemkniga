@@ -285,6 +285,14 @@ async function AnimalsTab({
             >
               JSON
             </a>
+            {/*
+               Ручной ввод стоит рядом с загрузкой, но кнопкой послабее:
+               файлом заводят стадо, руками — одиночные случаи, и порядок
+               кнопок должен подсказывать именно это.
+            */}
+            <Link href="/account/animals/new" className="btn">
+              Добавить животное
+            </Link>
             <Link href="/account/import" className="btn btn-brand">
               Загрузить данные
             </Link>

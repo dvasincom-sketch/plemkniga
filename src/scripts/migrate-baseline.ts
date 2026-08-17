@@ -159,6 +159,11 @@ const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
     probe: { kind: 'constraint', name: 'chk_index_values_percentile' },
     note: 'целые типы и границы для процентиля',
   },
+  {
+    name: '20260817_051437_animal_revisions',
+    probe: { kind: 'table', name: 'animal_revisions' },
+    note: 'журнал правок карточки',
+  },
 ]
 
 const { driverUri, uri, source, sslConfig } = resolveDatabase()
