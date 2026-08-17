@@ -26,7 +26,7 @@ import { IndexValues } from '@/collections/IndexValues'
 import { IndexBases } from '@/collections/IndexBases'
 import { DICTIONARY_COLLECTIONS } from '@/collections/dictionaries'
 import { addDomainConstraints } from '@/lib/db-constraints'
-import { databaseEnvKeys, maskUri, resolveDatabase } from '@/lib/db-url'
+import { databaseEnvKeys, isLocalDatabase, maskUri, resolveDatabase } from '@/lib/db-url'
 import { migrations } from '@/migrations'
 
 const filename = fileURLToPath(import.meta.url)
@@ -89,12 +89,22 @@ export default buildConfig({
       ssl: sslConfig,
     },
     /*
-     * push сравнивает схему с конфигом и правит базу на лету. Payload включает
-     * его только когда NODE_ENV не равен production — то есть на проде
-     * переменная PAYLOAD_DB_PUSH ни на что не влияет, и таблицы не появятся
-     * сами. Там схему создают миграции.
+     * push приводит схему базы к конфигу на лету — удобно в разработке
+     * и недопустимо где-либо ещё.
+     *
+     * Payload включает его по одному признаку: `NODE_ENV` не равен
+     * `production`. Строку подключения он не смотрит. Из-за этого любая
+     * команда, запущенная с машины разработчика против боевой базы —
+     * пересчёт, выгрузка, ревизия, — молча правила боевую схему под рабочую
+     * копию и оставляла в журнале отметку `dev`. Прод потом не поднимался:
+     * при старте он видел отметку и спрашивал разрешения на миграции
+     * у контейнера, в котором некому отвечать.
+     *
+     * Поэтому к условию Payload добавлено своё: база должна быть локальной.
+     * Признак грубый — петлевой адрес или сокет, — и ошибиться он может
+     * только в безопасную сторону: не сделать push там, где было можно.
      */
-    push: process.env.PAYLOAD_DB_PUSH !== 'false',
+    push: process.env.PAYLOAD_DB_PUSH !== 'false' && isLocalDatabase(driverUri),
     migrationDir: path.resolve(dirname, 'migrations'),
     /*
      * Правила предметной области дописываются к схеме, которую Payload
