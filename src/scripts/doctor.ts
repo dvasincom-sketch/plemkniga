@@ -206,8 +206,15 @@ async function main() {
 
   /* -------------------------- 6. Раздутые таблицы ------------------------- */
 
-  const bloat = await pool.query<{ relname: string; live: string; dead: string; size: string }>(`
-    select relname, n_live_tup::text as live, n_dead_tup::text as dead,
+  const bloat = await pool.query<{
+    relname: string
+    qname: string
+    live: string
+    dead: string
+    size: string
+  }>(`
+    select relname, relid::regclass::text as qname,
+           n_live_tup::text as live, n_dead_tup::text as dead,
            pg_size_pretty(pg_total_relation_size(relid)) as size
       from pg_stat_user_tables
      where schemaname = 'public' and n_dead_tup > 100000 and n_dead_tup > n_live_tup / 2
@@ -216,19 +223,50 @@ async function main() {
 
   if (bloat.rows.length) {
     /*
-     * Полностью опустевшая таблица — отдельный случай. VACUUM вернёт её
-     * страницы под будущие вставки в неё же, но файл на диске не уменьшит:
-     * место останется занятым до следующего наполнения. Если наполнять
-     * нечем, короче и честнее TRUNCATE — он отдаёт файл системе сразу.
+     * Полностью опустевшая таблица — отдельный случай: VACUUM вернёт её
+     * страницы под будущие вставки в неё же, но файл на диске не уменьшит.
+     * Если наполнять нечем, короче TRUNCATE — он отдаёт файл системе сразу.
+     *
+     * Только «пусто» здесь нельзя брать из n_live_tup. Это оценка сборщика
+     * статистики, и после массового удаления она показывает ноль у таблицы,
+     * в которой ещё лежат живые строки: статистика обновится не раньше
+     * следующего прохода. Один раз по такому нулю чуть не был предложен
+     * truncate таблице с девятью сотнями настоящих записей.
+     *
+     * Поэтому пустота проверяется запросом, и запрос ограничен по времени:
+     * на таблице, где живого действительно нет, он честно прочитает все
+     * мёртвые строки, прежде чем ответить. Не успел — молчим: осмотр не
+     * вправе задерживать себя ради необязательного совета.
      */
-    const emptied = bloat.rows.filter((r) => Number(r.live) === 0)
+    const emptied: string[] = []
+    for (const r of bloat.rows) {
+      if (Number(r.live) !== 0) continue
+      const probe = await pool.connect()
+      try {
+        // set local действует до конца транзакции — потому begin, а не просто set:
+        // иначе таймаут остался бы на соединении, которое вернётся в пул
+        await probe.query('begin')
+        await probe.query('set local statement_timeout = 5000')
+        const res = await probe.query<{ any: boolean }>(
+          `select exists(select 1 from ${r.qname}) as any`,
+        )
+        if (res.rows[0]?.any === false) emptied.push(r.relname)
+      } catch {
+        /* не успели или нет прав — совета про truncate просто не будет */
+      } finally {
+        await probe.query('rollback').catch(() => {})
+        probe.release()
+      }
+    }
+
     add({
       ok: false,
       title: `Раздуты мёртвыми строками: ${bloat.rows.map((r) => r.relname).join(', ')}`,
       detail: bloat.rows
         .map(
           (r) =>
-            `${r.relname}: живых ${ru(Number(r.live))}, мёртвых ${ru(Number(r.dead))}, на диске ${r.size}`,
+            `${r.relname}: живых ${ru(Number(r.live))} (оценка), мёртвых ${ru(Number(r.dead))}, ` +
+            `на диске ${r.size}`,
         )
         .join('\n     '),
       fix:
@@ -242,7 +280,7 @@ async function main() {
         '     VACUUM FULL: он блокирует таблицу и требует запаса места\n' +
         '     размером с неё.' +
         (emptied.length
-          ? `\n     Пусты целиком: ${emptied.map((r) => r.relname).join(', ')}.\n` +
+          ? `\n     Проверено запросом — пусты целиком: ${emptied.join(', ')}.\n` +
             '     Если данные не вернутся, короче truncate — он отдаёт файл\n' +
             '     системе сразу, не требуя ни блокировки, ни запаса места.'
           : ''),
