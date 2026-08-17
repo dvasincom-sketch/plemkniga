@@ -19,6 +19,16 @@ import { maskUri, resolveDatabase } from '../lib/db-url'
  *   DATABASE_URI='postgres://…прод…' npm run db:psql -- -c "..."
  *
  * Скрипт ничего не решает за psql: аргументы после `--` уходят ему как есть.
+ *
+ * Одна засада не от нас. `npm run` вырезает кавычки внутри аргументов,
+ * поэтому запрос со строковым литералом до psql доходит покалеченным:
+ * `where name = 'dev'` превращается в `where name = dev`, и база отвечает
+ * «column "dev" does not exist». Обходов два, оба надёжные:
+ *
+ *   echo "delete from t where name = 'dev'" | npm run db:psql   — через stdin
+ *   npx tsx src/scripts/psql.ts -c "delete from t where name = 'dev'"
+ *
+ * Либо обойтись без литерала: `where batch = -1` кавычек не требует.
  */
 
 const { uri, source } = resolveDatabase()

@@ -84,7 +84,12 @@ async function main() {
       fix: 'npm run payload migrate — она создаст схему с нуля.',
     })
   } else {
-    const dev = await pool.query(`select 1 from payload_migrations where name = 'dev'`)
+    /*
+     * Ищется по batch = -1, а не по имени. Имя `dev` кладёт push сегодня,
+     * а Payload перед миграциями смотрит именно на номер пакета — и по нему
+     * решает, спрашивать ли разрешение. Проверять надо то, на что смотрит он.
+     */
+    const dev = await pool.query(`select 1 from payload_migrations where batch = -1`)
     const hasDev = (dev.rowCount ?? 0) > 0
 
     if (hasDev && !local) {
@@ -93,10 +98,13 @@ async function main() {
         title: 'В боевом журнале осталась отметка dev',
         detail:
           'Её оставляет `drizzle push` — значит, по этой базе ходили из режима\n' +
-          '     разработки. При старте приложение спросит разрешение на миграции\n' +
-          '     и будет ждать ответа, которого в контейнере не будет.',
+          '     разработки. Перед прогоном миграций Payload находит эту запись\n' +
+          '     и спрашивает разрешение: «возможна потеря данных, продолжать?»\n' +
+          '     В контейнере отвечать некому, и на отказ процесс выходит\n' +
+          '     с кодом 0, не начав работу. Снаружи это выглядит как «сборка\n' +
+          '     прошла, а сайт не открывается».',
         fix:
-          `npm run db:psql -- -c "delete from payload_migrations where name = 'dev'"\n` +
+          'npm run db:psql -- -c "delete from payload_migrations where batch = -1"\n' +
           '     Затем сверьте журнал: npm run migrate:baseline',
       })
     } else if (hasDev) {

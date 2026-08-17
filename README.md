@@ -429,7 +429,19 @@ SEED_CONFIRM=1 DATABASE_URI='postgres://…прод…' npm run seed:bulk -- --a
 
 ```bash
 DATABASE_URI='postgres://…прод…' npm run db:psql -- \
-  -c "delete from payload_migrations where name = 'dev'"
+  -c "delete from payload_migrations where batch = -1"
+```
+
+Отметка опознаётся по `batch = -1`, а не по имени: имя `dev` — то, что кладёт
+push сегодня, а Payload перед миграциями смотрит именно на номер пакета.
+Заодно такой запрос обходит неприятность `npm run`: он вырезает кавычки внутри
+аргументов, и `name = 'dev'` доходит до psql как `name = dev` — база отвечает
+«column "dev" does not exist». Если литерал в запросе всё же нужен, передайте
+запрос через stdin или мимо npm:
+
+```bash
+echo "delete from t where name = 'dev'" | npm run db:psql
+npx tsx src/scripts/psql.ts -c "delete from t where name = 'dev'"
 ```
 
 После этого — `DATABASE_URI='postgres://…прод…' npm run migrate:baseline`, чтобы
