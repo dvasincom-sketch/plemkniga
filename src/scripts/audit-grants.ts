@@ -78,12 +78,26 @@ function describeError(e: unknown): string {
   return parts.join('\n  ← ') || String(e)
 }
 
+/**
+ * Пропущенные проверки считаются наравне с найденным.
+ *
+ * Первый прогон закончился словами «ведёт себя как обещано», хотя две
+ * проверки из шести не выполнялись вовсе: у выбранной коровы не было
+ * документов, а единственный её предок оказался публичным. Пропуск
+ * не ошибка — данные бывают всякие, — но молчаливый пропуск превращает
+ * ревизию в поздравление. Итог теперь называет непроверенное вслух.
+ */
+const skipped: string[] = []
+
 const ok = (line: string) => console.log(`  ✓  ${line}`)
 const bad = (step: string, detail: string) => {
   findings.push({ step, detail })
   console.log(`  ✗  ${detail}`)
 }
-const skip = (line: string) => console.log(`  ·  ${line}`)
+const skip = (line: string) => {
+  skipped.push(line)
+  console.log(`  ·  ${line}  (не проверено)`)
+}
 
 /** Коллекции, приписанные к области. Читается прицельно, по одной строке. */
 const BY_SCOPE = {
@@ -139,26 +153,55 @@ async function main() {
     overrideAccess: true,
   })
 
-  const hasRows = async (id: number | string): Promise<boolean> => {
-    for (const collection of ['milk-tests', 'calvings', 'animal-evaluations'] as const) {
-      const res = await payload.find({
-        collection,
-        where: { animal: { equals: id } },
-        limit: 1,
+  /*
+   * Выбираем не первую попавшуюся, а самую пригодную для проверки.
+   *
+   * Пригодность — это сколько проверок на ней вообще выполнится: есть ли
+   * записи каждой области и есть ли закрытый предок. Первый прогон взял
+   * первую попавшуюся, и две проверки из шести не выполнились ни разу.
+   * Ревизия на неподходящих данных отвечает не «всё хорошо», а «не знаю»,
+   * и разница между этими ответами — вся её ценность.
+   */
+  const anyRow = async (collection: string, animalId: number | string): Promise<boolean> => {
+    const res = await payload.find({
+      collection: collection as never,
+      where: { animal: { equals: animalId } },
+      limit: 1,
+      depth: 0,
+      overrideAccess: true,
+    })
+    return res.docs.length > 0
+  }
+
+  const closedParent = async (a: { father?: unknown; mother?: unknown }): Promise<boolean> => {
+    for (const parent of [idOf(a.father), idOf(a.mother)]) {
+      if (parent === null) continue
+      const doc = await payload.findByID({
+        collection: 'animals',
+        id: parent,
         depth: 0,
         overrideAccess: true,
       })
-      if (res.docs.length) return true
+      if (doc && !doc.publicVisible) return true
     }
     return false
   }
 
   let victim = candidates.docs[0]
+  let best = -1
+
   for (const candidate of candidates.docs) {
-    if (await hasRows(candidate.id)) {
+    let score = 0
+    if (await anyRow('milk-tests', candidate.id)) score++
+    if (await anyRow('animal-evaluations', candidate.id)) score++
+    if (await anyRow('documents', candidate.id)) score++
+    if (await closedParent(candidate)) score++
+
+    if (score > best) {
+      best = score
       victim = candidate
-      break
     }
+    if (score === 4) break
   }
 
   if (!victim) {
@@ -397,9 +440,23 @@ async function main() {
   /* -------------------------------- Итог ----------------------------------- */
 
   console.log('\n' + '─'.repeat(74))
+
+  if (skipped.length) {
+    console.log(`\nНе проверено: ${skipped.length}\n`)
+    for (const line of skipped) console.log(`  · ${line}`)
+    console.log(
+      '\nЭто не находки, а пробелы в данных: на выбранной записи такой проверке\n' +
+        'не на чем было выполниться. Ревизия выбирает запись с наибольшим охватом\n' +
+        'из двадцати пяти кандидатов — если пробелы остались, их нет во всей базе.',
+    )
+  }
+
   if (!findings.length) {
-    console.log('\nТочечный доступ ведёт себя как обещано: область открывает только своё,')
-    console.log('предки закрыты, срок и отзыв действуют.\n')
+    console.log(
+      skipped.length
+        ? '\nИз выполненных проверок не сработала ни одна: область открывает только своё,\nсрок и отзыв действуют. Пропущенное выше остаётся непроверенным.\n'
+        : '\nТочечный доступ ведёт себя как обещано: область открывает только своё,\nпредки закрыты, срок и отзыв действуют.\n',
+    )
     return
   }
 
