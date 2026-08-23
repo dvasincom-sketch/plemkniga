@@ -8,6 +8,7 @@ import { isAssociationUser } from '@/lib/association'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { ProfileForm } from '@/components/ProfileForm'
 import { SubTabs } from '@/components/SubTabs'
+import { SettingsNav, type SettingsSub } from '@/components/SettingsNav'
 import { getCurrentUser } from '@/lib/payload'
 import { ROLES, labelOf } from '@/lib/dictionaries'
 import type { Organization } from '@/payload-types'
@@ -73,7 +74,7 @@ export default async function ProfilePage({
            стояли разделы хозяйства, и на профиле эксперта они выглядели
            приглашением, которое никуда не ведёт.
         */}
-        {association ? <AssociationNav /> : <AccountNav />}
+        {association ? <AssociationNav /> : <AccountNav active="settings" />}
 
         {/*
            Вкладки профиля — третий уровень навигации, и стоят они там же,
@@ -86,16 +87,31 @@ export default async function ProfilePage({
            Разметка живёт в общем `SubTabs`; там же записано, почему это
            ссылки, а не кнопки с состоянием.
         */}
-        <SubTabs
-          label="Разделы профиля"
-          active={tab}
-          items={tabs.map((t) => ({
-            key: t.key,
-            label: t.label,
-            hint: t.hint,
-            href: `/account/profile?tab=${t.key}`,
-          }))}
-        />
+        {/*
+           У хозяйства это те же настройки, что видимость и сотрудники,
+           и ряд у них общий: разделять «настройки кабинета» и «вкладки
+           профиля» значило бы заставить человека помнить, в каком
+           из двух рядов лежит нужное.
+
+           У сотрудника Ассоциации своего хозяйства нет, и половина
+           разделов настроек к нему не относится — ни видимости стада,
+           ни сотрудников, ни журнала хозяйства. Ему остаётся прежний
+           короткий ряд из двух вкладок.
+        */}
+        {association ? (
+          <SubTabs
+            label="Разделы профиля"
+            active={tab}
+            items={tabs.map((t) => ({
+              key: t.key,
+              label: t.label,
+              hint: t.hint,
+              href: `/account/profile?tab=${t.key}`,
+            }))}
+          />
+        ) : (
+          <SettingsNav active={tab as SettingsSub} />
+        )}
 
         <Breadcrumbs
           items={
@@ -107,7 +123,7 @@ export default async function ProfilePage({
               : [
                   { label: 'Личный кабинет', href: '/account' },
                   { label: 'Настройки', href: '/account?tab=settings' },
-                  { label: 'Профиль пользователя' },
+                  { label: TABS.find((t) => t.key === tab)?.label ?? 'Профиль пользователя' },
                 ]
           }
         />

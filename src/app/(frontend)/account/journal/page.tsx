@@ -5,6 +5,7 @@ import type { Where } from 'payload'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { AccountNav } from '@/components/AccountNav'
+import { SettingsNav } from '@/components/SettingsNav'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { OperationsTable, OperationGroups } from '@/components/OperationsTable'
 import { getClient, getCurrentUser } from '@/lib/payload'
@@ -77,11 +78,16 @@ export default async function AccountJournalPage({
       <SiteHeader active="/account" />
 
       <main className="container-page pb-8">
-        <AccountNav active="journal" />
+        <AccountNav active="settings" />
+        <SettingsNav active="journal" />
 
         <div className="min-w-0">
           <Breadcrumbs
-            items={[{ label: 'Личный кабинет', href: '/account' }, { label: 'Журнал операций' }]}
+            items={[
+              { label: 'Личный кабинет', href: '/account' },
+              { label: 'Настройки', href: '/account?tab=settings' },
+              { label: 'Журнал операций' },
+            ]}
           />
 
           <h1 className="text-[30px] font-medium leading-tight sm:text-[36px]">Журнал операций</h1>

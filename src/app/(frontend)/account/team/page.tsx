@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { AccountNav } from '@/components/AccountNav'
+import { SettingsNav } from '@/components/SettingsNav'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { TeamPanel, type Invite, type Member } from '@/components/TeamPanel'
 import { getClient, getCurrentUser } from '@/lib/payload'
@@ -91,11 +92,16 @@ export default async function TeamPage() {
       <SiteHeader active="/account" />
 
       <main className="container-page pb-8">
-        <AccountNav active="team" />
+        <AccountNav active="settings" />
+        <SettingsNav active="team" />
 
         <div className="min-w-0">
           <Breadcrumbs
-            items={[{ label: 'Личный кабинет', href: '/account' }, { label: 'Сотрудники' }]}
+            items={[
+              { label: 'Личный кабинет', href: '/account' },
+              { label: 'Настройки', href: '/account?tab=settings' },
+              { label: 'Сотрудники' },
+            ]}
           />
 
           <h1 className="text-[30px] font-medium leading-tight sm:text-[36px]">Сотрудники</h1>

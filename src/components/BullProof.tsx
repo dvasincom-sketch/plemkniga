@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { BULL_COMPARISON_MIN, type BullProof as Proof } from '@/lib/bull-proof'
 
 /**
@@ -41,7 +42,15 @@ const plural = (n: number, one: string, few: string, many: string) => {
   return many
 }
 
-export function BullProofBlock({ data }: { data: Proof }) {
+/**
+ * Ссылка на сравнение — здесь, а не в общем меню.
+ *
+ * Мысль «а с кем его сравнить» приходит на карточке быка и нигде больше:
+ * человек уже смотрит на одного и хочет положить рядом второго. Пункт
+ * меню в этот момент искать не будут, а найдя — начнут с пустой таблицы
+ * вместо той, где первый бык уже стоит.
+ */
+export function BullProofBlock({ data, bullId }: { data: Proof; bullId?: number }) {
   if (data.daughters === 0) {
     return (
       <div className="card">
@@ -57,7 +66,17 @@ export function BullProofBlock({ data }: { data: Proof }) {
 
   return (
     <div className="card">
-      <h2 className="panel-heading">Оценка по дочерям</h2>
+      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+        <h2 className="panel-heading mb-0">Оценка по дочерям</h2>
+        {bullId && (
+          <Link
+            href={`/bulls/compare?ids=${bullId}`}
+            className="text-[14px] underline underline-offset-4 hover:text-forest-500"
+          >
+            Сравнить с другими быками
+          </Link>
+        )}
+      </div>
 
       <p className="mb-6 max-w-[75ch] text-[15px] leading-relaxed text-ink-700">
         У быка нет собственного удоя — его ценность видна в дочерях. Ниже то, что о них знает

@@ -837,7 +837,7 @@ export default async function AnimalPage({
             */}
             {proof && (
               <section className="mt-8">
-                <BullProofBlock data={proof} />
+                <BullProofBlock data={proof} bullId={animal.id} />
               </section>
             )}
 

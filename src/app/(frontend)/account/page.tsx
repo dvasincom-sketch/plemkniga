@@ -31,6 +31,7 @@ import {
 import { DOCUMENT_TYPES, ROLES, eventTypeLabel, labelOf } from '@/lib/dictionaries'
 import { SubmissionHistory } from '@/components/SubmissionHistory'
 import { DATA_SUBTABS, DataNav, type DataSub } from '@/components/DataNav'
+import { SettingsNav } from '@/components/SettingsNav'
 import {
   FileUploadIcon,
   HerdScanIcon,
@@ -119,6 +120,12 @@ export default async function AccountPage({
            страницы, содержимое.
         */}
         {tab === 'data' && <DataNav active={sub} />}
+        {/*
+           Меню настроек стоит и на первой странице раздела тоже: ряд,
+           появляющийся только на внутренних страницах, читается как
+           «вы куда-то ушли», а не как «вы в разделе».
+        */}
+        {tab === 'settings' && <SettingsNav active="visibility" />}
 
         <div>
           <div className="min-w-0">
