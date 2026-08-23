@@ -30,7 +30,18 @@
  * четверть ячеек.
  */
 
-export type ColumnKind = 'text' | 'number' | 'date' | 'sex' | 'breed' | 'herd' | 'animal'
+import { AGE_GROUPS, STATES } from '@/lib/dictionaries'
+import { CALVING_EASE, CALVING_RESULTS } from '@/collections/Calvings'
+
+export type ColumnKind =
+  | 'text'
+  | 'number'
+  | 'date'
+  | 'sex'
+  | 'breed'
+  | 'herd'
+  | 'animal'
+  | 'enum'
 
 export type ImportColumn = {
   /** Куда попадает значение — путь в карточке животного. */
@@ -45,7 +56,39 @@ export type ImportColumn = {
   example: string
   /** Оговорка, без которой колонку поймут неверно. */
   note?: string
+  /**
+   * Допустимые значения — только для `kind: 'enum'`.
+   *
+   * Принимается и код, и русское название: в выгрузках встречается
+   * и «cow2», и «Корова 2 лакт.». Значение не из списка не роняет строку —
+   * поле остаётся пустым, а само значение попадает в «не нашлись
+   * в справочниках», как это давно устроено у породы и стада.
+   */
+  options?: readonly { value: string; label: string }[]
 }
+
+/**
+ * Колонка со списком значений — вместе с описанием, собранным из самого
+ * списка.
+ *
+ * Описание не пишется руками намеренно. В подсказке к «Возрастной группе»
+ * стояло «Код группы: calf, heifer, firstCalf, cow, bull» — а группы `cow`
+ * в справочнике нет, есть `cow2` и `cow3`. Файл, заполненный точно
+ * по нашей же подсказке, база отвергала. Текст, переписанный от руки
+ * с справочника, расходится с ним в тот день, когда справочник меняют;
+ * собранный из справочника — не расходится никогда.
+ */
+const enumColumn = (
+  c: Omit<ImportColumn, 'kind' | 'what' | 'example'> & {
+    options: readonly { value: string; label: string }[]
+    what: string
+  },
+): ImportColumn => ({
+  ...c,
+  kind: 'enum',
+  what: `${c.what} Коды: ${c.options.map((o) => o.value).join(', ')}. Принимается и название.`,
+  example: c.options[0]?.value ?? '',
+})
 
 export type ColumnGroup = {
   key: string
@@ -125,22 +168,20 @@ const PASSPORT: ImportColumn[] = [
     what: 'Доля крови по голштину, от 0 до 100.',
     example: '87,5',
   },
-  {
+  enumColumn({
     key: 'ageGroup',
     title: 'Возрастная группа',
     aliases: ['возраст', 'группа животного'],
-    kind: 'text',
-    what: 'Код группы: calf, heifer, firstCalf, cow, bull.',
-    example: 'cow',
-  },
-  {
+    what: 'Возрастная группа животного.',
+    options: AGE_GROUPS.map((g) => ({ value: g.value, label: g.label })),
+  }),
+  enumColumn({
     key: 'state',
     title: 'Состояние',
     aliases: [],
-    kind: 'text',
-    what: 'Код состояния: alive, sold, culled, dead.',
-    example: 'alive',
-  },
+    what: 'В стаде животное или выбыло.',
+    options: STATES.map((s) => ({ value: s.value, label: s.full })),
+  }),
   {
     key: 'notes',
     title: 'Примечание',
@@ -292,22 +333,20 @@ const CALVINGS: ImportColumn[] = [
     example: '',
     note: 'Оставьте пустым — система поставит следующий за последним записанным. Заполнять стоит только при переносе истории из прежней системы учёта, где нумерация уже своя.',
   },
-  {
+  enumColumn({
     key: 'result',
     title: 'Результат',
     aliases: ['приплод'],
-    kind: 'text',
-    what: 'Код: heifer, bull, twins, stillborn, abortion.',
-    example: 'heifer',
-  },
-  {
+    what: 'Чем закончился отёл.',
+    options: CALVING_RESULTS,
+  }),
+  enumColumn({
     key: 'ease',
     title: 'Лёгкость отёла',
     aliases: ['лёгкость', 'легкость'],
-    kind: 'text',
-    what: 'Код: easy, assisted, hard.',
-    example: 'easy',
-  },
+    what: 'Насколько тяжело прошёл отёл.',
+    options: CALVING_EASE,
+  }),
   {
     key: 'calfWeight',
     title: 'Масса телёнка, кг',

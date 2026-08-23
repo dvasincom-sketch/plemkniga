@@ -12,6 +12,20 @@ export const CALVING_RESULTS = [
 ] as const
 
 /**
+ * Лёгкость отёла.
+ *
+ * Вынесено из поля наружу по той же причине, что и результат: этот список
+ * читает не только форма, но и разбор загружаемого файла. Пока он лежал
+ * внутри поля, описание допустимых кодов в формате импорта было переписано
+ * от руки — и разошлось со справочником в первый же раз.
+ */
+export const CALVING_EASE = [
+  { value: 'easy', label: 'Лёгкий' },
+  { value: 'assisted', label: 'С помощью' },
+  { value: 'hard', label: 'Тяжёлый' },
+] as const
+
+/**
  * Отёлы — «Таблица межотельного цикла».
  *
  * ТЗ, п. 5.2: каждое событие воспроизводства привязано к уникальному номеру
@@ -78,11 +92,7 @@ export const Calvings: CollectionConfig = {
           name: 'ease',
           type: 'select',
           label: 'Лёгкость отёла',
-          options: [
-            { value: 'easy', label: 'Лёгкий' },
-            { value: 'assisted', label: 'С помощью' },
-            { value: 'hard', label: 'Тяжёлый' },
-          ],
+          options: [...CALVING_EASE],
         },
         { name: 'calfWeight', type: 'number', label: 'Вес телёнка, кг' },
       ],

@@ -5,6 +5,7 @@ import { getClient, getCurrentUser } from '@/lib/payload'
 import { parseCsv } from '@/lib/csv'
 import { columnsOf, datasetByKey, headerMapOf, type Dataset } from '@/lib/import-format'
 import { IDENT_FIELD_LABEL, IDENT_VALUES_SQL, identCore } from '@/lib/animal-id'
+import { DOMAIN_RULES } from '@/lib/db-constraints'
 
 export type ImportState = {
   error?: string
@@ -101,6 +102,154 @@ const norm = (v: string) => v.trim().toLowerCase()
 
 /** Номера животных сравниваются без учёта разделителей и регистра. */
 const identKey = (v: string) => v.replace(/[^0-9a-zA-Zа-яА-Я]/g, '').toUpperCase()
+
+/**
+ * Действующее лицо загрузки: кто грузит и от чьего имени.
+ *
+ * Организация здесь обязательна — её спрашивают хуки коллекций событий.
+ */
+type Actor = { id: number; organization?: number; role?: string }
+
+/* ------------------------------------------------------------------ */
+/*  Ошибки базы на человеческом языке                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Отказ PostgreSQL, переведённый на язык зоотехника.
+ *
+ * ## Что было и почему это плохо
+ *
+ * В список непринятых строк уходил текст исключения как есть, и хозяйство
+ * читало: «Failed query: insert into "animals" ("id", "uuid",
+ * "ident_number", "id_format", "name", "name_latin", "alt_ids_iso_id"…» —
+ * обрезанное на двухстах символах перечисление колонок. Причина отказа
+ * в этой строке была, но стояла она за списком колонок и за списком
+ * параметров, то есть не помещалась в отведённое место никогда.
+ *
+ * Хуже простого неудобства: сообщение выглядит поломкой системы, а не
+ * ошибкой в данных. Хозяйство, получив такое, идёт не исправлять файл,
+ * а писать, что импорт сломался, — и оказывается право по-своему.
+ *
+ * ## Откуда берётся человеческий текст
+ *
+ * Из того же списка `DOMAIN_RULES`, по которому ограничения ставятся
+ * в саму базу. У каждого правила есть `note` — фраза, написанная для
+ * человека («животное не может быть своим отцом»). Заводя новое
+ * ограничение, объяснение к нему пишут один раз, и оно само доходит
+ * до того, кто наткнётся на отказ.
+ *
+ * ## Почему обход `cause`, а не разбор текста
+ *
+ * Payload заворачивает ошибку drizzle, drizzle — ошибку `pg`. Код
+ * (`23514`, `23505`) и имя ограничения лежат на самом внутреннем
+ * исключении, и добраться до них можно только по цепочке `cause`.
+ * Разбор текста оставлен запасным путём: формулировки PostgreSQL
+ * переводятся и меняются между версиями, а коды — нет.
+ */
+type PgLike = {
+  code?: unknown
+  constraint?: unknown
+  detail?: unknown
+  column?: unknown
+  message?: unknown
+  cause?: unknown
+}
+
+const pgErrorOf = (e: unknown): PgLike | null => {
+  let cur: unknown = e
+  for (let depth = 0; depth < 6 && cur && typeof cur === 'object'; depth++) {
+    const c = cur as PgLike
+    if (typeof c.code === 'string' && /^[0-9A-Z]{5}$/.test(c.code)) return c
+    cur = c.cause
+  }
+  return null
+}
+
+/**
+ * Все тексты по цепочке `cause` — в одну строку.
+ *
+ * Payload иногда перевыбрасывает ошибку своей, теряя код и `constraint`,
+ * но сохраняя исходный текст в `cause`. Искать имя ограничения только
+ * в верхнем сообщении значит промахиваться ровно в этом случае —
+ * а он самый частый.
+ */
+const chainText = (e: unknown): string => {
+  const parts: string[] = []
+  let cur: unknown = e
+  for (let depth = 0; depth < 6 && cur && typeof cur === 'object'; depth++) {
+    const c = cur as PgLike
+    if (typeof c.message === 'string') parts.push(c.message)
+    if (typeof c.detail === 'string') parts.push(c.detail)
+    cur = c.cause
+  }
+  return parts.join(' | ')
+}
+
+/** Имя ограничения — со самой ошибки либо из текста, если код потерялся. */
+const constraintOf = (pg: PgLike | null, text: string): string | null => {
+  if (pg && typeof pg.constraint === 'string') return pg.constraint
+  const named = /constraint "([^"]+)"/.exec(text)
+  if (named) return named[1]!
+  return DOMAIN_RULES.find((r) => text.includes(r.name))?.name ?? null
+}
+
+/*
+ * Не `export`: в файле с `'use server'` наружу разрешено отдавать только
+ * асинхронные функции — всё экспортированное там считается серверным
+ * действием и вызывается по сети. Сборка падает на этом сразу
+ * («Server Actions must be async functions»), и это правильно: синхронная
+ * функция, выставленная как действие, не работала бы вовсе.
+ */
+const describeDbError = (e: unknown): string => {
+  const message = e instanceof Error ? e.message : String(e)
+
+  /*
+   * Сообщения самого Payload («Следующее поле недействительно: …»)
+   * уже написаны для человека и переводу не подлежат. Признак —
+   * отсутствие текста запроса: свои ошибки Payload формулирует словами.
+   */
+  if (!message.includes('Failed query') && !pgErrorOf(e)) return message.slice(0, 200)
+
+  const pg = pgErrorOf(e)
+  const text = chainText(e)
+  const code = typeof pg?.code === 'string' ? pg.code : ''
+  const constraint = constraintOf(pg, text)
+  const rule = constraint ? DOMAIN_RULES.find((r) => r.name === constraint) : undefined
+  const detail = typeof pg?.detail === 'string' ? pg.detail : text
+
+  if (code === '23514' || (!code && constraint?.startsWith('chk_'))) {
+    return rule
+      ? `Значение не проходит правило книги: ${rule.note}`
+      : `Значение не проходит ограничение базы${constraint ? ` «${constraint}»` : ''}`
+  }
+
+  if (code === '23505' || (!code && /unique constraint/i.test(text))) {
+    /* «Key (ident_number)=(RU123) already exists.» — вытаскиваем номер. */
+    const key = /\(([^)]+)\)=\(([^)]+)\)/.exec(detail)
+    return key
+      ? `Такая запись уже есть: ${key[1] === 'ident_number' ? 'номер' : key[1]} ${key[2]} занят`
+      : 'Такая запись уже есть'
+  }
+
+  if (code === '23503' || (!code && /foreign key constraint/i.test(text)))
+    return 'Строка ссылается на запись, которой в книге нет'
+
+  if (code === '23502') {
+    const col = typeof pg?.column === 'string' ? pg.column : null
+    return col ? `Не заполнено обязательное поле «${col}»` : 'Не заполнено обязательное поле'
+  }
+
+  if (code === '22003') return 'Число не помещается в это поле — проверьте разряды'
+  if (code === '22P02' || code === '22007')
+    return 'Значение не подходит по типу: число там, где ожидался текст, или наоборот'
+
+  /*
+   * Неопознанный отказ базы. Текст запроса не показываем всё равно:
+   * хозяйству он не поможет, а место занимает целиком. Код оставляем —
+   * по нему разговор с поддержкой начинается с сути.
+   */
+  return `База отклонила строку${code ? ` (код ${code})` : ''}. Проверьте значения в этой строке`
+}
 
 /* ------------------------------------------------------------------ */
 /*  Совпадение цифр идентификаторов                                    */
@@ -267,7 +416,7 @@ function readFile(text: string, ds: Dataset) {
 
 async function importAnimals(
   payload: Awaited<ReturnType<typeof getClient>>,
-  user: { id: number },
+  user: Actor,
   orgId: number,
   ds: Dataset,
   rows: Row[],
@@ -358,6 +507,29 @@ async function importAnimals(
           else unresolved.add(`стадо «${raw}»`)
           break
         }
+        /*
+         * Значение не из справочника роняло всю строку: Payload отвергал
+         * запись целиком с «Следующее поле недействительно: Общие данные >
+         * Возрастная группа». Двадцать полей заполнены верно, одно
+         * непонятно — и не сохраняется ничего.
+         *
+         * Теперь как у породы и стада: строка принимается, поле остаётся
+         * пустым, значение названо в «не нашлись в справочниках». Ошибка
+         * в одной ячейке не должна стоить всей строки — тем более что
+         * заполнить пустую группу потом можно, а восстановить непринятую
+         * строку нельзя ничем, кроме повторной загрузки файла.
+         *
+         * Принимается и код, и русское название: в выгрузках встречается
+         * и `cow2`, и «Корова 2 лакт.».
+         */
+        case 'enum': {
+          const opt = (col.options ?? []).find(
+            (o) => norm(o.value) === norm(raw) || norm(o.label) === norm(raw),
+          )
+          if (opt) assign(data, col.key, opt.value)
+          else unresolved.add(`${col.title.toLowerCase()} «${raw}»`)
+          break
+        }
         default:
           assign(data, col.key, raw)
       }
@@ -415,10 +587,11 @@ async function importAnimals(
       /*
        * Сообщения проверок написаны для человека («Некорректный
        * индивидуальный номер. Национальный номер РФ: от 6 до 15 цифр…»),
-       * поэтому показываем их как есть, а не подменяем общей фразой.
+       * и доходят как есть. Отказы самой базы переводятся: их текст
+       * начинается с запроса на пятьсот символов, а причина стоит
+       * за ним и до экрана не доезжает никогда.
        */
-      const message = e instanceof Error ? e.message : String(e)
-      skip(line, message.slice(0, 200) || 'Запись не сохранилась', identNumber)
+      skip(line, describeDbError(e) || 'Запись не сохранилась', identNumber)
     }
   }
 
@@ -454,7 +627,7 @@ async function importAnimals(
  */
 async function importEvents(
   payload: Awaited<ReturnType<typeof getClient>>,
-  user: { id: number },
+  user: Actor,
   orgId: number,
   ds: Dataset,
   rows: Row[],
@@ -585,6 +758,7 @@ async function importEvents(
   let created = 0
   let skipped = 0
   const touched = new Set<number>()
+  const unresolved = new Set<string>()
   const issues: { row: number; ident?: string; reason: string }[] = []
   const skip = (line: number, reason: string, ident?: string) => {
     skipped++
@@ -623,6 +797,17 @@ async function importEvents(
       if (['animal', 'date', 'bull'].includes(col.key)) continue
       const raw = get(col.key)
       if (raw === undefined || raw === '') continue
+
+      if (col.kind === 'enum') {
+        /* То же правило, что у животных: непонятное значение стоит поля, а не строки. */
+        const opt = (col.options ?? []).find(
+          (o) => norm(o.value) === norm(raw) || norm(o.label) === norm(raw),
+        )
+        if (opt) assign(data, col.key, opt.value)
+        else unresolved.add(`${col.title.toLowerCase()} «${raw}»`)
+        continue
+      }
+
       assign(data, col.key, col.kind === 'number' ? numOrUndef(raw) : col.kind === 'date' ? dateOrUndef(raw) : raw)
     }
 
@@ -685,8 +870,7 @@ async function importEvents(
       touched.add(animal.id)
       created++
     } catch (e) {
-      const message = e instanceof Error ? e.message : String(e)
-      skip(line, message.slice(0, 200) || 'Запись не сохранилась', rawIdent)
+      skip(line, describeDbError(e) || 'Запись не сохранилась', rawIdent)
     }
   }
 
@@ -702,7 +886,7 @@ async function importEvents(
     skipped,
     issues,
     touched: [...touched],
-    unresolved: [] as string[],
+    unresolved: [...unresolved].slice(0, 20),
     identMatches: [] as IdentMatch[],
   }
 }
@@ -735,7 +919,30 @@ export async function importDataAction(
   }
 
   const payload = await getClient()
-  const actor = { id: user.id as number }
+
+  /*
+   * Организация в действующем лице — не украшение, а условие работы.
+   *
+   * Загрузка событий передаёт `user` в `payload.create`, а хук
+   * `requireOwnAnimal` на отёлах, осеменениях и дойках спрашивает
+   * у этого пользователя его организацию. Раньше сюда уходило
+   * `{ id }` — и хук честно отвечал «У вашей учётной записи нет
+   * организации» на каждой строке файла, при том что организация
+   * у человека есть и животные из того же кабинета грузились.
+   *
+   * Соблазн был не передавать `user` вовсе — тогда хук считает вызов
+   * серверным скриптом и пропускает всё. Так делать нельзя: заслон
+   * снимается ради удобства, а стоит он на том, чтобы файл не попал
+   * в чужое стадо. Правильный способ — назвать действующее лицо целиком.
+   *
+   * `role` здесь по той же причине: Ассоциация ведёт чужие данные
+   * по долгу службы, и хук отпускает её раньше проверки организации.
+   */
+  const actor = {
+    id: user.id as number,
+    organization: orgId,
+    role: (user as { role?: string }).role,
+  }
 
   const res =
     ds.key === 'animals'
