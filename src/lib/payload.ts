@@ -23,7 +23,34 @@ import type { User } from '@/payload-types'
  * судьбу всего приложения — и оставляет строку в логе, по которой видно,
  * что именно оборвалось.
  */
-let poolGuarded = false
+/**
+ * Отметка «пул уже под присмотром» стоит на самом пуле, а не в переменной
+ * модуля.
+ *
+ * Сначала это был обычный `let poolGuarded = false`, и в проде он работал:
+ * модуль вычисляется один раз, слушатели вешаются один раз. В `next dev`
+ * то же самое разваливается. Пул живёт в `globalThis` — его кладёт туда сам
+ * Payload, чтобы пережить горячую замену модулей, — а вот наш модуль после
+ * каждой пересборки вычисляется заново, и `poolGuarded` снова становится
+ * `false`. Пул один, охранников всё больше: на одиннадцатой пересборке Node
+ * сообщает `MaxListenersExceededWarning: 11 error listeners added to
+ * [Client]`. Предупреждение не про утечку памяти в буквальном смысле — оно
+ * про то, что каждое соединение теперь пишет в лог одиннадцать одинаковых
+ * строк об одном обрыве.
+ *
+ * Отметка на пуле переживает пересборку ровно потому, что переживает её
+ * сам пул: это одно и то же место жизни. `Symbol.for` берёт символ
+ * из общего для процесса реестра, а не заводит новый — важно, потому что
+ * серверные компоненты, обработчики маршрутов и серверные действия
+ * собираются в разные пакеты, и `Symbol()` дал бы каждому свой ключ,
+ * то есть ту же болезнь с другой стороны.
+ *
+ * Поднять `setMaxListeners` было бы проще всего и означало бы заглушить
+ * счётчик, оставив саму очередь охранников на месте.
+ */
+const GUARDED: unique symbol = Symbol.for('plemkniga.pool-guarded')
+
+type Guarded = { [GUARDED]?: true }
 
 type ClientLike = { on?: (event: 'error', listener: (err: Error) => void) => void }
 type PoolLike = {
@@ -37,12 +64,13 @@ const note = (what: string, err: Error): void => {
   )
 }
 
-const guardPool = (client: unknown): void => {
-  if (poolGuarded) return
+export const guardPool = (client: unknown): void => {
   const pool = (client as { db?: { pool?: PoolLike } })?.db?.pool
   if (typeof pool?.on !== 'function') return
 
-  poolGuarded = true
+  const marked = pool as PoolLike & Guarded
+  if (marked[GUARDED]) return
+  marked[GUARDED] = true
 
   // Соединение, лежавшее в пуле без дела
   pool.on('error', ((err: Error) => note('Простаивающее соединение с базой оборвалось', err)) as never)
@@ -61,11 +89,17 @@ const guardPool = (client: unknown): void => {
    * Слушатель ничего не чинит: запрос всё равно завершится отказом,
    * и страница покажет ошибку. Он лишь не даёт обрыву одного соединения
    * решать судьбу всего приложения.
+   *
+   * Та же отметка стоит и на самом клиенте. Обработчик `connect` при
+   * исправном пуле один, и хватило бы простого `c.on`, — но если он
+   * всё-таки окажется не один, накопятся уже не одиннадцать слушателей
+   * на пуле, а одиннадцать на каждом соединении. Отметка стоит одну
+   * проверку и снимает целый класс возврата этой же ошибки.
    */
-  pool.on('connect', ((c: ClientLike) => {
-    if (typeof c?.on === 'function') {
-      c.on('error', (err) => note('Соединение с базой оборвалось во время запроса', err))
-    }
+  pool.on('connect', ((c: ClientLike & Guarded) => {
+    if (typeof c?.on !== 'function' || c[GUARDED]) return
+    c[GUARDED] = true
+    c.on('error', (err) => note('Соединение с базой оборвалось во время запроса', err))
   }) as never)
 }
 
