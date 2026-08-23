@@ -6,7 +6,7 @@ import { checkAnimals, type CheckCoverage } from '@/lib/data-checks'
 import { analyzeAncestry } from '@/lib/ancestry'
 import { herdIssues } from '@/lib/checks-herd'
 import { farmStats } from '@/lib/farm-stats'
-import { CHECKS, checkSpec, type CheckCode } from '@/lib/checks-registry'
+import { ALL_CHECKS, CHECKS, checkSpec, guardedChecks, type CheckCode } from '@/lib/checks-registry'
 
 /**
  * Ревизия автоматических проверок на настоящих данных.
@@ -70,6 +70,19 @@ const DEFAULT_LIMIT = 300
 
 /** Выше этой доли разобранных записей проверка считается шумной. */
 const NOISY_SHARE = 0.2
+
+/**
+ * Меньше этого числа проверенных записей доля не считается вовсе.
+ *
+ * На контрольном хозяйстве `inbreeding-mismatch` сверила две записи
+ * и нашла две находки — сто процентов, и отчёт потребовал разобраться
+ * с порогом. Разбираться там не с чем: обе записи для того и заведены.
+ *
+ * Доля от двух — не доля, а пересказ числителя. То же правило уже
+ * применено к проверкам по стаду (`HERD_THRESHOLDS.minHerd`), и здесь
+ * оно нужно ровно по той же причине.
+ */
+const NOISY_MIN = 20
 
 /** Сколько хозяйств смотрим по стаду, если не указано одно. */
 const ORG_CAP = 25
@@ -417,12 +430,26 @@ async function main() {
 
   /* ------------------------ Что требует внимания ------------------------ */
 
-  const silent = CHECKS.filter(
-    (c) => !animalTally.has(c.code) && !herdTally.has(c.code),
-  )
+  /*
+   * Молчащие делятся надвое, и разница существенная.
+   *
+   * Одни не сработали потому, что подходящих данных в базе нет — про них
+   * мы не знаем ничего. Другие не сработают никогда: ограничение базы
+   * не даёт такие данные записать (`dbGuard` в реестре). Валить их в один
+   * список значит требовать завести данные, которые `insert` отвергнет, —
+   * ровно на этом остановился первый прогон контрольного хозяйства.
+   */
+  const guardedCodes = new Set(guardedChecks().map((c) => c.code))
+
+  const silentAll = ALL_CHECKS.filter((c) => !animalTally.has(c.code) && !herdTally.has(c.code))
+  const silent = silentAll.filter((c) => !guardedCodes.has(c.code))
+  const unreachable = silentAll.filter((c) => guardedCodes.has(c.code))
 
   const noisy = [...animalTally.entries()]
-    .filter(([code, t]) => denomOf(code) && t.animals.size / denomOf(code) > NOISY_SHARE)
+    .filter(
+      ([code, t]) =>
+        denomOf(code) >= NOISY_MIN && t.animals.size / denomOf(code) > NOISY_SHARE,
+    )
     .sort((a, b) => b[1].animals.size / denomOf(b[0]) - a[1].animals.size / denomOf(a[0]))
 
   console.log('')
@@ -456,6 +483,18 @@ async function main() {
     console.log('    Это не значит «сломаны». Значит, что данных, на которых их')
     console.log('    видно, в базе нет, — и что о их работоспособности мы')
     console.log('    по-прежнему ничего не знаем.')
+    console.log('')
+  }
+
+  if (unreachable.length) {
+    console.log(`  Недостижимы, пока действует ограничение базы (${unreachable.length}):`)
+    console.log('')
+    for (const c of unreachable) console.log(`    ${pad(c.code, 38)}${c.dbGuard}`)
+    console.log('')
+    console.log('    Данных под них в этой базе не бывает: `insert` их отвергает.')
+    console.log('    Правила оставлены намеренно — ограничения приписываются к схеме')
+    console.log('    хуком, а не миграцией, и на чужом дампе или на записях старше')
+    console.log('    самого ограничения нарушения встречаются.')
     console.log('')
   }
 
