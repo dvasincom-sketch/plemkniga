@@ -10,6 +10,7 @@ import {
   VerificationAutoIssues,
   VerificationDecision,
   VerificationFindings,
+  VerificationHerdIssues,
 } from '@/components/VerificationReview'
 import { getClient } from '@/lib/payload'
 import { isStaleSchemaError, requireAssociation, waitingDays, waitingLabel } from '@/lib/association'
@@ -247,33 +248,26 @@ export default async function ReviewVerificationPage({
               readOnly={decided}
             />
 
-            {herd.issues.length > 0 && (
-              <div className="card">
-                <h2 className="panel-heading">Сопоставимость данных хозяйства</h2>
-                <p className="mb-4 max-w-[80ch] text-[14px] leading-relaxed text-ink-500">
-                  Посчитано по всему стаду ({herd.scanned.toLocaleString('ru-RU')} записей),
-                  а не по заявке: несопоставимость — свойство учёта, а не выборки.
-                  Заявку эти замечания не блокируют.
-                </p>
-                <ul className="space-y-4">
-                  {herd.issues.map((h) => (
-                    <li key={h.code + h.text} className="border-t border-ink-100 pt-4">
-                      <p className="text-[15px] font-medium">
-                        {checkSpec(h.code)?.label ?? h.code}
-                      </p>
-                      <p className="mt-1 max-w-[80ch] text-[14px] leading-relaxed text-ink-700">
-                        {h.text}
-                      </p>
-                      {!!h.examples?.length && (
-                        <p className="mt-1 text-[13px] leading-relaxed text-ink-500">
-                          {h.examples.map((e) => e.label).join('; ')}
-                        </p>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            {/*
+               Находки по стаду теперь не только показываются, но и переносятся
+               в замечания — ко всему пакету и без животного. Иначе хозяйство
+               о них не узнает: «Проверить моё стадо» оно открывает по своей
+               воле, а заключение по заявке читает обязательно.
+            */}
+            <VerificationHerdIssues
+              id={request.id}
+              scanned={herd.scanned}
+              issues={herd.issues.map((h) => ({
+                code: h.code,
+                label: checkSpec(h.code)?.label ?? h.code,
+                text: h.text,
+                examples: h.examples?.map((e) => e.label),
+              }))}
+              recorded={findings
+                .filter((f) => !f.animal && f.field)
+                .map((f) => String(f.field))}
+              readOnly={decided}
+            />
 
             {(limits.length > 0 || herd.limits.length > 0) && (
               <div className="card">

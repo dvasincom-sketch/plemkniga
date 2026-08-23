@@ -270,6 +270,106 @@ export function VerificationAutoIssues({
   )
 }
 
+/**
+ * Находки по стаду — в работу эксперта.
+ *
+ * ## Почему они не переносятся так же, как находки по записи
+ *
+ * У находки по записи есть животное, и замечание с пометкой «требует
+ * исправления» исключает его из подтверждения. У находки по стаду животного
+ * нет: смешанные единицы измерения — свойство всего массива, и указать,
+ * какую именно корову за это не подтверждать, нельзя.
+ *
+ * Поэтому такое замечание записывается ко всему пакету и всегда
+ * «на усмотрение». Не из мягкости: существенность, которая ничего
+ * не исключает, — обещание последствия, которого не будет.
+ *
+ * ## Зачем вообще переносить, если это ничего не блокирует
+ *
+ * Затем, что иначе хозяйство об этом не узнает. Находки по стаду видны
+ * эксперту при разборе и самому хозяйству в «Проверить моё стадо» — но
+ * второе оно открывает по своей воле, а заключение по заявке читает
+ * обязательно. Перенос превращает наблюдение в разговор.
+ */
+export function VerificationHerdIssues({
+  id,
+  issues,
+  scanned,
+  recorded,
+  readOnly,
+}: {
+  id: number | string
+  issues: { code: string; label: string; text: string; examples?: string[] }[]
+  scanned: number
+  recorded: string[]
+  readOnly: boolean
+}) {
+  const [state, addAction] = useActionState<VerificationState, FormData>(
+    addVerificationFindingAction,
+    {},
+  )
+
+  if (!issues.length) return null
+
+  const done = new Set(recorded)
+
+  return (
+    <div className="card">
+      <h2 className="panel-heading">Сопоставимость данных хозяйства · {issues.length}</h2>
+
+      <p className="mb-5 max-w-[75ch] text-[15px] leading-relaxed text-ink-700">
+        Посчитано по всему стаду ({scanned.toLocaleString('ru-RU')} записей), а не по заявке:
+        несопоставимость — свойство учёта, а не выборки. Заявку эти находки не блокируют
+        и записываются ко всему пакету, без животного: указать, какую именно корову
+        не подтверждать из-за смешанных единиц измерения, нельзя.
+      </p>
+
+      <Result state={state} />
+
+      <ul className="divide-y divide-[#ededed]">
+        {issues.map((i) => (
+          <li key={i.code} className="flex items-start justify-between gap-4 py-3">
+            <div className="min-w-0">
+              <p className="text-[15px] font-medium leading-snug">{i.label}</p>
+              <p className="mt-1 max-w-[70ch] text-[14px] leading-relaxed text-ink-700">{i.text}</p>
+              {!!i.examples?.length && (
+                <p className="mt-1 text-[13px] leading-relaxed text-ink-500">
+                  {i.examples.join('; ')}
+                </p>
+              )}
+            </div>
+
+            {!readOnly &&
+              (done.has(i.code) ? (
+                <span className="flex-none whitespace-nowrap text-[13px] text-ink-500">
+                  записано
+                </span>
+              ) : (
+                <form action={addAction} className="flex-none">
+                  <input type="hidden" name="id" value={String(id)} />
+                  {/*
+                     Животное не передаётся вовсе, а не пустой строкой «на всякий
+                     случай»: действие само превращает нечисло в отсутствие связи,
+                     и лишнее поле здесь только сбивало бы с толку читающего форму.
+                  */}
+                  <input type="hidden" name="field" value={i.code} />
+                  <input type="hidden" name="severity" value="note" />
+                  <input type="hidden" name="text" value={`${i.label}. ${i.text}`} />
+                  <button
+                    type="submit"
+                    className="whitespace-nowrap text-[13px] text-ink-500 underline underline-offset-4 hover:text-forest-500"
+                  >
+                    в замечания
+                  </button>
+                </form>
+              ))}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 export function VerificationFindings({
   id,
   findings,

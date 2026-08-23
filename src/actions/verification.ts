@@ -386,7 +386,14 @@ export async function decideVerificationAction(
     findings
       .filter((f) => ((f as { severity?: string }).severity ?? 'fix') === 'fix')
       .map((f) => Number((f as { animal?: number }).animal))
-      .filter((n) => Number.isFinite(n)),
+      /*
+       * `> 0` здесь не украшение. У замечания ко всему пакету животного нет,
+       * `Number(null)` даёт ноль, а ноль — конечное число: такое замечание
+       * попадало в набор исключённых записей под идентификатором 0.
+       * Ни одно животное этот идентификатор не носит, поэтому вреда не было —
+       * но набор «исключённые записи» содержал бы не запись.
+       */
+      .filter((n) => Number.isFinite(n) && n > 0),
   )
 
   const all = (request.animals ?? []).map((a) => relId(a)).filter((n): n is number => n !== null)

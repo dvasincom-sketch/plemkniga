@@ -34,6 +34,13 @@ export const dynamic = 'force-dynamic'
  */
 
 type Finding = {
+  /*
+   * Payload даёт каждой строке массива собственный идентификатор — им
+   * замечание и удаляют на стороне Ассоциации. В этом типе его не было,
+   * пока замечания перебирались по животным: ключом служил номер животного.
+   * Замечанию ко всему пакету животного нет, и ключ понадобился свой.
+   */
+  id?: string | null
   animal?: unknown
   field?: string | null
   severity?: string | null
@@ -98,9 +105,28 @@ export default async function VerificationRequestPage({
    * что к ней относится, закрыл.
    */
   const byAnimal = new Map<number, { animal: unknown; items: Finding[] }>()
+
+  /**
+   * Замечания ко всему пакету — те, у которых животного нет.
+   *
+   * Раньше строка `if (key === null) continue` их молча выбрасывала,
+   * и это было верно ровно до тех пор, пока таких замечаний не бывало.
+   * Теперь эксперт переносит сюда находки по стаду: смешанные единицы
+   * измерения, дойки из разных источников, год без единого отёла. Указать
+   * животное у них нельзя — беда в способе учёта, а не в записи.
+   *
+   * Выбрасывать их было бы худшим из исходов: эксперт видит, что записал
+   * замечание, хозяйство не видит ничего, и оба уверены, что разговор
+   * состоялся.
+   */
+  const general: Finding[] = []
+
   for (const f of findings) {
     const key = relId(f.animal)
-    if (key === null) continue
+    if (key === null) {
+      general.push(f)
+      continue
+    }
     const entry = byAnimal.get(key) ?? { animal: f.animal, items: [] }
     entry.items.push(f)
     byAnimal.set(key, entry)
@@ -164,6 +190,35 @@ export default async function VerificationRequestPage({
               Цель: {labelOf(VERIFICATION_PURPOSES, request.purpose).toLowerCase()}
             </p>
           ) : null}
+
+          {/* ------------------ Замечания ко всему пакету ---------------------- */}
+          {/*
+             Стоят выше списка непрошедших записей, хотя подтверждению
+             не мешают. Причина в том, что чинить их — другая работа: не
+             поправить поле в карточке, а привести в порядок способ учёта.
+             Прочитанное после списка «поправьте и подайте заново» такое
+             замечание выглядит как ещё одна строка того же списка.
+          */}
+          {general.length > 0 && (
+            <section className="card mt-8">
+              <h2 className="panel-heading">Замечания ко всему пакету</h2>
+              <p className="mb-5 max-w-[75ch] text-[14px] leading-relaxed text-ink-700">
+                Эти замечания не относятся к отдельной записи и подтверждению не мешали.
+                Они о том, как ведётся учёт в целом: пока они в силе, средние по стаду
+                и сравнение животных между собой ненадёжны.
+              </p>
+
+              <ul className="space-y-4">
+                {general.map((f, i) => (
+                  <li key={f.id ?? i} className="border-t border-ink-100 pt-4">
+                    <p className="max-w-[75ch] text-[15px] leading-relaxed text-ink-700">
+                      {f.text}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           {/* ------------------- Что не прошло — первым делом ------------------ */}
           {held.length > 0 && (
