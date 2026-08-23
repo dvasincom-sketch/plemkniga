@@ -21,6 +21,7 @@ import { DataSubmissions } from '@/collections/DataSubmissions'
 import { AccessRequests } from '@/collections/AccessRequests'
 import { AccessGrants } from '@/collections/AccessGrants'
 import { AccessViews } from '@/collections/AccessViews'
+import { CheckSettings } from '@/collections/CheckSettings'
 import { AnimalEvaluations } from '@/collections/AnimalEvaluations'
 import { AnimalExteriors } from '@/collections/AnimalExteriors'
 import { AnimalRevisions } from '@/collections/AnimalRevisions'
@@ -74,6 +75,7 @@ export default buildConfig({
     AccessRequests,
     AccessGrants,
     AccessViews,
+    CheckSettings,
     IndexProfiles,
     IndexValues,
     IndexBases,

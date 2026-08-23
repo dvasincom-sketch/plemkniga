@@ -83,6 +83,7 @@ export interface Config {
     'access-requests': AccessRequest;
     'access-grants': AccessGrant;
     'access-views': AccessView;
+    'check-settings': CheckSetting;
     'index-profiles': IndexProfile;
     'index-values': IndexValue;
     'index-bases': IndexBase;
@@ -127,6 +128,7 @@ export interface Config {
     'access-requests': AccessRequestsSelect<false> | AccessRequestsSelect<true>;
     'access-grants': AccessGrantsSelect<false> | AccessGrantsSelect<true>;
     'access-views': AccessViewsSelect<false> | AccessViewsSelect<true>;
+    'check-settings': CheckSettingsSelect<false> | CheckSettingsSelect<true>;
     'index-profiles': IndexProfilesSelect<false> | IndexProfilesSelect<true>;
     'index-values': IndexValuesSelect<false> | IndexValuesSelect<true>;
     'index-bases': IndexBasesSelect<false> | IndexBasesSelect<true>;
@@ -1332,6 +1334,29 @@ export interface AccessView {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "check-settings".
+ */
+export interface CheckSetting {
+  id: number;
+  /**
+   * Из реестра `src/lib/checks-registry.ts`
+   */
+  code: string;
+  enabled?: boolean | null;
+  /**
+   * Пусто — как задано в реестре
+   */
+  severity?: ('fix' | 'note') | null;
+  /**
+   * Настройку через год будет читать другой человек. Без причины он не поймёт, можно ли её вернуть
+   */
+  note?: string | null;
+  updatedBy?: (number | null) | User;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "index-profiles".
  */
 export interface IndexProfile {
@@ -1598,6 +1623,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'access-views';
         value: number | AccessView;
+      } | null)
+    | ({
+        relationTo: 'check-settings';
+        value: number | CheckSetting;
       } | null)
     | ({
         relationTo: 'index-profiles';
@@ -2375,6 +2404,19 @@ export interface AccessViewsSelect<T extends boolean = true> {
   firstAt?: T;
   at?: T;
   sessions?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "check-settings_select".
+ */
+export interface CheckSettingsSelect<T extends boolean = true> {
+  code?: T;
+  enabled?: T;
+  severity?: T;
+  note?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }

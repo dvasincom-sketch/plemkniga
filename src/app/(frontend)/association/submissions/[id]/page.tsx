@@ -92,7 +92,14 @@ export default async function ReviewSubmissionPage({
    * до тех пор, пока кто-нибудь не пересчитает. Сохранять стоит только
    * то, что сказал человек.
    */
-  const issues = await checkAnimals(payload, animals)
+  /*
+   * Разбор возвращает не только находки, но и оговорки о своей полноте:
+   * какие проверки уперлись в потолок. Показываются они рядом с находками
+   * и намеренно не спрятаны в подсказку — «замечаний не найдено»
+   * и «замечаний не искали» выглядят на экране одинаково, а значат
+   * противоположное, и цена ошибки здесь не наша, а хозяйства.
+   */
+  const { issues, limits } = await checkAnimals(payload, animals)
 
   const blocking = findings.filter((f) => (f.severity ?? 'fix') === 'fix').length
   const decided = submission.status === 'checked' || submission.status === 'accepted' || submission.status === 'rejected'
@@ -242,6 +249,19 @@ export default async function ReviewSubmissionPage({
 
             {/* --------------------- Автоматические проверки ------------------ */}
             <AutoIssues id={submission.id} issues={issues} readOnly={decided} />
+
+            {limits.length > 0 && (
+              <div className="card">
+                <h2 className="panel-heading">Что проверено не полностью</h2>
+                <ul className="space-y-2">
+                  {limits.map((l) => (
+                    <li key={l} className="text-[14px] leading-relaxed text-ink-700">
+                      {l}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* -------------------------- Находки ----------------------------- */}
             <Findings

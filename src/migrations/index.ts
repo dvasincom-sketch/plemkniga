@@ -27,6 +27,7 @@ import * as migration_20260817_150000_request_scopes from './20260817_150000_req
 import * as migration_20260817_170000_view_journal from './20260817_170000_view_journal';
 import * as migration_20260817_180000_document_number from './20260817_180000_document_number';
 import * as migration_20260817_190000_document_snapshot from './20260817_190000_document_snapshot';
+import * as migration_20260822_090000_check_settings from './20260822_090000_check_settings';
 
 export const migrations = [
   {
@@ -173,5 +174,10 @@ export const migrations = [
     up: migration_20260817_190000_document_snapshot.up,
     down: migration_20260817_190000_document_snapshot.down,
     name: '20260817_190000_document_snapshot',
+  },
+  {
+    up: migration_20260822_090000_check_settings.up,
+    down: migration_20260822_090000_check_settings.down,
+    name: '20260822_090000_check_settings',
   },
 ];

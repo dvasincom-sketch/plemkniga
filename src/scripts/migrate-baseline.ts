@@ -209,6 +209,11 @@ const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
     probe: { kind: 'column', table: 'documents', column: 'snapshot' },
     note: 'снимок данных на момент выпуска документа',
   },
+  {
+    name: '20260822_090000_check_settings',
+    probe: { kind: 'table', name: 'check_settings' },
+    note: 'настройки автоматических проверок: отклонения от реестра',
+  },
 ]
 
 const { driverUri, uri, source, sslConfig } = resolveDatabase()

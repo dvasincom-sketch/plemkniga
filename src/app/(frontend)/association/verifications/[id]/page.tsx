@@ -96,7 +96,14 @@ export default async function ReviewVerificationPage({
         : (f.animal ?? null),
   }))
 
-  const issues = await checkAnimals(payload, animals)
+  /*
+   * Разбор возвращает не только находки, но и оговорки о своей полноте:
+   * какие проверки уперлись в потолок. Показываются они рядом с находками
+   * и намеренно не спрятаны в подсказку — «замечаний не найдено»
+   * и «замечаний не искали» выглядят на экране одинаково, а значат
+   * противоположное, и цена ошибки здесь не наша, а хозяйства.
+   */
+  const { issues, limits } = await checkAnimals(payload, animals)
 
   const heldIds = new Set(
     findings
@@ -206,6 +213,19 @@ export default async function ReviewVerificationPage({
             </div>
 
             <VerificationAutoIssues id={request.id} issues={issues} readOnly={decided} />
+
+            {limits.length > 0 && (
+              <div className="card">
+                <h2 className="panel-heading">Что проверено не полностью</h2>
+                <ul className="space-y-2">
+                  {limits.map((l) => (
+                    <li key={l} className="text-[14px] leading-relaxed text-ink-700">
+                      {l}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <VerificationFindings
               id={request.id}

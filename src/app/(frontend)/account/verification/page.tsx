@@ -125,6 +125,26 @@ export default async function VerificationPage() {
             .
           </p>
 
+          {/*
+             Ссылка на каталог стоит до формы, а не после.
+             Читают её ровно один раз — перед первой подачей, — и если
+             положить её ниже списка стада на пятьсот строк, до неё
+             не доберётся никто. А польза от неё вся в том, чтобы прочесть
+             раньше, чем подать.
+          */}
+          <p className="mt-3 max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
+            Перед подачей стоит заглянуть в{' '}
+            <Link href="/account/checks" className="underline underline-offset-4">
+              список автоматических проверок
+            </Link>
+            : система сверяет записи по нему сама, и часть замечаний проще снять
+            заранее, чем получить их в заключении. А{' '}
+            <Link href="/account/checks/herd" className="underline underline-offset-4">
+              прогон по своему стаду
+            </Link>{' '}
+            покажет, что именно найдётся в ваших записях.
+          </p>
+
           <div className="mt-8 space-y-6">
             <VerificationForm rows={rows} />
 
