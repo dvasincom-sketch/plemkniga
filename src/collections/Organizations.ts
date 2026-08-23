@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { anyone, isAdmin, ownOrganization } from '@/access'
 import { REGIONS } from '@/lib/dictionaries'
+import { orgNameKey } from '@/lib/movements'
 
 export const Organizations: CollectionConfig = {
   slug: 'organizations',
@@ -18,6 +19,20 @@ export const Organizations: CollectionConfig = {
     delete: isAdmin,
   },
   hooks: {
+    beforeChange: [
+      /*
+       * Ключ названия считается здесь, а не в форме.
+       *
+       * Карточки контрагентов заводят из формы перемещения, из импорта
+       * и из скриптов переноса — и поиск дублей обязан работать одинаково
+       * на всех трёх путях. Ключ, посчитанный в одной форме, защищал бы
+       * только её.
+       */
+      ({ data }) => {
+        if (data && typeof data.name === 'string') data.nameKey = orgNameKey(data.name)
+        return data
+      },
+    ],
     /*
      * Организацию со стадом удалить нельзя, и сказать об этом надо словами.
      *
@@ -61,6 +76,82 @@ export const Organizations: CollectionConfig = {
   fields: [
     { name: 'name', type: 'text', label: 'Наименование', required: true },
     { name: 'shortName', type: 'text', label: 'Краткое наименование' },
+    {
+      /*
+       * Название, приведённое к сравнимому виду: без кавычек, регистра
+       * и организационной формы. Нужно ровно для одного — не заводить
+       * третью карточку «Заря» там, где уже есть две.
+       */
+      name: 'nameKey',
+      type: 'text',
+      label: 'Ключ названия',
+      index: true,
+      admin: {
+        readOnly: true,
+        position: 'sidebar',
+        description: 'Считается автоматически, служит для поиска дублей',
+      },
+    },
+    {
+      /**
+       * Ведёт ли хозяйство свои записи в системе.
+       *
+       * У книги два разных «не члена». Первое — хозяйство, которое
+       * зарегистрировалось само, ведёт своё стадо и не вступило
+       * в Ассоциацию: у него есть люди, кабинет и данные. Второе —
+       * покупатель, которого назвал продавец, оформляя продажу: у него
+       * нет ни учётной записи, ни намерения что-то вести, и существует
+       * он в книге только затем, чтобы было к чему привязать перемещение.
+       *
+       * Различать их обязательно. Второму нельзя войти, за него нельзя
+       * подать заявку, его нельзя показывать в списке хозяйств рядом
+       * с настоящими — и при этом животное, ушедшее к нему, для книги
+       * выбыло: никаких записей о нём больше не придёт.
+       */
+      name: 'presence',
+      type: 'select',
+      label: 'Присутствие в системе',
+      defaultValue: 'registered',
+      index: true,
+      options: [
+        { value: 'registered', label: 'Ведёт свои записи' },
+        { value: 'referenced', label: 'Только упомянуто (карточку завёл контрагент)' },
+      ],
+      access: {
+        /*
+         * Признак меняет Ассоциация, разбирая очередь новых карточек.
+         * Открыть его хозяйству значило бы позволить объявить себя
+         * ведущим книгу — или, наоборот, пометить так конкурента.
+         */
+        update: () => false,
+      },
+    },
+    {
+      name: 'referencedBy',
+      type: 'relationship',
+      relationTo: 'organizations',
+      label: 'Кто завёл карточку',
+      admin: {
+        readOnly: true,
+        description: 'Хозяйство, оформлявшее перемещение, — к нему вопросы при разборе дублей',
+      },
+      access: { update: () => false },
+    },
+    {
+      /*
+       * Куда слили дубль. Карточка остаётся: на неё уже могут ссылаться
+       * выданные документы и чужие выгрузки, а удаление превратило бы
+       * их в ссылки в никуда. Из списков она уходит, перемещения
+       * переписываются на основную.
+       */
+      name: 'mergedInto',
+      type: 'relationship',
+      relationTo: 'organizations',
+      label: 'Слито с',
+      index: true,
+      admin: { readOnly: true, position: 'sidebar' },
+      access: { update: () => false },
+    },
     {
       type: 'row',
       fields: [

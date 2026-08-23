@@ -11,6 +11,7 @@ import { Organizations } from '@/collections/Organizations'
 import { Herds } from '@/collections/Herds'
 import { Animals } from '@/collections/Animals'
 import { Events } from '@/collections/Events'
+import { Movements } from '@/collections/Movements'
 import { Documents } from '@/collections/Documents'
 import { Media } from '@/collections/Media'
 import { Inseminations } from '@/collections/Inseminations'
@@ -66,6 +67,7 @@ export default buildConfig({
     Organizations,
     Herds,
     Animals,
+    Movements,
     Calvings,
     Inseminations,
     MilkTests,

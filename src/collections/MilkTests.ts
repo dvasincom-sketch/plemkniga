@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { isAdmin, isAuthenticated, animalScopedReadFor, animalScopedMutate } from '@/access'
-import { requireOwnAnimal } from '@/access/guards'
+import { requireOwnAnimal, stampOwnerOrg } from '@/access/guards'
+import { ownerOrgField } from '@/collections/shared'
 
 /**
  * Контрольные дойки.
@@ -31,6 +32,7 @@ export const MilkTests: CollectionConfig = {
   },
   indexes: [{ fields: ['animal', 'date'] }],
   fields: [
+    ownerOrgField,
     {
       type: 'row',
       fields: [
@@ -84,7 +86,7 @@ export const MilkTests: CollectionConfig = {
     },
   ],
   hooks: {
-    beforeChange: [requireOwnAnimal],
+    beforeChange: [requireOwnAnimal, stampOwnerOrg],
     beforeValidate: [
       ({ data }) => {
         // ТЗ, Таблица №6: test_date не может быть будущей датой

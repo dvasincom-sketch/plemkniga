@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { isAdmin, isAuthenticated, animalScopedReadFor, animalScopedMutate } from '@/access'
-import { requireOwnAnimal } from '@/access/guards'
+import { requireOwnAnimal, stampOwnerOrg } from '@/access/guards'
+import { ownerOrgField } from '@/collections/shared'
 
 /** Результат отёла — колонка «Результат» в таблице межотельного цикла. */
 export const CALVING_RESULTS = [
@@ -52,10 +53,11 @@ export const Calvings: CollectionConfig = {
     update: animalScopedMutate,
     delete: isAdmin,
   },
-  hooks: { beforeChange: [requireOwnAnimal] },
+  hooks: { beforeChange: [requireOwnAnimal, stampOwnerOrg] },
   indexes: [{ fields: ['animal', 'number'] }],
   defaultSort: 'number',
   fields: [
+    ownerOrgField,
     {
       type: 'row',
       fields: [

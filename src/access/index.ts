@@ -74,6 +74,15 @@ export const animalRead: Access = async ({ req }) => {
   const org = orgId(u)
   const variants: Where[] = [{ publicVisible: { equals: true } }]
   if (u && org) variants.unshift({ owner: { equals: org } })
+  /*
+   * Прежний владелец видит карточку проданного животного.
+   *
+   * Он вносил её пять лет и в день продажи не должен обнаружить, что записи,
+   * собранной его руками, для него больше нет. Правки при этом закрыты:
+   * `animalMutate` смотрит только на `owner`, и прежний владелец туда
+   * не попадает ни при каком условии.
+   */
+  if (u && org) variants.push({ pastOwners: { in: [org] } })
 
   const grants = await grantsForRequest(req)
   if (!grants.empty) {
@@ -197,6 +206,20 @@ const scopedRead =
     const org = orgId(u)
     const variants: Where[] = [{ 'animal.publicVisible': { equals: true } }]
     if (u && org) variants.unshift({ 'animal.owner': { equals: org } })
+    /*
+     * Прежний владелец видит свой период, и только его.
+     *
+     * Условие идёт по штампу самой строки (`ownerOrg`), а не по прежнему
+     * владению животным. Разница принципиальная: по владению он увидел бы
+     * и дойки, записанные покупателем после сделки, — то есть свою бывшую
+     * корову в чужом стаде. По штампу он видит ровно то, что собрал сам.
+     *
+     * Нынешний владелец при этом видит всю историю, включая чужой период:
+     * первое условие правила даёт ему все строки его животного. Иначе
+     * покупатель остался бы без родословной продуктивности, ради которой
+     * корову и покупают.
+     */
+    if (u && org) variants.push({ ownerOrg: { equals: org } })
 
     const grants = await grantsForRequest(req)
     if (!grants.empty) {

@@ -71,6 +71,7 @@ export interface Config {
     organizations: Organization;
     herds: Herd;
     animals: Animal;
+    movements: Movement;
     calvings: Calving;
     inseminations: Insemination;
     'milk-tests': MilkTest;
@@ -119,6 +120,7 @@ export interface Config {
     organizations: OrganizationsSelect<false> | OrganizationsSelect<true>;
     herds: HerdsSelect<false> | HerdsSelect<true>;
     animals: AnimalsSelect<false> | AnimalsSelect<true>;
+    movements: MovementsSelect<false> | MovementsSelect<true>;
     calvings: CalvingsSelect<false> | CalvingsSelect<true>;
     inseminations: InseminationsSelect<false> | InseminationsSelect<true>;
     'milk-tests': MilkTestsSelect<false> | MilkTestsSelect<true>;
@@ -244,6 +246,16 @@ export interface Organization {
   id: number;
   name: string;
   shortName?: string | null;
+  /**
+   * Считается автоматически, служит для поиска дублей
+   */
+  nameKey?: string | null;
+  presence?: ('registered' | 'referenced') | null;
+  /**
+   * Хозяйство, оформлявшее перемещение, — к нему вопросы при разборе дублей
+   */
+  referencedBy?: (number | null) | Organization;
+  mergedInto?: (number | null) | Organization;
   type?: ('farm' | 'service' | 'individual') | null;
   inn?: string | null;
   kpp?: string | null;
@@ -337,6 +349,10 @@ export interface Animal {
   owner: number | Organization;
   herd?: (number | null) | Herd;
   author?: (number | null) | User;
+  /**
+   * Заполняется записью о перемещении
+   */
+  pastOwners?: (number | Organization)[] | null;
   /**
    * ТЗ, Таблица №4: −1 отклонено, 0 черновик, 1 проверено собственником, 2 подтверждено лабораторией, 3 верифицировано ассоциацией
    */
@@ -834,10 +850,43 @@ export interface DisposalReason {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "movements".
+ */
+export interface Movement {
+  id: number;
+  animal: number | Animal;
+  date: string;
+  kind: 'sale' | 'lease' | 'transfer' | 'import' | 'cull' | 'death';
+  /**
+   * Пусто — животное поступило извне книги
+   */
+  from?: (number | null) | Organization;
+  /**
+   * Пусто — выбраковка или падёж
+   */
+  to?: (number | null) | Organization;
+  fromHerd?: (number | null) | Herd;
+  toHerd?: (number | null) | Herd;
+  /**
+   * Номер накладной, договора или ветеринарного свидетельства
+   */
+  basis?: string | null;
+  note?: string | null;
+  applied?: boolean | null;
+  recordedBy?: (number | null) | User;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "calvings".
  */
 export interface Calving {
   id: number;
+  /**
+   * Проставляется автоматически, нужен для доступа прежнего владельца
+   */
+  ownerOrg?: (number | null) | Organization;
   animal: number | Animal;
   number: number;
   date: string;
@@ -857,6 +906,10 @@ export interface Calving {
  */
 export interface Insemination {
   id: number;
+  /**
+   * Проставляется автоматически, нужен для доступа прежнего владельца
+   */
+  ownerOrg?: (number | null) | Organization;
   animal: number | Animal;
   /**
    * К какому отёлу относится осеменение
@@ -972,6 +1025,10 @@ export interface InseminationResult {
  */
 export interface MilkTest {
   id: number;
+  /**
+   * Проставляется автоматически, нужен для доступа прежнего владельца
+   */
+  ownerOrg?: (number | null) | Organization;
   animal: number | Animal;
   date: string;
   lactationNumber?: number | null;
@@ -990,6 +1047,10 @@ export interface MilkTest {
  */
 export interface HealthEvent {
   id: number;
+  /**
+   * Проставляется автоматически, нужен для доступа прежнего владельца
+   */
+  ownerOrg?: (number | null) | Organization;
   animal: number | Animal;
   type: number | HealthEventType;
   date: string;
@@ -1036,6 +1097,10 @@ export interface HealthEventType {
  */
 export interface AnimalEvaluation {
   id: number;
+  /**
+   * Проставляется автоматически, нужен для доступа прежнего владельца
+   */
+  ownerOrg?: (number | null) | Organization;
   animal: number | Animal;
   evaluatedAt: string;
   /**
@@ -1084,6 +1149,10 @@ export interface AnimalEvaluation {
  */
 export interface AnimalExterior {
   id: number;
+  /**
+   * Проставляется автоматически, нужен для доступа прежнего владельца
+   */
+  ownerOrg?: (number | null) | Organization;
   animal: number | Animal;
   assessedAt: string;
   /**
@@ -1123,6 +1192,10 @@ export interface AnimalExterior {
  */
 export interface AnimalRevision {
   id: number;
+  /**
+   * Проставляется автоматически, нужен для доступа прежнего владельца
+   */
+  ownerOrg?: (number | null) | Organization;
   animal: number | Animal;
   at: string;
   user?: (number | null) | User;
@@ -1578,6 +1651,10 @@ export interface IndexBase {
  */
 export interface Event {
   id: number;
+  /**
+   * Проставляется автоматически, нужен для доступа прежнего владельца
+   */
+  ownerOrg?: (number | null) | Organization;
   type: 'dryOff' | 'move' | 'disposal' | 'exteriorScore' | 'calving' | 'insemination' | 'milkTest' | 'vetTreatment';
   date: string;
   animal: number | Animal;
@@ -1672,6 +1749,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'animals';
         value: number | Animal;
+      } | null)
+    | ({
+        relationTo: 'movements';
+        value: number | Movement;
       } | null)
     | ({
         relationTo: 'calvings';
@@ -1905,6 +1986,10 @@ export interface UsersSelect<T extends boolean = true> {
 export interface OrganizationsSelect<T extends boolean = true> {
   name?: T;
   shortName?: T;
+  nameKey?: T;
+  presence?: T;
+  referencedBy?: T;
+  mergedInto?: T;
   type?: T;
   inn?: T;
   kpp?: T;
@@ -1980,6 +2065,7 @@ export interface AnimalsSelect<T extends boolean = true> {
   owner?: T;
   herd?: T;
   author?: T;
+  pastOwners?: T;
   trustLevel?: T;
   trustCheckedAt?: T;
   publicVisible?: T;
@@ -2196,9 +2282,29 @@ export interface AnimalsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "movements_select".
+ */
+export interface MovementsSelect<T extends boolean = true> {
+  animal?: T;
+  date?: T;
+  kind?: T;
+  from?: T;
+  to?: T;
+  fromHerd?: T;
+  toHerd?: T;
+  basis?: T;
+  note?: T;
+  applied?: T;
+  recordedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "calvings_select".
  */
 export interface CalvingsSelect<T extends boolean = true> {
+  ownerOrg?: T;
   animal?: T;
   number?: T;
   date?: T;
@@ -2217,6 +2323,7 @@ export interface CalvingsSelect<T extends boolean = true> {
  * via the `definition` "inseminations_select".
  */
 export interface InseminationsSelect<T extends boolean = true> {
+  ownerOrg?: T;
   animal?: T;
   lactationNumber?: T;
   date?: T;
@@ -2238,6 +2345,7 @@ export interface InseminationsSelect<T extends boolean = true> {
  * via the `definition` "milk-tests_select".
  */
 export interface MilkTestsSelect<T extends boolean = true> {
+  ownerOrg?: T;
   animal?: T;
   date?: T;
   lactationNumber?: T;
@@ -2255,6 +2363,7 @@ export interface MilkTestsSelect<T extends boolean = true> {
  * via the `definition` "health-events_select".
  */
 export interface HealthEventsSelect<T extends boolean = true> {
+  ownerOrg?: T;
   animal?: T;
   type?: T;
   date?: T;
@@ -2273,6 +2382,7 @@ export interface HealthEventsSelect<T extends boolean = true> {
  * via the `definition` "animal-evaluations_select".
  */
 export interface AnimalEvaluationsSelect<T extends boolean = true> {
+  ownerOrg?: T;
   animal?: T;
   evaluatedAt?: T;
   source?: T;
@@ -2314,6 +2424,7 @@ export interface AnimalEvaluationsSelect<T extends boolean = true> {
  * via the `definition` "animal-exteriors_select".
  */
 export interface AnimalExteriorsSelect<T extends boolean = true> {
+  ownerOrg?: T;
   animal?: T;
   assessedAt?: T;
   lactation?: T;
@@ -2349,6 +2460,7 @@ export interface AnimalExteriorsSelect<T extends boolean = true> {
  * via the `definition` "animal-revisions_select".
  */
 export interface AnimalRevisionsSelect<T extends boolean = true> {
+  ownerOrg?: T;
   animal?: T;
   at?: T;
   user?: T;
@@ -2669,6 +2781,7 @@ export interface IndexBasesSelect<T extends boolean = true> {
  * via the `definition` "events_select".
  */
 export interface EventsSelect<T extends boolean = true> {
+  ownerOrg?: T;
   type?: T;
   date?: T;
   animal?: T;

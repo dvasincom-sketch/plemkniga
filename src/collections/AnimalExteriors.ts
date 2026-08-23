@@ -1,4 +1,6 @@
 import type { CollectionConfig } from 'payload'
+import { stampOwnerOrg } from '@/access/guards'
+import { ownerOrgField } from '@/collections/shared'
 import { EXTERIOR_COMPOSITES, EXTERIOR_TRAITS } from '@/lib/dictionaries'
 import { animalScopedReadFor, isAdmin } from '@/access'
 import { applyExteriorSnapshot, idOf } from '@/lib/evaluation-snapshot'
@@ -46,6 +48,7 @@ export const AnimalExteriors: CollectionConfig = {
   },
 
   fields: [
+    ownerOrgField,
     {
       type: 'row',
       fields: [
@@ -113,6 +116,7 @@ export const AnimalExteriors: CollectionConfig = {
 
   hooks: {
     beforeChange: [
+      stampOwnerOrg,
       async ({ data, req, operation, originalDoc }) => {
         if (!data?.isCurrent) return data
 

@@ -1,4 +1,6 @@
 import type { CollectionConfig } from 'payload'
+import { stampOwnerOrg } from '@/access/guards'
+import { ownerOrgField } from '@/collections/shared'
 import { animalScopedRead, isAdmin } from '@/access'
 
 /**
@@ -40,7 +42,9 @@ export const AnimalRevisions: CollectionConfig = {
     update: () => false,
     delete: isAdmin,
   },
+  hooks: { beforeChange: [stampOwnerOrg] },
   fields: [
+    ownerOrgField,
     {
       type: 'row',
       fields: [

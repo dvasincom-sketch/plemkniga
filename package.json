@@ -13,6 +13,7 @@
     "lint": "next lint",
     "seed": "cross-env NODE_OPTIONS=--no-deprecation tsx src/seed/index.ts",
     "backfill:sort-ranks": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/backfill-sort-ranks.ts",
+    "backfill:name-key": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/backfill-name-key.ts",
     "backfill:index": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/backfill-index.ts",
     "rebase:index": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/rebase-index.ts",
     "repair:uuid": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/repair-uuid.ts",
@@ -35,6 +36,7 @@
     "audit:checks": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/audit-checks.ts",
     "audit:gate": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/audit-gate.ts",
     "archive:purge": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/archive-purge.ts",
+    "check:movements": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-movements.ts",
     "seed:checks": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/seed-checks.ts",
     "smoke": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/smoke.ts"
   },

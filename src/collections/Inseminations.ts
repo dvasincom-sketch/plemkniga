@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { isAdmin, isAuthenticated, animalScopedReadFor, animalScopedMutate } from '@/access'
-import { requireOwnAnimal } from '@/access/guards'
+import { requireOwnAnimal, stampOwnerOrg } from '@/access/guards'
+import { ownerOrgField } from '@/collections/shared'
 
 /**
  * Осеменения — отдельная сущность.
@@ -33,6 +34,7 @@ export const Inseminations: CollectionConfig = {
   },
   indexes: [{ fields: ['animal', 'lactationNumber'] }],
   fields: [
+    ownerOrgField,
     {
       type: 'row',
       fields: [
@@ -117,7 +119,7 @@ export const Inseminations: CollectionConfig = {
     },
   ],
   hooks: {
-    beforeChange: [requireOwnAnimal],
+    beforeChange: [requireOwnAnimal, stampOwnerOrg],
     beforeValidate: [
       ({ data }) => {
         // Логическая проверка: дата осеменения не может быть в будущем (ТЗ, п. 1.6)

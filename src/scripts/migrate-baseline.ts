@@ -261,6 +261,11 @@ const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
     probe: { kind: 'column', table: 'documents', column: 'public_code' },
     note: 'код проверки подлинности на бланке (UC-03)',
   },
+  {
+    name: '20260825_090000_movements',
+    probe: { kind: 'table', name: 'movements' },
+    note: 'перемещения животных, карточки хозяйств вне книги, штамп владельца',
+  },
 ]
 
 const { driverUri, uri, source, sslConfig } = resolveDatabase()

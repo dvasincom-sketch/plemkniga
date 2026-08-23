@@ -36,6 +36,7 @@ import * as migration_20260823_230000_verification_withdrawn from './20260823_23
 import * as migration_20260824_090000_archive_retention from './20260824_090000_archive_retention'
 import * as migration_20260824_140000_share_links from './20260824_140000_share_links'
 import * as migration_20260824_180000_certificate_check from './20260824_180000_certificate_check';
+import * as migration_20260825_090000_movements from './20260825_090000_movements'
 
 export const migrations = [
   {
@@ -227,5 +228,10 @@ export const migrations = [
     up: migration_20260824_180000_certificate_check.up,
     down: migration_20260824_180000_certificate_check.down,
     name: '20260824_180000_certificate_check',
+  },
+  {
+    up: migration_20260825_090000_movements.up,
+    down: migration_20260825_090000_movements.down,
+    name: '20260825_090000_movements',
   },
 ];

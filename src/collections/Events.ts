@@ -1,7 +1,8 @@
 import type { CollectionConfig } from 'payload'
 import { EVENT_TYPES, RETIRED_EVENT_TYPES, toOptions } from '@/lib/dictionaries'
 import { isAdmin, isAuthenticated, animalScopedReadFor, animalScopedMutate } from '@/access'
-import { requireOwnAnimal } from '@/access/guards'
+import { requireOwnAnimal, stampOwnerOrg } from '@/access/guards'
+import { ownerOrgField } from '@/collections/shared'
 
 export const Events: CollectionConfig = {
   slug: 'events',
@@ -24,6 +25,7 @@ export const Events: CollectionConfig = {
     delete: isAdmin,
   },
   fields: [
+    ownerOrgField,
     {
       type: 'row',
       fields: [
@@ -101,6 +103,7 @@ export const Events: CollectionConfig = {
     ],
     beforeChange: [
       requireOwnAnimal,
+      stampOwnerOrg,
       ({ data, req, operation }) => {
         if (operation === 'create' && req.user && !data.author) data.author = req.user.id
         return data
