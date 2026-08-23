@@ -1,4 +1,5 @@
 import type { Payload } from 'payload'
+import { plural } from '@/lib/format'
 
 /**
  * Что хозяйству стоит сделать прямо сейчас.
@@ -117,7 +118,7 @@ export async function farmTodo(payload: Payload, organizationId: number): Promis
     out.push({
       key: 'unverified',
       count: unverified,
-      label: unverified === 1 ? 'запись не подтверждена' : 'записей не подтверждены',
+      label: `${plural(unverified, ['запись', 'записи', 'записей'])} ${plural(unverified, ['не подтверждена', 'не подтверждены', 'не подтверждены'])}`,
       hint: 'Подтверждение требуется перед выпуском свидетельства',
       href: '/account/verification',
     })
@@ -128,8 +129,16 @@ export async function farmTodo(payload: Payload, organizationId: number): Promis
     out.push({
       key: 'incomplete',
       count: incomplete,
-      label: incomplete === 1 ? 'запись неполна' : 'записей неполны',
-      hint: 'Нет даты рождения, породы или происхождения',
+      label: `${plural(incomplete, ['запись', 'записи', 'записей'])} ${plural(incomplete, ['неполна', 'неполны', 'неполны'])}`,
+      /*
+       * Подсказка называет те же три правила, которые ищет разбор стада:
+       * `no-birth-date`, `no-breed`, `no-parents`. Числа обязаны сходиться,
+       * и сходятся они с тех пор, как разбор перестал пропускать
+       * подтверждённые записи — до этого полоса считала по всему стаду,
+       * а разбор по части, и хозяйство видело «2 неполны» здесь
+       * и «замечаний не найдено» там.
+       */
+      hint: 'Нет даты рождения, породы или происхождения — это же найдёт разбор стада',
       href: '/account/checks/herd',
       urgent: true,
     })
@@ -140,7 +149,7 @@ export async function farmTodo(payload: Payload, organizationId: number): Promis
     out.push({
       key: 'no-milk',
       count: noMilk,
-      label: noMilk === 1 ? 'корова без дойки за год' : 'коров без доек за год',
+      label: `${plural(noMilk, ['корова', 'коровы', 'коров'])} без ${plural(noMilk, ['дойки', 'доек', 'доек'])} за год`,
       hint: 'Без контрольных доек продуктивность в книге не считается',
       href: '/account/events/new',
     })
@@ -164,7 +173,7 @@ export async function farmTodo(payload: Payload, organizationId: number): Promis
     out.push({
       key: 'stale',
       count: days,
-      label: 'дней с последней загрузки',
+      label: `${plural(days, ['день', 'дня', 'дней'])} с последней загрузки`,
       hint: 'Чем свежее данные, тем точнее оценка',
       href: '/account/import',
     })

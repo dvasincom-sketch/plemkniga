@@ -5,11 +5,26 @@ import { dateRu } from '@/lib/format'
 import type { DataSubmission } from '@/payload-types'
 
 /**
- * Лента «История» — по одной строке на каждую смену статуса пакета данных.
+ * История загрузок — по строке на пакет, а не на каждую смену статуса.
  *
- * Пользователю важно понимать, на каком шаге ручной проверки находятся его
- * документы, поэтому лента строится не по пакетам, а по событиям: один пакет
- * появляется в ней столько раз, сколько статусов он прошёл.
+ * ## Что было
+ *
+ * Лента строилась по событиям: пакет появлялся в ней столько раз, сколько
+ * статусов прошёл. Замысел понятен — показать, на каком шаге проверки
+ * документы. На экране получалось другое: «№ 123441» тремя строками подряд
+ * с почти одинаковыми датами, «№ 123456» двумя. Читается это как «одно
+ * и то же загрузилось трижды», и первое, что хозяйство идёт проверять, —
+ * не завелись ли дубли.
+ *
+ * ## Как теперь
+ *
+ * Строка на пакет, в ней — нынешнее состояние. Путь, который пакет прошёл,
+ * стоит тут же мелким шрифтом одной строкой: «получен 03.03 → проверен
+ * 04.03 → согласован 04.03». Замысел сохранён целиком, а списка из десяти
+ * строк на три пакета больше нет.
+ *
+ * Порядок — по последнему движению пакета, а не по дате подачи: человек
+ * приходит сюда узнать, что изменилось.
  */
 
 type Tone = 'pending' | 'done' | 'accepted' | 'rejected'
@@ -72,44 +87,46 @@ function StatusIcon({ tone }: { tone: Tone }) {
   )
 }
 
+type Step = { status: string; at?: string | null }
+
 type Entry = {
   key: string
   submissionId: number | string
   number?: string | null
   kind?: string | null
-  status: string
-  at?: string | null
-  order: number
-  isCurrent: boolean
+  /** Нынешнее состояние — то, ради чего строка и открывается. */
+  current: Step
+  /** Пройденный путь, включая нынешнее состояние. */
+  trail: Step[]
 }
 
 export function SubmissionHistory({ submissions }: { submissions: DataSubmission[] }) {
-  const entries: Entry[] = submissions.flatMap((sub) => {
+  const entries: Entry[] = submissions.map((sub) => {
     const history = sub.history ?? []
 
-    // Если истории нет — показываем хотя бы текущий статус
-    const rows =
+    /*
+     * Истории может не быть вовсе — у пакетов, заведённых до появления
+     * журнала. Тогда путь состоит из одного шага: нынешнего состояния.
+     */
+    const trail: Step[] =
       history.length > 0
-        ? history
-        : [{ at: sub.submittedAt, status: sub.status, id: 'current' }]
+        ? history.map((h) => ({ status: String(h.status ?? sub.status), at: h.at }))
+        : [{ status: String(sub.status), at: sub.submittedAt }]
 
-    return rows.map((h, i) => ({
-      key: `${sub.id}-${h.id ?? i}`,
+    return {
+      key: String(sub.id),
       submissionId: sub.id,
       number: sub.number,
       kind: sub.kind,
-      status: String(h.status ?? sub.status),
-      at: h.at,
-      order: i,
-      isCurrent: i === rows.length - 1,
-    }))
+      current: trail[trail.length - 1]!,
+      trail,
+    }
   })
 
-  entries.sort((a, b) => {
-    const diff = new Date(b.at ?? 0).getTime() - new Date(a.at ?? 0).getTime()
-    // При совпадении отметок времени новее тот, кто позже в истории пакета
-    return diff !== 0 ? diff : b.order - a.order
-  })
+  /* По последнему движению: человек приходит узнать, что изменилось. */
+  entries.sort(
+    (a, b) => new Date(b.current.at ?? 0).getTime() - new Date(a.current.at ?? 0).getTime(),
+  )
 
   if (entries.length === 0) {
     return (
@@ -123,9 +140,9 @@ export function SubmissionHistory({ submissions }: { submissions: DataSubmission
   return (
     <ul className="space-y-4">
       {entries.map((e) => {
-        const view = STATUS_VIEW[e.status] ?? {
+        const view = STATUS_VIEW[e.current.status] ?? {
           tone: 'pending' as Tone,
-          text: labelOf(SUBMISSION_STATUSES, e.status),
+          text: labelOf(SUBMISSION_STATUSES, e.current.status),
         }
 
         return (
@@ -141,28 +158,40 @@ export function SubmissionHistory({ submissions }: { submissions: DataSubmission
           */
           <li
             key={e.key}
-            className={`flex flex-col gap-3 rounded-2xl p-4 transition-shadow sm:flex-row sm:items-center sm:gap-6 sm:py-0 sm:pl-2 sm:pr-2 ${
-              e.isCurrent
-                ? 'bg-white shadow-[0_2px_10px_rgb(23_24_26_/_0.06)]'
-                : 'bg-white/55 hover:bg-white'
-            }`}
+            className="flex flex-col gap-3 rounded-2xl bg-white p-4 shadow-[0_2px_10px_rgb(23_24_26_/_0.06)] transition-shadow sm:flex-row sm:items-center sm:gap-6 sm:py-3 sm:pl-2 sm:pr-2"
           >
             <div className="flex min-w-0 items-center gap-4 sm:contents">
               <StatusIcon tone={view.tone} />
 
               <div className="min-w-0 sm:w-[130px] sm:flex-none sm:py-4">
                 <p className="text-[15px] font-medium">№ {e.number}</p>
-                <p className="mt-1 text-sm text-ink-500">{dateRu(e.at)}</p>
+                <p className="mt-1 text-sm text-ink-500">{dateRu(e.current.at)}</p>
               </div>
             </div>
 
             <div className="min-w-0 sm:flex-1 sm:py-4">
               <p className="text-[15px]">{labelOf(SUBMISSION_KINDS, e.kind)}</p>
               <p className="mt-1 text-sm text-ink-500">{view.text}</p>
+
+              {/*
+                 Путь пакета одной строкой. Раньше каждый его шаг был
+                 отдельной строкой списка, и три шага читались как три
+                 загрузки. Показывается только когда шагов больше одного:
+                 «получен 03.03» само по себе повторяет дату слева.
+              */}
+              {e.trail.length > 1 && (
+                <p className="mt-1.5 text-[13px] leading-snug text-ink-500">
+                  {e.trail
+                    .map(
+                      (t) =>
+                        `${labelOf(SUBMISSION_STATUSES, t.status).toLowerCase()} ${dateRu(t.at)}`,
+                    )
+                    .join(' → ')}
+                </p>
+              )}
             </div>
 
-            {e.isCurrent && (
-              <Link
+            <Link
                 href={`/account/submissions/${e.submissionId}`}
                 className="btn btn-accent w-full justify-center sm:w-auto sm:flex-none"
               >
@@ -176,8 +205,7 @@ export function SubmissionHistory({ submissions }: { submissions: DataSubmission
                     strokeLinejoin="round"
                   />
                 </svg>
-              </Link>
-            )}
+            </Link>
           </li>
         )
       })}

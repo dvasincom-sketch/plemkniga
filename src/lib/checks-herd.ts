@@ -163,7 +163,8 @@ export async function herdIssues(
    * Пять независимых запросов одним заходом. Зависимый — только выбросы:
    * им нужна медиана, а её приносит второй запрос.
    */
-  const [magRows, shapeRows, birthRows, sourceRows, baseRows, yearRows, coreRows] = await Promise.all([
+  const [magRows, shapeRows, birthRows, sourceRows, baseRows, yearRows, milkGapRows, coreRows] =
+    await Promise.all([
     ask(
       'Единицы измерения удоя',
       `select floor(log(10, a.summary_milk_yield::numeric))::int as mag,
@@ -244,6 +245,32 @@ export async function herdIssues(
           and a.archived is not true
         group by 1
         order by 1`,
+      org,
+    ),
+    /*
+     * Дойное стадо без единого замера за год.
+     *
+     * Это же число хозяйство видит в полосе дел кабинета. Пока проверки
+     * такой не было, полоса называла работу, которой разбор не находил, —
+     * и два экрана об одном стаде говорили разное. Считается тем же
+     * условием, что и там: живая корова, у которой за двенадцать месяцев
+     * нет ни одной контрольной дойки.
+     */
+    ask(
+      'Коровы без доек за год',
+      `select count(*)::int as total,
+              count(*) filter (
+                where not exists (
+                  select 1 from milk_tests m
+                   where m.animal_id = a.id
+                     and m.date > now() - interval '12 months'
+                )
+              )::int as silent
+         from animals a
+        where a.owner_id = $1
+          and a.archived is not true
+          and a.sex = 'female'
+          and a.state = 'alive'`,
       org,
     ),
     /*
@@ -486,6 +513,33 @@ export async function herdIssues(
           `${gaps.length === 1 ? 'год нет ни одного' : 'годы нет ни одного'} — ` +
           `при среднем ${Math.round(total / span)} отёлов в год. ` +
           'Стадо, телившееся до и после, не могло не телиться в промежутке: скорее всего, отчёт за эти годы не передан',
+      )
+    }
+  }
+
+  /* -------------------- Коровы без доек за год --------------------- */
+
+  /*
+   * Порог не по доле, а по самому факту: корова без замеров не участвует
+   * ни в оценке быка по дочерям, ни в средних по стаду — она есть
+   * в списке и отсутствует в расчётах. Одна такая корова — уже потеря,
+   * поэтому доля здесь не считается, считается число.
+   *
+   * `herdMin` всё же применяется: у хозяйства с тремя коровами это
+   * разговор не о качестве учёта, а о размере.
+   */
+  const milkGap = milkGapRows?.[0] ?? null
+  if (milkGap) {
+    const cows = num(milkGap.total)
+    const silent = num(milkGap.silent)
+    if (silent > 0 && cows >= t.herdMin) {
+      push(
+        'no-milk-tests-year',
+        'note',
+        `${silent} из ${cows} дойных коров за последние двенадцать месяцев не имеют ` +
+          `ни одной контрольной дойки (${pct(silent, cows)}). ` +
+          'Продуктивность таких записей в книге не считается: в оценке быков по дочерям ' +
+          'и в средних по стаду они не участвуют',
       )
     }
   }

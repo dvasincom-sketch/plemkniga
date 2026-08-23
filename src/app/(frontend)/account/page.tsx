@@ -775,7 +775,15 @@ function StepTitle({ n, title, note }: { n: number; title: string; note: string 
       >
         {n}
       </span>
-      <h2 className="section-title mb-0">
+      {/*
+         Здесь `section-title` без своей точки: у класса есть маркер
+         `::before` — оранжевый кружок перед заголовком, — и рядом
+         с номером шага он давал два маркера подряд, зелёный и оранжевый.
+         Точка означает «начало раздела»; номер означает то же самое
+         и вдобавок порядок. Два знака одного смысла спорят друг с другом,
+         остаётся тот, который говорит больше.
+      */}
+      <h2 className="section-title mb-0 before:hidden">
         <span className="sr-only">Шаг {n}. </span>
         {title}
       </h2>
