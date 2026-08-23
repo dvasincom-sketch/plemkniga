@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ACCOUNT_TABS } from './AccountNav'
+import { accountTabHref, ACCOUNT_TABS } from './AccountNav'
 import { ASSOCIATION_TABS } from './AssociationNav'
 
 /**
@@ -119,7 +119,7 @@ export function HeaderAccountMenu({
   // готовые, будущие висят неактивными в её собственной навигации, а не здесь
   const tabs = association
     ? ASSOCIATION_TABS.filter((t) => t.href).map((t) => ({ key: t.key, href: t.href, label: t.label }))
-    : ACCOUNT_TABS.map((t) => ({ key: t.key, href: `/account?tab=${t.key}`, label: t.label }))
+    : ACCOUNT_TABS.map((t) => ({ key: t.key, href: accountTabHref(t), label: t.label }))
 
   const subtitle = association ? (associationLabel ?? 'Ассоциация') : orgName
 

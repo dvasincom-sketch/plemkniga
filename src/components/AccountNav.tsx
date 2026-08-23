@@ -61,6 +61,25 @@ export const ACCOUNT_TABS = [
 
 export type AccountTabKey = (typeof ACCOUNT_TABS)[number]['key']
 
+/**
+ * Адрес раздела кабинета.
+ *
+ * Правило простое — у раздела либо свой адрес, либо вкладка на общей
+ * странице, — и именно поэтому его нельзя было держать в двух местах.
+ * Меню кабинета считало его правильно, выпадающее меню под именем
+ * пользователя — по своей копии, где про `href` не знали. «Доступы»
+ * оттуда вели на `/account?tab=access`: вкладка с таким именем на общей
+ * странице есть, содержимого у неё нет — оно давно переехало
+ * на собственную страницу, — и человек попадал на пустой экран
+ * с заголовком.
+ *
+ * Ошибка не в забытой строке, а в том, что правило было записано дважды.
+ * Теперь оно записано один раз, и следующий раздел, получивший свой
+ * адрес, разойтись уже не сможет.
+ */
+export const accountTabHref = (tab: { key: string; href?: string }): string =>
+  tab.href ?? `/account?tab=${tab.key}`
+
 export function AccountNav({ active }: { active?: AccountTabKey }) {
   return (
     <nav aria-label="Разделы личного кабинета" className="mb-8">
@@ -70,7 +89,7 @@ export function AccountNav({ active }: { active?: AccountTabKey }) {
           return (
             <li key={t.key} className="flex-none">
               <Link
-                href={'href' in t ? t.href : `/account?tab=${t.key}`}
+                href={accountTabHref(t)}
                 aria-current={isActive ? 'page' : undefined}
                 className={`block rounded-xl px-5 py-3 transition-colors ${
                   isActive

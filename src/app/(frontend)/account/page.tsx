@@ -76,6 +76,21 @@ export default async function AccountPage({
     ? (normalized as AccountTabKey)
     : 'animals'
 
+  /*
+   * Раздел, у которого есть свой адрес, здесь не показывается — сюда
+   * уводит редирект.
+   *
+   * Такой раздел остаётся именем вкладки на этой странице, но содержимого
+   * у него тут нет: оно переехало. Без редиректа `/account?tab=access`
+   * открывался пустым экраном с заголовком — и открывался не по ошибке
+   * пользователя, а по ссылке из закладок, писем и старых страниц.
+   *
+   * Ссылки в меню чиним отдельно (`accountTabHref`), но чинить только их
+   * мало: адрес уже разошёлся по чужим закладкам, и оттуда его не забрать.
+   */
+  const moved = ACCOUNT_TABS.find((t) => t.key === tab && 'href' in t)
+  if (moved && 'href' in moved) redirect(moved.href)
+
   const tabTitle = ACCOUNT_TABS.find((t) => t.key === tab)?.label ?? 'Личный кабинет'
 
   /*
