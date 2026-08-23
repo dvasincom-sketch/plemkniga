@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
+import { WhyJoin } from '@/components/WhyJoin'
 import { ImageSlot } from '@/components/ImageSlot'
 import { SearchPanel } from '@/components/SearchPanel'
 import { ResultsBar } from '@/components/ResultsBar'
@@ -454,6 +455,20 @@ export default async function HerdbookPage({
             )}
           </div>
         </section>
+
+        {/*
+           Рассказ о системе — под каталогом и только гостю.
+
+           Порядок и есть главный довод. Сначала человек видит настоящие
+           записи настоящих хозяйств и убеждается, что книга живая; и только
+           потом читает, что она умеет. Тот же текст над каталогом был бы
+           обещанием, под каталогом он — вывод из увиденного.
+
+           Вошедшему хозяйству блок не показывается: выбор оно уже сделало,
+           и заставлять его пролистывать рекламу того, чем оно пользуется, —
+           плохой способ поблагодарить.
+        */}
+        {!user && <WhyJoin />}
       </main>
 
       <SiteFooter />
