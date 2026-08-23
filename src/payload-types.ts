@@ -78,11 +78,13 @@ export interface Config {
     'animal-evaluations': AnimalEvaluation;
     'animal-exteriors': AnimalExterior;
     'animal-revisions': AnimalRevision;
+    'animal-removals': AnimalRemoval;
     'data-submissions': DataSubmission;
     'verification-requests': VerificationRequest;
     'access-requests': AccessRequest;
     'access-grants': AccessGrant;
     'access-views': AccessView;
+    'share-links': ShareLink;
     'check-settings': CheckSetting;
     'check-thresholds': CheckThreshold;
     'index-profiles': IndexProfile;
@@ -124,11 +126,13 @@ export interface Config {
     'animal-evaluations': AnimalEvaluationsSelect<false> | AnimalEvaluationsSelect<true>;
     'animal-exteriors': AnimalExteriorsSelect<false> | AnimalExteriorsSelect<true>;
     'animal-revisions': AnimalRevisionsSelect<false> | AnimalRevisionsSelect<true>;
+    'animal-removals': AnimalRemovalsSelect<false> | AnimalRemovalsSelect<true>;
     'data-submissions': DataSubmissionsSelect<false> | DataSubmissionsSelect<true>;
     'verification-requests': VerificationRequestsSelect<false> | VerificationRequestsSelect<true>;
     'access-requests': AccessRequestsSelect<false> | AccessRequestsSelect<true>;
     'access-grants': AccessGrantsSelect<false> | AccessGrantsSelect<true>;
     'access-views': AccessViewsSelect<false> | AccessViewsSelect<true>;
+    'share-links': ShareLinksSelect<false> | ShareLinksSelect<true>;
     'check-settings': CheckSettingsSelect<false> | CheckSettingsSelect<true>;
     'check-thresholds': CheckThresholdsSelect<false> | CheckThresholdsSelect<true>;
     'index-profiles': IndexProfilesSelect<false> | IndexProfilesSelect<true>;
@@ -522,10 +526,12 @@ export interface Animal {
   disposalReason?: (number | null) | DisposalReason;
   disposalOrganization?: (number | null) | Organization;
   /**
-   * ТЗ, стр. 43: данные животных никогда не удаляются — только перевод в архив
+   * Архив — не «удалено»: карточка уходит из книги и из кабинета, но след о ней остаётся в реестре удалённых записей навсегда
    */
   archived?: boolean | null;
   archiveReason?: string | null;
+  archivedAt?: string | null;
+  archivedBy?: (number | null) | User;
   lastEditUser?: (number | null) | User;
   lastEditTime?: string | null;
   updatedAt: string;
@@ -1132,6 +1138,29 @@ export interface AnimalRevision {
   createdAt: string;
 }
 /**
+ * След записей, убранных из книги. Пополняется сценарием очистки архива, руками не правится.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "animal-removals".
+ */
+export interface AnimalRemoval {
+  id: number;
+  identNumber: string;
+  name?: string | null;
+  owner?: (number | null) | Organization;
+  birthDate?: string | null;
+  archivedAt?: string | null;
+  removedAt: string;
+  archivedBy?: (number | null) | User;
+  archiveReason?: string | null;
+  /**
+   * Отёлы, дойки, осеменения, оценки — всё, что ссылалось на карточку
+   */
+  removedRecords?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "data-submissions".
  */
@@ -1355,6 +1384,28 @@ export interface AccessView {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "share-links".
+ */
+export interface ShareLink {
+  id: number;
+  token: string;
+  owner: number | Organization;
+  createdBy?: (number | null) | User;
+  animals: (number | Animal)[];
+  scopes: ('origin' | 'production' | 'evaluation' | 'documents')[];
+  expiresAt: string;
+  revokedAt?: string | null;
+  /**
+   * Видно только вам: «Иванову на осмотр», «в страховую»
+   */
+  note?: string | null;
+  opens?: number | null;
+  lastOpenedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "check-settings".
  */
 export interface CheckSetting {
@@ -1557,6 +1608,10 @@ export interface Document {
     | null;
   number?: string | null;
   issuedAt?: string | null;
+  /**
+   * Печатается на бланке рядом с QR-кодом
+   */
+  publicCode?: string | null;
   animal?: (number | null) | Animal;
   organization?: (number | null) | Organization;
   file?: (number | null) | Media;
@@ -1647,6 +1702,10 @@ export interface PayloadLockedDocument {
         value: number | AnimalRevision;
       } | null)
     | ({
+        relationTo: 'animal-removals';
+        value: number | AnimalRemoval;
+      } | null)
+    | ({
         relationTo: 'data-submissions';
         value: number | DataSubmission;
       } | null)
@@ -1665,6 +1724,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'access-views';
         value: number | AccessView;
+      } | null)
+    | ({
+        relationTo: 'share-links';
+        value: number | ShareLink;
       } | null)
     | ({
         relationTo: 'check-settings';
@@ -2124,6 +2187,8 @@ export interface AnimalsSelect<T extends boolean = true> {
   disposalOrganization?: T;
   archived?: T;
   archiveReason?: T;
+  archivedAt?: T;
+  archivedBy?: T;
   lastEditUser?: T;
   lastEditTime?: T;
   updatedAt?: T;
@@ -2292,6 +2357,23 @@ export interface AnimalRevisionsSelect<T extends boolean = true> {
   before?: T;
   after?: T;
   source?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "animal-removals_select".
+ */
+export interface AnimalRemovalsSelect<T extends boolean = true> {
+  identNumber?: T;
+  name?: T;
+  owner?: T;
+  birthDate?: T;
+  archivedAt?: T;
+  removedAt?: T;
+  archivedBy?: T;
+  archiveReason?: T;
+  removedRecords?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -2468,6 +2550,24 @@ export interface AccessViewsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "share-links_select".
+ */
+export interface ShareLinksSelect<T extends boolean = true> {
+  token?: T;
+  owner?: T;
+  createdBy?: T;
+  animals?: T;
+  scopes?: T;
+  expiresAt?: T;
+  revokedAt?: T;
+  note?: T;
+  opens?: T;
+  lastOpenedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "check-settings_select".
  */
 export interface CheckSettingsSelect<T extends boolean = true> {
@@ -2589,6 +2689,7 @@ export interface DocumentsSelect<T extends boolean = true> {
   type?: T;
   number?: T;
   issuedAt?: T;
+  publicCode?: T;
   animal?: T;
   organization?: T;
   file?: T;

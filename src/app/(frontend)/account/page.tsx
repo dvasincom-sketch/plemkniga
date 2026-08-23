@@ -5,6 +5,8 @@ import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { AccountNav, ACCOUNT_TABS, type AccountTabKey } from '@/components/AccountNav'
 import { SearchPanel } from '@/components/SearchPanel'
+import { ResultsBar } from '@/components/ResultsBar'
+import { HerdSelection } from '@/components/HerdSelection'
 import { farmTodo } from '@/lib/todo'
 import { AnimalTable } from '@/components/AnimalTable'
 import { Pagination } from '@/components/Pagination'
@@ -23,6 +25,7 @@ import {
   one,
   pageSizeLabel,
   resolvePageSize,
+  resolveSort,
   type SearchParams,
 } from '@/lib/animal-query'
 import { DOCUMENT_TYPES, ROLES, eventTypeLabel, labelOf } from '@/lib/dictionaries'
@@ -35,6 +38,7 @@ import {
   SingleRecordIcon,
 } from '@/components/CardIcons'
 import { dateRu } from '@/lib/format'
+import { ARCHIVE_RETENTION_DAYS } from '@/lib/archive-retention'
 import { RANKING_CAP, rankByProfile } from '@/lib/index-column'
 import { indexValuesLag } from '@/lib/index-values'
 import { ASSOCIATION_PROFILE } from '@/lib/breeding-index'
@@ -236,7 +240,21 @@ async function AnimalsTab({
   const page = currentPage(sp)
   const perPage = resolvePageSize(sp)
   const scope: Where = orgId ? { owner: { equals: orgId } } : { author: { equals: userId } }
-  const where = buildAnimalWhere(sp, scope)
+
+  /*
+   * Список архива — тот же список, только наоборот.
+   *
+   * Отдельная страница была бы честнее по названию и хуже по делу:
+   * в архиве ищут тем же, чем в стаде («где та корова с номером на 51»),
+   * и заводить ради этого вторую форму поиска, вторую таблицу и вторую
+   * разбивку по страницам значило бы содержать две копии одного экрана.
+   *
+   * Без этого списка архив был бы ловушкой: запись, отправленная туда,
+   * исчезает отовсюду, а вернуть её можно только с её же карточки —
+   * до которой уже не добраться.
+   */
+  const archiveMode = one(sp.archive) === '1'
+  const where = buildAnimalWhere(sp, scope, { archive: archiveMode })
 
   /*
    * В своём стаде порядок строит основной профиль хозяйства — в этом и смысл
@@ -247,7 +265,7 @@ async function AnimalsTab({
    */
   const profile = await selectProfile(one(sp.profile), orgId)
 
-  const [result, herdsResult, total] = await Promise.all([
+  const [result, herdsResult, total, archivedTotal] = await Promise.all([
     profile
       ? rankByProfile({
           payload,
@@ -279,6 +297,11 @@ async function AnimalsTab({
       where: { and: [NOT_ARCHIVED, scope] },
       overrideAccess: true,
     }),
+    payload.count({
+      collection: 'animals',
+      where: { and: [{ archived: { equals: true } }, scope] },
+      overrideAccess: true,
+    }),
   ])
 
   const defaults: Record<string, string> = {}
@@ -305,7 +328,14 @@ async function AnimalsTab({
    * стадо пустое. Теперь ответ зависит от того, задан ли отбор.
    */
   const filtered = hasActiveFilters(sp)
-  const emptyText = filtered ? (
+  const emptyText = archiveMode ? (
+    <>
+      В архиве пусто.{' '}
+      <Link href="/account?tab=animals" className="underline underline-offset-4">
+        Вернуться к стаду
+      </Link>
+    </>
+  ) : filtered ? (
     <>
       По заданным условиям в вашем стаде ничего не найдено.{' '}
       <Link href="/account?tab=animals" className="underline underline-offset-4">
@@ -368,55 +398,100 @@ async function AnimalsTab({
       <section className="mt-6">
         <SearchPanel
           action="/account"
-          total={total.totalDocs}
-          totalLabel="Животных в хозяйстве"
+          total={archiveMode ? archivedTotal.totalDocs : total.totalDocs}
+          totalLabel={archiveMode ? 'Записей в архиве' : 'Животных в хозяйстве'}
           herds={herdsResult.docs.map((h) => ({ id: h.id as number, name: h.name }))}
           defaults={defaults}
           openAdvanced={hasAdvancedValues(sp)}
-          hidden={{ tab: 'animals' }}
+          /* Поиск внутри архива обязан остаться внутри архива: иначе форма
+             молча возвращает в стадо, и человек решает, что архив пропал */
+          hidden={archiveMode ? { tab: 'animals', archive: '1' } : { tab: 'animals' }}
         />
       </section>
 
       <section className="mt-8">
         {/*
-           Панель действий стоит в одной строке с заголовком раздела:
-           это настройка таблицы, а не отдельный сценарий, и занимать
-           собственную полосу ей незачем.
+           Шапка списка отвечает на три вопроса подряд: сколько нашлось,
+           почему именно столько, что с этим делать. Тот же порядок,
+           что в книге на главной, и тот же компонент.
+
+           Раньше здесь стоял заголовок «Животные» и ряд из пяти кнопок.
+           Заголовок повторял название раздела строкой выше, а число
+           найденного не показывалось вовсе — при заданном отборе человек
+           видел таблицу и не знал, сколько в ней записей и почему именно
+           эти. Условия отбора приходилось искать в свёрнутой форме.
         */}
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-          <h2 className="section-title mb-0">Животные</h2>
+        <ResultsBar
+          sp={sp}
+          total={result.totalDocs ?? 0}
+          sort={resolveSort(sp, Boolean(profile)).value}
+          hasActive={filtered}
+          herds={herdsResult.docs.map((h) => ({ id: h.id as number, name: h.name }))}
+          title={archiveMode ? 'Архив' : 'Мои животные'}
+          resetHref={archiveMode ? '/account?tab=animals&archive=1' : '/account?tab=animals'}
+          /*
+             Пояснение сжато до нескольких слов: оно стоит в одной строке
+             с заголовком, и абзац про тридцать дней снова растянул бы
+             панель на ярус. Полный разбор — на самой карточке, в блоке
+             архива, где он и нужен: там его читают перед нажатием.
+          */
+          note={
+            archiveMode ? (
+              <>
+                хранятся {ARCHIVE_RETENTION_DAYS} дней, потом удаляются{' '}
+                <Link href="/account?tab=animals" className="underline underline-offset-4">
+                  к стаду
+                </Link>
+              </>
+            ) : archivedTotal.totalDocs > 0 ? (
+              <>
+                в архиве {archivedTotal.totalDocs.toLocaleString('ru-RU')}{' '}
+                <Link
+                  href="/account?tab=animals&archive=1"
+                  className="underline underline-offset-4"
+                >
+                  открыть
+                </Link>
+              </>
+            ) : null
+          }
+          actions={
+            <div className="flex flex-wrap items-center gap-2 text-[14px]">
+              {/*
+                 Одна кнопка выгрузки вместо двух.
 
-          <div className="flex flex-wrap items-center gap-2 text-[14px]">
-            <a
-              href="/account/export?format=csv"
-              className="rounded-lg bg-white px-3 py-2 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] transition-colors hover:bg-[#f6f6f6]"
-            >
-              Выгрузить CSV
-            </a>
-            <a
-              href="/account/export?format=json"
-              className="rounded-lg bg-white px-3 py-2 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] transition-colors hover:bg-[#f6f6f6]"
-            >
-              JSON
-            </a>
-            {/*
-               Ручной ввод стоит рядом с загрузкой, но кнопкой послабее:
-               файлом заводят стадо, руками — одиночные случаи, и порядок
-               кнопок должен подсказывать именно это.
-            */}
-            <Link href="/account/events/new" className="btn">
-              Записать событие
-            </Link>
-            <Link href="/account/animals/new" className="btn">
-              Добавить животное
-            </Link>
-            <Link href="/account/import" className="btn btn-brand">
-              Загрузить данные
-            </Link>
-          </div>
-        </div>
+                 Здесь стояли «Выгрузить CSV» и «JSON» — и панель этим
+                 молча утверждала, что форматов два. Их пять: к CSV и JSON
+                 добавились XML и TXT, и все они живут на странице загрузки
+                 и выгрузки. Две кнопки из пяти — не сокращение, а неправда
+                 о собственных возможностях.
+              */}
+              <Link
+                href="/account/import#export"
+                className="rounded-lg bg-white px-3 py-2 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] transition-colors hover:bg-[#f6f6f6]"
+                title="CSV, JSON, XML, TXT"
+              >
+                Выгрузка
+              </Link>
+              {/*
+                 Ручной ввод стоит рядом с загрузкой, но кнопкой послабее:
+                 файлом заводят стадо, руками — одиночные случаи, и порядок
+                 кнопок должен подсказывать именно это.
+              */}
+              <Link href="/account/events/new" className="btn">
+                Записать событие
+              </Link>
+              <Link href="/account/animals/new" className="btn">
+                Добавить животное
+              </Link>
+              <Link href="/account/import" className="btn btn-brand">
+                Загрузить данные
+              </Link>
+            </div>
+          }
+        />
 
-        {profile && (
+        {profile && !archiveMode && (
           <p className="mb-4 text-[14px] leading-relaxed text-ink-500">
             Порядок и колонка «{profile.name}» — по основному профилю хозяйства.{' '}
             <Link href="/account/indices" className="underline underline-offset-4">
@@ -438,14 +513,23 @@ async function AnimalsTab({
           </p>
         )}
 
-        <AnimalTable
-          animals={result.docs as Animal[]}
-          startIndex={(page - 1) * (perPage || 0)}
-          viewer={viewer}
-          emptyText={emptyText}
-          indexLabel={profile?.name}
-          indexValues={'values' in result ? result.values : undefined}
-        />
+        {/*
+           Отметки — только в своём стаде и только вне архива.
+
+           В архиве отмечать нечего: поделиться убранной записью нельзя,
+           а всё остальное, что делают с отмеченным, к архиву не относится.
+        */}
+        <HerdSelection>
+          <AnimalTable
+            animals={result.docs as Animal[]}
+            startIndex={(page - 1) * (perPage || 0)}
+            viewer={viewer}
+            emptyText={emptyText}
+            indexLabel={profile?.name}
+            indexValues={'values' in result ? result.values : undefined}
+            selectable={!archiveMode}
+          />
+        </HerdSelection>
         {/*
            Подвал таблицы: слева — сколько показано и по сколько показывать,
            справа — страницы. Оба управляют одной таблицей, поэтому стоят

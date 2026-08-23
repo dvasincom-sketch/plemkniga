@@ -190,3 +190,95 @@ export async function updateAnimalAction(
   revalidatePath('/account')
   return { message: 'Сохранено' }
 }
+
+/**
+ * Отправить карточку в архив — и вернуть обратно.
+ *
+ * ## Почему это не «удалить»
+ *
+ * Кнопки «удалить» у хозяйства нет и не будет. Нажатие, стирающее данные
+ * немедленно, ошибается ровно один раз и навсегда, а ошибаются здесь
+ * не редко: не тот файл, не то хозяйство, не тот номер. Архив даёт
+ * тридцать дней передумать, и всё это время запись возвращается одним
+ * нажатием.
+ *
+ * ## Почему причина обязательна
+ *
+ * Через месяц список архива читает другой человек — или тот же, но
+ * забывший. «Загружено по ошибке из файла за март» отличает ошибку
+ * от выбытия, а пустая строка не отличает ничего. Требование дешёвое:
+ * тот, кто отправляет запись в архив, причину знает прямо сейчас.
+ *
+ * ## Чего действие не делает
+ *
+ * Не удаляет. Даже когда срок вышел — удаляет только `npm run archive:purge`,
+ * и только он. Здесь нет ни одной ветки, стирающей данные, и это удобно
+ * проверить: удаление в этой системе живёт в одном месте.
+ */
+export async function archiveAnimalAction(
+  _prev: AnimalFormState,
+  formData: FormData,
+): Promise<AnimalFormState> {
+  const user = await getCurrentUser()
+  if (!user) return { error: 'Требуется авторизация' }
+
+  const id = Number(formData.get('id'))
+  if (!Number.isFinite(id) || id <= 0) return { error: 'Животное не определено' }
+
+  const restore = String(formData.get('restore') || '') === '1'
+  const reason = String(formData.get('archiveReason') || '').trim()
+
+  if (!restore && reason.length < 3) {
+    return { error: 'Напишите причину — по ней отличают ошибочную запись от выбывшего животного' }
+  }
+
+  const payload = await getClient()
+  const animal = await payload.findByID({
+    collection: 'animals',
+    id,
+    depth: 0,
+    overrideAccess: true,
+  })
+  if (!animal) return { error: 'Запись не найдена' }
+
+  if (!mayEdit(user as Actor, relId(animal.owner))) {
+    return { error: 'Отправить запись в архив может только хозяйство-владелец' }
+  }
+
+  try {
+    await payload.update({
+      collection: 'animals',
+      id,
+      data: restore
+        ? /*
+           * Возврат стирает и дату, и причину, и того, кто отправил.
+           * Оставь их — и следующая архивация будет считать срок
+           * от прошлого раза, то есть запись, вернувшаяся вчера
+           * и отправленная обратно сегодня, исчезнет через день.
+           */
+          { archived: false, archivedAt: null, archivedBy: null, archiveReason: null }
+        : {
+            archived: true,
+            archivedAt: new Date().toISOString(),
+            archivedBy: user.id,
+            archiveReason: reason,
+            /*
+             * Из архива запись уходит и из общей книги. Иначе хозяйство,
+             * убравшее ошибочную запись у себя, продолжало бы показывать
+             * её всей стране ещё месяц.
+             */
+            publicVisible: false,
+            publicDetails: false,
+          },
+      overrideAccess: true,
+      user,
+    })
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Не удалось изменить запись' }
+  }
+
+  revalidatePath(`/animals/${id}`)
+  revalidatePath('/account')
+  revalidatePath('/')
+  return { message: restore ? 'Запись возвращена из архива' : 'Запись отправлена в архив' }
+}

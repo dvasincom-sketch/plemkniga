@@ -23,6 +23,9 @@ import { certificateReadiness } from '@/lib/certification'
 import { ClosedAnimal } from '@/components/ClosedAnimal'
 import { AccessRequestForm } from '@/components/AccessRequestForm'
 import { AnimalVisibility } from '@/components/AnimalVisibility'
+import { ArchiveBlock } from '@/components/ArchiveBlock'
+import { ARCHIVE_RETENTION_DAYS } from '@/lib/archive-retention'
+import { resolveShare } from '@/lib/share-links'
 import { GrantBanner, ScopeLocked } from '@/components/AccessScope'
 import { grantsFor, scopesForAnimal } from '@/lib/grants'
 import { recordAnimalView, uniqueViews } from '@/lib/access-log'
@@ -190,15 +193,33 @@ export default async function AnimalPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ tab?: string }>
+  searchParams: Promise<{ tab?: string; share?: string }>
 }) {
   const { id } = await params
-  const { tab: tabParam } = await searchParams
+  const { tab: tabParam, share: shareParam } = await searchParams
   const tab: TabKey = TABS.some((t) => t.key === tabParam) ? (tabParam as TabKey) : 'evaluation'
 
   const user = await getCurrentUser()
   const viewer = viewerOf(user)
   const payload = await getClient()
+
+  /*
+   * Ссылка на просмотр приходит адресом, а не входом в систему.
+   *
+   * Посетитель по ссылке — обычно человек без учётной записи: покупатель,
+   * ветеринар, страховой агент. Прав у него нет никаких, и запись ему
+   * отдаётся не потому, что он кто-то, а потому, что владелец выпустил
+   * ссылку именно на неё. Поэтому здесь два условия, а не одно: токен
+   * действует **и** запись входит в эту ссылку. Подставить в адрес чужой
+   * идентификатор с чужим токеном не поможет — второе условие не сойдётся.
+   */
+  const share = await resolveShare(payload, shareParam)
+  /*
+   * `Number(id)` — не косметика. Адрес отдаёт идентификатор строкой,
+   * а в ссылке лежат числа: `Set<number>.has('579')` всегда ложь, и первая
+   * редакция молча не пускала по совершенно правильной ссылке.
+   */
+  const sharedHere = Boolean(share && share.animalIds.has(Number(id)))
 
   let animal: Animal | null = null
   try {
@@ -206,7 +227,12 @@ export default async function AnimalPage({
       collection: 'animals',
       id,
       depth: 2,
-      overrideAccess: false,
+      /*
+       * Обычные права обошли бы ссылку: у гостя их нет, и закрытая запись
+       * не отдалась бы ему никогда. Обход включается ровно для записи,
+       * названной в действующей ссылке, — и ни для какой другой.
+       */
+      overrideAccess: sharedHere,
       user,
     })) as Animal
   } catch {
@@ -363,6 +389,18 @@ export default async function AnimalPage({
    */
   const grants = await grantsFor(payload, userOrgId)
   const grantedScopes = scopesForAnimal(grants, animal.id as number, ownerId as number | null)
+
+  /*
+   * Области из ссылки добавляются к тем, что есть у посетителя.
+   *
+   * Складываются, а не заменяют: по ссылке может прийти и участник книги,
+   * у которого свой грант на эту же запись. Отнять у него то, что ему уже
+   * открыто, из-за того что он открыл присланный адрес, было бы наказанием
+   * за переход по ссылке.
+   */
+  if (share && sharedHere) {
+    for (const s of share.scopes) grantedScopes.add(s)
+  }
 
   const lockedByOwner = isAnimalLocked(animal, viewer)
   /** Раздел показывается: карточка открыта целиком либо область выдана грантом. */
@@ -549,6 +587,38 @@ export default async function AnimalPage({
    */
   const views = isMine || isAssociation(user) ? await uniqueViews(payload, animal.id as number) : null
 
+  /*
+   * Что уйдёт вместе с карточкой и что не даст ей уйти.
+   *
+   * Считается только владельцу и только на вкладке общих данных — там,
+   * где стоит сама кнопка. Пять счётчиков и три запроса заслона на каждом
+   * открытии чужой карточки были бы платой ни за что: цифры нужны ровно
+   * в момент, когда человек смотрит на кнопку «в архив».
+   */
+  const archiveFacts =
+    isMine && tab === 'general'
+      ? await (async () => {
+          const { removalBlockers } = await import('@/lib/archive-retention')
+          const [calvings, milk, inseminations, health, evaluations, blockers] = await Promise.all([
+            payload.count({ collection: 'calvings', where: { animal: { equals: animal.id } }, overrideAccess: true }),
+            payload.count({ collection: 'milk-tests', where: { animal: { equals: animal.id } }, overrideAccess: true }),
+            payload.count({ collection: 'inseminations', where: { animal: { equals: animal.id } }, overrideAccess: true }),
+            payload.count({ collection: 'health-events', where: { animal: { equals: animal.id } }, overrideAccess: true }),
+            payload.count({ collection: 'animal-evaluations', where: { animal: { equals: animal.id } }, overrideAccess: true }),
+            removalBlockers(payload, animal.id as number),
+          ])
+          return {
+            dependents:
+              calvings.totalDocs +
+              milk.totalDocs +
+              inseminations.totalDocs +
+              health.totalDocs +
+              evaluations.totalDocs,
+            blockers: blockers.map((b) => b.text),
+          }
+        })()
+      : null
+
   const crumbs = isMine
     ? [
         { label: 'Личный кабинет', href: '/account' },
@@ -583,6 +653,31 @@ export default async function AnimalPage({
             expiresAt={grantForBanner?.expiresAt ?? null}
             wholeHerd={!grantForBanner?.animal}
           />
+        )}
+
+        {/*
+            Архивная карточка обязана сказать это первой строкой.
+
+            Из книги она пропадает, но по прямой ссылке открывается —
+            из закладки, из письма, из чужой родословной. Без плашки она
+            выглядит обычной записью, и человек будет читать удой коровы,
+            которой через две недели не станет.
+
+            Плашка видна всем, кому карточка вообще доступна, а не только
+            владельцу: тот, кто пришёл по ссылке, и есть тот, кого надо
+            предупредить.
+        */}
+        {animal.archived && (
+          <p className="mb-5 flex flex-wrap items-center gap-2 rounded-xl bg-white px-5 py-3.5 text-[15px] text-ink-900 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)]">
+            <span className="rounded-md bg-[#8a6d3b] px-2 py-0.5 text-[13px] font-medium text-white">
+              В архиве
+            </span>
+            {animal.archivedAt
+              ? `Запись убрана из книги ${dateRu(animal.archivedAt)}. ` +
+                `Через ${ARCHIVE_RETENTION_DAYS} дней после этого карточка удаляется, ` +
+                'а в реестре удалённых записей остаётся строка о ней.'
+              : 'Запись убрана из книги.'}
+          </p>
         )}
 
         <div>
@@ -650,34 +745,45 @@ export default async function AnimalPage({
             <p className={`text-[13px] ${isForeign ? 'text-white/70' : 'text-ink-500'}`}>
               Обновлено {dateRu(animal.updatedAt)}
             </p>
+
+            {/*
+                Счётчик просмотров — здесь же, под датой обновления.
+
+                Сначала он был первой строкой страницы, выше хлебных крошек
+                и клички: открывая свою корову, человек получал отчёт
+                о посещаемости раньше самой коровы. Потом уехал под шапку —
+                и оказался ничьим: висел отдельной строкой над вкладками,
+                на полосе, где больше ничего нет, и читался как заголовок
+                следующего раздела.
+
+                Место ему рядом с «Обновлено»: обе строки — служебные
+                сведения о карточке, а не о животном, и стоять им вместе.
+
+                Счётчик виден только владельцу и Ассоциации. Ноль показан
+                словами: «0 хозяйств» читается как поломка, «пока никто» —
+                как ответ на вопрос.
+            */}
+            {views !== null && (
+              <p
+                className={`max-w-[36ch] text-[13px] leading-snug lg:text-right ${
+                  isForeign ? 'text-white/70' : 'text-ink-500'
+                }`}
+              >
+                {views === 0
+                  ? 'Эту карточку пока не открывало ни одно хозяйство'
+                  : `Карточку смотрели ${views} ${
+                      views % 10 === 1 && views % 100 !== 11
+                        ? 'хозяйство'
+                        : [2, 3, 4].includes(views % 10) && ![12, 13, 14].includes(views % 100)
+                          ? 'хозяйства'
+                          : 'хозяйств'
+                    } — считаются вошедшие, кроме вашего и Ассоциации`}
+              </p>
+            )}
+
             <TrustBadge level={animal.trustLevel} onDark={isForeign} />
           </div>
         </section>
-
-        {/*
-            Счётчик просмотров стоит под шапкой, а не над ней.
-
-            Он был первой строкой страницы — выше хлебных крошек и клички.
-            Открывая свою корову, человек хочет увидеть корову, а не отчёт
-            о её посещаемости; а на чужой карточке эта строка и вовсе
-            перебивала главное — чьё это животное и что в нём открыто.
-
-            Счётчик виден только владельцу и Ассоциации. Ноль показывается
-            словами: «0 хозяйств» читается как поломка, «пока никто» — как
-            ответ на вопрос */}
-        {views !== null && (
-          <p className="mt-8 text-[13px] text-ink-500">
-            {views === 0
-              ? 'Эту карточку пока не открывало ни одно хозяйство'
-              : `Карточку смотрели ${views} ${
-                  views % 10 === 1 && views % 100 !== 11
-                    ? 'хозяйство'
-                    : [2, 3, 4].includes(views % 10) && ![12, 13, 14].includes(views % 100)
-                      ? 'хозяйства'
-                      : 'хозяйств'
-                } — считаются вошедшие, кроме вашего и Ассоциации`}
-          </p>
-        )}
 
         {/* ------------------------------ Вкладки ---------------------------- */}
         <p className="mb-3 mt-8 text-[12px] uppercase tracking-[0.09em] text-ink-500">
@@ -1100,6 +1206,19 @@ export default async function AnimalPage({
             animalId={animal.id as number}
             publicVisible={Boolean(animal.publicVisible)}
             publicDetails={Boolean(animal.publicDetails)}
+          />
+        )}
+
+        {/* Архив стоит последним блоком вкладки: убрать запись — не то,
+            что предлагают раньше, чем показали саму запись */}
+        {isMine && tab === 'general' && archiveFacts && (
+          <ArchiveBlock
+            animalId={animal.id as number}
+            archived={Boolean(animal.archived)}
+            archivedAt={animal.archivedAt ? String(animal.archivedAt) : null}
+            archiveReason={animal.archiveReason ?? null}
+            dependents={archiveFacts.dependents}
+            blockers={archiveFacts.blockers}
           />
         )}
 
