@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { AccountNav } from '@/components/AccountNav'
+import { ShareLinkForm, ShareRevokeButton } from '@/components/ShareLinkForm'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { ReplacePublic, RevokeGrant } from '@/components/GrantActions'
 import { getClient, getCurrentUser } from '@/lib/payload'
@@ -59,7 +60,17 @@ const term = (g: { expiresAt?: string | null; revokedAt?: string | null }): stri
   return until <= Date.now() ? `истёк ${dateRu(g.expiresAt)}` : `до ${dateRu(g.expiresAt)}`
 }
 
-export default async function AccessPage() {
+export default async function AccessPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ numbers?: string }>
+}) {
+  /*
+   * Номера приходят адресом из таблицы стада: отметил галочками —
+   * нажал «Поделиться ссылкой» — форма уже заполнена. Раньше их
+   * приходилось перепечатывать руками, глядя в ту же таблицу.
+   */
+  const { numbers } = await searchParams
   const user = await getCurrentUser()
   if (!user) redirect('/login?next=/account/access')
 
@@ -83,7 +94,7 @@ export default async function AccessPage() {
     )
   }
 
-  const [issued, received, publicByOldApproval] = await Promise.all([
+  const [issued, received, publicByOldApproval, shares] = await Promise.all([
     payload
       .find({
         collection: 'access-grants',
@@ -128,6 +139,27 @@ export default async function AccessPage() {
       })
       .then((r) => r.docs)
       .catch(() => []),
+
+    /*
+     * Ссылки на просмотр — и живые, и отработавшие.
+     *
+     * Истёкшие не прячутся: хозяйство приходит сюда с вопросом
+     * «а что я вообще открывал», и ссылка, исчезнувшая вместе со сроком,
+     * этот вопрос оставляет без ответа. Счётчик открытий по ней —
+     * единственное, что известно о судьбе отправленного адреса.
+     */
+    payload
+      .find({
+        collection: 'share-links',
+        where: { owner: { equals: org } },
+        sort: '-createdAt',
+        limit: 100,
+        depth: 1,
+        overrideAccess: false,
+        user,
+      })
+      .then((r) => r.docs)
+      .catch(() => []),
   ])
 
   const stillPublic = publicByOldApproval.filter((r) => {
@@ -159,15 +191,39 @@ export default async function AccessPage() {
         />
 
         <h1 className="mt-2 text-[28px] font-medium leading-tight sm:text-[32px]">Доступы</h1>
+        {/*
+           Одно объяснение на странице вместо трёх.
+
+           Здесь стоял абзац про точечный доступ, ниже — абзац про ссылки,
+           и внутри формы третий, снова про ссылки. Три объяснения подряд
+           читаются как спор страницы с самой собой: человек ищет, чем они
+           отличаются, вместо того чтобы выбрать способ.
+
+           Теперь наверху сказано только про выбор между двумя способами,
+           а подробность про каждый — под его собственным заголовком.
+        */}
         <p className="mt-2 max-w-[75ch] text-[15px] leading-relaxed text-ink-500">
-          Точечный доступ выдаётся хозяйству, а не человеку, и всегда отзывается.
-          Выдать его можно из уведомления о запросе — там же выбираются области,
-          охват и срок.
+          Два способа показать свои записи чужим: точечный доступ — хозяйствам,
+          которые уже в книге; ссылка на просмотр — всем остальным.
+        </p>
+
+        {/*
+           Заголовок группы, которого не было.
+
+           «Вы открыли» и «Вам открыли» — две стороны одного механизма,
+           а рядом стоял третий раздел того же уровня, оформленный крупнее.
+           Иерархия обещала, что ссылки важнее точечного доступа, хотя они
+           равноправны. Общий заголовок ставит оба механизма в один ряд.
+        */}
+        <h2 className="section-title mb-2 mt-8">Точечный доступ</h2>
+        <p className="mb-2 max-w-[75ch] text-[15px] leading-relaxed text-ink-500">
+          Выдаётся хозяйству, а не человеку, и всегда отзывается. Выдать его можно
+          из уведомления о запросе — там же выбираются области, охват и срок.
         </p>
 
         {/* --------------------------- Выданные --------------------------- */}
-        <section className="card mt-8">
-          <h2 className="panel-heading">Вы открыли</h2>
+        <section className="card mt-4">
+          <h3 className="panel-heading">Вы открыли</h3>
 
           {alive.length === 0 && gone.length === 0 ? (
             <p className="text-[15px] leading-relaxed text-ink-500">
@@ -253,8 +309,8 @@ export default async function AccessPage() {
         </section>
 
         {/* --------------------------- Полученные -------------------------- */}
-        <section className="card mt-6">
-          <h2 className="panel-heading">Вам открыли</h2>
+        <section className="card mt-4">
+          <h3 className="panel-heading">Вам открыли</h3>
 
           {received.filter(isAlive).length === 0 ? (
             <p className="text-[15px] leading-relaxed text-ink-500">
@@ -304,8 +360,8 @@ export default async function AccessPage() {
 
         {/* ---------------- Открыто всем по прежним запросам ---------------- */}
         {toReplace.length > 0 && (
-          <section className="card mt-6">
-            <h2 className="panel-heading">Открыто всем по прежним запросам</h2>
+          <section className="card mt-4">
+            <h3 className="panel-heading">Открыто всем по прежним запросам</h3>
 
             <p className="mb-5 max-w-[75ch] text-[15px] leading-relaxed text-ink-700">
               Раньше одобрение запроса открывало карточку не заявителю, а всем
@@ -358,6 +414,52 @@ export default async function AccessPage() {
             </ul>
           </section>
         )}
+        {/* ----------------------- Ссылки на просмотр ---------------------- */}
+        <section className="mt-8">
+          <h2 className="section-title mb-2">Ссылки на просмотр</h2>
+          <p className="mb-2 max-w-[75ch] text-[15px] leading-relaxed text-ink-500">
+            Для покупателя, ветеринара, оценщика, страхового агента — тех, у кого нет
+            и не будет учётной записи. Срок обязателен: на другом конце неизвестно кто,
+            и дата — единственное, чем вы управляете после отправки.
+          </p>
+
+          <ShareLinkForm defaultNumber={numbers} />
+
+          {shares.length > 0 && (
+            <div className="card mt-6">
+              <h3 className="panel-heading">Выпущенные ссылки</h3>
+              <ul className="divide-y divide-[#ececec]">
+                {shares.map((l) => {
+                  const until = new Date(String(l.expiresAt))
+                  const dead = Boolean(l.revokedAt) || until.getTime() <= Date.now()
+                  const count = (l.animals ?? []).length
+                  return (
+                    <li key={l.id} className="flex flex-wrap items-baseline gap-x-4 gap-y-1 py-3">
+                      <span className="text-[15px] font-medium">
+                        {l.note || `${count} ${count === 1 ? 'запись' : 'записей'}`}
+                      </span>
+                      <span className="text-[14px] text-ink-500">
+                        {count} {count === 1 ? 'запись' : 'записей'} ·{' '}
+                        {l.revokedAt
+                          ? `отозвана ${dateRu(l.revokedAt)}`
+                          : dead
+                            ? `истекла ${dateRu(l.expiresAt)}`
+                            : `до ${dateRu(l.expiresAt)}`}{' '}
+                        · открывали {Number(l.opens ?? 0)}
+                        {l.lastOpenedAt ? `, последний раз ${dateRu(l.lastOpenedAt)}` : ''}
+                      </span>
+                      {!dead && (
+                        <span className="ml-auto">
+                          <ShareRevokeButton id={l.id as number} />
+                        </span>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          )}
+        </section>
       </main>
 
       <SiteFooter />

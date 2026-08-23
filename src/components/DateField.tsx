@@ -94,7 +94,9 @@ export function DateField({
   required = false,
   ariaLabel,
   className = '',
+  min,
   max,
+  rangeHint,
 }: {
   name: string
   /** ISO, как у нативного поля. */
@@ -103,8 +105,25 @@ export function DateField({
   required?: boolean
   ariaLabel?: string
   className?: string
-  /** ISO-предел сверху: у даты рождения будущего быть не может. */
+  /**
+   * Пределы срока, ISO. Снизу и сверху — оба необязательны.
+   *
+   * Нижнего предела не было вовсе, пока поле стояло только у дат
+   * рождения: там ограничивают будущее. У ссылки на просмотр наоборот —
+   * прошлое: срок «до вчера» не срок.
+   */
+  min?: string
   max?: string
+  /**
+   * Что сказать, когда дата вне предела.
+   *
+   * Раньше здесь стояло намертво «Дата не может быть в будущем» —
+   * верно ровно для одного случая, даты рождения. Для срока ссылки
+   * та же строка была бы неправдой: там предел не «сегодня», а «год».
+   * Подпись, объясняющая чужое правило, хуже отсутствующей: по ней
+   * начинают искать ошибку не там.
+   */
+  rangeHint?: string
 }) {
   const [text, setText] = useState(() => toRu(defaultValue))
   const [open, setOpen] = useState(false)
@@ -176,13 +195,13 @@ export function DateField({
     setCursor({ year: cursor.year + Math.floor(m / 12), month: ((m % 12) + 12) % 12 })
   }
 
-  const beyondMax = Boolean(max && iso && iso > max)
+  const outOfRange = Boolean(iso && ((max && iso > max) || (min && iso < min)))
   const incomplete = text.length > 0 && !iso
 
   return (
     <div ref={rootRef} className={`relative ${className}`}>
       {/* В форму уходит только разобранная дата: незаконченный ввод — не дата */}
-      {iso && !beyondMax && <input type="hidden" name={name} value={iso} />}
+      {iso && !outOfRange && <input type="hidden" name={name} value={iso} />}
 
       <div className="flex items-center gap-2">
         <input
@@ -222,8 +241,10 @@ export function DateField({
       {incomplete && (
         <p className="mt-1 text-[12px] text-ink-500">Дата вводится как 17.08.2026</p>
       )}
-      {beyondMax && (
-        <p className="mt-1 text-[12px] text-[#c0392b]">Дата не может быть в будущем</p>
+      {outOfRange && (
+        <p className="mt-1 text-[12px] text-[#c0392b]">
+          {rangeHint ?? 'Дата вне допустимого срока'}
+        </p>
       )}
 
       {open &&
@@ -273,7 +294,7 @@ export function DateField({
                 const mm = String(cursor.month + 1).padStart(2, '0')
                 const value = `${cursor.year}-${mm}-${dd}`
                 const selected = value === iso
-                const disabled = Boolean(max && value > max)
+                const disabled = Boolean((max && value > max) || (min && value < min))
 
                 return (
                   <button
