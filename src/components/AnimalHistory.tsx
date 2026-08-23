@@ -3,6 +3,7 @@ import { getClient } from '@/lib/payload'
 import { dateRu, nf } from '@/lib/format'
 import { CALVING_RESULTS } from '@/collections/Calvings'
 import { eventTypeLabel } from '@/lib/dictionaries'
+import { ageAtMonths, ageLabel, monthsLabel } from '@/lib/afc'
 import type { Animal } from '@/payload-types'
 
 /**
@@ -20,6 +21,20 @@ import type { Animal } from '@/payload-types'
  * Год — не круглое число ради красоты: это горизонт, на котором у коровы
  * умещается полный цикл (отёл, раздой, осеменение, спад, запуск), и на котором
  * зоотехник помнит события лично и может проверить запись.
+ *
+ * ## Возраст рядом с датой
+ *
+ * У каждой записи показан возраст животного на тот день. Причина простая:
+ * дату человек читает, а возраст держит в уме — и не держит. Смотреть
+ * на «14.03.2024» и одновременно помнить, что корова родилась в декабре
+ * 2021-го, не получается ни у кого, поэтому возраст первого отёла — величина,
+ * которая решает судьбу коровы на годы вперёд, — до сих пор не была видна
+ * нигде, хотя обе даты лежат в базе.
+ *
+ * Теперь она видна без единого нового поля и без всякой аналитики: у отёла
+ * с номером 1 возраст назван полностью и словом. Что из него следует —
+ * вопрос отдельного разбора (`docs/vneshnie-dannye.md`), но сначала его надо
+ * увидеть.
  */
 
 const KIND_STYLE: Record<string, { label: string; tone: string }> = {
@@ -126,12 +141,21 @@ export async function AnimalHistory({ animal }: { animal: Animal }) {
   }
 
   for (const c of calvings.docs) {
+    /*
+     * У первого отёла возраст называется полностью и словом, а не сокращением
+     * в колонке слева. Это единственное место ленты, где возраст важнее даты:
+     * дата первого отёла сама по себе не говорит ничего, а «первый отёл
+     * в 27 месяцев» — говорит всё.
+     */
+    const afc = c.number === 1 ? ageAtMonths(animal.birthDate, c.date) : null
+
     entries.push({
       id: `c${c.id}`,
       at: new Date(c.date).getTime(),
       kind: 'calving',
       title: `Отёл № ${c.number} — ${CALVING_RESULTS.find((r) => r.value === c.result)?.label ?? '—'}`,
       detail: [
+        afc !== null && afc >= 0 ? `первый отёл в ${monthsLabel(afc)}` : null,
         c.ease === 'easy' ? 'лёгкий' : c.ease === 'assisted' ? 'с помощью' : c.ease === 'hard' ? 'трудный' : null,
         c.calfWeight ? `масса телёнка ${nf(c.calfWeight, 0)} кг` : null,
       ]
@@ -289,23 +313,37 @@ export async function AnimalHistory({ animal }: { animal: Animal }) {
 
       <p className="mb-4 text-[12px] text-ink-500">
         Столбец — средний суточный удой за месяц, точки под ним — отёлы, осеменения и события
-        здоровья.
+        здоровья. В ленте ниже вторая колонка — возраст животного на день события.
       </p>
 
       {/* --------------------------- Лента записей -------------------------- */}
       <ol className="space-y-2 border-t border-ink-100 pt-4">
-        {entries.map((e) => (
-          <li key={e.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[14px]">
-            <span className="w-[92px] flex-none tabular-nums text-ink-500">{dateRu(new Date(e.at).toISOString())}</span>
-            <span
-              className={`flex-none rounded px-1.5 py-0.5 text-[11px] ${KIND_STYLE[e.kind].tone}`}
-            >
-              {KIND_STYLE[e.kind].label}
-            </span>
-            <span className="min-w-0">{e.title}</span>
-            {e.detail && <span className="text-[13px] text-ink-500">{e.detail}</span>}
-          </li>
-        ))}
+        {entries.map((e) => {
+          const age = ageLabel(ageAtMonths(animal.birthDate, new Date(e.at)))
+
+          return (
+            <li key={e.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[14px]">
+              <span className="w-[92px] flex-none tabular-nums text-ink-500">
+                {dateRu(new Date(e.at).toISOString())}
+              </span>
+              {/*
+                 Ширина задана даже пустому месту: без неё строки без возраста
+                 (дата рождения не заполнена) сдвигали бы весь ряд влево,
+                 и лента переставала читаться колонками.
+              */}
+              <span className="w-[64px] flex-none tabular-nums text-[13px] text-ink-300">
+                {age ?? ''}
+              </span>
+              <span
+                className={`flex-none rounded px-1.5 py-0.5 text-[11px] ${KIND_STYLE[e.kind].tone}`}
+              >
+                {KIND_STYLE[e.kind].label}
+              </span>
+              <span className="min-w-0">{e.title}</span>
+              {e.detail && <span className="text-[13px] text-ink-500">{e.detail}</span>}
+            </li>
+          )
+        })}
       </ol>
     </div>
   )
