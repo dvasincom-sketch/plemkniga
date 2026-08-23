@@ -8,7 +8,9 @@
   },
   "scripts": {
     "dev": "next dev",
+    "predev": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/copy-swagger.ts",
     "build": "next build",
+    "prebuild": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/copy-swagger.ts",
     "start": "next start",
     "lint": "next lint",
     "seed": "cross-env NODE_OPTIONS=--no-deprecation tsx src/seed/index.ts",
@@ -36,6 +38,7 @@
     "audit:checks": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/audit-checks.ts",
     "audit:gate": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/audit-gate.ts",
     "archive:purge": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/archive-purge.ts",
+    "check:openapi": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-openapi.ts",
     "check:bulls": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-bulls.ts",
     "check:journal": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-journal.ts",
     "check:security": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-security.ts",
@@ -58,7 +61,8 @@
     "qrcode": "^1.5.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "sharp": "0.34.2"
+    "sharp": "0.34.2",
+    "swagger-ui-dist": "^5.32.14"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.0",

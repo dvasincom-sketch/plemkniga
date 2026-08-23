@@ -109,6 +109,19 @@ export function SiteFooter() {
           >
             Эволюция продукта
           </Link>
+          {/*
+             API — в подвале, а не в меню, по той же причине, что
+             и «Эволюция продукта»: страница нужна не пользователю книги,
+             а тому, кто собирается к ней подключаться. В основном меню
+             она соперничала бы с рабочими разделами и мешала бы каждый
+             день ради того, кто зайдёт однажды.
+          */}
+          <Link
+            href="/api-docs"
+            className="text-[13px] text-white/50 underline underline-offset-4 transition-colors hover:text-white"
+          >
+            API
+          </Link>
           <Link
             href="/privacy"
             className="text-[13px] text-white/50 underline underline-offset-4 transition-colors hover:text-white"

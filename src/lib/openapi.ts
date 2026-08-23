@@ -1,0 +1,446 @@
+import type { Payload } from 'payload'
+
+/**
+ * Описание REST API в формате OpenAPI (ТЗ, требование №16).
+ *
+ * ## Почему описание собирается из конфигурации, а не написано руками
+ *
+ * Рукописная спецификация — это обещание, которое стареет. Поле добавили,
+ * поле переименовали, коллекцию завели — описание про это не узнает,
+ * и через полгода оно начинает врать: сначала в мелочах, потом целиком.
+ * Проверить его нечем, потому что оно и есть тот документ, по которому
+ * проверяют.
+ *
+ * Здесь описание строится из тех же коллекций, из которых Payload строит
+ * сам API. Разойтись им негде: новое поле появляется в описании в тот же
+ * день, что и в базе, а удалённое исчезает.
+ *
+ * ## Чего OpenAPI про этот API сказать не может, и об этом сказано прямо
+ *
+ * **Язык фильтра.** Payload принимает `where` — вложенную структуру
+ * с операторами (`equals`, `in`, `greater_than`, `like`, `and`, `or`),
+ * которую передают как `where[поле][оператор]=значение`. В OpenAPI
+ * такого параметра не выразить: он не описывается ни enum, ни схемой.
+ * Поэтому здесь он объявлен строкой с объяснением и примером, а не
+ * подделан под что-то стандартное. Подделка выглядела бы точнее
+ * и вводила бы в заблуждение.
+ *
+ * **Права доступа.** Одна и та же ручка отдаёт разное разным: хозяйству —
+ * его записи, Ассоциации — все, анониму — только публичные. Это свойство
+ * не схемы ответа, а правил доступа, и описать его полями нельзя.
+ * Сказано словами в описании каждой коллекции — иначе документация
+ * обещает больше, чем API делает.
+ *
+ * ## Почему служебные коллекции скрыты
+ *
+ * `payload-*` — внутренняя кухня: блокировки документов, настройки
+ * интерфейса, журнал миграций. Они существуют, они доступны по тем же
+ * адресам, и описывать их значит предлагать ими пользоваться.
+ */
+
+type FieldLike = {
+  name?: string
+  type: string
+  label?: unknown
+  required?: boolean
+  hasMany?: boolean
+  relationTo?: string | string[]
+  options?: unknown
+  fields?: FieldLike[]
+  tabs?: { name?: string; label?: unknown; fields: FieldLike[] }[]
+  admin?: { description?: unknown; readOnly?: boolean }
+}
+
+type CollectionLike = {
+  slug: string
+  labels?: { singular?: unknown; plural?: unknown }
+  fields: FieldLike[]
+  auth?: unknown
+  upload?: unknown
+  admin?: { description?: unknown; group?: unknown }
+}
+
+type Schema = Record<string, unknown>
+
+/** Служебные коллекции Payload — в описание не попадают. */
+const isInternal = (slug: string): boolean => slug.startsWith('payload-')
+
+const text = (v: unknown): string | undefined => {
+  if (typeof v === 'string') return v
+  if (v && typeof v === 'object') {
+    const ru = (v as Record<string, unknown>).ru
+    if (typeof ru === 'string') return ru
+  }
+  return undefined
+}
+
+const optionValues = (options: unknown): string[] | undefined => {
+  if (!Array.isArray(options)) return undefined
+  const values = options
+    .map((o) => (typeof o === 'string' ? o : ((o as { value?: unknown })?.value ?? null)))
+    .filter((v): v is string => typeof v === 'string')
+  return values.length ? values : undefined
+}
+
+/**
+ * Поле коллекции → схема JSON.
+ *
+ * Связи описаны как «число или вложенный объект» намеренно: что придёт,
+ * зависит от параметра `depth` в запросе, и притвориться, что придёт
+ * что-то одно, значило бы описать половину случаев. Тот же приём
+ * у загруженных файлов.
+ */
+function fieldSchema(field: FieldLike): Schema | null {
+  const description = text(field.admin?.description) ?? text(field.label)
+  const base = description ? { description } : {}
+
+  switch (field.type) {
+    case 'text':
+    case 'textarea':
+    case 'code':
+    case 'email':
+      return { type: 'string', ...base }
+
+    case 'number':
+      return { type: 'number', ...base }
+
+    case 'checkbox':
+      return { type: 'boolean', ...base }
+
+    case 'date':
+      return { type: 'string', format: 'date-time', ...base }
+
+    case 'select': {
+      const values = optionValues(field.options)
+      const one = { type: 'string', ...(values ? { enum: values } : {}), ...base }
+      return field.hasMany ? { type: 'array', items: one, ...base } : one
+    }
+
+    case 'relationship':
+    case 'upload': {
+      const to = Array.isArray(field.relationTo) ? field.relationTo.join(', ') : field.relationTo
+      const one = {
+        oneOf: [{ type: 'integer' }, { type: 'object' }],
+        description:
+          `${description ? `${description}. ` : ''}Ссылка на «${to}». ` +
+          'При depth=0 приходит идентификатор, при depth>0 — вложенная запись.',
+      }
+      return field.hasMany ? { type: 'array', items: one } : one
+    }
+
+    case 'array':
+      return {
+        type: 'array',
+        items: { type: 'object', properties: propertiesOf(field.fields ?? []) },
+        ...base,
+      }
+
+    case 'group':
+      return { type: 'object', properties: propertiesOf(field.fields ?? []), ...base }
+
+    case 'json':
+    case 'richText':
+      return { ...base }
+
+    case 'point':
+      return { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2, ...base }
+
+    default:
+      return { ...base }
+  }
+}
+
+/**
+ * Поля → свойства схемы.
+ *
+ * `row`, `collapsible` и `tabs` без имени — это разметка формы, а не
+ * данные: в базе они ничего не создают, и в описании их быть не должно.
+ * Их содержимое поднимается на уровень выше, ровно как это делает сам
+ * Payload.
+ */
+function propertiesOf(fields: FieldLike[]): Record<string, Schema> {
+  const props: Record<string, Schema> = {}
+
+  for (const field of fields) {
+    if (field.type === 'row' || field.type === 'collapsible') {
+      Object.assign(props, propertiesOf(field.fields ?? []))
+      continue
+    }
+
+    if (field.type === 'tabs') {
+      for (const tab of field.tabs ?? []) {
+        if (tab.name) {
+          props[tab.name] = { type: 'object', properties: propertiesOf(tab.fields) }
+        } else {
+          Object.assign(props, propertiesOf(tab.fields))
+        }
+      }
+      continue
+    }
+
+    if (!field.name) continue
+    const schema = fieldSchema(field)
+    if (schema) props[field.name] = schema
+  }
+
+  return props
+}
+
+const requiredOf = (fields: FieldLike[]): string[] => {
+  const out: string[] = []
+  for (const field of fields) {
+    if (field.type === 'row' || field.type === 'collapsible') {
+      out.push(...requiredOf(field.fields ?? []))
+      continue
+    }
+    if (field.type === 'tabs') {
+      for (const tab of field.tabs ?? []) if (!tab.name) out.push(...requiredOf(tab.fields))
+      continue
+    }
+    if (field.name && field.required) out.push(field.name)
+  }
+  return out
+}
+
+/** Общие параметры выборки — одни и те же у каждой коллекции. */
+const LIST_PARAMS = [
+  {
+    name: 'where',
+    in: 'query',
+    required: false,
+    schema: { type: 'string' },
+    description:
+      'Условие отбора в формате Payload: where[поле][оператор]=значение. ' +
+      'Операторы: equals, not_equals, greater_than, greater_than_equal, less_than, ' +
+      'less_than_equal, like, in, not_in, exists. Условия объединяются through and/or: ' +
+      'where[or][0][state][equals]=alive. ' +
+      'Стандартными средствами OpenAPI этот язык не описывается — здесь он объявлен ' +
+      'строкой намеренно, чтобы не выглядеть точнее, чем есть.',
+    example: 'where[state][equals]=alive',
+  },
+  {
+    name: 'limit',
+    in: 'query',
+    required: false,
+    schema: { type: 'integer', default: 10 },
+    description: 'Сколько записей на странице. 0 — без ограничения (осторожно на книге).',
+  },
+  { name: 'page', in: 'query', required: false, schema: { type: 'integer', default: 1 } },
+  {
+    name: 'sort',
+    in: 'query',
+    required: false,
+    schema: { type: 'string' },
+    description: 'Поле сортировки; минус впереди — по убыванию: sort=-createdAt',
+  },
+  {
+    name: 'depth',
+    in: 'query',
+    required: false,
+    schema: { type: 'integer', default: 1 },
+    description:
+      'На сколько уровней разворачивать связи. 0 — только идентификаторы: ' +
+      'быстрее и предсказуемее, если связанные записи не нужны.',
+  },
+] as const
+
+const listResponse = (ref: string): Schema => ({
+  type: 'object',
+  properties: {
+    docs: { type: 'array', items: { $ref: ref } },
+    totalDocs: { type: 'integer' },
+    limit: { type: 'integer' },
+    totalPages: { type: 'integer' },
+    page: { type: 'integer' },
+    hasPrevPage: { type: 'boolean' },
+    hasNextPage: { type: 'boolean' },
+  },
+})
+
+export type OpenApiDocument = Record<string, unknown>
+
+export function buildOpenApi(payload: Payload, serverUrl: string): OpenApiDocument {
+  const collections = (payload.config.collections as unknown as CollectionLike[]).filter(
+    (c) => !isInternal(c.slug),
+  )
+
+  const schemas: Record<string, Schema> = {}
+  const paths: Record<string, Schema> = {}
+
+  for (const collection of collections) {
+    const name = text(collection.labels?.plural) ?? collection.slug
+    const singular = text(collection.labels?.singular) ?? collection.slug
+    const schemaName = collection.slug
+    const ref = `#/components/schemas/${schemaName}`
+
+    const properties = propertiesOf(collection.fields)
+    properties.id = { type: 'integer', description: 'Идентификатор записи' }
+    properties.createdAt = { type: 'string', format: 'date-time' }
+    properties.updatedAt = { type: 'string', format: 'date-time' }
+
+    if (collection.upload) {
+      properties.filename = { type: 'string' }
+      properties.mimeType = { type: 'string' }
+      properties.filesize = { type: 'integer' }
+      properties.url = { type: 'string', description: 'Адрес файла; доступ к нему — по тем же правилам чтения, что и к записи' }
+    }
+
+    schemas[schemaName] = {
+      type: 'object',
+      description: text(collection.admin?.description) ?? singular,
+      properties,
+      ...(requiredOf(collection.fields).length
+        ? { required: requiredOf(collection.fields) }
+        : {}),
+    }
+
+    /*
+     * Оговорка про доступ повторяется у каждой коллекции, и это не
+     * многословие: человек читает описание одной ручки, а не документ
+     * целиком, и общее предупреждение во введении до него не дойдёт.
+     */
+    const accessNote =
+      'Выдача зависит от того, кто спрашивает: хозяйство видит свои записи ' +
+      'и публичные, Ассоциация — все, аноним — только публичные. Это правила ' +
+      'доступа, а не схема ответа, и в схеме они не выражены.'
+
+    paths[`/api/${collection.slug}`] = {
+      get: {
+        tags: [name],
+        summary: `Список: ${name}`,
+        description: accessNote,
+        parameters: LIST_PARAMS,
+        responses: {
+          '200': {
+            description: 'Страница выдачи',
+            content: { 'application/json': { schema: listResponse(ref) } },
+          },
+        },
+      },
+      post: {
+        tags: [name],
+        summary: `Создать: ${singular}`,
+        description: accessNote,
+        requestBody: { content: { 'application/json': { schema: { $ref: ref } } } },
+        responses: {
+          '201': { description: 'Запись создана' },
+          '403': { description: 'Недостаточно прав' },
+        },
+      },
+    }
+
+    paths[`/api/${collection.slug}/{id}`] = {
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'integer' } },
+        {
+          name: 'depth',
+          in: 'query',
+          required: false,
+          schema: { type: 'integer', default: 1 },
+        },
+      ],
+      get: {
+        tags: [name],
+        summary: `Запись: ${singular}`,
+        description: accessNote,
+        responses: {
+          '200': { description: 'Запись', content: { 'application/json': { schema: { $ref: ref } } } },
+          '403': { description: 'Недостаточно прав' },
+          '404': { description: 'Не найдено' },
+        },
+      },
+      patch: {
+        tags: [name],
+        summary: `Изменить: ${singular}`,
+        requestBody: { content: { 'application/json': { schema: { $ref: ref } } } },
+        responses: { '200': { description: 'Изменено' }, '403': { description: 'Недостаточно прав' } },
+      },
+      delete: {
+        tags: [name],
+        summary: `Удалить: ${singular}`,
+        responses: { '200': { description: 'Удалено' }, '403': { description: 'Недостаточно прав' } },
+      },
+    }
+  }
+
+  /*
+   * Вход описан отдельно: без него спецификация показывает двери,
+   * но не говорит, где взять ключ. Именно на этом обычно и застревают,
+   * пробуя API впервые.
+   */
+  paths['/api/users/login'] = {
+    post: {
+      tags: ['Доступ'],
+      summary: 'Войти и получить токен',
+      requestBody: {
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              required: ['email', 'password'],
+              properties: { email: { type: 'string' }, password: { type: 'string' } },
+            },
+          },
+        },
+      },
+      responses: {
+        '200': {
+          description: 'Токен и данные пользователя',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  token: { type: 'string' },
+                  exp: { type: 'integer' },
+                  user: { $ref: '#/components/schemas/users' },
+                },
+              },
+            },
+          },
+        },
+        '401': { description: 'Неверная пара e-mail и пароль' },
+      },
+    },
+  }
+
+  paths['/api/users/me'] = {
+    get: {
+      tags: ['Доступ'],
+      summary: 'Кто я',
+      responses: { '200': { description: 'Текущий пользователь или null' } },
+    },
+  }
+
+  return {
+    openapi: '3.1.0',
+    info: {
+      title: 'Племенная книга — REST API',
+      version: '1.0.0',
+      description:
+        'Описание собрано из тех же коллекций, из которых построен сам API, ' +
+        'и обновляется вместе с ними — расходиться им негде.\n\n' +
+        '**Как войти.** POST /api/users/login возвращает токен. Дальше его передают ' +
+        'заголовком `Authorization: JWT <токен>`. Браузер может пользоваться cookie ' +
+        '`payload-token`, которую ставит та же ручка.\n\n' +
+        '**Чего здесь нет.** Прав доступа: одна и та же ручка отдаёт разное разным, ' +
+        'и это свойство правил, а не схемы. Рядом с REST работает GraphQL ' +
+        'на /api/graphql — та же модель, другой способ спрашивать.',
+    },
+    servers: [{ url: serverUrl || '/' }],
+    paths,
+    components: {
+      schemas,
+      securitySchemes: {
+        jwt: {
+          type: 'apiKey',
+          in: 'header',
+          name: 'Authorization',
+          description: 'Значение вида «JWT <токен>». Токен выдаёт POST /api/users/login.',
+        },
+        cookie: { type: 'apiKey', in: 'cookie', name: 'payload-token' },
+      },
+    },
+    security: [{ jwt: [] }, { cookie: [] }],
+  }
+}
