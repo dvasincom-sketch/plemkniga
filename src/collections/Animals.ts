@@ -1139,6 +1139,52 @@ export const Animals: CollectionConfig = {
      */
     afterChange: [
       /*
+       * Фотография открыта ровно настолько, насколько открыта карточка.
+       *
+       * Файлы по умолчанию закрыты (`src/collections/Media.ts`), а фото
+       * публичного животного — часть книги, и посетитель обязан его видеть.
+       * Вывести это из связей правило чтения не может: оно отдаёт одно
+       * условие на выборку и в чужие таблицы не ходит. Поэтому признак
+       * держится в самом файле, а согласованность — здесь.
+       *
+       * Момент важен: без этого хука хозяйство, закрывшее карточку,
+       * оставляло бы фотографию открытой навсегда — и «закрыл» означало бы
+       * «закрыл почти всё».
+       */
+      async ({ doc, previousDoc, req, operation }) => {
+        const photo = doc?.photo
+        const photoId = typeof photo === 'object' && photo ? photo.id : photo
+        if (typeof photoId !== 'number') return doc
+
+        const nowPublic = Boolean(doc?.publicVisible)
+        const wasPublic = Boolean(previousDoc?.publicVisible)
+        const prevPhoto = previousDoc?.photo
+        const prevPhotoId = typeof prevPhoto === 'object' && prevPhoto ? prevPhoto.id : prevPhoto
+
+        const changed = operation === 'create' || nowPublic !== wasPublic || photoId !== prevPhotoId
+        if (!changed) return doc
+
+        try {
+          await req.payload.update({
+            collection: 'media',
+            id: photoId,
+            overrideAccess: true,
+            req,
+            data: {
+              visibility: nowPublic ? 'public' : 'private',
+              ...(doc.owner ? { owner: doc.owner } : {}),
+            },
+          })
+        } catch {
+          /*
+           * Молча: несогласованная видимость файла — беда, но меньшая,
+           * чем отменённая правка карточки. Пересчитать её можно
+           * скриптом, потерянную правку — ничем.
+           */
+        }
+        return doc
+      },
+      /*
        * Журнал правок (ТЗ, п. 1.6).
        *
        * Пишется после сохранения и намеренно не в транзакции карточки:

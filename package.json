@@ -36,6 +36,7 @@
     "audit:checks": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/audit-checks.ts",
     "audit:gate": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/audit-gate.ts",
     "archive:purge": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/archive-purge.ts",
+    "check:security": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-security.ts",
     "check:team": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-team.ts",
     "check:movements": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-movements.ts",
     "seed:checks": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/seed-checks.ts",

@@ -497,6 +497,7 @@ npx tsx src/scripts/psql.ts -c "delete from t where name = 'dev'"
 | [docs/model-dannyh.md](docs/model-dannyh.md) | сущности, валидации, уровни достоверности, родословная, архив |
 | [docs/dostup-i-vidimost.md](docs/dostup-i-vidimost.md) | две ступени публичности, роли, права по коллекциям, запрос доступа |
 | [docs/indeks-plemennoy-cennosti.md](docs/indeks-plemennoy-cennosti.md) | формулы индекса, база сравнения, веса, достоверность, процентиль |
+| [docs/reestr-parametrov.md](docs/reestr-parametrov.md) | реестр референсных параметров: откуда берутся наследуемости, корреляции, цены и частоты гаплотипов |
 | [docs/pozicionirovanie.md](docs/pozicionirovanie.md) | три продуктовых акцента: интеграции, подбор пар, пользовательский индекс |
 | [docs/genomnyy-konveyer.md](docs/genomnyy-konveyer.md) | форматы генотипов, QC, импутация, матрицы A и G, ssGBLUP |
 | [docs/standarty.md](docs/standarty.md) | ICAR, лактационные кривые, ФГИАС ПР, ВетИС, Регламент ЕС |

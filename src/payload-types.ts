@@ -671,6 +671,11 @@ export interface AnimalPurpose {
 export interface Media {
   id: number;
   alt?: string | null;
+  /**
+   * Хозяйство, которому файл принадлежит. Пусто — виден только Ассоциации
+   */
+  owner?: (number | null) | Organization;
+  visibility?: ('private' | 'public') | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -2878,6 +2883,8 @@ export interface DocumentsSelect<T extends boolean = true> {
  */
 export interface MediaSelect<T extends boolean = true> {
   alt?: T;
+  owner?: T;
+  visibility?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;

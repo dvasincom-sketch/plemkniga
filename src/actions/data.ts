@@ -1139,7 +1139,16 @@ export async function importDataAction(
     const media = await payload.create({
       collection: 'media',
       overrideAccess: true,
-      data: { alt: `Файл импорта ${file.name}` },
+      /*
+       * Исходник загрузки — закрытый файл своего хозяйства.
+       *
+       * В нём всё стадо построчно: номера, удои, родословные. Владелец
+       * и видимость проставляются здесь явно, а не оставляются на умолчание
+       * коллекции: путь этот единственный, по которому в систему попадают
+       * чужие данные целым файлом, и полагаться тут на умолчание — значит
+       * однажды его поменять и не заметить.
+       */
+      data: { alt: `Файл импорта ${file.name}`, owner: orgId, visibility: 'private' },
       file: {
         data: Buffer.from(await file.arrayBuffer()),
         name: file.name,

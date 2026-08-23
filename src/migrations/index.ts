@@ -38,6 +38,7 @@ import * as migration_20260824_140000_share_links from './20260824_140000_share_
 import * as migration_20260824_180000_certificate_check from './20260824_180000_certificate_check';
 import * as migration_20260825_090000_movements from './20260825_090000_movements'
 import * as migration_20260825_140000_team_roles from './20260825_140000_team_roles'
+import * as migration_20260825_200000_media_access from './20260825_200000_media_access'
 
 export const migrations = [
   {
@@ -239,5 +240,10 @@ export const migrations = [
     up: migration_20260825_140000_team_roles.up,
     down: migration_20260825_140000_team_roles.down,
     name: '20260825_140000_team_roles',
+  },
+  {
+    up: migration_20260825_200000_media_access.up,
+    down: migration_20260825_200000_media_access.down,
+    name: '20260825_200000_media_access',
   },
 ];

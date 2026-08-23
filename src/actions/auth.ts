@@ -97,7 +97,25 @@ export async function registerAction(
   const email = get('email')
   const password = get('password')
   const passwordConfirm = get('passwordConfirm')
-  const role = (get('role') || 'farmer') as RegisterPayload['role']
+  /*
+   * Роль сверяется со списком в рантайме, а не приведением типа.
+   *
+   * `as RegisterPayload['role']` существует только при сборке: серверное
+   * действие — это обычный POST, и в поле `role` приходит то, что отправили.
+   * Отправляли, разумеется, `admin`. Приведение типа выглядит как проверка
+   * и ею не является — это худший вид защиты, потому что читается как
+   * имеющаяся.
+   *
+   * Второй заслон стоит в самой коллекции: у поля `role` закрыт и `create`.
+   * Оба нужны. Здесь — чтобы отказ был внятным, там — чтобы он был
+   * при любом пути записи.
+   */
+  const SELF_REGISTER_ROLES = ['farmer', 'service', 'individual'] as const
+  const asked = get('role') || 'farmer'
+  if (!SELF_REGISTER_ROLES.includes(asked as (typeof SELF_REGISTER_ROLES)[number])) {
+    return { error: 'Такой роли при самостоятельной регистрации не бывает' }
+  }
+  const role = asked as RegisterPayload['role']
 
   if (!email || !password) return { error: 'Укажите e-mail и пароль' }
   if (password.length < 8) return { error: 'Пароль должен быть не короче 8 символов' }

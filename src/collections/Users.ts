@@ -1,7 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { ROLES, toOptions } from '@/lib/dictionaries'
 import { ORG_ROLES } from '@/lib/roles'
-import { anyone, isAdmin, isAdminField, selfOrAdmin, selfOrAssociation } from '@/access'
+import { isAdmin, isAdminField, selfOrAdmin, selfOrAssociation } from '@/access'
 
 export const Users: CollectionConfig = {
   slug: 'users',
@@ -18,8 +18,23 @@ export const Users: CollectionConfig = {
     },
   },
   access: {
-    // Регистрация открыта — форма на /register создаёт пользователя.
-    create: anyone,
+    /*
+     * Прямое создание пользователя через API закрыто.
+     *
+     * Здесь стояло `anyone` с пояснением «регистрация открыта — форма
+     * на /register создаёт пользователя». Пояснение было неверным: форма
+     * идёт через `registerAction` с `overrideAccess: true`, и правило
+     * ей не нужно вовсе. Зато нужно было тому, кто отправляет
+     * `POST /api/users` руками, — а там принималось всё: `role: 'admin'`,
+     * `confirmed: true` и, что хуже всего, `organization` чужого
+     * хозяйства. Последнее давало не «повышение роли», а прямой доступ
+     * к чужому стаду: правила видимости строятся от организации.
+     *
+     * Поля ниже закрыты отдельно — на случай, если создание когда-нибудь
+     * снова откроют. Одной защиты здесь мало: она снимается одной
+     * строкой, а поля переживут это.
+     */
+    create: isAdmin,
     // Читать — Ассоциации (кто подал заявку от хозяйства), править — только себя
     read: selfOrAssociation,
     update: selfOrAdmin,
@@ -45,7 +60,13 @@ export const Users: CollectionConfig = {
           required: true,
           defaultValue: 'farmer',
           options: toOptions(ROLES),
-          access: { update: isAdminField },
+          /*
+           * `update` тут стоял с самого начала, `create` не стоял —
+           * и это была дыра, а не оплошность вида «забыли симметрию»:
+           * роль назначается ровно один раз, при заведении записи,
+           * и именно на создании её и подставляли.
+           */
+          access: { create: isAdminField, update: isAdminField },
         },
         { name: 'phone', type: 'text', label: 'Телефон' },
       ],
@@ -58,6 +79,19 @@ export const Users: CollectionConfig = {
       admin: {
         description: 'Хозяйство или сервисная организация, к которой привязан пользователь',
       },
+      /*
+       * Самое опасное поле в этой коллекции.
+       *
+       * Вся видимость книги строится от организации пользователя.
+       * Пока поле было открыто, любой участник мог одним запросом
+       * `PATCH /api/users/<свой id>` переписать себе организацию
+       * на чужую — и получить чужое стадо целиком: карточки, дойки,
+       * отёлы, документы. Не «повышение роли», а смена хозяйства.
+       *
+       * Законные пути смены — регистрация и принятие приглашения —
+       * идут с `overrideAccess: true` и правилами полей не ограничены.
+       */
+      access: { create: isAdminField, update: isAdminField },
     },
     {
       name: 'position',
@@ -88,7 +122,10 @@ export const Users: CollectionConfig = {
          * правит он сам (`selfOrAdmin`) — без ограничения зоотехник
          * назначал бы себя руководителем одним запросом к API.
          * Настоящая смена идёт через `changeOrgRoleAction`.
+         * Создание закрыто по той же причине: роль подставили бы
+         * прямо в запросе на заведение записи.
          */
+        create: () => false,
         update: () => false,
       },
     },
@@ -115,7 +152,7 @@ export const Users: CollectionConfig = {
           label: 'Заблокирован',
           index: true,
           admin: { readOnly: true },
-          access: { update: () => false },
+          access: { create: () => false, update: () => false },
         },
         {
           name: 'blockedBy',
@@ -123,7 +160,7 @@ export const Users: CollectionConfig = {
           relationTo: 'users',
           label: 'Кем',
           admin: { readOnly: true },
-          access: { update: () => false },
+          access: { create: () => false, update: () => false },
         },
       ],
     },
@@ -132,14 +169,15 @@ export const Users: CollectionConfig = {
       type: 'text',
       label: 'Причина блокировки',
       admin: { readOnly: true, position: 'sidebar' },
-      access: { update: () => false },
+      access: { create: () => false, update: () => false },
     },
     {
       name: 'confirmed',
       type: 'checkbox',
       label: 'Заявка подтверждена Ассоциацией',
       defaultValue: false,
-      access: { update: isAdminField },
+      // Подтверждает Ассоциация — и на создании тоже, иначе им подтверждали себя сами
+      access: { create: isAdminField, update: isAdminField },
     },
     {
       name: 'acceptedPolicy',
