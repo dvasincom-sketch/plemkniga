@@ -1,0 +1,490 @@
+import 'dotenv/config'
+import { getPayload, type Payload, type Where } from 'payload'
+import config from '@payload-config'
+import type { Animal } from '@/payload-types'
+import { checkAnimals, type CheckCoverage } from '@/lib/data-checks'
+import { analyzeAncestry } from '@/lib/ancestry'
+import { herdIssues } from '@/lib/checks-herd'
+import { farmStats } from '@/lib/farm-stats'
+import { CHECKS, checkSpec, type CheckCode } from '@/lib/checks-registry'
+
+/**
+ * Ревизия автоматических проверок на настоящих данных.
+ *
+ * ## Зачем это отдельным скриптом
+ *
+ * Проверок под сорок, и почти все написаны без единого запуска: правило
+ * читается глазами, компилируется и выглядит верным. Компиляция здесь
+ * не доказывает ничего. `percentile_cont` над `numeric`, остаток от деления
+ * денежного типа, `extract` без указания зоны — каждое такое место падает
+ * или молча врёт по-своему, и tsc об этом не знает.
+ *
+ * Второй вопрос дороже первого: пороги. Пять процентов на «первое января»,
+ * четверть на круглые удои, втрое от медианы стада — числа взяты из головы.
+ * Проверка, срабатывающая на половине книги, бесполезна ровно так же,
+ * как не срабатывающая никогда: и то и другое эксперт перестаёт читать
+ * после третьего пакета. Понять, какая из двух бед случилась, можно
+ * единственным способом — прогнать по настоящим данным и посмотреть доли.
+ *
+ * ## Что скрипт делает и чего не делает
+ *
+ * Только читает. Ни одной записи не создаёт, не меняет и не удаляет —
+ * его не страшно запускать на боевой базе.
+ *
+ * Печатает три вещи:
+ *
+ *  1. упавшие запросы — с текстом ошибки PostgreSQL целиком, а не оговоркой,
+ *     которую видит хозяйство;
+ *  2. сколько находок дала каждая проверка и какую долю разобранных записей
+ *     она задела;
+ *  3. отдельно — проверки, не сработавшие ни разу, и проверки, сработавшие
+ *     слишком часто. Первые не проверены, вторые подозрительны порогом.
+ *
+ * ## Как читать «ни разу не сработала»
+ *
+ * Это **не** значит «проверка сломана», и скрипт такого не утверждает.
+ * Значит только, что данных, на которых её видно, в базе нет — и что о её
+ * работоспособности мы по-прежнему ничего не знаем. Различить два случая
+ * машина не может; для этого есть `seed:bulk` и заведомо испорченная запись.
+ *
+ * ## Разбор одной записи
+ *
+ * `--animal=<номер>` прогоняет все правила по единственной карточке
+ * и печатает вдобавок разбор её родословной: заявленный коэффициент
+ * инбридинга против посчитанного, глубину и общих предков с вкладами.
+ *
+ * Нужно это ровно для одного — подтвердить сам расчёт. В общем прогоне
+ * инбридинг сверяется у пятидесяти записей, и попадёт ли в них та самая,
+ * у которой коэффициент известен заранее, — вопрос удачи. Здесь удачи
+ * не требуется.
+ *
+ *   npm run audit:checks                        # 300 записей, все хозяйства
+ *   npm run audit:checks -- --limit=1000        # больше записей в разбор
+ *   npm run audit:checks -- --org=12            # одно хозяйство
+ *   npm run audit:checks -- --quiet             # без списка примеров
+ *   npm run audit:checks -- --animal=RU1234567  # одна карточка и её родословная
+ */
+
+/** Сколько записей идёт в разбор по умолчанию. */
+const DEFAULT_LIMIT = 300
+
+/** Выше этой доли разобранных записей проверка считается шумной. */
+const NOISY_SHARE = 0.2
+
+/** Сколько хозяйств смотрим по стаду, если не указано одно. */
+const ORG_CAP = 25
+
+/** Сколько примеров текста показываем под шумной проверкой. */
+const SAMPLES = 2
+
+const arg = (name: string): string | null => {
+  const hit = process.argv.find((a) => a.startsWith(`--${name}=`))
+  return hit ? hit.slice(name.length + 3) : null
+}
+
+const has = (name: string) => process.argv.includes(`--${name}`)
+
+const num = (v: string | null, fallback: number): number => {
+  const n = Number(v)
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback
+}
+
+const pad = (s: string, n: number) => (s.length >= n ? s.slice(0, n) : s + ' '.repeat(n - s.length))
+const padL = (s: string, n: number) => (s.length >= n ? s : ' '.repeat(n - s.length) + s)
+
+const pct = (part: number, total: number): string =>
+  total ? `${((part / total) * 100).toFixed(1)} %` : '—'
+
+const describeError = (e: unknown): string => {
+  if (e instanceof Error) {
+    const detail = (e as { detail?: string }).detail
+    const hint = (e as { hint?: string }).hint
+    const code = (e as { code?: string }).code
+    return [e.message, code ? `код ${code}` : null, detail, hint].filter(Boolean).join(' · ')
+  }
+  return String(e)
+}
+
+const nameOf = (v: unknown): string =>
+  v && typeof v === 'object' && 'name' in v ? String((v as { name?: string }).name ?? '—') : '—'
+
+type Tally = { count: number; animals: Set<number>; samples: string[] }
+
+const bump = (map: Map<string, Tally>, code: string, animalId: number | null, text: string) => {
+  const t = map.get(code) ?? { count: 0, animals: new Set<number>(), samples: [] }
+  t.count += 1
+  if (animalId !== null) t.animals.add(animalId)
+  if (t.samples.length < SAMPLES) t.samples.push(text)
+  map.set(code, t)
+}
+
+/**
+ * Разбор одной карточки: все правила плюс родословная с числами.
+ *
+ * Потолок инбридинга здесь не срабатывает — записей всё равно одна,
+ * а пятьдесят это больше одной. Именно поэтому проверка расчёта делается
+ * так, а не общим прогоном: в общем она сверяет пятьдесят записей
+ * из полутора сотен, и попадёт ли туда нужная — вопрос удачи.
+ */
+async function auditOne(payload: Payload, ident: string) {
+  const found = await payload.find({
+    collection: 'animals',
+    where: { identNumber: { equals: ident } },
+    limit: 1,
+    depth: 0,
+    overrideAccess: true,
+  })
+
+  const animal = found.docs[0] as Animal | undefined
+  if (!animal) {
+    console.log(`\nЖивотного с номером «${ident}» в книге нет.\n`)
+    process.exitCode = 1
+    return
+  }
+
+  const { issues, limits } = await checkAnimals(payload, [animal])
+
+  console.log('')
+  console.log(`РАЗБОР ОДНОЙ ЗАПИСИ: № ${animal.identNumber}${animal.name ? ` «${animal.name}»` : ''}`)
+  console.log('')
+
+  if (!issues.length) {
+    console.log('  Замечаний нет.')
+  } else {
+    for (const i of issues) {
+      console.log(`  [${i.severity === 'fix' ? 'исправить' : 'на усмотрение'}] ${i.code}`)
+      console.log(`    ${i.text}`)
+    }
+  }
+
+  for (const l of limits) console.log(`  · ${l}`)
+
+  /* --------------------------- Родословная --------------------------- */
+
+  const stated = typeof animal.inbreeding === 'number' ? animal.inbreeding : null
+
+  const report = await analyzeAncestry(payload, animal).catch((e: unknown) => {
+    console.log(`\n  Родословную разобрать не удалось: ${describeError(e)}\n`)
+    return null
+  })
+
+  if (!report) return
+
+  console.log('')
+  console.log('  РОДОСЛОВНАЯ')
+  console.log('')
+  console.log(`    заявленный инбридинг   ${stated === null ? 'не указан' : `${stated} %`}`)
+  console.log(`    посчитанный            ${report.coi} %`)
+  console.log(`    глубина                ${report.deepest} колен из ${report.depth}`)
+  console.log(`    различных предков      ${report.totalDistinct}`)
+
+  const shared = report.ancestors.filter((a) => a.onBothSides)
+  if (shared.length) {
+    console.log('')
+    console.log('    Общие предки — те, из-за кого коэффициент вообще не ноль:')
+    for (const a of shared) {
+      console.log(
+        `      ${pad(`${a.identNumber}${a.name ? ` «${a.name}»` : ''}`, 32)}` +
+          `${padL(`${a.coiContribution} %`, 10)}   путей ${a.occurrences}`,
+      )
+    }
+  } else {
+    console.log('')
+    console.log('    Общих предков нет — коэффициент равен нулю по построению,')
+    console.log('    а не потому, что расчёт чего-то не нашёл.')
+  }
+
+  /*
+   * Главный вывод скрипта в этом режиме. Ноль, посчитанный на родословной
+   * без общих предков, ничего не доказывает: так же выглядел бы расчёт,
+   * всегда возвращающий ноль. Подтверждает расчёт только совпадение
+   * с величиной, известной заранее.
+   */
+  console.log('')
+  if (stated === null) {
+    console.log('    Сверять не с чем: коэффициент в карточке не заполнен.')
+  } else if (Math.abs(report.coi - stated) <= 0.1) {
+    console.log(`    Сошлось: ${report.coi} % против заявленных ${stated} %.`)
+    if (report.coi === 0) {
+      console.log('    Но ноль против нуля — слабое подтверждение: расчёт, всегда')
+      console.log('    возвращающий ноль, выглядел бы так же. Нужна запись')
+      console.log('    с заранее известным ненулевым коэффициентом.')
+    } else {
+      console.log('    Обход родословной сошёлся с величиной, посчитанной вне кода.')
+    }
+  } else {
+    console.log(`    РАСХОЖДЕНИЕ: посчитано ${report.coi} %, заявлено ${stated} %.`)
+    console.log('    Если заявленное число посчитано руками по этой же родословной,')
+    console.log('    ошибка в расчёте. Если взято из чужой книги — в исходных данных.')
+  }
+  console.log('')
+}
+
+async function main() {
+  const limit = num(arg('limit'), DEFAULT_LIMIT)
+  const onlyOrg = arg('org') ? Number(arg('org')) : null
+  const quiet = has('quiet')
+
+  const payload = await getPayload({ config })
+
+  const one = arg('animal')
+  if (one) {
+    await auditOne(payload, one)
+    return
+  }
+
+  /*
+   * Ошибки запросов собираются, а не печатаются на месте: иначе они лягут
+   * посреди таблицы и потеряются. Это единственное, ради чего скрипт
+   * вообще существует, и место у них — первое.
+   */
+  const failures: { where: string; error: string }[] = []
+
+  /* ------------------------- Проверки по стаду ------------------------- */
+
+  const stats = await farmStats(payload)
+  const orgIds = [...stats.values()]
+    .filter((s) => s.animals > 0 && (onlyOrg === null || s.organizationId === onlyOrg))
+    .sort((a, b) => b.animals - a.animals)
+    .slice(0, onlyOrg === null ? ORG_CAP : 1)
+    .map((s) => s.organizationId)
+
+  const orgs = orgIds.length
+    ? await payload
+        .find({
+          collection: 'organizations',
+          where: { id: { in: orgIds } },
+          limit: orgIds.length,
+          depth: 0,
+          overrideAccess: true,
+        })
+        .then((r) => new Map(r.docs.map((o) => [o.id as number, nameOf(o)])))
+        .catch(() => new Map<number, string>())
+    : new Map<number, string>()
+
+  const herdTally = new Map<string, Tally>()
+  const herdLimits = new Set<string>()
+  const perOrg: { id: number; name: string; scanned: number; found: number }[] = []
+
+  const herdStart = Date.now()
+
+  for (const id of orgIds) {
+    const res = await herdIssues(payload, id, {
+      onQueryError: (label, e) =>
+        failures.push({ where: `стадо ${id} · ${label}`, error: describeError(e) }),
+    })
+
+    // Во втором поле `Tally` здесь лежат хозяйства, а не животные:
+    // у находки по стаду животного нет, а считать надо, скольких хозяйств
+    // она касается.
+    for (const i of res.issues) bump(herdTally, i.code, id, i.text)
+    for (const l of res.limits) herdLimits.add(l)
+
+    perOrg.push({
+      id,
+      name: orgs.get(id) ?? `#${id}`,
+      scanned: res.scanned,
+      found: res.issues.length,
+    })
+  }
+
+  const herdMs = Date.now() - herdStart
+
+  /* ------------------------ Проверки по записям ------------------------ */
+
+  /*
+   * Выборка по номеру, а не случайная. Случайная давала бы каждый раз
+   * другой ответ, и «проверка перестала срабатывать» нельзя было бы
+   * отличить от «в этот раз не попались такие записи».
+   */
+  /*
+   * Тип указан явно. Вытащенный в переменную объект-условие TypeScript
+   * расширяет до объединения с `?: undefined`, а это нарушает индексную
+   * подпись `Where` — ошибка вылезает не здесь, а в `payload.find`,
+   * и читается как ошибка вызова.
+   */
+  const where: Where = onlyOrg === null ? {} : { owner: { equals: onlyOrg } }
+
+  const found = await payload.find({
+    collection: 'animals',
+    where,
+    limit,
+    sort: 'identNumber',
+    depth: 0,
+    overrideAccess: true,
+  })
+
+  const animals = found.docs as Animal[]
+
+  const animalStart = Date.now()
+  const { issues, limits, coverage } = animals.length
+    ? await checkAnimals(payload, animals)
+    : { issues: [], limits: [] as string[], coverage: [] as CheckCoverage[] }
+  const animalMs = Date.now() - animalStart
+
+  const animalTally = new Map<string, Tally>()
+  for (const i of issues) bump(animalTally, i.code, i.animalId, `${i.ident}: ${i.text}`)
+
+  /*
+   * Знаменатель у проверки с потолком — не весь набор.
+   *
+   * `inbreeding-mismatch` смотрит пятьдесят записей из ста шестидесяти
+   * девяти. Тридцать девять её находок — это тринадцать процентов набора
+   * и семьдесят восемь процентов проверенного. Первое число успокаивает,
+   * второе требует разбираться сегодня, и печатать надо второе.
+   */
+  const looked = new Map(coverage.map((c) => [c.code as string, c]))
+  const denomOf = (code: string) => looked.get(code)?.looked ?? animals.length
+  const capped = (code: string) => looked.has(code)
+
+  /* ------------------------------ Отчёт ------------------------------- */
+
+  console.log('')
+  console.log('РЕВИЗИЯ АВТОМАТИЧЕСКИХ ПРОВЕРОК')
+  console.log('')
+  console.log(`  записей в разборе   ${animals.length} из ${found.totalDocs}`)
+  console.log(`  хозяйств по стаду   ${orgIds.length}`)
+  console.log(`  время               по записям ${animalMs} мс, по стаду ${herdMs} мс`)
+  console.log('')
+
+  if (failures.length) {
+    console.log('УПАВШИЕ ЗАПРОСЫ')
+    console.log('')
+    for (const f of failures) {
+      console.log(`  ${f.where}`)
+      console.log(`    ${f.error}`)
+    }
+    console.log('')
+    console.log('  Это ошибка в самом SQL, а не в данных. Пока запрос падает,')
+    console.log('  проверка не выполняется вовсе, а на экране выглядит как «чисто».')
+    console.log('')
+  }
+
+  console.log('ПО ЗАПИСЯМ')
+  console.log('')
+  console.log(
+    `  ${pad('код', 38)}${pad('группа', 15)}${padL('находок', 9)}${padL('записей', 9)}${padL('из', 7)}${padL('доля', 9)}`,
+  )
+  console.log(`  ${'─'.repeat(87)}`)
+
+  const animalChecks = CHECKS.filter((c) => c.group !== 'herd')
+  const sortedAnimal = [...animalChecks].sort(
+    (a, b) => (animalTally.get(b.code)?.count ?? 0) - (animalTally.get(a.code)?.count ?? 0),
+  )
+
+  for (const spec of sortedAnimal) {
+    const t = animalTally.get(spec.code)
+    const denom = denomOf(spec.code)
+    console.log(
+      `  ${pad(spec.code, 38)}${pad(spec.group, 15)}${padL(String(t?.count ?? 0), 9)}` +
+        `${padL(String(t?.animals.size ?? 0), 9)}${padL(String(denom) + (capped(spec.code) ? '*' : ''), 7)}` +
+        `${padL(pct(t?.animals.size ?? 0, denom), 9)}`,
+    )
+  }
+
+  if (coverage.length) {
+    console.log('')
+    console.log('  * проверка с потолком: знаменатель — сколько записей она успела посмотреть,')
+    console.log('    а не сколько было в наборе. Полностью:')
+    for (const c of coverage) {
+      console.log(`      ${pad(c.code, 38)}${c.looked} из ${c.eligible} подходящих`)
+    }
+  }
+
+  console.log('')
+  console.log('ПО СТАДУ')
+  console.log('')
+
+  if (!orgIds.length) {
+    console.log('  Хозяйств с животными не нашлось — проверять нечего.')
+  } else {
+    console.log(`  ${pad('код', 34)}${padL('находок', 9)}${padL('хозяйств', 10)}`)
+    console.log(`  ${'─'.repeat(53)}`)
+    for (const spec of CHECKS.filter((c) => c.group === 'herd')) {
+      const t = herdTally.get(spec.code)
+      console.log(
+        `  ${pad(spec.code, 34)}${padL(String(t?.count ?? 0), 9)}${padL(String(t?.animals.size ?? 0), 10)}`,
+      )
+    }
+
+    console.log('')
+    console.log(`  ${pad('хозяйство', 40)}${padL('записей', 9)}${padL('находок', 9)}`)
+    console.log(`  ${'─'.repeat(58)}`)
+    for (const o of perOrg.sort((a, b) => b.found - a.found)) {
+      console.log(`  ${pad(o.name, 40)}${padL(String(o.scanned), 9)}${padL(String(o.found), 9)}`)
+    }
+  }
+
+  /* ------------------------ Что требует внимания ------------------------ */
+
+  const silent = CHECKS.filter(
+    (c) => !animalTally.has(c.code) && !herdTally.has(c.code),
+  )
+
+  const noisy = [...animalTally.entries()]
+    .filter(([code, t]) => denomOf(code) && t.animals.size / denomOf(code) > NOISY_SHARE)
+    .sort((a, b) => b[1].animals.size / denomOf(b[0]) - a[1].animals.size / denomOf(a[0]))
+
+  console.log('')
+  console.log('ТРЕБУЕТ ВНИМАНИЯ')
+  console.log('')
+
+  if (noisy.length) {
+    console.log(`  Сработали больше чем на ${Math.round(NOISY_SHARE * 100)} % разобранных записей:`)
+    console.log('')
+    for (const [code, t] of noisy) {
+      const spec = checkSpec(code as CheckCode)
+      console.log(
+        `    ${pad(code, 38)}${padL(pct(t.animals.size, denomOf(code)), 8)}` +
+          `${capped(code) ? ` (из ${denomOf(code)} проверенных)` : ''}  ${spec?.threshold ?? ''}`,
+      )
+      if (!quiet) for (const s of t.samples) console.log(`      ${s}`)
+    }
+    console.log('')
+    console.log('    Такая доля означает одно из двух: порог не тот либо в книге')
+    console.log('    действительно массовая беда. Второе бывает — но решать это')
+    console.log('    надо разговором с хозяйствами, а не проверкой, которую')
+    console.log('    эксперт перестанет читать после третьего пакета.')
+    console.log('')
+  }
+
+  if (silent.length) {
+    console.log(`  Не сработали ни разу (${silent.length} из ${CHECKS.length}):`)
+    console.log('')
+    console.log('    ' + silent.map((c) => c.code).join(', '))
+    console.log('')
+    console.log('    Это не значит «сломаны». Значит, что данных, на которых их')
+    console.log('    видно, в базе нет, — и что о их работоспособности мы')
+    console.log('    по-прежнему ничего не знаем.')
+    console.log('')
+  }
+
+  if (!noisy.length && !silent.length) {
+    console.log('  Каждая проверка сработала хотя бы раз и ни одна не задела')
+    console.log(`  больше ${Math.round(NOISY_SHARE * 100)} % записей.`)
+    console.log('')
+  }
+
+  const allLimits = [...limits, ...herdLimits]
+  if (allLimits.length) {
+    console.log('ЧТО ПРОВЕРЕНО НЕ ПОЛНОСТЬЮ')
+    console.log('')
+    for (const l of allLimits) console.log(`  ${l}`)
+    console.log('')
+  }
+
+  /*
+   * Ненулевой код возврата — только у упавших запросов. Шумная проверка
+   * и молчащая проверка требуют решения человека, а не остановки сборки:
+   * объявить их провалом значило бы уронить CI на данных, которые просто
+   * такие, какие есть.
+   */
+  if (failures.length) process.exitCode = 1
+}
+
+main()
+  .then(() => process.exit(process.exitCode ?? 0))
+  .catch((e) => {
+    console.error('\nОшибка:\n  ' + describeError(e) + '\n')
+    process.exit(1)
+  })

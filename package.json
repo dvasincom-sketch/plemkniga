@@ -32,6 +32,7 @@
     "audit:tenancy": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/audit-tenancy.ts",
     "audit:indexes": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/audit-indexes.ts",
     "audit:grants": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/audit-grants.ts",
+    "audit:checks": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/audit-checks.ts",
     "smoke": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/smoke.ts"
   },
   "dependencies": {

@@ -320,8 +320,13 @@ function animalRow(opts: {
   herdIndex: number
   father: number | null
   mother: number | null
+  /**
+   * Коэффициент инбридинга, посчитанный вызывающей стороной по той
+   * родословной, которую она же и строит. Не случайное число.
+   */
+  inbreeding: number
 }): { row: unknown[]; ipc: number; milk: number } {
-  const { n, sex, birth, ctx, herdIndex, father, mother } = opts
+  const { n, sex, birth, ctx, herdIndex, father, mother, inbreeding } = opts
   const herd = ctx.herds[herdIndex % ctx.herds.length]!
   const male = sex === 'male'
 
@@ -359,8 +364,27 @@ function animalRow(opts: {
       int(-1, 3),
       chance(0.6),
       chance(0.3),
-      round(gauss(2.5, 2.2, 0, 30), 2),
-      false,
+      /*
+       * Коэффициент приходит снаружи и соответствует построенной
+       * родословной. Раньше здесь стояло `round(gauss(2.5, 2.2, 0, 30), 2)` —
+       * случайное число со средним 2,5 % при родословной без общих предков,
+       * то есть при настоящем коэффициенте, равном нулю.
+       *
+       * Ревизия проверок это и показала: `inbreeding-mismatch` срабатывала
+       * на 78 % сверенных записей. Расхождение было настоящим — врал сид,
+       * а не проверка. Но пользы от такого прогона нет никакой: находки,
+       * которых заведомо 78 %, никто не читает, и настоящее расхождение
+       * в них утонет.
+       *
+       * Отсюда правило: синтетика не обязана быть настоящей, но обязана
+       * быть **непротиворечивой**. Число, которое противоречит соседнему
+       * полю той же записи, ломает не красоту, а возможность что-либо
+       * на этих данных проверить.
+       */
+      inbreeding,
+      // Порог из хука коллекции: > 25 % требует ручного подтверждения.
+      // Сид пишет прямым SQL, хука не будет — значение ставится здесь.
+      inbreeding > 25,
       false,
       chance(0.05),
       ipc,
@@ -427,6 +451,8 @@ async function generate(client: PoolClient) {
         herdIndex: i,
         father: null,
         mother: null,
+        // Родителей нет — общих предков взяться неоткуда.
+        inbreeding: 0,
       }).row,
     )
   }
@@ -436,17 +462,22 @@ async function generate(client: PoolClient) {
   /* --- Поколение 2: матери ---------------------------------------------- */
 
   const damIds: number[] = []
+  const damBirths: Date[] = []
   const damBatch: unknown[][] = []
   for (let i = 0; i < dams; i++) {
+    const birth = year(2018, 300)
+    damBirths.push(birth)
     damBatch.push(
       animalRow({
         n: counter++,
         sex: 'female',
-        birth: year(2018, 300),
+        birth,
         ctx,
         herdIndex: i,
         father: bullIds[i % bullIds.length]!,
         mother: null,
+        // Известен один родитель: пути от общего предка не замыкаются.
+        inbreeding: 0,
       }).row,
     )
     if (damBatch.length >= CHUNK * 5 || i === dams - 1) {
@@ -459,18 +490,85 @@ async function generate(client: PoolClient) {
 
   /* --- Поколение 3: дочери ---------------------------------------------- */
 
+  /*
+   * Каждая двадцатая дочь спаривается с отцом своей матери.
+   *
+   * Это не украшение и не небрежность. До сих пор родословная строилась
+   * так, что общих предков не возникало вовсе, и настоящий коэффициент
+   * инбридинга у всех до одного равнялся нулю. На таких данных проверить
+   * `analyzeAncestry` нельзя ничем: расчёт, который всегда возвращает ноль,
+   * и расчёт, который возвращает ноль потому, что инбридинга нет,
+   * выглядят одинаково.
+   *
+   * Спаривание с отцом матери даёт ровно 25 % — величина известна заранее
+   * и посчитана не нами, а учебником. Прогон `npm run audit:checks` теперь
+   * сверяет два независимых расчёта одной величины: аналитический здесь
+   * и обход девяти колен там. Расхождение будет означать ошибку в одном
+   * из них, а не в данных.
+   *
+   * В жизни такое спаривание — происшествие, а не практика, и пять
+   * процентов для него много. Но проверка написана именно ради этого
+   * случая, и оставить её без единого примера значило бы не проверить.
+   */
+  const INBRED_EVERY = 20
+
+  /*
+   * Дочери одной матери разносятся по годам, а не бросаются в общий
+   * разбег дат.
+   *
+   * Матерей втрое меньше дочерей, то есть у каждой их две-три. Общий
+   * разбег в 640 дней означал, что двое почти наверняка окажутся ближе
+   * друг к другу, чем длится стельность, — а это уже не «синтетика»,
+   * а невозможная запись, на которую проверка `siblings-too-close`
+   * справедливо ругается.
+   *
+   * Отсюда привязка к очереди: первая дочь матери рождается в 2022-м,
+   * вторая в 2023-м, третья в 2024-м. Разбег ±40 дней внутри года
+   * оставляет между соседними годами не меньше 285 дней — больше
+   * стельности, но достаточно, чтобы даты не выглядели штампованными.
+   */
+  const daughterBirth = (nth: number) =>
+    new Date(Date.UTC(2022 + nth, 6, 1) + int(-40, 40) * 86_400_000)
+
   const daughterIds: number[] = []
+  const daughterBirths: Date[] = []
   const dBatch: unknown[][] = []
   for (let i = 0; i < daughters; i++) {
+    const nBulls = bullIds.length
+    const mother = damIds.length ? damIds[i % damIds.length]! : null
+
+    /*
+     * Отец матери известен по построению: матери заводились подряд
+     * и получали `bullIds[j % bulls]`. Поэтому «отец матери» здесь
+     * не запрашивается из базы, а вычисляется — сид не должен читать
+     * то, что сам только что записал.
+     */
+    const mgsIdx = mother === null ? -1 : (i % damIds.length) % nBulls
+
+    const wantInbred = mother !== null && i % INBRED_EVERY === 0
+    let fatherIdx = i % nBulls
+    if (wantInbred) fatherIdx = mgsIdx
+    else if (fatherIdx === mgsIdx) fatherIdx = (fatherIdx + 1) % nBulls
+
+    /*
+     * Отец совпал с отцом матери — спаривание отца с дочерью, F = 1/4.
+     * Иначе общих предков нет и коэффициент равен нулю.
+     */
+    const coi = fatherIdx === mgsIdx ? 25 : 0
+
+    const birth = daughterBirth(damIds.length ? Math.floor(i / damIds.length) : 0)
+    daughterBirths.push(birth)
+
     dBatch.push(
       animalRow({
         n: counter++,
         sex: 'female',
-        birth: year(2022, 300),
+        birth,
         ctx,
         herdIndex: i,
-        father: bullIds[i % bullIds.length]!,
-        mother: damIds[i % damIds.length] ?? null,
+        father: bullIds[fatherIdx]!,
+        mother,
+        inbreeding: coi,
       }).row,
     )
     if (dBatch.length >= CHUNK * 5 || i === daughters - 1) {
@@ -486,7 +584,25 @@ async function generate(client: PoolClient) {
   /* --- История оценок и экстерьера --------------------------------------- */
 
   await fillEvaluations(client, all)
-  if (!LIGHT) await fillEvents(client, [...damIds, ...daughterIds], bullIds, ctx)
+  /*
+   * События получают не только идентификаторы, но и даты рождения.
+   *
+   * Без них отёлы раскладывались по календарным годам, а не по возрасту
+   * коровы: матери 2018 года рождения телились впервые в 2023-м, то есть
+   * в пять лет. Проверка `afc-too-old` находила это у каждой седьмой
+   * записи — и находила верно.
+   */
+  if (!LIGHT) {
+    await fillEvents(
+      client,
+      [
+        ...damIds.map((id, j) => ({ id, birth: damBirths[j]! })),
+        ...daughterIds.map((id, j) => ({ id, birth: daughterBirths[j]! })),
+      ],
+      bullIds,
+      ctx,
+    )
+  }
 
   console.log(`\nВсего животных добавлено: ${all.length.toLocaleString('ru-RU')} за ${elapsed()} с`)
   console.log(
@@ -583,7 +699,12 @@ async function fillEvaluations(client: PoolClient, ids: number[]) {
  * Здесь основной объём строк — на каждую корову приходится до сорока записей,
  * и именно они делают карточку животного тяжёлой.
  */
-async function fillEvents(client: PoolClient, cows: number[], bulls: number[], ctx: Ctx) {
+async function fillEvents(
+  client: PoolClient,
+  cows: { id: number; birth: Date }[],
+  bulls: number[],
+  ctx: Ctx,
+) {
   const calvingCols = ['animal_id', 'number', 'date', 'result', 'milking_days', 'ease', 'calf_weight', 'updated_at', 'created_at']
   const milkCols = ['animal_id', 'date', 'lactation_number', 'daily_yield', 'fat_percent', 'protein_percent', 'somatic_cells', 'updated_at', 'created_at']
   const insCols = ['animal_id', 'bull_id', 'date', 'attempt_number', 'doses', 'lactation_number', 'updated_at', 'created_at']
@@ -611,11 +732,29 @@ async function fillEvents(client: PoolClient, cows: number[], bulls: number[], c
     health = []
   }
 
-  for (const [i, id] of cows.entries()) {
+  for (const [i, cow] of cows.entries()) {
+    const id = cow.id
     const lactations = int(0, 3)
 
+    /*
+     * Отёлы считаются от рождения коровы, а не от календаря.
+     *
+     * Раньше отёл номер `l` ставился в год `2022 + l` независимо от того,
+     * когда корова родилась и когда телилась в прошлый раз. Отсюда две
+     * невозможности сразу: первый отёл в пять лет у старших поколений
+     * и межотельный интервал в несколько дней, когда прошлый отёл
+     * приходился на декабрь, а следующий на январь.
+     *
+     * 24–30 месяцев до первого отёла — середина рамки правдоподобия
+     * из `docs/vozrast-pervogo-otela.md`. 320–400 дней между отёлами —
+     * заведомо больше стельности (270 в нашей рамке, около 279 в жизни).
+     */
+    let calvingDate = new Date(cow.birth.getTime() + int(730, 913) * 86_400_000)
+
     for (let l = 1; l <= lactations; l++) {
-      const calvingDate = new Date(Date.UTC(2022 + l, int(0, 11), int(1, 28)))
+      if (l > 1) {
+        calvingDate = new Date(calvingDate.getTime() + int(320, 400) * 86_400_000)
+      }
       if (calvingDate > now) break
 
       calvings.push([
