@@ -5,6 +5,7 @@ import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { AccountNav, ACCOUNT_TABS, type AccountTabKey } from '@/components/AccountNav'
 import { SearchPanel } from '@/components/SearchPanel'
+import { farmTodo } from '@/lib/todo'
 import { AnimalTable } from '@/components/AnimalTable'
 import { Pagination } from '@/components/Pagination'
 import { ProfileForm } from '@/components/ProfileForm'
@@ -253,6 +254,12 @@ async function AnimalsTab({
       : 0
 
   /*
+   * Полоса дел. Считается только для хозяйства: у пользователя без
+   * организации своего стада нет, и дела ему не про что.
+   */
+  const todo = orgId ? await farmTodo(payload, orgId) : []
+
+  /*
    * Пустая таблица объясняется по-разному.
    *
    * Раньше в обоих случаях стояло «в вашем стаде пока нет записей»: человек
@@ -279,6 +286,41 @@ async function AnimalsTab({
 
   return (
     <>
+      {/*
+         Дела — первым, до поиска.
+
+         Раздел открывается таблицей, и таблица отвечает на вопрос «что
+         у меня есть». Между двумя заходами в кабинет меняется не состав
+         стада, а состояние дел, и увидеть их человек должен раньше, чем
+         начнёт листать. Когда дел нет, полосы нет вовсе: пустая строка
+         «всё хорошо» занимает место и ничего не сообщает.
+      */}
+      {todo.length > 0 && (
+        <section className="mt-6">
+          <div className="flex flex-wrap gap-3">
+            {todo.map((t) => (
+              <Link
+                key={t.key}
+                href={t.href}
+                className={`min-w-[190px] flex-1 rounded-xl px-4 py-3 transition-colors ${
+                  t.urgent
+                    ? 'bg-[#fdecea] hover:bg-[#fbe0dc]'
+                    : 'bg-white shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] hover:bg-[#f6f6f6]'
+                }`}
+              >
+                <span className="block text-[15px] font-medium">
+                  {t.count > 0 && <span className="tabular-nums">{t.count} </span>}
+                  {t.label}
+                </span>
+                <span className="mt-0.5 block text-[12px] leading-snug text-ink-500">
+                  {t.hint}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/*
          Раньше здесь одновременно жили два несовместимых сценария: крупные
          карточки импорта-экспорта и поиск по стаду. Действия ушли на свою
@@ -324,6 +366,9 @@ async function AnimalsTab({
                файлом заводят стадо, руками — одиночные случаи, и порядок
                кнопок должен подсказывать именно это.
             */}
+            <Link href="/account/events/new" className="btn">
+              Записать событие
+            </Link>
             <Link href="/account/animals/new" className="btn">
               Добавить животное
             </Link>
@@ -446,7 +491,30 @@ async function EventsTab({ orgId }: { orgId?: number }) {
 
   return (
     <>
+      {/*
+         Запись события — первым в разделе.
+
+         Слово «события» до сих пор означало в системе три разные вещи:
+         эту вкладку с загрузками, коллекцию `events` и вкладку карточки
+         животного. Человек, который хотел записать отёл, приходил сюда
+         и не находил ничего похожего. Теперь находит — и первым.
+      */}
       <section className="mt-8">
+        <h2 className="section-title mb-6">Записать событие</h2>
+        <div className="card">
+          <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
+            Отёл, осеменение, контрольная дойка, запуск, перемещение, выбытие. Сначала
+            выбираете, что произошло, потом ищете животное по номеру или кличке.
+            Номера отёла и лактации проставляются сами, а после записи форма остаётся
+            открытой — пять отёлов подряд вводятся подряд.
+          </p>
+          <Link href="/account/events/new" className="btn btn-accent mt-5">
+            Записать событие
+          </Link>
+        </div>
+      </section>
+
+      <section className="mt-10">
         <h2 className="section-title mb-6">История загрузок</h2>
         <SubmissionHistory submissions={submissions.docs} />
       </section>
@@ -467,6 +535,26 @@ async function EventsTab({ orgId }: { orgId?: number }) {
           </p>
           <Link href="/account/verification" className="btn btn-accent mt-5">
             Подать на верификацию
+          </Link>
+        </div>
+      </section>
+
+      {/*
+         Возраст первого отёла — здесь же, потому что это тот же раздел
+         с другой стороны. Выше — что хозяйство прислало и что с этим стало;
+         ниже — что из присланного следует. Отдельной вкладки не заводим:
+         это не новый вид работы, а прочтение уже введённых событий.
+      */}
+      <section className="mt-10">
+        <h2 className="section-title mb-6">Возраст первого отёла</h2>
+        <div className="card">
+          <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
+            Считается по датам, которые вы уже внесли, — рождение и первый отёл.
+            Показывает, как телились ваши коровы, что с ними было дальше и дочери
+            каких быков телятся раньше. Вводить для этого ничего не нужно.
+          </p>
+          <Link href="/account/afc" className="btn btn-accent mt-5">
+            Посмотреть отчёт
           </Link>
         </div>
       </section>

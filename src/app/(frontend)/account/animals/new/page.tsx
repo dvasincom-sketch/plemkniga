@@ -5,7 +5,7 @@ import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { AccountNav } from '@/components/AccountNav'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
-import { NewAnimalForm } from '@/components/NewAnimalForm'
+import { NewAnimalForm, type Scenario } from '@/components/NewAnimalForm'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { denyAssociation } from '@/lib/association'
 import { relId } from '@/lib/visibility'
@@ -21,7 +21,13 @@ export const dynamic = 'force-dynamic'
  * и возвращаются. Окно такое переживает плохо, а адрес страницы можно
  * открыть заново, переслать и оставить открытым.
  */
-export default async function NewAnimalPage() {
+const SCENARIOS = new Set<Scenario>(['born', 'bought', 'bull'])
+
+export default async function NewAnimalPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ scenario?: string }>
+}) {
   const user = await getCurrentUser()
   // Кабинет хозяйства — не для сотрудника Ассоциации: у него свой раздел
   denyAssociation(user)
@@ -29,6 +35,17 @@ export default async function NewAnimalPage() {
 
   const orgId = relId(user.organization)
   const payload = await getClient()
+
+  /*
+   * Сценарий можно назвать адресом: со страницы записи событий сюда ведёт
+   * ссылка «родился телёнок», и заставлять человека выбирать случай заново
+   * после того, как он его уже выбрал, значит терять то, что он сказал.
+   * Чужое значение молча игнорируется — выбор просто останется за человеком.
+   */
+  const { scenario } = await searchParams
+  const initialScenario = SCENARIOS.has(scenario as Scenario)
+    ? (scenario as Scenario)
+    : undefined
 
   /*
    * Списки для выбора грузятся на сервере: пород в справочнике десятки,
@@ -68,9 +85,9 @@ export default async function NewAnimalPage() {
           <h1 className="text-[30px] font-medium leading-tight sm:text-[36px]">Новое животное</h1>
 
           <p className="mt-4 max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
-            Ручной ввод — для одиночных случаев: купили животное, нашли расхождение с бумажным
-            свидетельством, завели телёнка от своей коровы. Когда записей больше десятка,
-            быстрее и надёжнее{' '}
+            Сначала скажите, откуда животное: от этого зависит, что спрашивать. У телёнка
+            своей коровы родители выбираются из стада, у купленного — переписываются
+            со свидетельства. Когда записей больше десятка, быстрее и надёжнее{' '}
             <Link href="/account/import" className="underline underline-offset-4">
               загрузить файлом
             </Link>
@@ -81,6 +98,7 @@ export default async function NewAnimalPage() {
             <NewAnimalForm
               breeds={breeds.docs.map((b) => ({ id: b.id as number, name: b.name }))}
               herds={herds.docs.map((h) => ({ id: h.id as number, name: h.name }))}
+              initialScenario={initialScenario}
             />
           </div>
         </div>
