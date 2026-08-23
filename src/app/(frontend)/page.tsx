@@ -29,6 +29,7 @@ import {
   type SearchParams,
 } from '@/lib/animal-query'
 import { describeFilter } from '@/lib/filter-labels'
+import { PresetIcon } from '@/components/PresetIcons'
 import { loadProfileChoices, selectProfile } from '@/lib/index-profiles'
 import { RANKING_CAP, indexValues, rankByProfile } from '@/lib/index-column'
 import { indexValuesLag } from '@/lib/index-values'
@@ -106,19 +107,35 @@ export default async function HerdbookPage({
      * нового поля, пока запущенный процесс держит прежнюю схему коллекции
      * в памяти — тогда чип просто погаснет, а книга откроется.
      */
+    /*
+     * Считаются все отборы, а не только те, у кого написан `probe`.
+     *
+     * Раньше число знал один отбор — «на продажу», ради того чтобы гаснуть
+     * при пустоте. Остальные вели в никуда молча: нажал «Быки-производители»
+     * в книге без быков и получил пустую страницу вместо ответа «их нет».
+     * Условие для счёта берётся оттуда же, откуда строится сама ссылка
+     * (`buildAnimalWhere` от параметров отбора), — разойтись числу
+     * и выдаче теперь негде.
+     *
+     * Ошибка здесь намеренно проглатывается: это украшение плашки, и оно
+     * не должно ронять страницу.
+     */
     Promise.all(
       PRESETS.map(async (p) => {
-        if (!('probe' in p) || !p.probe) return null
+        const probe =
+          'probe' in p && p.probe
+            ? p.probe
+            : buildAnimalWhere(p.params as unknown as SearchParams)
         try {
           const { totalDocs } = await payload.count({
             collection: 'animals',
-            where: { and: [NOT_ARCHIVED, p.probe] },
+            where: { and: [NOT_ARCHIVED, probe] },
             overrideAccess: false,
             user,
           })
           return totalDocs
         } catch {
-          return 0
+          return null
         }
       }),
     ),
@@ -278,20 +295,41 @@ export default async function HerdbookPage({
             }}
           />
 
+          {/*
+             Быстрый отбор — плашки со значком, а не чипсы.
+
+             Чипсы читались как продолжение формы поиска, стоящей прямо
+             над ними: тот же размер, тот же вид, только текст другой.
+             Пять одинаковых прямоугольников с русскими подписями глаз
+             разбирает построчно, и на пятой строке забывает первую.
+             Значок даёт зацепку: «бык», «удой», «родословная», «знак»,
+             «продажа» узнаются силуэтом раньше, чем прочитана подпись.
+
+             Плашки нарочно маленькие. Это не главные действия страницы,
+             а сокращение к поиску над ними: вырасти до размера карточек
+             им значило бы поспорить с самим поиском.
+          */}
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <span className="mr-1 text-[14px] text-ink-500">Быстрый отбор:</span>
             {PRESETS.map((p, i) => {
               const isActive = preset === p.key
               const muted = presetCounts[i] === 0
 
+              /*
+                 Пустой отбор гаснет, но остаётся на месте: исчезнув, он
+                 сообщил бы, что такого отбора нет вовсе, — а он есть,
+                 просто данных под ним пока нет. Подсказка объясняет
+                 разницу.
+              */
               if (muted) {
                 return (
                   <span
                     key={p.key}
                     aria-disabled="true"
                     title={'emptyHint' in p ? p.emptyHint : 'Данных пока нет'}
-                    className="cursor-default rounded-lg bg-white px-3 py-1.5 text-[14px] text-ink-300 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)]"
+                    className="flex cursor-default items-center gap-2 rounded-lg bg-white px-3 py-2 text-[14px] text-ink-300 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)]"
                   >
+                    <PresetIcon preset={p.key} />
                     {p.label}
                   </span>
                 )
@@ -302,13 +340,30 @@ export default async function HerdbookPage({
                   key={p.key}
                   href={isActive ? '/#results' : presetHref(p, sp)}
                   aria-current={isActive ? 'true' : undefined}
-                  className={`rounded-lg px-3 py-1.5 text-[14px] transition-colors ${
+                  title={
+                    isActive
+                      ? 'Снять этот отбор'
+                      : `${p.label}: ${presetCounts[i]?.toLocaleString('ru-RU') ?? ''}`
+                  }
+                  className={`flex items-center gap-2 rounded-lg px-3 py-2 text-[14px] transition-colors ${
                     isActive
                       ? 'bg-forest-500 font-medium text-white'
                       : 'bg-white text-ink-900 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] hover:bg-[#f6f6f6]'
                   }`}
                 >
+                  <PresetIcon preset={p.key} />
                   {p.label}
+                  {/*
+                     Число рядом с подписью — не украшение: оно отвечает
+                     на вопрос «а есть ли там что-нибудь» до нажатия.
+                     Счёт уже посчитан ради погасших отборов, и не показать
+                     его значило бы выбросить готовый ответ.
+                  */}
+                  <span
+                    className={`tabular-nums ${isActive ? 'text-white/70' : 'text-ink-500'}`}
+                  >
+                    {presetCounts[i]?.toLocaleString('ru-RU')}
+                  </span>
                 </Link>
               )
             })}
