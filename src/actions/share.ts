@@ -7,6 +7,7 @@ import { newShareToken, SHARE_ANIMALS_CAP, SHARE_MAX_DAYS } from '@/lib/share-li
 import { ACCESS_SCOPES, type AccessScope } from '@/lib/dictionaries'
 import { identCore } from '@/lib/animal-id'
 import { assertCan } from '@/lib/roles'
+import { recordOperation } from '@/lib/operations'
 
 /**
  * Выпуск и отзыв ссылок на просмотр.
@@ -164,6 +165,14 @@ export async function createShareLinkAction(
     return { error: e instanceof Error ? e.message : 'Не удалось выпустить ссылку' }
   }
 
+  await recordOperation(guardPayload, {
+    action: 'share-created',
+    actor: user,
+    organization: orgId,
+    subjectType: 'share',
+    summary: `Записей в ссылке: ${found.length}, срок до ${until.toISOString().slice(0, 10)}`,
+  })
+
   revalidatePath('/account/access')
 
   const base = process.env.NEXT_PUBLIC_SERVER_URL || ''
@@ -217,5 +226,13 @@ export async function revokeShareLinkAction(
   })
 
   revalidatePath('/account/access')
+  await recordOperation(payload, {
+    action: 'share-revoked',
+    actor: user,
+    subjectType: 'share',
+    subjectId: id,
+    summary: 'Ссылка на просмотр отозвана',
+  })
+
   return { message: 'Ссылка отозвана. По ней больше ничего не откроется.' }
 }

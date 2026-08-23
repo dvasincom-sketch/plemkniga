@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { isAssociationUser } from '@/lib/association'
+import { recordOperation } from '@/lib/operations'
 
 /**
  * Членство хозяйства и подтверждение учётных записей.
@@ -92,6 +93,15 @@ export async function decideMembershipAction(
   revalidatePath('/association/farms')
   revalidatePath('/account')
   revalidatePath('/account/profile')
+
+  await recordOperation(payload, {
+    action: 'membership-decided',
+    actor: user,
+    organization: id,
+    subjectType: 'organization',
+    subjectId: id,
+    summary: `Членство: ${decision}`,
+  })
 
   return {
     message:

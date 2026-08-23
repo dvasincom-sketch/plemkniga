@@ -13,6 +13,7 @@ import { relId } from '@/lib/visibility'
 import { buildCertificateView } from '@/lib/certificate-view'
 import { newCertificateCode } from '@/lib/certificate-check'
 import type { Animal } from '@/payload-types'
+import { recordOperation } from '@/lib/operations'
 
 /**
  * Выпуск племенных документов и журнал выдачи.
@@ -170,6 +171,16 @@ export async function issueDocumentAction(
     revalidatePath('/association/documents')
     revalidatePath(`/animals/${animal.id}`)
     revalidatePath('/account')
+
+    await recordOperation(payload, {
+      action: 'document-issued',
+      actor: user,
+      organization: relId(animal.owner),
+      subjectType: 'document',
+      subjectId: Number(created.id),
+      subject: number,
+      summary: `На животное ${animal.identNumber ?? ''}`,
+    })
 
     return { message: `Выдан документ № ${number}`, issuedId: created.id }
   } catch (e) {

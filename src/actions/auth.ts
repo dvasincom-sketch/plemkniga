@@ -3,6 +3,8 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getClient } from '@/lib/payload'
+import { headers } from 'next/headers'
+import { ipFromHeaders, recordOperation } from '@/lib/operations'
 
 const COOKIE = 'payload-token'
 
@@ -55,8 +57,26 @@ export async function loginAction(_prev: AuthState, formData: FormData): Promise
      * идёт звонить и тратит чужое время вместо того, чтобы исправить
      * то, из-за чего его заблокировали.
      */
+    const ip = ipFromHeaders(await headers())
+
     const blocked = result.user as { blockedAt?: string | null; blockReason?: string | null }
     if (blocked?.blockedAt) {
+      /*
+       * Отказ заблокированному пишется в журнал, а неверный пароль — нет.
+       *
+       * Разница не в важности, а в том, кто это делает. Отказ
+       * заблокированному означает, что человек с действующим паролем
+       * продолжает ходить, — и это стоит увидеть. Неверный пароль вводят
+       * все и ежедневно; журнал, полный опечаток, перестают читать раньше,
+       * чем в нём появится что-то важное.
+       */
+      await recordOperation(payload, {
+        action: 'login-refused',
+        actor: result.user as never,
+        subjectType: 'user',
+        summary: 'Учётная запись заблокирована',
+        ip,
+      })
       return {
         error: blocked.blockReason
           ? `Учётная запись заблокирована: ${blocked.blockReason}`
@@ -65,6 +85,13 @@ export async function loginAction(_prev: AuthState, formData: FormData): Promise
     }
 
     await setAuthCookie(result.token, result.exp)
+
+    await recordOperation(payload, {
+      action: 'login',
+      actor: result.user as never,
+      subjectType: 'user',
+      ip,
+    })
   } catch {
     return { error: 'Неверный e-mail или пароль' }
   }

@@ -47,6 +47,12 @@ export const ACCOUNT_TABS = [
     hint: 'Кто ведёт данные и что каждому можно',
     href: '/account/team',
   },
+  {
+    key: 'journal',
+    label: 'Журнал',
+    hint: 'Что происходило с данными хозяйства',
+    href: '/account/journal',
+  },
   { key: 'settings', label: 'Настройки', hint: 'Личные данные и видимость' },
 ] as const
 

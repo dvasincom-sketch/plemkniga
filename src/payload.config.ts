@@ -29,6 +29,7 @@ import { AnimalExteriors } from '@/collections/AnimalExteriors'
 import { AnimalRemovals } from '@/collections/AnimalRemovals'
 import { ShareLinks } from '@/collections/ShareLinks'
 import { Invitations } from '@/collections/Invitations'
+import { Operations } from '@/collections/Operations'
 import { AnimalRevisions } from '@/collections/AnimalRevisions'
 import { VerificationRequests } from '@/collections/VerificationRequests'
 import { IndexProfiles } from '@/collections/IndexProfiles'
@@ -80,6 +81,7 @@ export default buildConfig({
     DataSubmissions,
     VerificationRequests,
     Invitations,
+    Operations,
     AccessRequests,
     AccessGrants,
     AccessViews,

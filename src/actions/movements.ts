@@ -11,6 +11,7 @@ import {
   orgNameKey,
   type MovementKind,
 } from '@/lib/movements'
+import { recordOperation } from '@/lib/operations'
 
 /**
  * Запись перемещения и разбор справочника хозяйств.
@@ -211,6 +212,16 @@ export async function recordMovementAction(
   }
 
   revalidatePath(`/animals/${animalId}`)
+  await recordOperation(payload, {
+    action: 'movement-recorded',
+    actor: user,
+    organization: org,
+    subjectType: 'animal',
+    subjectId: animalId,
+    subject: String(animal.identNumber ?? ''),
+    summary: `${kind}${created ? `, заведена карточка «${created}»` : ''}`,
+  })
+
   revalidatePath('/account')
 
   return {
@@ -275,6 +286,15 @@ export async function mergeOrganizationsAction(
     return { error: e instanceof Error ? e.message : 'Не удалось слить карточки' }
   }
 
+  await recordOperation(payload, {
+    action: 'directory-merged',
+    actor: user,
+    organization: target,
+    subjectType: 'organization',
+    subjectId: duplicate,
+    summary: `Дубль ${duplicate} слит с ${target}`,
+  })
+
   revalidatePath('/association/farms')
   return { message: 'Карточки слиты' }
 }
@@ -297,6 +317,14 @@ export async function confirmReferencedOrgAction(
     overrideAccess: true,
     user,
     data: { presence: 'registered' },
+  })
+
+  await recordOperation(payload, {
+    action: 'directory-confirmed',
+    actor: user,
+    organization: id,
+    subjectType: 'organization',
+    subjectId: id,
   })
 
   revalidatePath('/association/farms')

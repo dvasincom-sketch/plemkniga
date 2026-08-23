@@ -17,6 +17,12 @@ export const ASSOCIATION_TABS = [
   { key: 'queue', href: '/association', label: 'Очередь проверки', hint: 'Пакеты, ждущие разбора' },
   { key: 'farms', href: '/association/farms', label: 'Хозяйства', hint: 'Членство и заявки' },
   {
+    key: 'journal',
+    href: '/association/journal',
+    label: 'Журнал',
+    hint: 'Что происходило в книге',
+  },
+  {
     key: 'directory',
     href: '/association/directory',
     label: 'Справочник',

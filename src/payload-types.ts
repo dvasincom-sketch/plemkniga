@@ -83,6 +83,7 @@ export interface Config {
     'data-submissions': DataSubmission;
     'verification-requests': VerificationRequest;
     invitations: Invitation;
+    operations: Operation;
     'access-requests': AccessRequest;
     'access-grants': AccessGrant;
     'access-views': AccessView;
@@ -133,6 +134,7 @@ export interface Config {
     'data-submissions': DataSubmissionsSelect<false> | DataSubmissionsSelect<true>;
     'verification-requests': VerificationRequestsSelect<false> | VerificationRequestsSelect<true>;
     invitations: InvitationsSelect<false> | InvitationsSelect<true>;
+    operations: OperationsSelect<false> | OperationsSelect<true>;
     'access-requests': AccessRequestsSelect<false> | AccessRequestsSelect<true>;
     'access-grants': AccessGrantsSelect<false> | AccessGrantsSelect<true>;
     'access-views': AccessViewsSelect<false> | AccessViewsSelect<true>;
@@ -1408,6 +1410,57 @@ export interface Invitation {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "operations".
+ */
+export interface Operation {
+  id: number;
+  at: string;
+  action:
+    | 'login'
+    | 'login-refused'
+    | 'member-invited'
+    | 'invite-revoked'
+    | 'member-joined'
+    | 'role-changed'
+    | 'user-blocked'
+    | 'user-unblocked'
+    | 'animal-created'
+    | 'animal-archived'
+    | 'animal-restored'
+    | 'animal-purged'
+    | 'movement-recorded'
+    | 'submission-published'
+    | 'share-created'
+    | 'share-revoked'
+    | 'grant-issued'
+    | 'grant-revoked'
+    | 'verification-requested'
+    | 'verification-decided'
+    | 'document-issued'
+    | 'membership-decided'
+    | 'directory-merged'
+    | 'directory-confirmed';
+  /**
+   * Пусто — действие системы: срок хранения, пересчёт
+   */
+  actor?: (number | null) | User;
+  actorName?: string | null;
+  organization?: (number | null) | Organization;
+  subjectType?:
+    | ('animal' | 'user' | 'organization' | 'document' | 'share' | 'submission' | 'verification' | 'movement' | 'none')
+    | null;
+  subjectId?: number | null;
+  subject?: string | null;
+  summary?: string | null;
+  /**
+   * Заголовок прокси. Подсказка при разборе, а не доказательство
+   */
+  ip?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "access-requests".
  */
 export interface AccessRequest {
@@ -1830,6 +1883,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'invitations';
         value: number | Invitation;
+      } | null)
+    | ({
+        relationTo: 'operations';
+        value: number | Operation;
       } | null)
     | ({
         relationTo: 'access-requests';
@@ -2661,6 +2718,24 @@ export interface InvitationsSelect<T extends boolean = true> {
   invitedBy?: T;
   acceptedBy?: T;
   note?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "operations_select".
+ */
+export interface OperationsSelect<T extends boolean = true> {
+  at?: T;
+  action?: T;
+  actor?: T;
+  actorName?: T;
+  organization?: T;
+  subjectType?: T;
+  subjectId?: T;
+  subject?: T;
+  summary?: T;
+  ip?: T;
   updatedAt?: T;
   createdAt?: T;
 }

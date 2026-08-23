@@ -8,6 +8,7 @@ import { relId } from '@/lib/visibility'
 import { isAssociation } from '@/access'
 import { assertCan, type OrgRole } from '@/lib/roles'
 import { INVITE_DAYS, newInviteToken, resolveInvite } from '@/lib/invitations'
+import { recordOperation } from '@/lib/operations'
 
 /**
  * Сотрудники хозяйства: пригласить, сменить роль, заблокировать.
@@ -129,6 +130,14 @@ export async function inviteMemberAction(
     return { error: e instanceof Error ? e.message : 'Не удалось выпустить приглашение' }
   }
 
+  await recordOperation(payload, {
+    action: 'member-invited',
+    actor: user!,
+    subjectType: 'user',
+    subject: email,
+    summary: `Роль в приглашении: ${orgRole}`,
+  })
+
   revalidatePath('/account/team')
   return {
     message: `Приглашение выпущено, срок — ${INVITE_DAYS} дней`,
@@ -166,6 +175,14 @@ export async function revokeInviteAction(
   })
 
   revalidatePath('/account/team')
+  await recordOperation(payload, {
+    action: 'invite-revoked',
+    actor: user!,
+    subjectType: 'user',
+    subject: invite.email,
+    summary: 'Приглашение отозвано до того, как им воспользовались',
+  })
+
   return { message: 'Приглашение отозвано' }
 }
 
@@ -232,6 +249,16 @@ export async function acceptInviteAction(
       id: invite.id,
       overrideAccess: true,
       data: { acceptedAt: new Date().toISOString(), acceptedBy: created.id },
+    })
+
+    await recordOperation(payload, {
+      action: 'member-joined',
+      actor: created as never,
+      organization: invite.organization,
+      subjectType: 'user',
+      subjectId: Number(created.id),
+      subject: invite.email,
+      summary: `Роль: ${invite.orgRole}`,
     })
 
     const result = await payload.login({
@@ -315,6 +342,15 @@ export async function changeOrgRoleAction(
   })
 
   revalidatePath('/account/team')
+  await recordOperation(payload, {
+    action: 'role-changed',
+    actor: user!,
+    subjectType: 'user',
+    subjectId: id,
+    subject: [target.lastName, target.firstName].filter(Boolean).join(' ') || target.email,
+    summary: `Роль: ${target.orgRole ?? 'head'} → ${orgRole}`,
+  })
+
   return { message: 'Роль изменена' }
 }
 
@@ -405,5 +441,15 @@ export async function blockUserAction(
 
   revalidatePath('/account/team')
   revalidatePath('/association/farms')
+  await recordOperation(payload, {
+    action: unblock ? 'user-unblocked' : 'user-blocked',
+    actor: user!,
+    organization: relId(target.organization),
+    subjectType: 'user',
+    subjectId: id,
+    subject: [target.lastName, target.firstName].filter(Boolean).join(' ') || target.email,
+    summary: unblock ? null : String(formData.get('reason') || '').trim(),
+  })
+
   return { message: unblock ? 'Блокировка снята' : 'Учётная запись заблокирована' }
 }

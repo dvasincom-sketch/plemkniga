@@ -8,6 +8,7 @@ import { VERIFICATION_LIMIT } from '@/lib/verification-limit'
 import { OPEN_VERIFICATION_STATUSES } from '@/collections/VerificationRequests'
 import { dismissKey, heldAnimals } from '@/lib/verification-gate'
 import { assertCan } from '@/lib/roles'
+import { recordOperation } from '@/lib/operations'
 
 /**
  * Полный цикл верификации: хозяйство подаёт — Ассоциация решает.
@@ -207,6 +208,15 @@ export async function requestVerificationAction(
     revalidatePath('/account')
     revalidatePath('/account/verification')
     revalidatePath('/association/verifications')
+    await recordOperation(guardPayload, {
+      action: 'verification-requested',
+      actor: user,
+      organization: orgId,
+      subjectType: 'verification',
+      subjectId: Number(created.id),
+      summary: `Животных в заявке: ${ids.length}`,
+    })
+
     return { message: 'Заявка подана', createdId: created.id }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Не удалось подать заявку' }

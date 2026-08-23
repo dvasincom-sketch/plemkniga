@@ -5,6 +5,7 @@ import { getClient, getCurrentUser } from '@/lib/payload'
 import { relId } from '@/lib/visibility'
 import { collectFromForm } from '@/lib/animal-edit'
 import { assertCan } from '@/lib/roles'
+import { recordOperation } from '@/lib/operations'
 
 /**
  * Ручной ввод и правка карточки животного (ТЗ, п. 1.4 и 1.6).
@@ -112,7 +113,7 @@ export async function createAnimalAction(
   data.trustLevel = 0
 
   const payload = await getClient()
-  let created: { id: number } | null = null
+  let created: { id: number; identNumber?: string } | null = null
   try {
     created = (await payload.create({
       collection: 'animals',
@@ -121,13 +122,22 @@ export async function createAnimalAction(
       user,
       // Создание — не правка: журналу нечего сравнивать, вся карточка новая
       context: { skipJournal: true },
-    })) as { id: number }
+    })) as { id: number; identNumber?: string }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Не удалось создать запись' }
   }
 
   revalidatePath('/account')
   revalidatePath('/animals')
+  await recordOperation(guardPayload, {
+    action: 'animal-created',
+    actor: user,
+    organization: orgId,
+    subjectType: 'animal',
+    subjectId: Number(created.id),
+    subject: String(created.identNumber ?? ''),
+  })
+
   return { message: 'Карточка создана', createdId: created.id }
 }
 
@@ -285,5 +295,15 @@ export async function archiveAnimalAction(
   revalidatePath(`/animals/${id}`)
   revalidatePath('/account')
   revalidatePath('/')
+  await recordOperation(payload, {
+    action: restore ? 'animal-restored' : 'animal-archived',
+    actor: user,
+    organization: relId(animal.owner),
+    subjectType: 'animal',
+    subjectId: id,
+    subject: String(animal.identNumber ?? ''),
+    summary: restore ? null : String(formData.get('archiveReason') || '').trim(),
+  })
+
   return { message: restore ? 'Запись возвращена из архива' : 'Запись отправлена в архив' }
 }

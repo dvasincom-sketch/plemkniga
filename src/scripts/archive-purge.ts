@@ -9,6 +9,7 @@ import {
   removalBlockers,
   removalDueAt,
 } from '../lib/archive-retention'
+import { recordOperation } from '@/lib/operations'
 
 /**
  * Очистка архива: убрать из книги то, что пролежало срок.
@@ -223,6 +224,21 @@ async function main() {
      */
     try {
       await payload.delete({ collection: 'animals', id, overrideAccess: true })
+      /*
+       * Автор операции — никто: удаляет срок, а не человек. Пустое поле
+       * «кто» в журнале читается как «система» и это правда; подставить
+       * туда того, кто месяц назад отправил запись в архив, значило бы
+       * приписать ему действие, которого он не совершал.
+       */
+      await recordOperation(payload, {
+        action: 'animal-purged',
+        actor: null,
+        organization: typeof a.owner === 'number' ? a.owner : null,
+        subjectType: 'animal',
+        subjectId: Number(id),
+        subject: ident,
+        summary: `Срок хранения архива вышел, связанных записей: ${dependents}`,
+      })
       console.log(`  ${pad(ident, 22)} удалена, связанных записей: ${dependents}`)
       removed++
     } catch (e) {

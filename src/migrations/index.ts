@@ -39,6 +39,7 @@ import * as migration_20260824_180000_certificate_check from './20260824_180000_
 import * as migration_20260825_090000_movements from './20260825_090000_movements'
 import * as migration_20260825_140000_team_roles from './20260825_140000_team_roles'
 import * as migration_20260825_200000_media_access from './20260825_200000_media_access'
+import * as migration_20260826_090000_operations from './20260826_090000_operations'
 
 export const migrations = [
   {
@@ -245,5 +246,10 @@ export const migrations = [
     up: migration_20260825_200000_media_access.up,
     down: migration_20260825_200000_media_access.down,
     name: '20260825_200000_media_access',
+  },
+  {
+    up: migration_20260826_090000_operations.up,
+    down: migration_20260826_090000_operations.down,
+    name: '20260826_090000_operations',
   },
 ];

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { assertCan } from '@/lib/roles'
+import { recordOperation } from '@/lib/operations'
 
 export type SubmissionState = { error?: string; message?: string }
 
@@ -105,6 +106,14 @@ export async function publishSubmissionAction(
 
   revalidatePath('/account')
   revalidatePath(`/account/submissions/${id}`)
+
+  await recordOperation(guardPayload, {
+    action: 'submission-published',
+    actor: user,
+    subjectType: 'submission',
+    subject: submission.number ?? String(id),
+    summary: `Уровень достоверности поднят у ${raised} из ${ids.length}`,
+  })
 
   if (!ids.length) {
     return {

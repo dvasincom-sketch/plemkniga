@@ -276,6 +276,11 @@ const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
     probe: { kind: 'column', table: 'media', column: 'visibility' },
     note: 'владелец и видимость у файлов: закрыты исходники загрузок',
   },
+  {
+    name: '20260826_090000_operations',
+    probe: { kind: 'table', name: 'operations' },
+    note: 'сводный журнал операций',
+  },
 ]
 
 const { driverUri, uri, source, sslConfig } = resolveDatabase()

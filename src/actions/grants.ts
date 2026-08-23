@@ -5,6 +5,7 @@ import { getClient, getCurrentUser } from '@/lib/payload'
 import { relId } from '@/lib/visibility'
 import { forgetGrants } from '@/lib/grants'
 import { assertCan } from '@/lib/roles'
+import { recordOperation } from '@/lib/operations'
 
 export type GrantFormState = { error?: string; message?: string }
 
@@ -57,6 +58,14 @@ export async function revokeGrantAction(
   }
 
   revalidatePath('/account/access')
+  await recordOperation(payload, {
+    action: 'grant-revoked',
+    actor: user,
+    subjectType: 'organization',
+    subjectId: id,
+    summary: 'Точечный доступ отозван',
+  })
+
   return { message: 'Доступ отозван' }
 }
 
