@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { BullProofBlock } from '@/components/BullProof'
+import { bullProof } from '@/lib/bull-proof'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { ExteriorChart } from '@/components/ExteriorChart'
@@ -445,6 +447,16 @@ export default async function AnimalPage({
   const readiness = tab === 'documents' ? await certificateReadiness(payload, animal) : null
 
   /*
+   * Оценка по дочерям считается только быку и только на вкладке «Оценка».
+   * Это четыре агрегата по книге, и платить за них при открытии
+   * происхождения или документов незачем.
+   */
+  const proof =
+    tab === 'evaluation' && animal.kind === 'bull'
+      ? await bullProof(payload, animal.id as number)
+      : null
+
+  /*
    * Индекс считается по профилю смотрящего: хозяйство со своим набором весов
    * должно видеть карточку своими глазами. У гостя и у хозяйства без своего
    * профиля это стандартный профиль Ассоциации.
@@ -704,6 +716,18 @@ export default async function AnimalPage({
             )}
 
             {/*
+               Оценка по дочерям стоит выше «Данных из документов»,
+               рядом с расчётным индексом, — потому что это тоже наш расчёт
+               по книге, а не привезённое число. И выше собственной
+               продуктивности её ставить не нужно: у быка её просто нет.
+            */}
+            {proof && (
+              <section className="mt-8">
+                <BullProofBlock data={proof} />
+              </section>
+            )}
+
+            {/*
                Граница между расчётом и первоисточником проведена явно.
                Выше — то, что система посчитала сама и умеет разложить
                на слагаемые. Ниже — то, что пришло извне: из документов,
@@ -824,6 +848,13 @@ export default async function AnimalPage({
             </section>
 
             {/* ----------------------------- Фенотип ---------------------------- */}
+            {/*
+               Быку таблица лактаций не показывается вовсе, а не показывается
+               пустой. Прочерки в одиннадцати колонках читаются как «данных
+               не завезли» и заставляют искать, кто их не завёз, — тогда как
+               лактаций у быка не бывает по устройству животного.
+            */}
+            {animal.kind !== 'bull' && (
             <section className="mt-6">
               <Collapsible
                 title="Фенотип по лактациям"
@@ -875,6 +906,7 @@ export default async function AnimalPage({
                 </div>
               </Collapsible>
             </section>
+            )}
           </>
         )}
 
@@ -904,7 +936,8 @@ export default async function AnimalPage({
             />
 
             <div>
-              <LactationDynamics animal={animal} />
+              {/* Кривая лактации быку не строится по той же причине. */}
+              {animal.kind !== 'bull' && <LactationDynamics animal={animal} />}
               {animal.notes && (
                 <p className="mt-4 text-sm leading-relaxed text-ink-700">{animal.notes}</p>
               )}

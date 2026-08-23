@@ -355,6 +355,18 @@ async function main() {
     base(ctx, 36, { ...parents, summary_fat_percent: 9 }),                            // fat-implausible
     base(ctx, 37, { ...parents, summary_protein_percent: 0.4 }),                      // protein-implausible
     base(ctx, 38, { ...parents, summary_fat_kg: 90 }),                                // fat-kg-mismatch
+    /*
+     * Быку записали удой коровы. Пол при этом мужской, а `kind` — бык:
+     * именно так выглядит перенос из таблицы, где пол лежал отдельной
+     * колонкой и не совпал со строкой.
+     */
+    base(ctx, 60, {
+      ...parents,
+      kind: 'bull',
+      sex: 'male',
+      age_group: 'bull',
+      birth_date: ymd(2018, 4, 2),
+    }),                                                                               // bull-own-production
 
     // Состояние и выбытие
     /*
