@@ -70,13 +70,13 @@ export default async function AfcPage() {
       <SiteHeader active="/account" />
 
       <main className="container-page pb-8">
-        <AccountNav active="events" />
+        <AccountNav active="animals" />
 
         <div className="min-w-0">
           <Breadcrumbs
             items={[
               { label: 'Личный кабинет', href: '/account' },
-              { label: 'События', href: '/account?tab=events' },
+              { label: 'Мои животные', href: '/account?tab=animals' },
               { label: 'Возраст первого отёла' },
             ]}
           />

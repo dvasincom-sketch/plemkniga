@@ -81,13 +81,13 @@ export default async function RecordEventPage() {
       <SiteHeader active="/account" />
 
       <main className="container-page pb-8">
-        <AccountNav active="events" />
+        <AccountNav active="data" />
 
         <div className="min-w-0">
           <Breadcrumbs
             items={[
               { label: 'Личный кабинет', href: '/account' },
-              { label: 'События', href: '/account?tab=events' },
+              { label: 'Данные', href: '/account?tab=data' },
               { label: 'Записать событие' },
             ]}
           />

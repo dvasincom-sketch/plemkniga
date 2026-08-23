@@ -27,6 +27,7 @@ import {
 } from '@/lib/animal-query'
 import { DOCUMENT_TYPES, ROLES, eventTypeLabel, labelOf } from '@/lib/dictionaries'
 import { SubmissionHistory } from '@/components/SubmissionHistory'
+import { SubTabs } from '@/components/SubTabs'
 import { dateRu } from '@/lib/format'
 import { RANKING_CAP, rankByProfile } from '@/lib/index-column'
 import { indexValuesLag } from '@/lib/index-values'
@@ -51,8 +52,15 @@ export default async function AccountPage({
   if (!user) redirect('/login')
 
   const tabParam = one(sp.tab)
-  // «Личные данные» переехали в настройки отдельным блоком — старые ссылки не ломаем
-  const normalized = tabParam === 'profile' ? 'settings' : tabParam
+  /*
+   * Старые адреса разделов не ломаем. «Личные данные» переехали в настройки
+   * отдельным блоком; «События» стали «Данными». Ссылок на `?tab=events`
+   * снаружи много — в письмах, в закладках, в наших же страницах, — и
+   * встречать их пустым разделом «Мои животные» значит наказывать человека
+   * за нашу правку.
+   */
+  const normalized =
+    tabParam === 'profile' ? 'settings' : tabParam === 'events' ? 'data' : tabParam
   const tab: AccountTabKey = ACCOUNT_TABS.some((t) => t.key === normalized)
     ? (normalized as AccountTabKey)
     : 'animals'
@@ -122,7 +130,7 @@ export default async function AccountPage({
 
             {tab === 'animals' && <AnimalsTab sp={sp} orgId={orgId} userId={user.id} viewer={viewer} />}
 
-            {tab === 'events' && <EventsTab orgId={orgId} />}
+            {tab === 'data' && <DataTab sp={sp} orgId={orgId} />}
             {tab === 'documents' && <DocumentsTab orgId={orgId} />}
 
             {tab === 'settings' && (
@@ -459,64 +467,210 @@ async function AnimalsTab({
           />
         </div>
       </section>
+
+      {/*
+         Отчёты по стаду — под таблицей, а не в разделе данных.
+
+         «Возраст первого отёла» стоял среди загрузок и заявок, и это была
+         ошибка раскладки: там всё про то, как данные попадают в систему
+         и что с ними делает Ассоциация, а отчёт — про стадо, и считается
+         он из того, что уже введено. Вводить для него нечего.
+
+         Раздел заведён с запасом на будущие отчёты, но пустым бы
+         не заводился: один отчёт — уже повод дать ему место, где его
+         станут искать.
+      */}
+      <section className="mt-12">
+        <h2 className="section-title mb-6">Отчёты по стаду</h2>
+        <div className="card">
+          <h3 className="panel-heading">Возраст первого отёла</h3>
+          <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
+            Считается по датам, которые вы уже внесли, — рождение и первый отёл.
+            Показывает, как телились ваши коровы, что с ними было дальше и дочери
+            каких быков телятся раньше. Вводить для этого ничего не нужно.
+          </p>
+          <Link href="/account/afc" className="btn btn-accent mt-5">
+            Посмотреть отчёт
+          </Link>
+        </div>
+      </section>
     </>
   )
 }
 
 /* ------------------------------------------------------------------ */
-/*                              Вкладка «События»                       */
+/*                              Раздел «Данные»                         */
 /* ------------------------------------------------------------------ */
 
-async function EventsTab({ orgId }: { orgId?: number }) {
+/**
+ * Раздел собран не по видам содержимого, а по тому, зачем человек пришёл.
+ *
+ * ## Что было
+ *
+ * Пять блоков подряд одной портянкой: записать событие, история загрузок,
+ * верификация, возраст первого отёла, лента событий. Три из пяти — не
+ * содержимое, а двери: карточка с абзацем и кнопкой на другую страницу.
+ * Читалось это как список того, что здесь есть, а не как ответ на вопрос,
+ * с которым сюда пришли.
+ *
+ * ## Как разложено теперь
+ *
+ * Три раздела, и каждый отвечает на свой вопрос:
+ *
+ *  - «Записать» — как внести данные: форма события и загрузка файлом;
+ *  - «Проверка» — что с отданным: разбор своих ошибок, заявки, пакеты;
+ *  - «Лента» — что записано за последнее время.
+ *
+ * Загрузка файлом получила здесь своё место. Раньше она жила только
+ * кнопкой на панели таблицы животных — как настройка списка, а не как
+ * способ внести данные. Кнопка там и осталась, она удобна; но человек,
+ * пришедший «внести данные», искал их не в таблице стада, и правильно
+ * делал: файлом грузят прежде всего события — тысячами строк из доильного
+ * зала. Карточки животных заводят раз, а дойки приходят каждый месяц.
+ *
+ * «Возраст первого отёла» отсюда убран: это не работа с данными, а отчёт
+ * по стаду, посчитанный из уже введённого. Его место рядом со стадом.
+ *
+ * ## Что нашлось попутно
+ *
+ * «Проверить моё стадо» и каталог проверок не имели в кабинете ни одной
+ * кнопки: на них вели только текстовые ссылки внутри страницы верификации.
+ * То есть самое полезное — «покажи, что у меня не так, до того как я подам
+ * заявку» — лежало там, куда попадают, уже решив подать заявку. Теперь
+ * проверка стоит первой в своём разделе: чинить данные надо до подачи,
+ * а не после отказа.
+ *
+ * ## Почему запросы внутри разделов, а не общие
+ *
+ * Раньше открытие вкладки тянуло из базы и пакеты, и ленту событий —
+ * даже если человек пришёл нажать одну кнопку. Теперь каждый раздел
+ * спрашивает своё: у «Записать» запросов нет вовсе.
+ */
+
+const DATA_SUBTABS = [
+  { key: 'write', label: 'Записать', hint: 'Форма события и загрузка файлом' },
+  { key: 'check', label: 'Проверка', hint: 'Свои ошибки, заявки и пакеты загрузок' },
+  { key: 'feed', label: 'Лента', hint: 'Что записано за последнее время' },
+] as const
+
+type DataSub = (typeof DATA_SUBTABS)[number]['key']
+
+async function DataTab({ sp, orgId }: { sp: SearchParams; orgId?: number }) {
+  const subParam = one(sp.sub)
+  const sub: DataSub = DATA_SUBTABS.some((s) => s.key === subParam)
+    ? (subParam as DataSub)
+    : 'write'
+
+  return (
+    <>
+      <SubTabs
+        label="Разделы данных"
+        active={sub}
+        items={DATA_SUBTABS.map((s) => ({
+          key: s.key,
+          label: s.label,
+          hint: s.hint,
+          href: `/account?tab=data&sub=${s.key}`,
+        }))}
+      />
+
+      {sub === 'write' && <DataWrite />}
+      {sub === 'check' && <DataCheck orgId={orgId} />}
+      {sub === 'feed' && <DataFeed orgId={orgId} />}
+    </>
+  )
+}
+
+/* ----------------------------- Записать ----------------------------- */
+
+function DataWrite() {
+  return (
+    <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+      {/*
+         Форма — первой, файл — вторым, и порядок не случаен. Файлом
+         грузят раз в месяц отчётом, а отёл записывают в тот день, когда
+         он случился. Частое действие стоит ближе.
+      */}
+      <div className="card">
+        <h2 className="panel-heading">По одному</h2>
+        <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
+          Отёл, осеменение, контрольная дойка, запуск, перемещение, выбытие. Сначала
+          выбираете, что произошло, потом ищете животное по номеру или кличке. Номера
+          отёла и лактации проставляются сами, а после записи форма остаётся открытой —
+          пять отёлов подряд вводятся подряд.
+        </p>
+        <Link href="/account/events/new" className="btn btn-accent mt-5">
+          Записать событие
+        </Link>
+      </div>
+
+      <div className="card">
+        <h2 className="panel-heading">Файлом</h2>
+        <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
+          Животные, отёлы, осеменения и контрольные дойки — по одному набору за раз,
+          CSV или TXT. На странице загрузки лежат шаблоны и таблица принимаемых колонок;
+          строки, которые не удалось принять, называются сразу и с причиной.
+        </p>
+        <Link href="/account/import" className="btn btn-accent mt-5">
+          Загрузить файл
+        </Link>
+      </div>
+    </div>
+  )
+}
+
+/* ----------------------------- Проверка ----------------------------- */
+
+async function DataCheck({ orgId }: { orgId?: number }) {
   const payload = await getClient()
 
-  const [submissions, events] = await Promise.all([
-    payload.find({
-      collection: 'data-submissions',
-      where: orgId ? { organization: { equals: orgId } } : {},
-      sort: '-submittedAt',
-      limit: 30,
-      depth: 1,
-      overrideAccess: true,
-    }),
-    payload.find({
-      collection: 'events',
-      depth: 1,
-      limit: 30,
-      sort: '-date',
-      overrideAccess: true,
-      where: orgId ? { 'animal.owner': { equals: orgId } } : {},
-    }),
-  ])
+  const submissions = await payload.find({
+    collection: 'data-submissions',
+    where: orgId ? { organization: { equals: orgId } } : {},
+    sort: '-submittedAt',
+    limit: 30,
+    depth: 1,
+    overrideAccess: true,
+  })
 
   return (
     <>
       {/*
-         Запись события — первым в разделе.
-
-         Слово «события» до сих пор означало в системе три разные вещи:
-         эту вкладку с загрузками, коллекцию `events` и вкладку карточки
-         животного. Человек, который хотел записать отёл, приходил сюда
-         и не находил ничего похожего. Теперь находит — и первым.
+         Своя проверка — раньше заявки, и это главное в порядке блоков.
+         Хозяйство может разобрать свои данные само, ничего никому
+         не отправляя, и починить найденное до подачи. Обратный порядок
+         означал бы «подайте, а Ассоциация скажет, что не так» — то есть
+         чужую работу вместо своей и лишний круг ожидания.
       */}
       <section className="mt-8">
-        <h2 className="section-title mb-6">Записать событие</h2>
-        <div className="card">
-          <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
-            Отёл, осеменение, контрольная дойка, запуск, перемещение, выбытие. Сначала
-            выбираете, что произошло, потом ищете животное по номеру или кличке.
-            Номера отёла и лактации проставляются сами, а после записи форма остаётся
-            открытой — пять отёлов подряд вводятся подряд.
-          </p>
-          <Link href="/account/events/new" className="btn btn-accent mt-5">
-            Записать событие
-          </Link>
-        </div>
-      </section>
+        <h2 className="section-title mb-6">Проверить свои данные</h2>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className="card">
+            <h3 className="panel-heading">Разбор стада</h3>
+            <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
+              Система пройдёт по вашим записям теми же правилами, которыми пользуется
+              эксперт Ассоциации, и покажет противоречия: невозможные даты, кровность
+              вразрез с родителями, смешанные единицы измерения. Ничего никуда
+              не отправляется — это ваш разбор для себя.
+            </p>
+            <Link href="/account/checks/herd" className="btn btn-accent mt-5">
+              Проверить моё стадо
+            </Link>
+          </div>
 
-      <section className="mt-10">
-        <h2 className="section-title mb-6">История загрузок</h2>
-        <SubmissionHistory submissions={submissions.docs} />
+          <div className="card">
+            <h3 className="panel-heading">Каталог правил</h3>
+            <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
+              Полный список того, что проверяется, с объяснением, почему каждое правило
+              заведено и при каких значениях срабатывает. Пороги устанавливает
+              Ассоциация — они одни на всю книгу, иначе записи разных хозяйств
+              несравнимы.
+            </p>
+            <Link href="/account/checks" className="btn btn-brand mt-5">
+              Открыть каталог
+            </Link>
+          </div>
+        </div>
       </section>
 
       {/*
@@ -539,75 +693,88 @@ async function EventsTab({ orgId }: { orgId?: number }) {
         </div>
       </section>
 
-      {/*
-         Возраст первого отёла — здесь же, потому что это тот же раздел
-         с другой стороны. Выше — что хозяйство прислало и что с этим стало;
-         ниже — что из присланного следует. Отдельной вкладки не заводим:
-         это не новый вид работы, а прочтение уже введённых событий.
-      */}
       <section className="mt-10">
-        <h2 className="section-title mb-6">Возраст первого отёла</h2>
-        <div className="card">
-          <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
-            Считается по датам, которые вы уже внесли, — рождение и первый отёл.
-            Показывает, как телились ваши коровы, что с ними было дальше и дочери
-            каких быков телятся раньше. Вводить для этого ничего не нужно.
-          </p>
-          <Link href="/account/afc" className="btn btn-accent mt-5">
-            Посмотреть отчёт
-          </Link>
-        </div>
-      </section>
-
-      <section className="mt-10">
-        <h2 className="section-title mb-7">События животных</h2>
-        <div className="card overflow-x-auto">
-          <table className="metric-table min-w-[720px]">
-            <thead>
-              <tr>
-                <th>Дата</th>
-                <th>Тип</th>
-                <th>Животное</th>
-                <th>Описание</th>
-                <th>Статус</th>
-              </tr>
-            </thead>
-            <tbody>
-              {events.docs.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="py-8 text-center text-ink-500">
-                    Событий пока нет
-                  </td>
-                </tr>
-              )}
-              {events.docs.map((e) => (
-                <tr key={e.id}>
-                  <td>{dateRu(e.date)}</td>
-                  <td>{eventTypeLabel(e.type)}</td>
-                  <td>
-                    {typeof e.animal === 'object' && e.animal ? (
-                      <Link href={`/animals/${e.animal.id}`} className="underline underline-offset-2">
-                        {e.animal.identNumber}
-                      </Link>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td>{e.title || '—'}</td>
-                  <td>
-                    {e.status === 'accepted'
-                      ? 'Принято'
-                      : e.status === 'sent'
-                        ? 'Отправлено'
-                        : 'Черновик'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <h2 className="section-title mb-6">История загрузок</h2>
+        <SubmissionHistory submissions={submissions.docs} />
       </section>
     </>
+  )
+}
+
+/* ------------------------------- Лента ------------------------------- */
+
+async function DataFeed({ orgId }: { orgId?: number }) {
+  const payload = await getClient()
+
+  const events = await payload.find({
+    collection: 'events',
+    depth: 1,
+    limit: 30,
+    sort: '-date',
+    overrideAccess: true,
+    where: orgId ? { 'animal.owner': { equals: orgId } } : {},
+  })
+
+  return (
+    <section className="mt-8">
+      <h2 className="section-title mb-2">События животных</h2>
+      {/*
+         Оговорка про состав ленты обязательна. Отёлы, осеменения и дойки
+         живут в своих таблицах, а не в коллекции `events`, и человек,
+         записавший утром отёл и не увидевший его здесь, решит, что запись
+         пропала. Она не пропала — она в карточке животного.
+      */}
+      <p className="mb-7 max-w-[80ch] text-[14px] leading-relaxed text-ink-500">
+        Последние тридцать записей журнала: перемещения, выбытие, ветеринарные обработки
+        и прочее, для чего нет отдельной таблицы. Отёлы, осеменения и контрольные дойки
+        сюда не попадают — они лежат в карточке животного, во вкладке «События».
+      </p>
+      <div className="card overflow-x-auto">
+        <table className="metric-table min-w-[720px]">
+          <thead>
+            <tr>
+              <th>Дата</th>
+              <th>Тип</th>
+              <th>Животное</th>
+              <th>Описание</th>
+              <th>Статус</th>
+            </tr>
+          </thead>
+          <tbody>
+            {events.docs.length === 0 && (
+              <tr>
+                <td colSpan={5} className="py-8 text-center text-ink-500">
+                  Событий пока нет
+                </td>
+              </tr>
+            )}
+            {events.docs.map((e) => (
+              <tr key={e.id}>
+                <td>{dateRu(e.date)}</td>
+                <td>{eventTypeLabel(e.type)}</td>
+                <td>
+                  {typeof e.animal === 'object' && e.animal ? (
+                    <Link href={`/animals/${e.animal.id}`} className="underline underline-offset-2">
+                      {e.animal.identNumber}
+                    </Link>
+                  ) : (
+                    '—'
+                  )}
+                </td>
+                <td>{e.title || '—'}</td>
+                <td>
+                  {e.status === 'accepted'
+                    ? 'Принято'
+                    : e.status === 'sent'
+                      ? 'Отправлено'
+                      : 'Черновик'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   )
 }
 

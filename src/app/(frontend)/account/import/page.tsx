@@ -52,13 +52,13 @@ export default async function ImportPage() {
       <SiteHeader active="/account" />
 
       <main className="container-page pb-8">
-        <AccountNav active="animals" />
+        <AccountNav active="data" />
 
         <div className="min-w-0">
           <Breadcrumbs
             items={[
               { label: 'Личный кабинет', href: '/account' },
-              { label: 'Мои животные', href: '/account?tab=animals' },
+              { label: 'Данные', href: '/account?tab=data' },
               { label: 'Загрузка данных' },
             ]}
           />
@@ -79,8 +79,8 @@ export default async function ImportPage() {
             набору за раз. Записи попадают в стадо сразу, с уровнем достоверности «Черновик»,
             и одновременно заводится пакет данных: он уходит на проверку к сотрудникам
             Ассоциации, и его состояние видно в разделе{' '}
-            <Link href="/account?tab=events" className="underline underline-offset-4">
-              «События»
+            <Link href="/account?tab=data&sub=check" className="underline underline-offset-4">
+              «Данные» → «Проверка»
             </Link>
             . Когда проверка завершится и вы согласитесь с результатом, записи этого пакета
             получат уровень «Верифицировано ассоциацией». Остального стада проверка не касается.

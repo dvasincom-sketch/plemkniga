@@ -304,8 +304,14 @@ export async function loadNotifications(
           : raw.review?.comment
             ? `${kind}. ${raw.review.comment}`
             : kind,
-      href: '/account?tab=events',
-      linkLabel: 'К событиям',
+      /*
+         Ссылка ведёт прямо в «Проверку», а не в корень раздела:
+         уведомление о пакете читают, чтобы посмотреть, что с пакетом,
+         и первый экран раздела («Записать») к этому вопросу отношения
+         не имеет.
+      */
+      href: '/account?tab=data&sub=check',
+      linkLabel: 'К пакетам загрузок',
     })
   }
 

@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
@@ -8,6 +7,7 @@ import { AssociationNav } from '@/components/AssociationNav'
 import { isAssociationUser } from '@/lib/association'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { ProfileForm } from '@/components/ProfileForm'
+import { SubTabs } from '@/components/SubTabs'
 import { getCurrentUser } from '@/lib/payload'
 import { ROLES, labelOf } from '@/lib/dictionaries'
 import type { Organization } from '@/payload-types'
@@ -100,40 +100,26 @@ export default async function ProfilePage({
 
         {/*
            Вкладки профиля — третий уровень навигации, и выглядеть он должен
-           третьим. Раньше плашки повторяли разделы кабинета: та же высота,
-           та же подпись под названием, — и два ряда читались как один
-           двухэтажный переключатель, в котором непонятно, что чему
-           подчинено.
+           третьим: плашки в полтора раза ниже разделов кабинета и без
+           подписи под названием. Раньше они повторяли верхний ряд, и два
+           уровня читались как один двухэтажный переключатель, в котором
+           непонятно, что чему подчинено.
 
-           Подписи убраны, плашки стали в полтора раза ниже. Название
-           раздела и так объясняет себя: «Уведомления», «Организация»,
-           «Биллинг» — подписывать их «что присылать на почту» значит
-           объяснять очевидное там, где место дороже. Подсказка осталась
-           в `title`: она нужна раз в жизни, при первом знакомстве.
+           Сама разметка живёт теперь в общем `SubTabs` — такой же ряд стоит
+           в разделе «Данные». Пока он был скопирован, две одинаковые
+           по смыслу вещи разошлись бы на первой же правке отступа;
+           там же записано, почему это ссылки, а не кнопки с состоянием.
         */}
-        <nav aria-label="Разделы профиля" className="mt-7">
-          <ul className="flex flex-wrap gap-2">
-            {tabs.map((t) => {
-              const isActive = tab === t.key
-              return (
-                <li key={t.key}>
-                  <Link
-                    href={`/account/profile?tab=${t.key}`}
-                    aria-current={isActive ? 'page' : undefined}
-                    title={t.hint}
-                    className={`block rounded-lg px-3.5 py-1.5 text-[14px] leading-6 transition-colors ${
-                      isActive
-                        ? 'bg-forest-500 text-white'
-                        : 'bg-white text-ink-900 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] hover:bg-[#f6f6f6]'
-                    }`}
-                  >
-                    {t.label}
-                  </Link>
-                </li>
-              )
-            })}
-          </ul>
-        </nav>
+        <SubTabs
+          label="Разделы профиля"
+          active={tab}
+          items={tabs.map((t) => ({
+            key: t.key,
+            label: t.label,
+            hint: t.hint,
+            href: `/account/profile?tab=${t.key}`,
+          }))}
+        />
 
         <div className="mt-7 max-w-[860px]">
           {tab === 'notifications' && (
