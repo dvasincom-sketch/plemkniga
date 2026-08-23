@@ -73,6 +73,17 @@ export default async function AccountPage({
 
   const tabTitle = ACCOUNT_TABS.find((t) => t.key === tab)?.label ?? 'Личный кабинет'
 
+  /*
+   * Подраздел разбирается здесь, а не внутри `DataTab`: ряд его разделов
+   * стоит выше заголовка страницы — там же, где на страницах третьего
+   * уровня, — и знать выбранный подраздел нужно до того, как начнётся
+   * содержимое.
+   */
+  const subParam = one(sp.sub)
+  const sub: DataSub = DATA_SUBTABS.some((s) => s.key === subParam)
+    ? (subParam as DataSub)
+    : 'write'
+
   const org =
     typeof user.organization === 'object' && user.organization
       ? (user.organization as Organization)
@@ -91,6 +102,19 @@ export default async function AccountPage({
           всегда видно, где вы находитесь.
         */}
         <AccountNav active={tab} />
+
+        {/*
+           Ряд подразделов стоит одинаково на всех страницах раздела:
+           сразу под меню кабинета и выше заголовка. Раньше на самой
+           странице раздела он стоял под заголовком, а на страницах
+           третьего уровня — над ним, и один и тот же переключатель
+           приходилось искать глазами в двух разных местах.
+
+           Порядок сверху вниз: чем шире охват, тем выше. Меню сайта,
+           разделы кабинета, разделы внутри раздела, путь, заголовок
+           страницы, содержимое.
+        */}
+        {tab === 'data' && <DataNav active={sub} />}
 
         <div>
           <div className="min-w-0">
@@ -136,7 +160,7 @@ export default async function AccountPage({
 
             {tab === 'animals' && <AnimalsTab sp={sp} orgId={orgId} userId={user.id} viewer={viewer} />}
 
-            {tab === 'data' && <DataTab sp={sp} orgId={orgId} />}
+            {tab === 'data' && <DataTab sub={sub} orgId={orgId} />}
             {tab === 'documents' && <DocumentsTab orgId={orgId} />}
 
             {tab === 'settings' && (
@@ -559,16 +583,9 @@ async function AnimalsTab({
  * здесь, за пределами этой страницы меню второго уровня просто исчезало.
  */
 
-async function DataTab({ sp, orgId }: { sp: SearchParams; orgId?: number }) {
-  const subParam = one(sp.sub)
-  const sub: DataSub = DATA_SUBTABS.some((s) => s.key === subParam)
-    ? (subParam as DataSub)
-    : 'write'
-
+async function DataTab({ sub, orgId }: { sub: DataSub; orgId?: number }) {
   return (
     <>
-      <DataNav active={sub} className="mt-7" />
-
       {sub === 'write' && <DataWrite />}
       {sub === 'check' && <DataCheck orgId={orgId} />}
       {sub === 'feed' && <DataFeed orgId={orgId} />}

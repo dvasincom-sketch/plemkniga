@@ -36,23 +36,11 @@ export const DATA_SUBTABS = [
 
 export type DataSub = (typeof DATA_SUBTABS)[number]['key']
 
-/**
- * Умолчательный отступ рассчитан на страницы третьего уровня: там ряд
- * стоит сразу под меню кабинета, у которого свой нижний отступ. Страница
- * самого раздела ставит его под заголовком и передаёт отступ свой.
- */
-export function DataNav({
-  active,
-  className = '-mt-4 mb-8',
-}: {
-  active: DataSub
-  className?: string
-}) {
+export function DataNav({ active }: { active: DataSub }) {
   return (
     <SubTabs
       label="Разделы данных"
       active={active}
-      className={className}
       items={DATA_SUBTABS.map((s) => ({
         key: s.key,
         label: s.label,

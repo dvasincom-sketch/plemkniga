@@ -688,7 +688,13 @@ async function importAnimals(
          * в которой ничего не изменилось, значило бы наказывать
          * за аккуратность.
          */
-        const changed = changedFields(doc as Record<string, unknown>, data)
+        /*
+         * Через `unknown`: у типа `Animal` нет индексной сигнатуры, и tsc
+         * справедливо не считает его совместимым с `Record<string, unknown>`.
+         * Сравниватель ходит по путям строки файла и знает о записи ровно
+         * столько, сколько ему передали, — приведение здесь честное.
+         */
+        const changed = changedFields(doc as unknown as Record<string, unknown>, data)
         const isVerified = Number((doc as { trustLevel?: unknown }).trustLevel ?? 0) >= 3
 
         if (isVerified && changed.length > 0 && !updateVerified) {
