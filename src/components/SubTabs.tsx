@@ -47,14 +47,24 @@ export function SubTabs({
   label,
   items,
   active,
+  className = 'mt-7',
 }: {
   /** Что это за набор разделов — для читающей программы. */
   label: string
   items: readonly SubTab[]
   active: string
+  /**
+   * Отступы задаёт вызывающая сторона.
+   *
+   * Один и тот же ряд стоит в двух местах с разным окружением: на странице
+   * кабинета — под заголовком раздела, на страницах третьего уровня —
+   * сразу под меню кабинета, у которого свой нижний отступ. Зашитый
+   * отступ означал бы, что в одном из двух мест он всегда неверный.
+   */
+  className?: string
 }) {
   return (
-    <nav aria-label={label} className="mt-7">
+    <nav aria-label={label} className={className}>
       <ul className="flex flex-wrap gap-2">
         {items.map((t) => {
           const isActive = t.key === active

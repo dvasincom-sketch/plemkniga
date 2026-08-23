@@ -27,7 +27,7 @@ import {
 } from '@/lib/animal-query'
 import { DOCUMENT_TYPES, ROLES, eventTypeLabel, labelOf } from '@/lib/dictionaries'
 import { SubmissionHistory } from '@/components/SubmissionHistory'
-import { SubTabs } from '@/components/SubTabs'
+import { DATA_SUBTABS, DataNav, type DataSub } from '@/components/DataNav'
 import {
   FileUploadIcon,
   HerdScanIcon,
@@ -553,17 +553,11 @@ async function AnimalsTab({
  * спрашивает своё: у «Записать» запросов нет вовсе.
  */
 
-const DATA_SUBTABS = [
-  { key: 'write', label: 'Записать', hint: 'Форма события и загрузка файлом' },
-  {
-    key: 'check',
-    label: 'Проверка и подача',
-    hint: 'Сначала разобрать самим, потом подать в Ассоциацию',
-  },
-  { key: 'feed', label: 'Лента', hint: 'Что записано за последнее время' },
-] as const
-
-type DataSub = (typeof DATA_SUBTABS)[number]['key']
+/*
+ * Список разделов и сам переключатель переехали в `DataNav`: он же стоит
+ * на страницах третьего уровня, куда эти разделы ведут. Пока список жил
+ * здесь, за пределами этой страницы меню второго уровня просто исчезало.
+ */
 
 async function DataTab({ sp, orgId }: { sp: SearchParams; orgId?: number }) {
   const subParam = one(sp.sub)
@@ -573,16 +567,7 @@ async function DataTab({ sp, orgId }: { sp: SearchParams; orgId?: number }) {
 
   return (
     <>
-      <SubTabs
-        label="Разделы данных"
-        active={sub}
-        items={DATA_SUBTABS.map((s) => ({
-          key: s.key,
-          label: s.label,
-          hint: s.hint,
-          href: `/account?tab=data&sub=${s.key}`,
-        }))}
-      />
+      <DataNav active={sub} className="mt-7" />
 
       {sub === 'write' && <DataWrite />}
       {sub === 'check' && <DataCheck orgId={orgId} />}
@@ -720,7 +705,7 @@ async function DataCheck({ orgId }: { orgId?: number }) {
                 Ассоциация — они одни на всю книгу, иначе записи разных хозяйств
                 несравнимы.
               </p>
-              <Link href="/account/checks" className="btn btn-brand mt-5">
+              <Link href="/account/checks" className="btn btn-accent mt-5">
                 Открыть каталог
               </Link>
             </div>

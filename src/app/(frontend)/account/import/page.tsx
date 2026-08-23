@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { AccountNav } from '@/components/AccountNav'
+import { DataNav } from '@/components/DataNav'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { ImportCard } from '@/components/ImportCard'
 import { ExportCard } from '@/components/ExportCard'
@@ -53,6 +54,7 @@ export default async function ImportPage() {
 
       <main className="container-page pb-8">
         <AccountNav active="data" />
+        <DataNav active="write" />
 
         <div className="min-w-0">
           <Breadcrumbs

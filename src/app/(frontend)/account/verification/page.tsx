@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { AccountNav } from '@/components/AccountNav'
+import { DataNav } from '@/components/DataNav'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { VerificationForm } from '@/components/VerificationForm'
 import { getClient, getCurrentUser } from '@/lib/payload'
@@ -123,6 +124,7 @@ export default async function VerificationPage() {
 
       <main className="container-page pb-8">
         <AccountNav active="data" />
+        <DataNav active="check" />
 
         <div className="min-w-0">
           <Breadcrumbs
