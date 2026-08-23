@@ -50,6 +50,13 @@ type Probe =
    */
   | { kind: 'index'; name: string }
   /**
+   * Значение перечисления. Понадобилось миграции, которая ничего
+   * не создаёт, а только расширяет уже существующий тип: ни таблицы,
+   * ни колонки, ни ограничения после неё не появляется, и опознать её
+   * прежними признаками нечем.
+   */
+  | { kind: 'enum-value'; type: string; value: string }
+  /**
    * Опорного объекта больше нет: его убрала более поздняя миграция.
    *
    * Случай неочевидный, но неизбежный. Миграция завела индекс, по нему её
@@ -229,6 +236,11 @@ const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
     probe: { kind: 'table', name: 'check_thresholds' },
     note: 'пороги проверок: отклонения от заложенных в реестр',
   },
+  {
+    name: '20260823_200000_id_format_rus',
+    probe: { kind: 'enum-value', type: 'enum_animals_id_format', value: 'rus' },
+    note: 'российский международный номер XXRUS… отдельным форматом',
+  },
 ]
 
 const { driverUri, uri, source, sslConfig } = resolveDatabase()
@@ -263,6 +275,15 @@ const exists = async (probe: Probe): Promise<boolean> => {
     const r = await pool.query(
       `select 1 from pg_indexes where schemaname = 'public' and indexname = $1`,
       [probe.name],
+    )
+    return r.rowCount === 1
+  }
+  if (probe.kind === 'enum-value') {
+    const r = await pool.query(
+      `select 1 from pg_enum e
+         join pg_type t on t.oid = e.enumtypid
+        where t.typname = $1 and e.enumlabel = $2`,
+      [probe.type, probe.value],
     )
     return r.rowCount === 1
   }

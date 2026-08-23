@@ -15,6 +15,7 @@ import {
   resolveCheckSettings,
   type CheckSettingsMap,
 } from '@/lib/check-settings'
+import { IDENT_CORE_MIN, IDENT_FIELD_LABEL, IDENT_VALUES_SQL } from '@/lib/animal-id'
 
 /**
  * Проверки, у которых предмет — стадо, а не запись.
@@ -162,7 +163,7 @@ export async function herdIssues(
    * Пять независимых запросов одним заходом. Зависимый — только выбросы:
    * им нужна медиана, а её приносит второй запрос.
    */
-  const [magRows, shapeRows, birthRows, sourceRows, baseRows, yearRows] = await Promise.all([
+  const [magRows, shapeRows, birthRows, sourceRows, baseRows, yearRows, coreRows] = await Promise.all([
     ask(
       'Единицы измерения удоя',
       `select floor(log(10, a.summary_milk_yield::numeric))::int as mag,
@@ -244,6 +245,29 @@ export async function herdIssues(
         group by 1
         order by 1`,
       org,
+    ),
+    /*
+     * Ядро — общая с загрузкой файла выборка идентификаторов
+     * (`IDENT_VALUES_SQL`): разойдясь, эти два запроса начали бы отвечать
+     * по-разному на один и тот же вопрос.
+     */
+    ask(
+      'Совпадение цифр идентификаторов',
+      `with ok as (${IDENT_VALUES_SQL}),
+        sized as (select * from ok where length(core) >= $2),
+        dup as (
+          select core, count(distinct id)::int as animals
+            from sized
+           group by core
+          having count(distinct id) > 1
+        ),
+        top as (select core from dup order by animals desc, core limit $3)
+        select (select count(*) from dup)::int as groups,
+               c.core, c.id, c.ident_number, c.field, c.value
+          from sized c
+          join top t on t.core = c.core
+         order by c.core, c.id, c.field`,
+      [organizationId, IDENT_CORE_MIN, CAPS.examples],
     ),
   ])
 
@@ -462,6 +486,79 @@ export async function herdIssues(
           `${gaps.length === 1 ? 'год нет ни одного' : 'годы нет ни одного'} — ` +
           `при среднем ${Math.round(total / span)} отёлов в год. ` +
           'Стадо, телившееся до и после, не могло не телиться в промежутке: скорее всего, отчёт за эти годы не передан',
+      )
+    }
+  }
+
+  /* ------------------ Совпадение цифр идентификаторов ------------------ */
+
+  /*
+   * Находка на каждую группу совпавших цифр, а не одна общая.
+   *
+   * Общая пришлось бы читать так: «в стаде семь совпадений» — и дальше
+   * искать их самому. Каждая группа — отдельный вопрос к отдельной паре
+   * записей, и ответы на них разные: одну пару надо слить, другую оставить
+   * как есть.
+   *
+   * Существенность — «на усмотрение», и иначе быть не может. Совпадение
+   * цифр не является ошибкой: в одних хозяйствах это тот же номер в другой
+   * записи, в других — независимые системы нумерации, случайно сошедшиеся.
+   * Пометка «требует исправления» здесь означала бы, что мы знаем ответ
+   * на вопрос, который сами же задаём.
+   */
+  if (coreRows?.length) {
+    type IdentRow = { id: number; ident: string; field: string; value: string }
+    const groups = new Map<string, IdentRow[]>()
+    for (const r of coreRows) {
+      const key = String(r.core)
+      const row: IdentRow = {
+        id: num(r.id),
+        ident: String(r.ident_number),
+        field: String(r.field),
+        value: String(r.value),
+      }
+      groups.set(key, [...(groups.get(key) ?? []), row])
+    }
+
+    for (const [core, rows] of groups) {
+      /*
+       * Одно животное в группе — та же цифра в двух своих же полях
+       * (номер и бирка, например). Это норма и находкой не является;
+       * запрос такие группы уже отбросил, но проверка стоит и здесь:
+       * она стоит ничего, а тихая находка «корова совпала сама с собой»
+       * стоила бы доверия ко всему списку.
+       */
+      const byAnimal = new Map<number, IdentRow[]>()
+      for (const r of rows) byAnimal.set(r.id, [...(byAnimal.get(r.id) ?? []), r])
+      if (byAnimal.size < 2) continue
+
+      const where = [...byAnimal.entries()].map(
+        ([, list]) =>
+          `№ ${list[0]!.ident} (${list
+            .map((r) => `${IDENT_FIELD_LABEL[r.field] ?? r.field}: ${r.value}`)
+            .join(', ')})`,
+      )
+
+      push(
+        'ident-core-shared',
+        'note',
+        `Цифры ${core} встречаются у ${byAnimal.size} разных записей: ${where.join('; ')}. ` +
+          'Единого номера у скота нет, и одно животное ходит под несколькими — ' +
+          'поэтому это либо одна корова, заведённая дважды, либо два разных номера, ' +
+          'случайно совпавших цифрами. Что именно, знает только хозяйство: ' +
+          'записи не объединяются автоматически ни при каком совпадении',
+        [...byAnimal.entries()].map(([id, list]) => ({
+          animalId: id,
+          label: `№ ${list[0]!.ident} — ${IDENT_FIELD_LABEL[list[0]!.field] ?? list[0]!.field}`,
+        })),
+      )
+    }
+
+    const total = num(coreRows[0]!.groups)
+    if (total > CAPS.examples) {
+      limits.push(
+        `Совпадений цифр в идентификаторах найдено ${total}, показаны ${CAPS.examples} ` +
+          'с наибольшим числом записей. Остальные появятся после разбора этих.',
       )
     }
   }

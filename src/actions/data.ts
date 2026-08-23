@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { parseCsv } from '@/lib/csv'
 import { columnsOf, datasetByKey, headerMapOf, type Dataset } from '@/lib/import-format'
+import { IDENT_FIELD_LABEL, IDENT_VALUES_SQL, identCore } from '@/lib/animal-id'
 
 export type ImportState = {
   error?: string
@@ -28,7 +29,25 @@ export type ImportState = {
   unknownColumns?: string[]
   /** Значения, которых не нашлось в справочниках, — порода и стадо. */
   unresolved?: string[]
+  /**
+   * Строки, принятые с вопросом: их цифры совпали с другой записью.
+   *
+   * Отдельно от `issues` намеренно. Там — строки, которых **нет** в стаде;
+   * здесь — строки, которые есть, и всё же требуют взгляда. Свалить их
+   * в один список значило бы сказать хозяйству «пропущено 4», когда
+   * пропущено ноль.
+   */
+  identMatches?: IdentMatch[]
 }
+
+/**
+ * Совпадение цифровой части идентификаторов — вопрос, а не отказ.
+ *
+ * Текст собирается на сервере целиком: разница между «это одна корова
+ * дважды» и «два независимых номера случайно сошлись» объясняется словами,
+ * а не полями, и разбирать её на экране заново незачем.
+ */
+export type IdentMatch = { core: string; text: string; row?: number }
 
 /* ------------------------------------------------------------------ */
 /*  Разбор значений                                                    */
@@ -82,6 +101,123 @@ const norm = (v: string) => v.trim().toLowerCase()
 
 /** Номера животных сравниваются без учёта разделителей и регистра. */
 const identKey = (v: string) => v.replace(/[^0-9a-zA-Zа-яА-Я]/g, '').toUpperCase()
+
+/* ------------------------------------------------------------------ */
+/*  Совпадение цифр идентификаторов                                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Загрузка сопоставляет записи **только по точному совпадению**
+ * индивидуального номера, и менять это правило нельзя.
+ *
+ * Единого номера у скота в России нет: одно животное приезжает то под
+ * национальным номером, то под `XXRUS…`, то под инвентарным, то под
+ * биркой. Соблазн сопоставлять по цифрам понятен — и ошибочен. Цифры
+ * совпадают не всегда: в одних хозяйствах это действительно один номер
+ * в разной записи, в других системы нумерации независимы. Слияние
+ * по цифрам однажды объединит двух разных коров, и разъединить их
+ * обратно будет нечем — события, оценки и родословная уже перемешаны.
+ * Ошибка «не нашли, завели вторую карточку» чинится за минуту; ошибка
+ * «нашли не ту и слили» не чинится вовсе.
+ *
+ * Поэтому здесь ровно вопрос: строки приняты как есть, а совпадение
+ * названо человеку. Что с ним делать, знает хозяйство.
+ *
+ * Запрос один на всю загрузку, а не по строке на строку: проход по стаду
+ * с разбором json — не та цена, чтобы платить её тысячу раз.
+ */
+type Accepted = { line: number; ident: string; core: string }
+
+type SqlPool = {
+  query: (q: string, p?: unknown[]) => Promise<{ rows?: Record<string, unknown>[] }>
+}
+
+async function identCoreMatches(
+  payload: Awaited<ReturnType<typeof getClient>>,
+  orgId: number,
+  accepted: Accepted[],
+): Promise<IdentMatch[]> {
+  const out: IdentMatch[] = []
+  if (!accepted.length) return out
+
+  /* --- Совпадения внутри самого файла --- */
+
+  const byCore = new Map<string, Accepted[]>()
+  for (const a of accepted) byCore.set(a.core, [...(byCore.get(a.core) ?? []), a])
+
+  for (const [core, list] of byCore) {
+    const idents = [...new Set(list.map((l) => l.ident))]
+    if (idents.length < 2) continue
+    out.push({
+      core,
+      row: list[0]!.line,
+      text:
+        `В файле ${idents.length} разных номера с одними и теми же цифрами ${core}: ` +
+        `${idents.join(', ')}. Заведены они как разные животные — ` +
+        'если это одно и то же, объединять записи придётся вручную',
+    })
+  }
+
+  /* --- Совпадения с тем, что уже есть в стаде --- */
+
+  const pool = (payload.db as unknown as { pool?: SqlPool }).pool ?? null
+  if (!pool) return out
+
+  const cores = [...byCore.keys()]
+
+  const res = await pool
+    .query(
+      `with ok as (${IDENT_VALUES_SQL})
+       select ident_number, field, value, core from ok where core = any($2::text[])`,
+      [orgId, cores],
+    )
+    /*
+     * Падение запроса не отменяет загрузку и не превращается в ошибку
+     * на экране: строки уже приняты, а замечание — не условие приёма.
+     * След остаётся в логе, потому что «совпадений не найдено»
+     * и «совпадения не искали» на экране выглядят одинаково.
+     */
+    .catch((e: unknown) => {
+      console.error('[import] сверка цифр идентификаторов не выполнилась:', e)
+      return null
+    })
+
+  if (!res) return out
+
+  const inBase = new Map<string, { ident: string; field: string; value: string }[]>()
+  for (const r of res.rows ?? []) {
+    const core = String(r.core)
+    const item = { ident: String(r.ident_number), field: String(r.field), value: String(r.value) }
+    inBase.set(core, [...(inBase.get(core) ?? []), item])
+  }
+
+  for (const [core, list] of byCore) {
+    const idents = new Set(list.map((l) => l.ident))
+    /*
+     * Своя же запись отбрасывается по номеру животного, а не по значению:
+     * совпадение основного номера с собственной биркой — норма, ради
+     * которой бирку и заводят, и находкой оно быть не может.
+     */
+    const others = (inBase.get(core) ?? []).filter((r) => !idents.has(r.ident))
+    if (!others.length) continue
+
+    const where = [...new Map(others.map((r) => [r.ident + r.field, r])).values()]
+      .slice(0, 5)
+      .map((r) => `№ ${r.ident} (${IDENT_FIELD_LABEL[r.field] ?? r.field}: ${r.value})`)
+
+    out.push({
+      core,
+      row: list[0]!.line,
+      text:
+        `Номер ${list[0]!.ident} содержит те же цифры ${core}, что и запись, уже заведённая ` +
+        `в стаде: ${where.join('; ')}. Загрузка сопоставляет записи только по точному ` +
+        'совпадению номера, поэтому строка принята как отдельное животное. ' +
+        'Если это то же самое животное под другим номером — объедините записи вручную',
+    })
+  }
+
+  return out.slice(0, 50)
+}
 
 /* ------------------------------------------------------------------ */
 
@@ -166,6 +302,8 @@ async function importAnimals(
   let created = 0
   let updated = 0
   const touched: number[] = []
+  /* Цифровые ядра принятых строк — для сверки одним запросом после разбора. */
+  const accepted: Accepted[] = []
   const issues: { row: number; ident?: string; reason: string }[] = []
   let skipped = 0
   const skip = (line: number, reason: string, ident?: string) => {
@@ -255,6 +393,13 @@ async function importAnimals(
         })
         touched.push(doc.id as number)
         updated++
+        /*
+         * Обновлённая строка сверяется наравне с новой. Она совпала
+         * с записью по точному номеру — но третья запись, у которой те же
+         * цифры в другой системе нумерации, от этого никуда не делась.
+         */
+        const core = identCore(identNumber)
+        if (core) accepted.push({ line, ident: identNumber, core })
       } else {
         const doc = await payload.create({
           collection: 'animals',
@@ -263,6 +408,8 @@ async function importAnimals(
         })
         touched.push(doc.id as number)
         created++
+        const core = identCore(identNumber)
+        if (core) accepted.push({ line, ident: identNumber, core })
       }
     } catch (e) {
       /*
@@ -275,7 +422,17 @@ async function importAnimals(
     }
   }
 
-  return { created, updated, skipped, issues, touched, unresolved: [...unresolved].slice(0, 20) }
+  const identMatches = await identCoreMatches(payload, orgId, accepted)
+
+  return {
+    created,
+    updated,
+    skipped,
+    issues,
+    touched,
+    unresolved: [...unresolved].slice(0, 20),
+    identMatches,
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -533,7 +690,21 @@ async function importEvents(
     }
   }
 
-  return { created, updated: 0, skipped, issues, touched: [...touched], unresolved: [] as string[] }
+  /*
+   * У файла событий цифровых совпадений не бывает по построению: он
+   * не заводит карточек, а привязывается к существующим по точному номеру.
+   * Пустой список стоит здесь, чтобы обе ветви загрузки возвращали
+   * одинаковую форму, — иначе о нём пришлось бы помнить на каждом шаге.
+   */
+  return {
+    created,
+    updated: 0,
+    skipped,
+    issues,
+    touched: [...touched],
+    unresolved: [] as string[],
+    identMatches: [] as IdentMatch[],
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -637,5 +808,6 @@ export async function importDataAction(
     issues: res.issues,
     unknownColumns: parsed.unknownColumns,
     unresolved: res.unresolved,
+    identMatches: res.identMatches,
   }
 }

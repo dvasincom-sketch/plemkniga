@@ -31,6 +31,7 @@ import * as migration_20260822_090000_check_settings from './20260822_090000_che
 import * as migration_20260823_080000_dna_verdict from './20260823_080000_dna_verdict';
 import * as migration_20260823_120000_dismissed_issues from './20260823_120000_dismissed_issues';
 import * as migration_20260823_170000_check_thresholds from './20260823_170000_check_thresholds';
+import * as migration_20260823_200000_id_format_rus from './20260823_200000_id_format_rus';
 
 export const migrations = [
   {
@@ -197,5 +198,10 @@ export const migrations = [
     up: migration_20260823_170000_check_thresholds.up,
     down: migration_20260823_170000_check_thresholds.down,
     name: '20260823_170000_check_thresholds',
+  },
+  {
+    up: migration_20260823_200000_id_format_rus.up,
+    down: migration_20260823_200000_id_format_rus.down,
+    name: '20260823_200000_id_format_rus',
   },
 ];

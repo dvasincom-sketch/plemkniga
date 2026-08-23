@@ -298,7 +298,7 @@ export interface Animal {
    */
   uuid?: string | null;
   identNumber: string;
-  idFormat?: ('rf' | 'icar' | 'usa' | 'can' | 'deu' | 'internal') | null;
+  idFormat?: ('rf' | 'rus' | 'icar' | 'usa' | 'can' | 'deu' | 'internal') | null;
   name?: string | null;
   /**
    * Транслитерация по ГОСТ 7.79-2000 (ISO-9), заполняется автоматически

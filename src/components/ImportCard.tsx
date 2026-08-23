@@ -230,6 +230,36 @@ export function ImportCard({ datasets }: { datasets: (Choice & { hint: string })
                     </div>
                   )}
 
+                  {/*
+                     Совпадение цифр — единственный блок здесь, который
+                     ничего не требует. Он стоит после отказов и потерь
+                     намеренно: сначала то, что не записалось, потом
+                     то, что записалось и вызывает вопрос. Обратный
+                     порядок читался бы как «загрузка не удалась».
+                  */}
+                  {!!state.identMatches?.length && (
+                    <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-ink-700">
+                      <p className="font-medium">Записи с одинаковыми цифрами в номерах:</p>
+                      <ul className="mt-1 space-y-1">
+                        {state.identMatches.slice(0, 3).map((m) => (
+                          <li key={m.core} className="leading-snug">
+                            {m.row ? `строка ${m.row} — ` : ''}
+                            {m.text}
+                          </li>
+                        ))}
+                      </ul>
+                      {state.identMatches.length > 3 && (
+                        <p className="mt-1 text-ink-500">
+                          и ещё {state.identMatches.length - 3}
+                        </p>
+                      )}
+                      <p className="mt-1 text-ink-500">
+                        Строки приняты. Автоматически такие записи не объединяются: цифры
+                        совпадают и у одного животного под разными номерами, и у двух разных.
+                      </p>
+                    </div>
+                  )}
+
                   {!!state.unresolved?.length && (
                     <div className="mt-2 rounded-lg border border-ink-200 bg-ink-50 px-3 py-2 text-ink-700">
                       <p className="font-medium">Не нашлись в справочниках:</p>
