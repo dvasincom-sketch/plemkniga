@@ -43,6 +43,10 @@ export function ResultsBar({
   herds,
   profiles = [],
   profileKey = '',
+  title,
+  resetHref = '/#results',
+  actions,
+  note,
 }: {
   sp: SearchParams
   total: number
@@ -52,6 +56,27 @@ export function ResultsBar({
   /** Профили расчёта индекса; пустой список — переключатель не показывается. */
   profiles?: ProfileChoice[]
   profileKey?: string
+  /**
+   * Заголовок вместо «Найдено» / «Все животные книги».
+   *
+   * Нужен кабинету: там же, где в книге стоит «Все животные книги»,
+   * у хозяйства стоит «Мои животные» или «Архив», и подменять их общей
+   * формулировкой значит терять ответ на вопрос «чей это список».
+   */
+  title?: string
+  /** Куда ведёт «Сбросить всё». В книге это корень, в кабинете — свой раздел. */
+  resetHref?: string
+  /**
+   * Кнопки раздела — выгрузка, ввод, загрузка.
+   *
+   * Стоят здесь, а не отдельной полосой над таблицей, потому что отвечают
+   * на тот же вопрос, что и сама шапка: что я делаю с этим списком.
+   * Отдельная полоса из пяти кнопок читалась как самостоятельный раздел
+   * и перебивала главное — сколько нашлось и почему.
+   */
+  actions?: React.ReactNode
+  /** Строка под заголовком: пояснение к списку. */
+  note?: React.ReactNode
 }) {
   const chips = FILTER_KEYS.map((key) => {
     const value = one(sp[key])
@@ -63,29 +88,64 @@ export function ResultsBar({
 
   return (
     <div className="mb-5">
-      <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4">
-        <h2 className="text-[22px] font-medium sm:text-[26px]">
-          {hasActive ? 'Найдено' : 'Все животные книги'}
+      {/*
+         Одна строка, а не три.
+
+         Здесь стояло три элемента подряд с `justify-between`: заголовок,
+         кнопки, списки. Флексбокс развёл их по краям и середине, кнопки
+         оказались посреди строки, а списки — на своей собственной; вместе
+         с пояснением под заголовком получалось три яруса над таблицей
+         и добрых двести пикселей до первой записи.
+
+         Теперь ярус один: слева — что за список и сколько в нём,
+         справа — как на него смотреть и что с ним делать. Переносится
+         строка только когда не помещается по-настоящему.
+      */}
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+        <h2 className="min-w-0 text-[22px] font-medium sm:text-[26px]">
+          {title ?? (hasActive ? 'Найдено' : 'Все животные книги')}
           <span className="ml-3 text-[15px] font-normal text-ink-500">
             {total.toLocaleString('ru-RU')} {plural(total, 'запись', 'записи', 'записей')}
           </span>
+          {/*
+             Пояснение — в той же строке, отделённое точкой, а не абзацем
+             под заголовком. Строка «В архиве записей: 398» занимала ярус
+             целиком ради семи слов.
+          */}
+          {note && (
+            <span className="ml-3 text-[15px] font-normal text-ink-500">
+              <span aria-hidden="true" className="mr-3 text-ink-300">
+                ·
+              </span>
+              {note}
+            </span>
+          )}
         </h2>
 
-        {total > 0 && (
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[14px]">
-            {profiles.length > 0 && (
-              <label className="flex items-center gap-2">
-                <span className="text-ink-500">Индекс</span>
-                <ProfilePicker sp={sp} profiles={profiles} value={profileKey} />
-              </label>
-            )}
+        {/*
+           `ml-auto` держит правую группу у правого края и тогда, когда
+           она перенеслась на свою строку: `justify-between` действует
+           внутри строки, и перенесённая начиналась бы слева — кнопка
+           «Загрузить данные» оказывалась посреди пустоты, а не там,
+           где её ищут глазами.
+        */}
+        <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-2 text-[14px]">
+          {total > 0 && profiles.length > 0 && (
+            <label className="flex items-center gap-2">
+              <span className="text-ink-500">Индекс</span>
+              <ProfilePicker sp={sp} profiles={profiles} value={profileKey} />
+            </label>
+          )}
 
+          {total > 0 && (
             <label className="flex items-center gap-2">
               <span className="text-ink-500">Порядок</span>
               <SortPicker sp={sp} value={sort} withProfile={profiles.length > 0 && Boolean(profileKey) && profileKey !== 'none'} />
             </label>
-          </div>
-        )}
+          )}
+
+          {actions}
+        </div>
       </div>
 
       {chips.length > 0 && (
@@ -107,7 +167,7 @@ export function ResultsBar({
           ))}
 
           <Link
-            href="/#results"
+            href={resetHref}
             className="rounded-lg px-2 py-1.5 text-[13px] text-ink-500 underline underline-offset-4 hover:text-ink-900"
           >
             Сбросить всё

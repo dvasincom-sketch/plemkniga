@@ -73,6 +73,7 @@ export function AnimalTable({
   emptyText = 'По заданным условиям животных не найдено',
   indexLabel,
   indexValues,
+  selectable = false,
 }: {
   animals: Animal[]
   startIndex?: number
@@ -84,6 +85,20 @@ export function AnimalTable({
   indexLabel?: string
   /** Значение индекса по id животного. */
   indexValues?: Record<number, number>
+  /**
+   * Показывать колонку с галочками.
+   *
+   * Сами галочки — обычные `input` без состояния: их считает и обнуляет
+   * клиентская обёртка `HerdSelection` обработчиком на форме. Так таблица
+   * остаётся серверной. Сделать её клиентской ради отметок значило бы
+   * тащить на клиент четырнадцать колонок, справочники и разбор замка —
+   * ради того, чтобы посчитать поставленные галочки.
+   *
+   * В значении — индивидуальный номер, а не идентификатор: отмеченное
+   * уходит в форму ссылки на просмотр, а та работает номерами, потому что
+   * номерами живёт хозяйство.
+   */
+  selectable?: boolean
 }) {
   const COLUMNS = columnsFor(indexLabel)
 
@@ -92,6 +107,27 @@ export function AnimalTable({
       <table className="data-table w-full">
         <thead>
           <tr>
+            {selectable && (
+              /*
+                 Галочка «все» стоит в шапке столбца, а не отдельной кнопкой
+                 над таблицей: отмечают взглядом по столбцу, и переключатель
+                 всего столбца должен быть его началом.
+
+                 Состояние ей ставит `HerdSelection` — отмечена, когда
+                 отмечены все, и в промежуточном виде, когда часть.
+                 Промежуточный вид (`indeterminate`) через разметку задать
+                 нельзя, только из кода, поэтому здесь стоит только
+                 сам переключатель.
+              */
+              <th className="w-8 pr-0">
+                <input
+                  type="checkbox"
+                  name="pick-all"
+                  className="checkbox"
+                  aria-label="Отметить все записи на странице"
+                />
+              </th>
+            )}
             {COLUMNS.map((c) => (
               <th key={c.key} className={`whitespace-normal ${c.hide ?? ''}`}>
                 {c.label}
@@ -104,7 +140,7 @@ export function AnimalTable({
             /* is-empty снимает со строки подсветку и курсор-руку:
                нажимать здесь не на что */
             <tr className="is-empty">
-              <td colSpan={COLUMNS.length} className="py-10 text-center text-ink-500">
+              <td colSpan={COLUMNS.length + (selectable ? 1 : 0)} className="py-10 text-center text-ink-500">
                 {emptyText}
               </td>
             </tr>
@@ -121,6 +157,20 @@ export function AnimalTable({
               // Адрес строки читает обработчик таблицы; сама ссылка
               // остаётся в ячейке с номером
               <tr key={a.id} data-href={`/animals/${a.id}`}>
+                {selectable && (
+                  /* Строка кликабельна целиком, но галочку это не задевает:
+                     обработчик `TableRowNav` пропускает клики по `input`
+                     мимо себя — там же, где по ссылкам и кнопкам */
+                  <td className="w-8 pr-0">
+                    <input
+                      type="checkbox"
+                      name="pick"
+                      value={String(a.identNumber ?? '')}
+                      className="checkbox"
+                      aria-label={`Отметить ${a.name ?? a.identNumber}`}
+                    />
+                  </td>
+                )}
                 <td className="tabular-nums">{startIndex + i + 1}</td>
                 <td className="w-6 pl-0 pr-0">
                   {locked && <LockHint href={`/animals/${a.id}`} text={LOCK_HINT} />}
