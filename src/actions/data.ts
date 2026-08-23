@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { parseCsv } from '@/lib/csv'
+import { columnsOf, datasetByKey, headerMapOf, type Dataset } from '@/lib/import-format'
 
 export type ImportState = {
   error?: string
@@ -10,36 +11,28 @@ export type ImportState = {
   updated?: number
   skipped?: number
   ok?: boolean
+  /** Какой набор загружали — чтобы сообщение говорило о нём, а не «о данных». */
+  dataset?: string
   /** Пакет загрузки, заведённый этим импортом. */
   submissionId?: number | string
   submissionNumber?: string
   /** Непринятые строки с причинами — чтобы «пропущено 4» можно было понять. */
   issues?: { row: number; ident?: string; reason: string }[]
+  /**
+   * Заголовки, которых система не знает.
+   *
+   * Раньше такие колонки молча пропадали: файл принимался, данные из них
+   * не записывались, и человек узнавал об этом через месяц, не найдя
+   * в карточках того, что точно грузил. Теперь они названы сразу.
+   */
+  unknownColumns?: string[]
+  /** Значения, которых не нашлось в справочниках, — порода и стадо. */
+  unresolved?: string[]
 }
 
-/** Заголовки CSV, которые понимает импорт (регистр не важен). */
-const MAP: Record<string, string> = {
-  'инд.№': 'identNumber',
-  'инд№': 'identNumber',
-  'индивидуальный номер': 'identNumber',
-  identnumber: 'identNumber',
-  кличка: 'name',
-  name: 'name',
-  пол: 'sex',
-  sex: 'sex',
-  'дата рождения': 'birthDate',
-  birthdate: 'birthDate',
-  возраст: 'ageGroup',
-  состояние: 'state',
-  'удой': 'milkYield',
-  'удой, л': 'milkYield',
-  'жир, %': 'fatPercent',
-  'белок, %': 'proteinPercent',
-  'жир, кг': 'fatKg',
-  'белок, кг': 'proteinKg',
-  ипц: 'ipc',
-  ipc: 'ipc',
-}
+/* ------------------------------------------------------------------ */
+/*  Разбор значений                                                    */
+/* ------------------------------------------------------------------ */
 
 const numOrUndef = (v?: string) => {
   if (!v) return undefined
@@ -54,63 +47,137 @@ const sexOf = (v?: string) => {
   return undefined
 }
 
-export async function importAnimalsAction(
-  _prev: ImportState,
-  formData: FormData,
-): Promise<ImportState> {
-  const user = await getCurrentUser()
-  if (!user) return { error: 'Требуется авторизация' }
+/**
+ * Дата в двух видах: 2023-04-17 и 17.04.2023.
+ *
+ * `Date.parse` разбирает первый и врёт на втором: 17.04.2023 он либо
+ * не поймёт, либо поймёт по американскому порядку. Русское написание
+ * в выгрузках из «Селэкса» — обычное дело, и молча принять его неверно
+ * хуже, чем не принять вовсе.
+ */
+const dateOrUndef = (v?: string): string | undefined => {
+  const s = (v || '').trim()
+  if (!s) return undefined
 
-  const orgId =
-    typeof user.organization === 'object' && user.organization
-      ? user.organization.id
-      : (user.organization as number | undefined)
-  if (!orgId) return { error: 'У пользователя не заполнена организация' }
+  const ru = /^(\d{2})[.](\d{2})[.](\d{4})$/.exec(s)
+  if (ru) return new Date(`${ru[3]}-${ru[2]}-${ru[1]}T00:00:00.000Z`).toISOString()
 
-  const file = formData.get('file')
-  if (!(file instanceof File) || file.size === 0) return { error: 'Выберите CSV-файл' }
-  if (file.size > 8 * 1024 * 1024) return { error: 'Файл больше 8 МБ' }
+  const t = Date.parse(s)
+  return Number.isNaN(t) ? undefined : new Date(t).toISOString()
+}
 
-  const rows = parseCsv(await file.text())
-  if (rows.length < 2) return { error: 'В файле нет строк с данными' }
+/** Значение по пути вида `summary.milkYield` — с созданием вложенных объектов. */
+const assign = (target: Record<string, unknown>, path: string, value: unknown) => {
+  if (value === undefined) return
+  const parts = path.split('.')
+  let node = target
+  for (const key of parts.slice(0, -1)) {
+    if (typeof node[key] !== 'object' || node[key] === null) node[key] = {}
+    node = node[key] as Record<string, unknown>
+  }
+  node[parts[parts.length - 1]!] = value
+}
 
-  const header = rows[0].map((h) => MAP[h.trim().toLowerCase()] ?? h.trim())
-  const idIdx = header.indexOf('identNumber')
-  if (idIdx === -1)
-    return { error: 'В файле не найдена колонка «Инд.№» (identNumber)' }
+const norm = (v: string) => v.trim().toLowerCase()
 
-  const payload = await getClient()
+/** Номера животных сравниваются без учёта разделителей и регистра. */
+const identKey = (v: string) => v.replace(/[^0-9a-zA-Zа-яА-Я]/g, '').toUpperCase()
+
+/* ------------------------------------------------------------------ */
+
+type Row = string[]
+type Reader = (key: string) => string | undefined
+
+const readerFor = (header: string[], row: Row): Reader => (key) => {
+  const idx = header.indexOf(key)
+  return idx === -1 ? undefined : row[idx]?.trim()
+}
+
+/**
+ * Разбор файла и заголовка — общая часть всех наборов.
+ *
+ * Неизвестные колонки не отбрасываются молча: они собираются
+ * и возвращаются человеку. «Файл принят» при потерянной колонке — это
+ * ложь, из-за которой данные считаются загруженными, а их нет.
+ */
+function readFile(text: string, ds: Dataset) {
+  const rows = parseCsv(text)
+  if (rows.length < 2)
+    return { error: 'В файле нет строк с данными' as const, unknownColumns: [] as string[] }
+
+  const map = headerMapOf(ds)
+  const rawHeader = rows[0].map((h) => h.trim())
+  const header = rawHeader.map((h) => map[norm(h)] ?? '')
+  const unknownColumns = rawHeader.filter((h, i) => h !== '' && header[i] === '')
+
+  const required = columnsOf(ds).filter((c) => c.required)
+  const missing = required.filter((c) => !header.includes(c.key))
+
+  if (missing.length) {
+    return {
+      error: `В файле не найдены обязательные колонки: ${missing
+        .map((c) => `«${c.title}»`)
+        .join(', ')}. Скачайте шаблон, чтобы свериться`,
+      unknownColumns,
+    }
+  }
+
+  return { rows, header, unknownColumns }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Животные                                                           */
+/* ------------------------------------------------------------------ */
+
+async function importAnimals(
+  payload: Awaited<ReturnType<typeof getClient>>,
+  user: { id: number },
+  orgId: number,
+  ds: Dataset,
+  rows: Row[],
+  header: string[],
+) {
+  const cols = columnsOf(ds)
+
+  /*
+   * Справочники загружаются один раз на весь файл, а не на строку.
+   * Пять тысяч строк — это пять тысяч запросов «найди породу по названию»,
+   * и разбор файла упёрся бы не в разбор, а в справочник.
+   */
+  const [breedList, herdList] = await Promise.all([
+    header.includes('breed')
+      ? payload.find({ collection: 'breeds', limit: 500, depth: 0, overrideAccess: true })
+      : Promise.resolve({ docs: [] as { id: number; name: string }[] }),
+    header.includes('herd')
+      ? payload.find({
+          collection: 'herds',
+          where: { organization: { equals: orgId } },
+          limit: 500,
+          depth: 0,
+          overrideAccess: true,
+        })
+      : Promise.resolve({ docs: [] as { id: number; name: string }[] }),
+  ])
+
+  const breeds = new Map(breedList.docs.map((b) => [norm(b.name), b.id as number]))
+  const herds = new Map(herdList.docs.map((h) => [norm(h.name), h.id as number]))
+  const unresolved = new Set<string>()
+
   let created = 0
   let updated = 0
-  let skipped = 0
-  /*
-   * Записи, которых коснулся файл. Нужны пакету: проверка Ассоциации
-   * и последующая публикация касаются именно их, а не всего стада.
-   */
   const touched: number[] = []
-  /*
-   * Причины отказа. Проверки живут в коллекции животных — формат номера,
-   * даты, родословная, — и сообщение об ошибке возникает ровно здесь,
-   * в момент разбора строки. Не записав его сейчас, мы теряем его совсем
-   * и оставляем человека с числом «пропущено 4» без объяснения.
-   * Первых пятидесяти хватает: дальше это уже не разбор, а другой файл.
-   */
   const issues: { row: number; ident?: string; reason: string }[] = []
+  let skipped = 0
   const skip = (line: number, reason: string, ident?: string) => {
     skipped++
     if (issues.length < 50) issues.push({ row: line, ident, reason })
   }
 
   for (const [i, row] of rows.slice(1).entries()) {
-    // Номер строки, как его видит человек в редакторе: заголовок — первая
     const line = i + 2
+    const get = readerFor(header, row)
 
-    const get = (key: string) => {
-      const idx = header.indexOf(key)
-      return idx === -1 ? undefined : row[idx]?.trim()
-    }
-
-    const identNumber = row[idIdx]?.trim()
+    const identNumber = get('identNumber')
     if (!identNumber) {
       skip(line, 'Пустой индивидуальный номер')
       continue
@@ -118,21 +185,45 @@ export async function importAnimalsAction(
 
     const data: Record<string, unknown> = {
       identNumber,
-      name: get('name') || undefined,
-      sex: sexOf(get('sex')) ?? 'female',
       owner: orgId,
       author: user.id,
-      ipc: numOrUndef(get('ipc')),
-      summary: {
-        milkYield: numOrUndef(get('milkYield')),
-        fatPercent: numOrUndef(get('fatPercent')),
-        proteinPercent: numOrUndef(get('proteinPercent')),
-        fatKg: numOrUndef(get('fatKg')),
-        proteinKg: numOrUndef(get('proteinKg')),
-      },
+      /*
+       * Пол по умолчанию — женский. Правило старое и небезобидное: файл
+       * с быками без колонки «Пол» молча заводит их коровами. Убрать
+       * умолчание нельзя (большинство файлов — коровы и колонки не имеют),
+       * поэтому оговорка вынесена в описание формата и в шаблон.
+       */
+      sex: sexOf(get('sex')) ?? 'female',
     }
-    const birthDate = get('birthDate')
-    if (birthDate && !Number.isNaN(Date.parse(birthDate))) data.birthDate = new Date(birthDate).toISOString()
+
+    for (const col of cols) {
+      if (col.key === 'identNumber' || col.key === 'sex') continue
+      const raw = get(col.key)
+      if (raw === undefined || raw === '') continue
+
+      switch (col.kind) {
+        case 'number':
+          assign(data, col.key, numOrUndef(raw))
+          break
+        case 'date':
+          assign(data, col.key, dateOrUndef(raw))
+          break
+        case 'breed': {
+          const id = breeds.get(norm(raw))
+          if (id) assign(data, col.key, id)
+          else unresolved.add(`порода «${raw}»`)
+          break
+        }
+        case 'herd': {
+          const id = herds.get(norm(raw))
+          if (id) assign(data, col.key, id)
+          else unresolved.add(`стадо «${raw}»`)
+          break
+        }
+        default:
+          assign(data, col.key, raw)
+      }
+    }
 
     try {
       const existing = await payload.find({
@@ -184,15 +275,247 @@ export async function importAnimalsAction(
     }
   }
 
+  return { created, updated, skipped, issues, touched, unresolved: [...unresolved].slice(0, 20) }
+}
+
+/* ------------------------------------------------------------------ */
+/*  События: отёлы, осеменения, дойки                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Загрузка событий устроена иначе, чем загрузка животных, и разница
+ * не техническая.
+ *
+ * Файл животных **заводит** карточки: номера, которого нет, ещё не было,
+ * и это нормально. Файл событий карточек не заводит — он привязывает
+ * запись к уже существующему животному. Номер, которого нет в стаде, тут
+ * не «новое животное», а ошибка: событие уйдёт не туда либо повиснет
+ * на пустой карточке, которую никто не заполнит.
+ *
+ * Поэтому животные разрешаются одним запросом до разбора строк, и строка
+ * с ненайденным номером отклоняется с понятной причиной.
+ */
+async function importEvents(
+  payload: Awaited<ReturnType<typeof getClient>>,
+  user: { id: number },
+  orgId: number,
+  ds: Dataset,
+  rows: Row[],
+  header: string[],
+) {
+  const cols = columnsOf(ds)
+  const body = rows.slice(1)
+
+  /* --- Свои животные: разрешаются одним запросом на весь файл --- */
+
+  const wanted = new Set<string>()
+  for (const row of body) {
+    const v = readerFor(header, row)('animal')
+    if (v) wanted.add(identKey(v))
+  }
+
+  const mine = new Map<string, { id: number; sex?: string | null }>()
+  if (wanted.size) {
+    const { docs } = await payload.find({
+      collection: 'animals',
+      where: { owner: { equals: orgId } },
+      limit: 20_000,
+      depth: 0,
+      overrideAccess: true,
+    })
+    for (const a of docs) {
+      const k = identKey(a.identNumber)
+      if (wanted.has(k)) mine.set(k, { id: a.id as number, sex: a.sex })
+    }
+  }
+
+  /* --- Быки: ищутся по всей книге, семя чаще всего привозное --- */
+
+  const bulls = new Map<string, number>()
+  if (header.includes('bull')) {
+    const wantedBulls = new Set<string>()
+    for (const row of body) {
+      const v = readerFor(header, row)('bull')
+      if (v) wantedBulls.add(identKey(v))
+    }
+    if (wantedBulls.size) {
+      const { docs } = await payload.find({
+        collection: 'animals',
+        where: { sex: { equals: 'male' } },
+        limit: 20_000,
+        depth: 0,
+        overrideAccess: true,
+      })
+      for (const a of docs) {
+        const k = identKey(a.identNumber)
+        if (wantedBulls.has(k)) bulls.set(k, a.id as number)
+      }
+    }
+  }
+
+  /* --- Номера отёлов: считаются от того, что уже записано --- */
+
+  const nextCalving = new Map<number, number>()
+  if (ds.key === 'calvings' || ds.key === 'inseminations' || ds.key === 'milkTests') {
+    const ids = [...mine.values()].map((a) => a.id)
+    if (ids.length) {
+      const { docs } = await payload.find({
+        collection: 'calvings',
+        where: { animal: { in: ids } },
+        limit: 20_000,
+        sort: 'number',
+        depth: 0,
+        overrideAccess: true,
+      })
+      for (const c of docs) {
+        const aid = typeof c.animal === 'object' && c.animal ? (c.animal as { id: number }).id : (c.animal as number)
+        if (!aid) continue
+        const cur = nextCalving.get(aid) ?? 0
+        const num = typeof c.number === 'number' ? c.number : cur + 1
+        nextCalving.set(aid, Math.max(cur, num))
+      }
+    }
+  }
+
+  const collection =
+    ds.key === 'calvings' ? 'calvings' : ds.key === 'inseminations' ? 'inseminations' : 'milk-tests'
+
+  let created = 0
+  let skipped = 0
+  const touched = new Set<number>()
+  const issues: { row: number; ident?: string; reason: string }[] = []
+  const skip = (line: number, reason: string, ident?: string) => {
+    skipped++
+    if (issues.length < 50) issues.push({ row: line, ident, reason })
+  }
+
+  for (const [i, row] of body.entries()) {
+    const line = i + 2
+    const get = readerFor(header, row)
+
+    const rawIdent = get('animal')
+    if (!rawIdent) {
+      skip(line, 'Не указан номер животного')
+      continue
+    }
+
+    const animal = mine.get(identKey(rawIdent))
+    if (!animal) {
+      skip(line, 'Животного с таким номером нет в вашем стаде', rawIdent)
+      continue
+    }
+
+    const date = dateOrUndef(get('date'))
+    if (!date) {
+      skip(line, 'Дата не заполнена или не разобрана', rawIdent)
+      continue
+    }
+    if (new Date(date).getTime() > Date.now()) {
+      skip(line, 'Дата в будущем', rawIdent)
+      continue
+    }
+
+    const data: Record<string, unknown> = { animal: animal.id, date }
+
+    for (const col of cols) {
+      if (['animal', 'date', 'bull'].includes(col.key)) continue
+      const raw = get(col.key)
+      if (raw === undefined || raw === '') continue
+      assign(data, col.key, col.kind === 'number' ? numOrUndef(raw) : col.kind === 'date' ? dateOrUndef(raw) : raw)
+    }
+
+    if (ds.key === 'calvings') {
+      if (animal.sex === 'male') {
+        skip(line, 'Отёл записывается корове, а не быку', rawIdent)
+        continue
+      }
+      if (typeof data.number !== 'number') {
+        const next = (nextCalving.get(animal.id) ?? 0) + 1
+        data.number = next
+        nextCalving.set(animal.id, next)
+      }
+    }
+
+    if (ds.key === 'inseminations') {
+      if (animal.sex === 'male') {
+        skip(line, 'Осеменяют корову или тёлку, а не быка', rawIdent)
+        continue
+      }
+      const rawBull = get('bull')
+      const bullId = rawBull ? bulls.get(identKey(rawBull)) : undefined
+      if (bullId) data.bull = bullId
+      data.lactationNumber = (nextCalving.get(animal.id) ?? 0) + 1
+      data.source = 'import'
+    }
+
+    if (ds.key === 'milkTests') {
+      if (typeof data.lactationNumber !== 'number') {
+        const done = nextCalving.get(animal.id) ?? 0
+        if (done) data.lactationNumber = done
+      }
+      data.source = 'import'
+    }
+
+    try {
+      await payload.create({
+        collection: collection as never,
+        data: data as never,
+        overrideAccess: true,
+        user,
+      })
+      touched.add(animal.id)
+      created++
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      skip(line, message.slice(0, 200) || 'Запись не сохранилась', rawIdent)
+    }
+  }
+
+  return { created, updated: 0, skipped, issues, touched: [...touched], unresolved: [] as string[] }
+}
+
+/* ------------------------------------------------------------------ */
+
+export async function importDataAction(
+  _prev: ImportState,
+  formData: FormData,
+): Promise<ImportState> {
+  const user = await getCurrentUser()
+  if (!user) return { error: 'Требуется авторизация' }
+
+  const orgId =
+    typeof user.organization === 'object' && user.organization
+      ? user.organization.id
+      : (user.organization as number | undefined)
+  if (!orgId) return { error: 'У пользователя не заполнена организация' }
+
+  const ds = datasetByKey(String(formData.get('kind') || 'animals'))
+  if (!ds) return { error: 'Неизвестный вид данных' }
+
+  const file = formData.get('file')
+  if (!(file instanceof File) || file.size === 0) return { error: 'Выберите файл' }
+  if (file.size > 8 * 1024 * 1024) return { error: 'Файл больше 8 МБ' }
+
+  const parsed = readFile(await file.text(), ds)
+  if ('error' in parsed) {
+    return { error: parsed.error, unknownColumns: parsed.unknownColumns, dataset: ds.label }
+  }
+
+  const payload = await getClient()
+  const actor = { id: user.id as number }
+
+  const res =
+    ds.key === 'animals'
+      ? await importAnimals(payload, actor, orgId, ds, parsed.rows, parsed.header)
+      : await importEvents(payload, actor, orgId, ds, parsed.rows, parsed.header)
+
   /*
    * Пакет загрузки — не бюрократия, а условие доверия к данным.
    *
    * Записи попадают в стадо сразу: это данные владельца, и держать их
    * взаперти до чужой проверки незачем. Но уровень достоверности у них
    * остаётся черновиком, пока Ассоциация не посмотрит пакет и владелец
-   * не согласится с результатом. Раньше пакета из импорта не возникало
-   * вовсе, и «проверено Ассоциацией» было обещанием, которое система
-   * не могла выполнить: поднять уровень было нечем и не на чём.
+   * не согласится с результатом.
    *
    * Сбой на этом шаге не отменяет уже загруженные записи: данные важнее
    * сопроводительной записи о них, и терять их из-за неё нельзя.
@@ -216,14 +539,20 @@ export async function importAnimalsAction(
       collection: 'data-submissions',
       overrideAccess: true,
       data: {
-        kind: 'animals',
+        kind: ds.submissionKind,
         status: 'uploaded',
         organization: orgId,
         submittedBy: user.id,
         submittedAt: new Date().toISOString(),
         sourceFile: media.id,
-        animals: touched,
-        intake: { rows: rows.length - 1, created, updated, skipped, issues },
+        animals: res.touched,
+        intake: {
+          rows: parsed.rows.length - 1,
+          created: res.created,
+          updated: res.updated,
+          skipped: res.skipped,
+          issues: res.issues,
+        },
         consent: { agreed: false },
       },
     })
@@ -235,5 +564,16 @@ export async function importAnimalsAction(
   }
 
   revalidatePath('/account')
-  return { ok: true, created, updated, skipped, submissionId, submissionNumber, issues }
+  return {
+    ok: true,
+    dataset: ds.label,
+    created: res.created,
+    updated: res.updated,
+    skipped: res.skipped,
+    submissionId,
+    submissionNumber,
+    issues: res.issues,
+    unknownColumns: parsed.unknownColumns,
+    unresolved: res.unresolved,
+  }
 }

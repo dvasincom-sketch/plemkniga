@@ -1,9 +1,30 @@
 'use client'
 
 import Link from 'next/link'
-
 import { useActionState, useState } from 'react'
-import { importAnimalsAction, type ImportState } from '@/actions/data'
+import { importDataAction, type ImportState } from '@/actions/data'
+import { Select } from '@/components/Select'
+
+/**
+ * Загрузка файлом — одна карточка на четыре набора данных.
+ *
+ * ## Что изменилось
+ *
+ * Раньше карточка принимала только животных, а подписана была «добавление
+ * животных и отправка событий» — событий она не принимала никогда.
+ * Теперь наборов четыре: животные, отёлы, осеменения и контрольные дойки.
+ *
+ * Вид данных выбирается **до** файла, а не угадывается по его содержимому.
+ * Угадывание здесь было бы вредным: файл отёлов и файл доек различаются
+ * одной колонкой, и ошибка угадывания означала бы тысячу записей не в той
+ * таблице — а вытащить их обратно нечем.
+ *
+ * ## Шаблон здесь, и только здесь
+ *
+ * Ссылка на шаблон меняется вместе с выбранным набором. Держать её ещё
+ * и отдельной карточкой наверху страницы значило бы дважды предлагать одно
+ * действие, причём наверху — без выбора набора, то есть всегда для животных.
+ */
 
 const DocIcon = () => (
   <svg width="92" height="80" viewBox="0 0 92 80" fill="none" aria-hidden="true">
@@ -12,23 +33,33 @@ const DocIcon = () => (
     {[0, 1, 2, 3, 4, 5].map((i) => (
       <rect key={i} x="24" y={24 + i * 8} width={i % 2 ? 28 : 36} height="4" rx="2" fill="#c9c9c9" />
     ))}
-    <path d="M74 34v26m0 0-9-9m9 9 9-9" stroke="#9a9a9a" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+    <path
+      d="M74 34v26m0 0-9-9m9 9 9-9"
+      stroke="#9a9a9a"
+      strokeWidth="5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
   </svg>
 )
 
-export function ImportCard() {
-  const [state, formAction, pending] = useActionState<ImportState, FormData>(
-    importAnimalsAction,
-    {},
-  )
+type Choice = { value: string; label: string }
+
+export function ImportCard({ datasets }: { datasets: (Choice & { hint: string })[] }) {
+  const [state, formAction, pending] = useActionState<ImportState, FormData>(importDataAction, {})
   const [open, setOpen] = useState(false)
   const [fileName, setFileName] = useState('')
+  const [kind, setKind] = useState(datasets[0]?.value ?? 'animals')
+
+  const current = datasets.find((d) => d.value === kind)
 
   return (
     <div className="card flex items-start justify-between gap-4">
       <div className="min-w-0 flex-1">
         <h3 className="text-[21px] font-medium">Импорт данных</h3>
-        <p className="mt-1.5 text-[13px] text-ink-500">Добавление животных и отправка событий</p>
+        <p className="mt-1.5 text-[13px] text-ink-500">
+          Массовая загрузка из файла: животные, отёлы, осеменения, дойки
+        </p>
 
         <form action={formAction} className="mt-5">
           <button
@@ -67,33 +98,86 @@ export function ImportCard() {
 
           {open && (
             <div className="mt-4 space-y-3">
+              {/*
+                 Вид данных первым: от него зависит и набор колонок,
+                 и шаблон, и то, куда лягут строки. Выбирать его после
+                 файла значит выбирать вслепую.
+              */}
+              {/*
+                 `div`, а не `label`, и это не вкусовщина. `Select` у нас
+                 свой: триггер — кнопка, варианты — кнопки рядом. Клик
+                 по варианту внутри метки браузер переадресует на её элемент
+                 управления, то есть на тот же триггер, и он открывает список
+                 обратно сразу после того, как выбор его закрыл. Со стороны
+                 это выглядит как «список не закрывается».
+              */}
+              <div className="block text-[14px]">
+                <span className="mb-1.5 block text-ink-700">Что загружаем</span>
+                <input type="hidden" name="kind" value={kind} />
+                <Select
+                  name="kindPicker"
+                  options={datasets.map((d) => ({ value: d.value, label: d.label }))}
+                  defaultValue={kind}
+                  placeholder=""
+                  onLight
+                  onChange={setKind}
+                  ariaLabel="Что загружаем"
+                />
+              </div>
+
+              {current && <p className="text-[13px] leading-snug text-ink-500">{current.hint}</p>}
+
               <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-ink-300 px-4 py-3 text-sm text-ink-700 hover:border-brand-400">
                 <input
                   type="file"
                   name="file"
-                  accept=".csv,text/csv"
+                  accept=".csv,.txt,text/csv,text/plain"
                   className="sr-only"
                   onChange={(e) => setFileName(e.target.files?.[0]?.name ?? '')}
                 />
-                <span className="truncate">{fileName || 'Выберите CSV-файл…'}</span>
+                <span className="truncate">{fileName || 'Выберите файл CSV или TXT…'}</span>
               </label>
 
+              {/*
+                 Раньше здесь перечислялись восемь колонок из двадцати с лишним,
+                 и перечень отставал от разбора: «Возраст» и «Состояние» система
+                 принимала, а подсказка о них молчала. Список переехал в таблицу
+                 на странице и собирается из того же реестра, что и разбор.
+              */}
               <p className="text-xs leading-relaxed text-ink-500">
-                Ожидаемые колонки: <code>Инд.№</code>, <code>Кличка</code>, <code>Пол</code>,{' '}
-                <code>Дата рождения</code>, <code>Удой, л</code>, <code>Жир, %</code>,{' '}
-                <code>Белок, %</code>, <code>ИПЦ</code>. Разделитель — точка с запятой.
+                Разделитель «точка с запятой» или запятая, кодировка UTF-8, до 8 МБ.{' '}
+                <a
+                  href={`/account/import/template?kind=${kind}`}
+                  download
+                  className="underline underline-offset-4"
+                >
+                  Скачать шаблон
+                </a>{' '}
+                — в нём правильные заголовки и строка с примером; её перед загрузкой удалите.
+                Полный список колонок — в таблице ниже.
               </p>
 
               <button type="submit" className="btn btn-forest" disabled={pending}>
                 {pending ? 'Загружаем…' : 'Импортировать'}
               </button>
 
-              {state.error && <p className="text-sm text-red-700">{state.error}</p>}
+              {state.error && (
+                <div className="text-sm text-red-700">
+                  <p>{state.error}</p>
+                  {!!state.unknownColumns?.length && (
+                    <p className="mt-1 leading-snug text-ink-700">
+                      В файле распознаны не все заголовки:{' '}
+                      {state.unknownColumns.map((c) => `«${c}»`).join(', ')}
+                    </p>
+                  )}
+                </div>
+              )}
+
               {state.ok && (
                 <div className="text-sm text-forest-600">
                   <p>
-                    Готово: создано {state.created}, обновлено {state.updated}, пропущено{' '}
-                    {state.skipped}
+                    {state.dataset ? `${state.dataset}: ` : ''}создано {state.created}
+                    {state.updated ? `, обновлено ${state.updated}` : ''}, пропущено {state.skipped}
                   </p>
 
                   {/*
@@ -130,6 +214,32 @@ export function ImportCard() {
                       )}
                     </div>
                   )}
+
+                  {/*
+                     Неизвестные колонки — не придирка, а потеря данных.
+                     Файл принят, строки записаны, но содержимое этих колонок
+                     не попало никуда.
+                  */}
+                  {!!state.unknownColumns?.length && (
+                    <div className="mt-2 rounded-lg border border-ink-200 bg-ink-50 px-3 py-2 text-ink-700">
+                      <p className="font-medium">Колонки не распознаны и не записаны:</p>
+                      <p className="mt-1 leading-snug">
+                        {state.unknownColumns.map((c) => `«${c}»`).join(', ')}
+                      </p>
+                      <p className="mt-1 text-ink-500">Сверьте заголовки с таблицей ниже.</p>
+                    </div>
+                  )}
+
+                  {!!state.unresolved?.length && (
+                    <div className="mt-2 rounded-lg border border-ink-200 bg-ink-50 px-3 py-2 text-ink-700">
+                      <p className="font-medium">Не нашлись в справочниках:</p>
+                      <p className="mt-1 leading-snug">{state.unresolved.join(', ')}</p>
+                      <p className="mt-1 text-ink-500">
+                        Строки записаны, эти значения пропущены.
+                      </p>
+                    </div>
+                  )}
+
                   {/*
                      Ссылка на пакет — не украшение: загруженные записи остаются
                      черновиком, пока Ассоциация не проверит пакет, и человек
