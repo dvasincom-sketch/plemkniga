@@ -135,7 +135,16 @@ export function ColumnReference({ datasets }: { datasets: ReferenceDataset[] }) 
         id={`${baseId}-panel-${current.key}`}
         aria-labelledby={`${baseId}-tab-${current.key}`}
         tabIndex={0}
-        className="pt-7"
+        /*
+           Отступ от переключателя больше, чем кажется нужным по числу.
+           Под вкладками стоит не блок, а тонкая строка серого текста,
+           и она льнёт к плашкам: между кнопкой и мелким шрифтом граница
+           читается слабее, чем между кнопкой и карточкой. Двадцать восемь
+           пикселей, которых хватало карточкам на соседней странице,
+           здесь выглядели прижатыми — счёт идёт по восприятию,
+           а не по числу в классе.
+        */
+        className="pt-10"
       >
         <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
           <p className="max-w-[80ch] text-[14px] leading-relaxed text-ink-500">{current.hint}</p>
@@ -148,7 +157,7 @@ export function ColumnReference({ datasets }: { datasets: ReferenceDataset[] }) 
           </a>
         </div>
 
-        <div className="mt-6 space-y-10">
+        <div className="mt-8 space-y-10">
           {current.groups.map((group) => (
             <div key={group.key} className="pt-1">
               {current.groups.length > 1 && (

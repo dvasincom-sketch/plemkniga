@@ -1226,7 +1226,7 @@ export interface VerificationRequest {
    * Присваивается автоматически
    */
   number?: string | null;
-  status: 'new' | 'checking' | 'approved' | 'rejected';
+  status: 'new' | 'checking' | 'approved' | 'rejected' | 'cancelled';
   purpose?: ('trust' | 'certificate' | 'membership') | null;
   organization?: (number | null) | Organization;
   requestedBy?: (number | null) | User;
@@ -1236,6 +1236,11 @@ export interface VerificationRequest {
    * Что хозяйство хочет пояснить о поданных записях
    */
   comment?: string | null;
+  withdrawnAt?: string | null;
+  /**
+   * Номер заявки, ради которой эта отозвана
+   */
+  withdrawnFor?: string | null;
   review?: {
     assignee?: (number | null) | User;
     decidedBy?: (number | null) | User;
@@ -2372,6 +2377,8 @@ export interface VerificationRequestsSelect<T extends boolean = true> {
   requestedAt?: T;
   animals?: T;
   comment?: T;
+  withdrawnAt?: T;
+  withdrawnFor?: T;
   review?:
     | T
     | {

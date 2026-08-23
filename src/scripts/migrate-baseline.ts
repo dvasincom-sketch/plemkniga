@@ -241,6 +241,11 @@ const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
     probe: { kind: 'enum-value', type: 'enum_animals_id_format', value: 'rus' },
     note: 'российский международный номер XXRUS… отдельным форматом',
   },
+  {
+    name: '20260823_230000_verification_withdrawn',
+    probe: { kind: 'column', table: 'verification_requests', column: 'withdrawn_for' },
+    note: 'отзыв заявки в пользу новой: повторная подача тех же записей',
+  },
 ]
 
 const { driverUri, uri, source, sslConfig } = resolveDatabase()

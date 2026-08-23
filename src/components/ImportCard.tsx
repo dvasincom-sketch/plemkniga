@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useActionState, useState } from 'react'
 import { importDataAction, type ImportState } from '@/actions/data'
 import { Select } from '@/components/Select'
+import { FileUploadIcon } from '@/components/CardIcons'
 
 /**
  * Загрузка файлом — одна карточка на четыре набора данных.
@@ -26,22 +27,6 @@ import { Select } from '@/components/Select'
  * действие, причём наверху — без выбора набора, то есть всегда для животных.
  */
 
-const DocIcon = () => (
-  <svg width="92" height="80" viewBox="0 0 92 80" fill="none" aria-hidden="true">
-    <rect x="8" y="6" width="52" height="66" rx="5" fill="#d6d6d6" />
-    <rect x="16" y="12" width="52" height="66" rx="5" fill="#efefef" stroke="#d0d0d0" />
-    {[0, 1, 2, 3, 4, 5].map((i) => (
-      <rect key={i} x="24" y={24 + i * 8} width={i % 2 ? 28 : 36} height="4" rx="2" fill="#c9c9c9" />
-    ))}
-    <path
-      d="M74 34v26m0 0-9-9m9 9 9-9"
-      stroke="#9a9a9a"
-      strokeWidth="5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-)
 
 type Choice = { value: string; label: string }
 
@@ -295,7 +280,7 @@ export function ImportCard({ datasets }: { datasets: (Choice & { hint: string })
         </form>
       </div>
 
-      <DocIcon />
+      <FileUploadIcon />
     </div>
   )
 }

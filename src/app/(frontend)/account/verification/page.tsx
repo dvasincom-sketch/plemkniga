@@ -9,7 +9,10 @@ import { VerificationForm } from '@/components/VerificationForm'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { denyAssociation } from '@/lib/association'
 import { relId } from '@/lib/visibility'
-import { VERIFICATION_STATUSES } from '@/collections/VerificationRequests'
+import {
+  OPEN_VERIFICATION_STATUSES,
+  VERIFICATION_STATUSES,
+} from '@/collections/VerificationRequests'
 import { labelOf } from '@/lib/dictionaries'
 import { dateRu } from '@/lib/format'
 
@@ -71,6 +74,35 @@ export default async function VerificationPage() {
       })
     : { docs: [] }
 
+  const requests = orgId
+    ? await payload.find({
+        collection: 'verification-requests',
+        where: { organization: { equals: orgId } },
+        limit: 20,
+        sort: '-requestedAt',
+        depth: 0,
+        overrideAccess: true,
+      })
+    : { docs: [] }
+
+  /*
+   * Какие записи уже ждут решения.
+   *
+   * Считается из тех же заявок, что показаны ниже, — отдельного запроса
+   * не нужно. Если запись попала в две открытые заявки (так бывало
+   * до появления этой проверки), берётся первая по свежести: показывать
+   * человеку обе значило бы объяснять ему нашу же прежнюю недоработку.
+   */
+  const openBy = new Map<number, { number: string; status: string }>()
+  for (const r of requests.docs) {
+    if (!OPEN_VERIFICATION_STATUSES.some((s) => s === r.status)) continue
+    for (const a of r.animals ?? []) {
+      const id = relId(a)
+      if (typeof id !== 'number' || openBy.has(id)) continue
+      openBy.set(id, { number: String(r.number ?? `#${r.id}`), status: String(r.status) })
+    }
+  }
+
   const rows = docs.map((a) => {
     const missing = missingOf(a)
     return {
@@ -81,18 +113,9 @@ export default async function VerificationPage() {
       trustLevel: a.trustLevel,
       ready: missing.length === 0,
       missing,
+      openRequest: openBy.get(a.id as number) ?? null,
     }
   })
-
-  const requests = orgId
-    ? await payload.find({
-        collection: 'verification-requests',
-        where: { organization: { equals: orgId } },
-        limit: 20,
-        depth: 0,
-        overrideAccess: true,
-      })
-    : { docs: [] }
 
   return (
     <>
@@ -184,7 +207,18 @@ export default async function VerificationPage() {
                           <td className="text-right tabular-nums">{(r.animals ?? []).length}</td>
                           <td>{labelOf(VERIFICATION_STATUSES, r.status)}</td>
                           <td className="text-ink-500">
-                            {r.status === 'approved' ? (
+                            {r.status === 'cancelled' ? (
+                              /*
+                                 У отозванной заключения нет и не будет —
+                                 в этой ячейке место сказать, почему она
+                                 отозвана. Иначе строка выглядит оборванной:
+                                 состояние есть, объяснения нет.
+                              */
+                              <>
+                                отозвана вами
+                                {r.withdrawnFor && <> в пользу заявки {r.withdrawnFor}</>}
+                              </>
+                            ) : r.status === 'approved' ? (
                               <>
                                 подтверждено {r.review?.approvedCount ?? 0}
                                 {held > 0 && (

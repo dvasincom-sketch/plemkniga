@@ -5,6 +5,7 @@ import { getClient, getCurrentUser } from '@/lib/payload'
 import { isAssociationUser } from '@/lib/association'
 import { relId } from '@/lib/visibility'
 import { VERIFICATION_LIMIT } from '@/lib/verification-limit'
+import { OPEN_VERIFICATION_STATUSES } from '@/collections/VerificationRequests'
 
 /**
  * Полный цикл верификации: хозяйство подаёт — Ассоциация решает.
@@ -16,7 +17,20 @@ import { VERIFICATION_LIMIT } from '@/lib/verification-limit'
  * а именно это требуется перед выпуском свидетельства.
  */
 
-export type VerificationState = { error?: string; message?: string; createdId?: number | string }
+export type VerificationState = {
+  error?: string
+  message?: string
+  createdId?: number | string
+  /**
+   * Записи, которые уже лежат в неразобранной заявке.
+   *
+   * Отдельно от `error`, потому что это не отказ по вине человека,
+   * а требование выбрать: отозвать прежнюю заявку или не подавать эту.
+   * Свалить в общий текст ошибки значило бы предложить выбор строкой,
+   * которую нечем нажать.
+   */
+  duplicates?: { number: string; status: string; idents: string[] }[]
+}
 
 /* --------------------------- Сторона хозяйства --------------------------- */
 
@@ -81,6 +95,61 @@ export async function requestVerificationAction(
   const purposeRaw = String(formData.get('purpose') || 'trust')
   const purpose = ['trust', 'certificate', 'membership'].includes(purposeRaw) ? purposeRaw : 'trust'
 
+  /*
+   * Повторная подача тех же записей.
+   *
+   * Стоила она хозяйству ничего, а Ассоциации — двойной работы: эксперт
+   * разбирает то же стадо второй раз и не знает, какая из двух заявок
+   * отражает нынешние данные. Хуже того, решения по ним могут разойтись:
+   * одна подтвердит запись, вторая задержит, и обе будут правы
+   * относительно того, что видели.
+   *
+   * Поэтому дубль не запрещён, а требует выбора: отозвать прежнюю заявку
+   * или не подавать эту. Молча отзывать нельзя — прежняя может быть уже
+   * в работе, и хозяйство должно понимать, что отменяет чужой труд.
+   * Молча пропускать тоже нельзя — именно так и накопились дубли.
+   *
+   * Проверка на сервере, а не только в форме: список приходит из браузера,
+   * а форму можно и не открывать.
+   */
+  const openStatuses = [...OPEN_VERIFICATION_STATUSES]
+  const open = await payload.find({
+    collection: 'verification-requests',
+    where: {
+      and: [{ organization: { equals: orgId } }, { status: { in: openStatuses } }],
+    },
+    limit: 100,
+    depth: 0,
+    overrideAccess: true,
+  })
+
+  const submitted = new Set(docs.map((d) => Number(d.id)))
+  const identOf = new Map(docs.map((d) => [Number(d.id), String(d.identNumber)]))
+
+  const clashes = open.docs
+    .map((r) => {
+      const hit = (r.animals ?? [])
+        .map((a) => relId(a))
+        .filter((id): id is number => typeof id === 'number' && submitted.has(id))
+      return { request: r, hit }
+    })
+    .filter((c) => c.hit.length > 0)
+
+  const supersede = String(formData.get('supersede') || '') === '1'
+
+  if (clashes.length && !supersede) {
+    return {
+      duplicates: clashes.map((c) => ({
+        number: String(c.request.number ?? `#${c.request.id}`),
+        status: String(c.request.status),
+        idents: c.hit.map((id) => identOf.get(id) ?? String(id)),
+      })),
+      error:
+        'Эти записи уже лежат в неразобранной заявке. Отзовите её или снимите записи ' +
+        'из выбора — иначе Ассоциация будет разбирать одно и то же дважды.',
+    }
+  }
+
   try {
     const created = await payload.create({
       collection: 'verification-requests',
@@ -94,6 +163,40 @@ export async function requestVerificationAction(
         comment: String(formData.get('comment') || '').trim() || undefined,
       } as never,
     })
+
+    /*
+     * Отзыв — после создания новой, а не до неё.
+     *
+     * Порядок важен: в отозванной заявке остаётся номер той, ради которой
+     * её отозвали, и до создания этого номера ещё нет. А если создание
+     * упадёт, прежняя заявка останется живой — хозяйство окажется там же,
+     * откуда начало, а не без обеих.
+     *
+     * Ошибка отзыва не отменяет поданную заявку: данные уже у Ассоциации,
+     * и терять их из-за неудавшейся уборки нельзя. Такой случай виден
+     * эксперту как две живые заявки — то есть ровно то, что было раньше,
+     * и не хуже.
+     */
+    if (supersede && clashes.length) {
+      const at = new Date().toISOString()
+      const number = String(created.number ?? `#${created.id}`)
+
+      for (const c of clashes) {
+        await payload
+          .update({
+            collection: 'verification-requests',
+            id: c.request.id,
+            overrideAccess: true,
+            data: { status: 'cancelled', withdrawnAt: at, withdrawnFor: number } as never,
+          })
+          .catch((e: unknown) => {
+            console.error(
+              `[verification] заявка ${c.request.id} не отозвалась:`,
+              e instanceof Error ? e.message : e,
+            )
+          })
+      }
+    }
 
     revalidatePath('/account')
     revalidatePath('/account/verification')

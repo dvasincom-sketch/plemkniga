@@ -28,6 +28,12 @@ import {
 import { DOCUMENT_TYPES, ROLES, eventTypeLabel, labelOf } from '@/lib/dictionaries'
 import { SubmissionHistory } from '@/components/SubmissionHistory'
 import { SubTabs } from '@/components/SubTabs'
+import {
+  FileUploadIcon,
+  HerdScanIcon,
+  RulesIcon,
+  SingleRecordIcon,
+} from '@/components/CardIcons'
 import { dateRu } from '@/lib/format'
 import { RANKING_CAP, rankByProfile } from '@/lib/index-column'
 import { indexValuesLag } from '@/lib/index-values'
@@ -549,7 +555,11 @@ async function AnimalsTab({
 
 const DATA_SUBTABS = [
   { key: 'write', label: 'Записать', hint: 'Форма события и загрузка файлом' },
-  { key: 'check', label: 'Проверка', hint: 'Свои ошибки, заявки и пакеты загрузок' },
+  {
+    key: 'check',
+    label: 'Проверка и подача',
+    hint: 'Сначала разобрать самим, потом подать в Ассоциацию',
+  },
   { key: 'feed', label: 'Лента', hint: 'Что записано за последнее время' },
 ] as const
 
@@ -585,35 +595,56 @@ async function DataTab({ sp, orgId }: { sp: SearchParams; orgId?: number }) {
 
 function DataWrite() {
   return (
+    /*
+       Карточки построены как на странице загрузки: слева текст и кнопка,
+       справа рисунок. Это не украшение и не единообразие ради него —
+       карточка «Файлом» ведёт ровно в ту карточку, которая на той странице
+       выглядит так же и с тем же рисунком. Дверь и комната должны быть
+       узнаваемы друг по другу, иначе переход читается как переход
+       в незнакомое место.
+
+       Форма — первой, файл — вторым, и порядок не случаен. Файлом грузят
+       раз в месяц отчётом, а отёл записывают в тот день, когда он случился.
+       Частое действие стоит ближе.
+    */
     <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-      {/*
-         Форма — первой, файл — вторым, и порядок не случаен. Файлом
-         грузят раз в месяц отчётом, а отёл записывают в тот день, когда
-         он случился. Частое действие стоит ближе.
-      */}
-      <div className="card">
-        <h2 className="panel-heading">По одному</h2>
-        <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
-          Отёл, осеменение, контрольная дойка, запуск, перемещение, выбытие. Сначала
-          выбираете, что произошло, потом ищете животное по номеру или кличке. Номера
-          отёла и лактации проставляются сами, а после записи форма остаётся открытой —
-          пять отёлов подряд вводятся подряд.
-        </p>
-        <Link href="/account/events/new" className="btn btn-accent mt-5">
-          Записать событие
-        </Link>
+      <div className="card flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-[21px] font-medium">По одному</h2>
+          <p className="mt-1.5 text-[13px] text-ink-500">
+            Одно событие руками, сразу после того, как оно случилось
+          </p>
+          <p className="mt-4 text-[15px] leading-relaxed text-ink-700">
+            Отёл, осеменение, контрольная дойка, запуск, перемещение, выбытие. Сначала
+            выбираете, что произошло, потом ищете животное по номеру или кличке. Номера
+            отёла и лактации проставляются сами, а после записи форма остаётся открытой —
+            пять отёлов подряд вводятся подряд.
+          </p>
+          <Link href="/account/events/new" className="btn btn-accent mt-5">
+            Записать событие
+          </Link>
+        </div>
+
+        <SingleRecordIcon />
       </div>
 
-      <div className="card">
-        <h2 className="panel-heading">Файлом</h2>
-        <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
-          Животные, отёлы, осеменения и контрольные дойки — по одному набору за раз,
-          CSV или TXT. На странице загрузки лежат шаблоны и таблица принимаемых колонок;
-          строки, которые не удалось принять, называются сразу и с причиной.
-        </p>
-        <Link href="/account/import" className="btn btn-accent mt-5">
-          Загрузить файл
-        </Link>
+      <div className="card flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-[21px] font-medium">Файлом</h2>
+          <p className="mt-1.5 text-[13px] text-ink-500">
+            Тысяча строк из доильного зала или программы техника
+          </p>
+          <p className="mt-4 text-[15px] leading-relaxed text-ink-700">
+            Животные, отёлы, осеменения и контрольные дойки — по одному набору за раз,
+            CSV или TXT. На странице загрузки лежат шаблоны и таблица принимаемых колонок;
+            строки, которые не удалось принять, называются сразу и с причиной.
+          </p>
+          <Link href="/account/import" className="btn btn-accent mt-5">
+            Загрузить файл
+          </Link>
+        </div>
+
+        <FileUploadIcon />
       </div>
     </div>
   )
@@ -636,56 +667,86 @@ async function DataCheck({ orgId }: { orgId?: number }) {
   return (
     <>
       {/*
-         Своя проверка — раньше заявки, и это главное в порядке блоков.
-         Хозяйство может разобрать свои данные само, ничего никому
-         не отправляя, и починить найденное до подачи. Обратный порядок
-         означал бы «подайте, а Ассоциация скажет, что не так» — то есть
-         чужую работу вместо своей и лишний круг ожидания.
+         Раздел открывается не карточкой, а порядком действий.
+
+         До этого здесь стояли три блока подряд, и по ним нельзя было
+         догадаться, что первый нужно делать раньше второго. Хозяйство
+         видело кнопку «Подать на верификацию» и нажимало её — а разбор
+         своих данных, который снял бы половину замечаний за минуту
+         и ничего никуда не отправляет, оставался незамеченным. Цена
+         этой незаметности не наша: заявка с ошибками занимает эксперта
+         на день и возвращается в хозяйство через неделю.
+
+         Поэтому шаги пронумерованы словами, а не подразумеваются
+         порядком блоков. Порядок блоков читают не сверху вниз,
+         а по кнопкам.
       */}
-      <section className="mt-8">
-        <h2 className="section-title mb-6">Проверить свои данные</h2>
+      <p className="mt-7 max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
+        Путь у данных один: сначала разберите их сами — это ничего никуда не отправляет, —
+        потом подайте в Ассоциацию, потом следите за отданным. Ошибка, найденная на первом
+        шаге, чинится за минуту; та же ошибка, найденная Ассоциацией, возвращается
+        к вам через неделю ожидания и занимает эксперта на день.
+      </p>
+
+      <section className="mt-9">
+        <StepTitle n={1} title="Проверить самим" note="ничего никуда не отправляется" />
+
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <div className="card">
-            <h3 className="panel-heading">Разбор стада</h3>
-            <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
-              Система пройдёт по вашим записям теми же правилами, которыми пользуется
-              эксперт Ассоциации, и покажет противоречия: невозможные даты, кровность
-              вразрез с родителями, смешанные единицы измерения. Ничего никуда
-              не отправляется — это ваш разбор для себя.
-            </p>
-            <Link href="/account/checks/herd" className="btn btn-accent mt-5">
-              Проверить моё стадо
-            </Link>
+          <div className="card flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-[21px] font-medium">Разбор стада</h3>
+              <p className="mt-1.5 text-[13px] text-ink-500">Найти противоречия у себя</p>
+              <p className="mt-4 text-[15px] leading-relaxed text-ink-700">
+                Система пройдёт по вашим записям теми же правилами, которыми пользуется
+                эксперт Ассоциации, и покажет противоречия: невозможные даты, кровность
+                вразрез с родителями, смешанные единицы измерения. Результат видите
+                только вы.
+              </p>
+              <Link href="/account/checks/herd" className="btn btn-accent mt-5">
+                Проверить моё стадо
+              </Link>
+            </div>
+
+            <HerdScanIcon />
           </div>
 
-          <div className="card">
-            <h3 className="panel-heading">Каталог правил</h3>
-            <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
-              Полный список того, что проверяется, с объяснением, почему каждое правило
-              заведено и при каких значениях срабатывает. Пороги устанавливает
-              Ассоциация — они одни на всю книгу, иначе записи разных хозяйств
-              несравнимы.
-            </p>
-            <Link href="/account/checks" className="btn btn-brand mt-5">
-              Открыть каталог
-            </Link>
+          <div className="card flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-[21px] font-medium">Каталог правил</h3>
+              <p className="mt-1.5 text-[13px] text-ink-500">По чему сверяют записи</p>
+              <p className="mt-4 text-[15px] leading-relaxed text-ink-700">
+                Полный список того, что проверяется, с объяснением, почему каждое правило
+                заведено и при каких значениях срабатывает. Пороги устанавливает
+                Ассоциация — они одни на всю книгу, иначе записи разных хозяйств
+                несравнимы.
+              </p>
+              <Link href="/account/checks" className="btn btn-brand mt-5">
+                Открыть каталог
+              </Link>
+            </div>
+
+            <RulesIcon />
           </div>
         </div>
       </section>
 
       {/*
-         Верификация стоит рядом с загрузками, потому что это второй путь
-         к тому же результату — уровню «Верифицировано ассоциацией».
+         Верификация — второй путь к уровню «Верифицировано ассоциацией».
          Загрузкой его получают записи из проверенного файла; заявкой —
          любые свои, независимо от того, когда они попали в систему.
       */}
-      <section className="mt-10">
-        <h2 className="section-title mb-6">Верификация записей</h2>
+      <section className="mt-12">
+        <StepTitle n={2} title="Подать в Ассоциацию" note="разбирает человек" />
+
         <div className="card">
           <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
-            Подайте свои записи в Ассоциацию, чтобы она подтвердила их по документам. Это
+            Подайте свои записи, чтобы Ассоциация подтвердила их по документам. Это
             не загрузка данных: подавать можно любые записи стада, в том числе те, что лежат
             в системе давно. Подтверждение требуется перед выпуском племенного свидетельства.
+          </p>
+          <p className="mt-3 max-w-[80ch] text-[14px] leading-relaxed text-ink-500">
+            Одни и те же записи дважды подавать не нужно: если они уже ждут решения,
+            система скажет об этом и предложит отозвать прежнюю заявку.
           </p>
           <Link href="/account/verification" className="btn btn-accent mt-5">
             Подать на верификацию
@@ -693,11 +754,48 @@ async function DataCheck({ orgId }: { orgId?: number }) {
         </div>
       </section>
 
-      <section className="mt-10">
-        <h2 className="section-title mb-6">История загрузок</h2>
+      <section className="mt-12">
+        <StepTitle n={3} title="Следить за отданным" note="пакеты загрузок" />
+
+        <p className="mb-6 max-w-[80ch] text-[14px] leading-relaxed text-ink-500">
+          Здесь пакеты — то, что ушло файлом. Состояние поданных заявок видно
+          на{' '}
+          <Link href="/account/verification" className="underline underline-offset-4">
+            странице верификации
+          </Link>
+          , в списке «Ваши заявки».
+        </p>
+
         <SubmissionHistory submissions={submissions.docs} />
       </section>
     </>
+  )
+}
+
+/**
+ * Заголовок шага.
+ *
+ * Номер вынесен в отдельный кружок, а не вписан в текст заголовка:
+ * «1. Проверить самим» читается как пункт списка, из которого можно
+ * выбрать любой, а вынесенный номер — как порядок, в котором идут.
+ * Разница мелкая на вид и существенная по смыслу: весь этот раздел
+ * переписан ровно затем, чтобы первый шаг перестали пропускать.
+ */
+function StepTitle({ n, title, note }: { n: number; title: string; note: string }) {
+  return (
+    <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-1">
+      <span
+        aria-hidden="true"
+        className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-forest-500 text-[14px] font-medium text-white"
+      >
+        {n}
+      </span>
+      <h2 className="section-title mb-0">
+        <span className="sr-only">Шаг {n}. </span>
+        {title}
+      </h2>
+      <span className="text-[14px] text-ink-500">— {note}</span>
+    </div>
   )
 }
 
