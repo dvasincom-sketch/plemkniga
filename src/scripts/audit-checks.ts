@@ -7,6 +7,7 @@ import { analyzeAncestry } from '@/lib/ancestry'
 import { herdIssues } from '@/lib/checks-herd'
 import { farmStats } from '@/lib/farm-stats'
 import { ALL_CHECKS, CHECKS, checkSpec, guardedChecks, type CheckCode } from '@/lib/checks-registry'
+import { trustLabel } from '@/lib/dictionaries'
 
 /**
  * Ревизия автоматических проверок на настоящих данных.
@@ -132,6 +133,123 @@ const bump = (map: Map<string, Tally>, code: string, animalId: number | null, te
 }
 
 /**
+ * Происхождение самой записи: чья, какого уровня достоверности, кто
+ * и когда её менял.
+ *
+ * ## Зачем это в ревизии проверок
+ *
+ * Разбор одной карточки до сих пор отвечал на вопрос «что не так
+ * с данными». Оказалось, что в половине случаев нужен другой вопрос:
+ * **откуда эти данные взялись**. Расхождение заявленного инбридинга
+ * с посчитанным читается совершенно по-разному, если знать, менял ли
+ * кто-нибудь запись после того, как её завели, и не переписал ли её
+ * загруженный файл.
+ *
+ * Без этого блока пришлось бы гадать по косвенным признакам — а гадание,
+ * выданное за установленную причину, здесь уже случалось однажды и стоило
+ * дороже, чем стоил бы запрос.
+ *
+ * ## Почему журнал и пакеты вместе, а не по отдельности
+ *
+ * Они дополняют друг друга ровно в том месте, где каждый по отдельности
+ * молчит. Ручная правка идёт в журнал правок; загрузка файлом в журнал
+ * **не идёт** — она помечена `skipJournal`, и след от неё один: пакет
+ * загрузки, в списке которого стоит эта запись. Пустой журнал сам по себе
+ * не означает «запись не трогали»: он означает «руками не трогали».
+ */
+async function cardFacts(payload: Payload, animal: Animal) {
+  const ownerId = typeof animal.owner === 'object' ? animal.owner?.id : animal.owner
+
+  const [org, revisions, submissions] = await Promise.all([
+    ownerId
+      ? payload
+          .findByID({ collection: 'organizations', id: ownerId, depth: 0, overrideAccess: true })
+          .catch(() => null)
+      : Promise.resolve(null),
+    payload
+      .find({
+        collection: 'animal-revisions',
+        where: { animal: { equals: animal.id } },
+        sort: '-at',
+        limit: 5,
+        depth: 0,
+        overrideAccess: true,
+      })
+      .catch(() => null),
+    payload
+      .find({
+        collection: 'data-submissions',
+        where: { animals: { in: [animal.id] } },
+        sort: '-submittedAt',
+        limit: 5,
+        depth: 0,
+        overrideAccess: true,
+      })
+      .catch(() => null),
+  ])
+
+  const when = (v: unknown): string =>
+    v ? new Date(String(v)).toLocaleString('ru-RU', { timeZone: 'UTC' }) : '—'
+
+  console.log('  КАРТОЧКА')
+  console.log('')
+  console.log(`    владелец               ${org ? `${org.name} (№ ${ownerId})` : `№ ${ownerId ?? '—'}`}`)
+  console.log(
+    `    достоверность          ${trustLabel(animal.trustLevel)} (${animal.trustLevel ?? 0})`,
+  )
+  console.log(`    заведена               ${when(animal.createdAt)}`)
+  console.log(`    изменена               ${when(animal.updatedAt)}`)
+
+  /*
+   * Уровень 3 назван отдельной строкой, а не оставлен в общем списке.
+   * «Верифицировано ассоциацией» — единственный уровень, который что-то
+   * обещает наружу, и вопрос «пережил ли знак перезапись данных под ним»
+   * должен читаться с первого взгляда, а не вычисляться из числа.
+   */
+  if ((animal.trustLevel ?? 0) >= 3) {
+    console.log('')
+    console.log('    На записи стоит знак Ассоциации. Всё, что ниже, — про то,')
+    console.log('    менялись ли данные после того, как знак был поставлен.')
+  }
+
+  console.log('')
+  if (!revisions) {
+    console.log('    Журнал правок прочитать не удалось.')
+  } else if (!revisions.docs.length) {
+    console.log('    Правок руками не записано. Это не значит «не меняли»:')
+    console.log('    загрузка файлом в журнал не идёт — её след ниже, в пакетах.')
+  } else {
+    console.log(`    Последние правки руками (всего ${revisions.totalDocs}):`)
+    for (const r of revisions.docs) {
+      console.log(
+        `      ${pad(when((r as { at?: unknown }).at), 20)} ` +
+          `${pad(String((r as { label?: unknown }).label ?? (r as { path?: unknown }).path ?? '—'), 28)} ` +
+          `${String((r as { before?: unknown }).before ?? '—')} → ${String((r as { after?: unknown }).after ?? '—')}`,
+      )
+    }
+  }
+
+  console.log('')
+  if (!submissions) {
+    console.log('    Пакеты загрузки прочитать не удалось.')
+  } else if (!submissions.docs.length) {
+    console.log('    Ни в один пакет загрузки запись не входила: файлом её не трогали.')
+  } else {
+    console.log(`    Пакеты загрузки, в которые запись входила (всего ${submissions.totalDocs}):`)
+    for (const s of submissions.docs) {
+      const d = s as { number?: unknown; kind?: unknown; status?: unknown; submittedAt?: unknown }
+      console.log(
+        `      ${pad(when(d.submittedAt), 20)} ` +
+          `${pad(`№ ${String(d.number ?? '—')}`, 16)} ` +
+          `${String(d.kind ?? '—')}, ${String(d.status ?? '—')}`,
+      )
+    }
+  }
+
+  console.log('')
+}
+
+/**
  * Разбор одной карточки: все правила плюс родословная с числами.
  *
  * Потолок инбридинга здесь не срабатывает — записей всё равно одна,
@@ -160,6 +278,8 @@ async function auditOne(payload: Payload, ident: string) {
   console.log('')
   console.log(`РАЗБОР ОДНОЙ ЗАПИСИ: № ${animal.identNumber}${animal.name ? ` «${animal.name}»` : ''}`)
   console.log('')
+
+  await cardFacts(payload, animal)
 
   if (!issues.length) {
     console.log('  Замечаний нет.')
