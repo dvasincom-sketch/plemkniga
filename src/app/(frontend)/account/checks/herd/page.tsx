@@ -10,7 +10,8 @@ import { getClient, getCurrentUser } from '@/lib/payload'
 import { denyAssociation } from '@/lib/association'
 import { relId } from '@/lib/visibility'
 import { checkAnimals, type Issue } from '@/lib/data-checks'
-import { checkSpec, type CheckCode } from '@/lib/checks-registry'
+import { herdIssues } from '@/lib/checks-herd'
+import { checkSpec, type AnimalCheckCode } from '@/lib/checks-registry'
 import type { Animal } from '@/payload-types'
 
 export const metadata: Metadata = { title: 'Проверка моего стада' }
@@ -40,6 +41,18 @@ export const dynamic = 'force-dynamic'
  * всё и затевается, — записи, ещё не подтверждённые Ассоциацией. Сколько
  * осталось за потолком, страница говорит прямо: «замечаний не найдено»
  * и «замечаний не искали» не должны выглядеть одинаково.
+ *
+ * ## Два разбора на одной странице
+ *
+ * Проверки по стаду идут **по всему стаду**, включая подтверждённые
+ * записи и без всякого потолка. Это не непоследовательность: они считают
+ * доли — сколько записей из скольких, — а доля по выборке в пятьсот
+ * из трёх тысяч называлась бы долей по стаду и врала бы. Стоят они при
+ * этом шесть агрегатов, а не обход родословных, и потолка не требуют.
+ *
+ * Показаны они первыми, и это тоже решение. Смешанные единицы измерения
+ * порождают полсотни находок «удой неправдоподобен» ниже по странице;
+ * прочитав сначала причину, хозяйство чинит одно место вместо пятидесяти.
  */
 
 /**
@@ -60,7 +73,7 @@ const SEVERITY_TONE = {
 const SHOWN_PER_GROUP = 12
 
 type Group = {
-  code: CheckCode
+  code: AnimalCheckCode
   label: string
   why: string
   severity: 'fix' | 'note'
@@ -102,9 +115,22 @@ export default async function HerdCheckPage() {
     : { docs: [], totalDocs: 0 }
 
   const animals = found.docs as Animal[]
-  const { issues, limits } = animals.length
-    ? await checkAnimals(payload, animals)
-    : { issues: [], limits: [] as string[] }
+
+  /*
+   * Два разбора идут разом: они друг о друге не знают и ждать друг друга
+   * не должны. Проверки по стаду — шесть агрегатов, проверки по записям —
+   * обход родословных; последовательный запуск сложил бы их время
+   * без всякой на то причины.
+   */
+  const [perAnimal, herd] = await Promise.all([
+    animals.length
+      ? checkAnimals(payload, animals)
+      : Promise.resolve({ issues: [] as Issue[], limits: [] as string[] }),
+    herdIssues(payload, orgId),
+  ])
+
+  const { issues } = perAnimal
+  const limits = [...perAnimal.limits, ...herd.limits]
 
   if (found.totalDocs > SCAN_LIMIT) {
     limits.unshift(
@@ -114,7 +140,7 @@ export default async function HerdCheckPage() {
   }
 
   /* Находки собираются по правилам: чинят их пачками, а не по одной. */
-  const byCode = new Map<CheckCode, Issue[]>()
+  const byCode = new Map<AnimalCheckCode, Issue[]>()
   for (const i of issues) {
     byCode.set(i.code, [...(byCode.get(i.code) ?? []), i])
   }
@@ -169,10 +195,77 @@ export default async function HerdCheckPage() {
             .
           </p>
 
+          {/*
+             Находки по стаду — выше находок по записям, и это не вопрос
+             важности. Смешанные единицы измерения порождают внизу полсотни
+             замечаний «удой неправдоподобен»; прочитав сначала причину,
+             хозяйство чинит одно место вместо пятидесяти.
+          */}
+          {herd.issues.length > 0 && (
+            <section className="mt-8">
+              <h2 className="section-title mb-2">Сопоставимость данных по стаду</h2>
+              <p className="mb-4 max-w-[80ch] text-[14px] leading-relaxed text-ink-500">
+                Здесь каждая запись по отдельности в порядке. Не в порядке то, что вместе
+                они получены по-разному, и сравнивать их между собой нельзя. Считалось
+                по всему стаду — {herd.scanned.toLocaleString('ru-RU')} записей, — а не
+                по выборке ниже.
+              </p>
+
+              <div className="space-y-4">
+                {herd.issues.map((h) => {
+                  const spec = checkSpec(h.code)
+                  return (
+                    <div key={h.code + h.text} className="card">
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
+                        <h3 className="text-[17px] font-medium">{spec?.label ?? h.code}</h3>
+                        <span
+                          className={`flex-none rounded px-2 py-0.5 text-[12px] ${SEVERITY_TONE[h.severity]}`}
+                        >
+                          {h.severity === 'fix' ? 'Требует исправления' : 'На усмотрение'}
+                        </span>
+                      </div>
+
+                      <p className="mt-2 max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
+                        {h.text}
+                      </p>
+
+                      {spec?.why && (
+                        <p className="mt-2 max-w-[80ch] text-[14px] leading-relaxed text-ink-500">
+                          {spec.why}
+                        </p>
+                      )}
+
+                      {!!h.examples?.length && (
+                        <ul className="mt-4 space-y-2 border-t border-ink-100 pt-4 text-[14px]">
+                          {h.examples.map((e) => (
+                            <li key={e.label} className="text-ink-700">
+                              {e.animalId ? (
+                                <Link
+                                  href={`/animals/${e.animalId}`}
+                                  className="tabular-nums underline underline-offset-4"
+                                >
+                                  {e.label}
+                                </Link>
+                              ) : (
+                                e.label
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+          )}
+
           {animals.length === 0 ? (
             <div className="card mt-8">
               <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
                 Проверять нечего: неподтверждённых записей в стаде нет.
+                {herd.issues.length > 0 &&
+                  ' Замечания по стаду выше относятся ко всем записям сразу, включая уже подтверждённые.'}
               </p>
             </div>
           ) : (

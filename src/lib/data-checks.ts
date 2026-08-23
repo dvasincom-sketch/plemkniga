@@ -7,14 +7,18 @@ import {
   resolveCheckSettings,
   type CheckSettingsMap,
 } from '@/lib/check-settings'
+import { pedigreeIssues } from '@/lib/checks-pedigree'
+import { sequenceIssues } from '@/lib/checks-sequence'
 import {
   BLOOD_TOLERANCE,
   GESTATION_MIN_DAYS,
   INBREEDING_CHECK_LIMIT,
   INBREEDING_TOLERANCE,
   PLAUSIBLE,
-  type CheckCode,
+  type AnimalCheckCode,
+  type CheckLimits,
   type CheckSeverity,
+  type Issue,
 } from '@/lib/checks-registry'
 
 /**
@@ -40,24 +44,12 @@ import {
  * месяцев) такие рамки ловят, а хорошее животное — нет.
  */
 
-export type { CheckSeverity }
-
-export type Issue = {
-  /**
-   * Код правила.
-   *
-   * Тип берётся из реестра (`src/lib/checks-registry.ts`), а не пишется
-   * строкой: проверка, которой нет в реестре, не скомпилируется, и каталог
-   * для хозяйства не может отстать от кода.
-   */
-  code: CheckCode
-  animalId: number
-  ident: string
-  /** Поле карточки, к которому относится замечание */
-  field?: string
-  severity: CheckSeverity
-  text: string
-}
+/*
+ * Тип находки переехал в реестр: модули проверок (`checks-pedigree`,
+ * `checks-sequence`) импортируют его оттуда, и круга зависимостей
+ * не возникает — оркестратор зовёт их, они его нет.
+ */
+export type { CheckSeverity, Issue }
 
 const year = (d?: string | null): number | null => {
   if (!d) return null
@@ -114,7 +106,7 @@ const sameIdent = (a?: string | null, b?: string | null): boolean => {
  */
 function localIssues(a: Animal): Issue[] {
   const out: Issue[] = []
-  const push = (code: CheckCode, text: string, field?: string, severity: CheckSeverity = 'fix') =>
+  const push = (code: AnimalCheckCode, text: string, field?: string, severity: CheckSeverity = 'fix') =>
     out.push({ code, animalId: a.id as number, ident: a.identNumber, field, severity, text })
 
   const born = time(a.birthDate)
@@ -201,6 +193,32 @@ function localIssues(a: Animal): Issue[] {
     )
   }
 
+  /*
+   * ДНК-тест исключил происхождение, а родители в карточке остались.
+   *
+   * Единственный случай, когда система знает про родословную наверняка:
+   * не «сомнительно», а лаборатория написала, что этот бык отцом быть
+   * не может. Поэтому проверка не смотрит ни на кровность, ни на даты —
+   * они здесь ничего не добавляют.
+   *
+   * Смотрим на наличие связей, а не на их содержимое: вывод теста
+   * относится к паре «животное — заявленные родители», и какой именно
+   * родитель не подтвердился, протокол в системе не хранит. Указать
+   * на одного из двоих значило бы назвать виноватым наугад.
+   *
+   * Позднее «подтверждено» вывод не отменяет — это разные пробы, и
+   * какая из них верна, решает эксперт, а не порядок записей. Поэтому
+   * находка остаётся, пока в карточке есть «исключено».
+   */
+  const excluded = (a.dnaTests ?? []).some((t) => t.verdict === 'excluded')
+  if (excluded && (a.father || a.mother)) {
+    push(
+      'dna-parentage-excluded',
+      'ДНК-тест исключил происхождение, но родители в карточке остались. Свидетельство по такой записи не выпустится: либо связь с родителями неверна, либо вывод теста проставлен ошибочно',
+      'father',
+    )
+  }
+
   return out
 }
 
@@ -249,7 +267,7 @@ async function relationalIssues(
   }
 
   for (const a of animals) {
-    const push = (code: CheckCode, text: string, field?: string, severity: CheckSeverity = 'fix') =>
+    const push = (code: AnimalCheckCode, text: string, field?: string, severity: CheckSeverity = 'fix') =>
       out.push({ code, animalId: a.id as number, ident: a.identNumber, field, severity, text })
 
     const born = time(a.birthDate)
@@ -425,7 +443,7 @@ async function relationalIssues(
       if (!a) continue
 
       const push = (
-        code: CheckCode,
+        code: AnimalCheckCode,
         text: string,
         field?: string,
         severity: CheckSeverity = 'fix',
@@ -679,7 +697,22 @@ export async function checkAnimals(
     settings ?? (await resolveCheckSettings(payload).catch(() => defaultCheckSettings()))
 
   const local = animals.flatMap(localIssues)
-  const { issues, limits } = await relationalIssues(payload, animals, resolved)
+
+  /*
+   * Три источника, а не один. Дешёвые проверки идут по записи и её
+   * родителям; родословная и последовательность событий живут отдельно,
+   * потому что стоят на порядок дороже и лезут в базу за тем, чего
+   * в разбираемом наборе нет вовсе — за предками на девять колен
+   * и за потомством матерей.
+   */
+  const [rel, ped, seq] = await Promise.all([
+    relationalIssues(payload, animals, resolved),
+    pedigreeIssues(payload, animals),
+    sequenceIssues(payload, animals),
+  ])
+
+  const issues = [...rel.issues, ...ped.issues, ...seq.issues]
+  const limits: CheckLimits = [...rel.limits, ...ped.limits, ...seq.limits]
 
   const applied = [...local, ...issues].flatMap((i) => {
     const rule = resolved.get(i.code)

@@ -214,6 +214,11 @@ const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
     probe: { kind: 'table', name: 'check_settings' },
     note: 'настройки автоматических проверок: отклонения от реестра',
   },
+  {
+    name: '20260823_080000_dna_verdict',
+    probe: { kind: 'column', table: 'animals_dna_tests', column: 'verdict' },
+    note: 'вывод ДНК-теста: подтверждено / исключено / не определено',
+  },
 ]
 
 const { driverUri, uri, source, sslConfig } = resolveDatabase()

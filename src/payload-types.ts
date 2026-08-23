@@ -505,6 +505,10 @@ export interface Animal {
         type?: (number | null) | DnaTestType;
         date?: string | null;
         laboratory?: (number | null) | Organization;
+        /**
+         * Свидетельство выпускается только при подтверждённом происхождении
+         */
+        verdict?: ('confirmed' | 'excluded' | 'inconclusive') | null;
         result?: string | null;
         file?: (number | null) | Media;
         id?: string | null;
@@ -2066,6 +2070,7 @@ export interface AnimalsSelect<T extends boolean = true> {
         type?: T;
         date?: T;
         laboratory?: T;
+        verdict?: T;
         result?: T;
         file?: T;
         id?: T;

@@ -380,6 +380,51 @@ async function importEvents(
   const collection =
     ds.key === 'calvings' ? 'calvings' : ds.key === 'inseminations' ? 'inseminations' : 'milk-tests'
 
+  /* --- Заслон от повторной заливки того же файла --- */
+
+  /*
+   * Файл описывает факты, а не действия: «эта корова отелилась такого-то
+   * числа» верно и при первой заливке, и при второй. Значит вторая заливка
+   * не должна ничего добавлять — а до этого заслона добавляла, удваивая
+   * дойки и уводя вперёд нумерацию отёлов.
+   *
+   * Ключ — животное и день. У дойки в ключ входит ещё и удой: две записи
+   * за один день с разными числами это утро и вечер, а не дубль,
+   * а с одинаковыми — дубль наверняка.
+   *
+   * Множество пополняется по ходу разбора, поэтому ловятся и повторы
+   * внутри самого файла, а не только совпадения с уже записанным.
+   */
+  const seen = new Set<string>()
+  const dayOf = (iso: string) => iso.slice(0, 10)
+  const keyOf = (animalId: number, iso: string, extra?: number | null) =>
+    `${animalId}|${dayOf(iso)}${extra === null || extra === undefined ? '' : `|${extra}`}`
+
+  const existingIds = [...mine.values()].map((a) => a.id)
+  if (existingIds.length) {
+    const { docs } = await payload
+      .find({
+        collection: collection as never,
+        where: { animal: { in: existingIds } },
+        limit: 50_000,
+        depth: 0,
+        overrideAccess: true,
+      })
+      .catch(() => ({ docs: [] as Record<string, unknown>[] }))
+
+    for (const d of docs as Record<string, unknown>[]) {
+      const aid =
+        typeof d.animal === 'object' && d.animal
+          ? (d.animal as { id: number }).id
+          : (d.animal as number)
+      const date = d.date as string | undefined
+      if (!aid || !date) continue
+      seen.add(
+        keyOf(aid, date, ds.key === 'milkTests' ? (d.dailyYield as number | null) : null),
+      )
+    }
+  }
+
   let created = 0
   let skipped = 0
   const touched = new Set<number>()
@@ -456,6 +501,22 @@ async function importEvents(
       data.source = 'import'
     }
 
+    const key = keyOf(
+      animal.id,
+      date,
+      ds.key === 'milkTests' ? ((data.dailyYield as number | undefined) ?? null) : null,
+    )
+    if (seen.has(key)) {
+      skip(
+        line,
+        ds.key === 'milkTests'
+          ? 'Такая дойка уже записана — та же дата и тот же удой'
+          : 'Такое событие на эту дату уже записано',
+        rawIdent,
+      )
+      continue
+    }
+
     try {
       await payload.create({
         collection: collection as never,
@@ -463,6 +524,7 @@ async function importEvents(
         overrideAccess: true,
         user,
       })
+      seen.add(key)
       touched.add(animal.id)
       created++
     } catch (e) {

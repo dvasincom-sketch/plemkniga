@@ -15,6 +15,9 @@ import { getClient } from '@/lib/payload'
 import { isStaleSchemaError, requireAssociation, waitingDays, waitingLabel } from '@/lib/association'
 import { StaleSchemaNotice } from '@/components/StaleSchemaNotice'
 import { checkAnimals } from '@/lib/data-checks'
+import { herdIssues } from '@/lib/checks-herd'
+import { checkSpec } from '@/lib/checks-registry'
+import { relId } from '@/lib/visibility'
 import { VERIFICATION_PURPOSES, VERIFICATION_STATUSES } from '@/collections/VerificationRequests'
 import { labelOf, trustLabel } from '@/lib/dictionaries'
 import { dateRu } from '@/lib/format'
@@ -103,7 +106,24 @@ export default async function ReviewVerificationPage({
    * и «замечаний не искали» выглядят на экране одинаково, а значат
    * противоположное, и цена ошибки здесь не наша, а хозяйства.
    */
-  const { issues, limits } = await checkAnimals(payload, animals)
+  /*
+   * Разбор по стаду идёт рядом с разбором по заявке и намеренно шире её.
+   *
+   * В заявку попадают десятки записей, а несопоставимость — свойство всего
+   * массива хозяйства: единицы измерения смешаны не в заявке, а в учёте.
+   * Эксперту это нужнее, чем хозяйству: он единственный, кто видит рядом
+   * несколько хозяйств и понимает, что «средний удой 7 200» у одного
+   * и у другого — не одно и то же число.
+   *
+   * Заявку эти находки не блокируют и в автоматические замечания
+   * не попадают: чинить их поштучно нельзя, а отклонять заявку за то,
+   * что где-то в стаде смешаны источники доек, было бы наказанием
+   * не за то.
+   */
+  const [{ issues, limits }, herd] = await Promise.all([
+    checkAnimals(payload, animals),
+    herdIssues(payload, relId(request.organization)),
+  ])
 
   const heldIds = new Set(
     findings
@@ -214,11 +234,39 @@ export default async function ReviewVerificationPage({
 
             <VerificationAutoIssues id={request.id} issues={issues} readOnly={decided} />
 
-            {limits.length > 0 && (
+            {herd.issues.length > 0 && (
+              <div className="card">
+                <h2 className="panel-heading">Сопоставимость данных хозяйства</h2>
+                <p className="mb-4 max-w-[80ch] text-[14px] leading-relaxed text-ink-500">
+                  Посчитано по всему стаду ({herd.scanned.toLocaleString('ru-RU')} записей),
+                  а не по заявке: несопоставимость — свойство учёта, а не выборки.
+                  Заявку эти замечания не блокируют.
+                </p>
+                <ul className="space-y-4">
+                  {herd.issues.map((h) => (
+                    <li key={h.code + h.text} className="border-t border-ink-100 pt-4">
+                      <p className="text-[15px] font-medium">
+                        {checkSpec(h.code)?.label ?? h.code}
+                      </p>
+                      <p className="mt-1 max-w-[80ch] text-[14px] leading-relaxed text-ink-700">
+                        {h.text}
+                      </p>
+                      {!!h.examples?.length && (
+                        <p className="mt-1 text-[13px] leading-relaxed text-ink-500">
+                          {h.examples.map((e) => e.label).join('; ')}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {(limits.length > 0 || herd.limits.length > 0) && (
               <div className="card">
                 <h2 className="panel-heading">Что проверено не полностью</h2>
                 <ul className="space-y-2">
-                  {limits.map((l) => (
+                  {[...limits, ...herd.limits].map((l) => (
                     <li key={l} className="text-[14px] leading-relaxed text-ink-700">
                       {l}
                     </li>
