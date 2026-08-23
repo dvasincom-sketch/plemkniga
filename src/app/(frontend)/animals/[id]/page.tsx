@@ -870,7 +870,7 @@ export default async function AnimalPage({
                         <th>Дата осем.</th>
                         <th>Серв-бык</th>
                         <th>ДД</th>
-                        <th>У л</th>
+                        <th>У кг</th>
                         <th>У_305</th>
                         <th>Ж 305,%</th>
                         <th>Б 305,%</th>

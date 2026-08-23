@@ -35,7 +35,7 @@ const BASE_COLUMNS: { key: string; label: string; hide?: string }[] = [
   { key: 'state', label: 'Состояние', hide: 'hidden 2xl:table-cell' },
   { key: 'sex', label: 'Пол' },
   { key: 'age', label: 'Возраст' },
-  { key: 'milk', label: 'Удой (л)' },
+  { key: 'milk', label: 'Удой, кг' },
   { key: 'fatPercent', label: 'Жир (%)', hide: 'hidden xl:table-cell' },
   { key: 'proteinPercent', label: 'Белок (%)', hide: 'hidden xl:table-cell' },
   { key: 'fatKg', label: 'Жир (кг)', hide: 'hidden 2xl:table-cell' },

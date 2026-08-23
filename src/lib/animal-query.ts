@@ -14,7 +14,7 @@ const num = (v: string | string[] | undefined): number | undefined => {
 
 /** Поля расширенного фильтра «больше чем». */
 export const ADVANCED_FIELDS = [
-  { name: 'milk', label: 'Удой (л)', path: 'summary.milkYield' },
+  { name: 'milk', label: 'Удой, кг', path: 'summary.milkYield' },
   { name: 'fatPercent', label: 'Жир (%)', path: 'summary.fatPercent' },
   { name: 'proteinPercent', label: 'Белок (%)', path: 'summary.proteinPercent' },
   { name: 'fatKg', label: 'Жир (кг)', path: 'summary.fatKg' },

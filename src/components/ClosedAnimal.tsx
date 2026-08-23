@@ -120,7 +120,7 @@ export function ClosedAnimal({
           <Fact label="Половозрастная группа" value={labelOf(AGE_GROUPS, animal.ageGroup)} />
           <Fact label="Состояние" value={STATES.find((o) => o.value === animal.state)?.full ?? '—'} />
 
-          <Fact label="Удой, л" value={nf(s?.milkYield)} />
+          <Fact label="Удой, кг" value={nf(s?.milkYield)} />
           <Fact label="Жир, %" value={nf(s?.fatPercent, 2)} />
           <Fact label="Белок, %" value={nf(s?.proteinPercent, 2)} />
           <Fact label="ИПЦ" value={signed(animal.ipc ?? null)} />
@@ -235,7 +235,7 @@ export function ClosedAnimal({
 
                   <dl className="mt-4 grid grid-cols-3 gap-2 border-t border-ink-100 pt-3">
                     <div>
-                      <dt className="text-[11px] leading-tight text-ink-500">Удой, л</dt>
+                      <dt className="text-[11px] leading-tight text-ink-500">Удой, кг</dt>
                       <dd className="mt-0.5 text-[14px] tabular-nums">{nf(a.summary?.milkYield)}</dd>
                     </div>
                     <div>

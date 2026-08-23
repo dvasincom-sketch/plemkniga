@@ -443,7 +443,7 @@ export const Animals: CollectionConfig = {
                 {
                   type: 'row',
                   fields: [
-                    { name: 'milkYield', type: 'number', label: 'Удой, л' },
+                    { name: 'milkYield', type: 'number', label: 'Удой, кг' },
                     { name: 'fatPercent', type: 'number', label: 'Жир, %' },
                     { name: 'proteinPercent', type: 'number', label: 'Белок, %' },
                   ],
@@ -487,7 +487,7 @@ export const Animals: CollectionConfig = {
                   type: 'row',
                   fields: [
                     { name: 'dd', type: 'number', label: 'ДД' },
-                    { name: 'milkYield', type: 'number', label: 'У л' },
+                    { name: 'milkYield', type: 'number', label: 'У кг' },
                     { name: 'milk305', type: 'number', label: 'У_305' },
                   ],
                 },
