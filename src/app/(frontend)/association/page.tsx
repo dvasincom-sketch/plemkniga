@@ -5,6 +5,7 @@ import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { AssociationNav } from '@/components/AssociationNav'
 import { getClient } from '@/lib/payload'
+import { FilterChips } from '@/components/FilterChips'
 import {
   WAITING_LATE_DAYS,
   WAITING_WARN_DAYS,
@@ -97,6 +98,19 @@ export default async function AssociationQueuePage({
   const [waiting, inWork] = counts.map((c) => c.totalDocs)
   const myWork = myOpen.length
 
+  /*
+   * Пакеты «на проверке», за которыми никто не закреплён.
+   *
+   * «В работе: 1» и прочерк в колонке «Кто разбирает» — не противоречие
+   * в отображении, а настоящее состояние: состояние пакета сменилось,
+   * исполнитель не записался. Для хозяйства это худший вид ожидания:
+   * часы идут, работы не происходит, и снаружи это неотличимо от работы.
+   * Считать такие пакеты «в работе» значит прятать простой за словом.
+   */
+  const orphaned = closed
+    ? 0
+    : found.filter((s) => s.status === 'checking' && !assigneeOf(s)).length
+
   return (
     <>
       <SiteHeader active="/association" />
@@ -113,41 +127,47 @@ export default async function AssociationQueuePage({
             где эта работа стоит.
           </p>
 
-          <div className="mt-6 flex flex-wrap items-center gap-2 text-[14px]">
-            <Link
-              href="/association"
-              className={`rounded-lg px-3 py-2 transition-colors ${
-                !closed && mine !== '1'
-                  ? 'bg-forest-500 text-white'
-                  : 'bg-white shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] hover:bg-[#f6f6f6]'
-              }`}
-            >
-              Все открытые · {waiting + inWork}
-            </Link>
-            <Link
-              href="/association?mine=1"
-              className={`rounded-lg px-3 py-2 transition-colors ${
-                mine === '1'
-                  ? 'bg-forest-500 text-white'
-                  : 'bg-white shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] hover:bg-[#f6f6f6]'
-              }`}
-            >
-              Мои · {myWork}
-            </Link>
-            <Link
-              href="/association?show=closed"
-              className={`rounded-lg px-3 py-2 transition-colors ${
-                closed
-                  ? 'bg-forest-500 text-white'
-                  : 'bg-white shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] hover:bg-[#f6f6f6]'
-              }`}
-            >
-              Закрытые
-            </Link>
-            <span className="ml-2 text-ink-500">
-              не взято в работу: {waiting}, в работе: {inWork}
-            </span>
-          </div>
+          <FilterChips
+            label="Отбор пакетов"
+            active={closed ? 'closed' : mine === '1' ? 'mine' : 'open'}
+            items={[
+              {
+                key: 'open',
+                label: 'Все открытые',
+                href: '/association',
+                count: waiting + inWork,
+                hint: 'Загруженные и взятые в работу',
+              },
+              {
+                key: 'mine',
+                label: 'Мои',
+                href: '/association?mine=1',
+                count: myWork,
+                hint: 'Пакеты, закреплённые за вами',
+              },
+              {
+                key: 'closed',
+                label: 'Закрытые',
+                href: '/association?show=closed',
+                hint: 'Проверенные, принятые и отклонённые',
+              },
+            ]}
+          />
+
+          {/*
+             Разбивка состояний — строкой под отбором, а не внутри плашек.
+             В плашке стоит число записей под отбором, здесь — из чего оно
+             состоит; смешать это значило бы написать в кнопке два разных
+             числа.
+          */}
+          <p className="mt-3 text-[14px] text-ink-500">
+            не взято в работу: {waiting}, в работе: {inWork - orphaned}
+            {orphaned > 0 && (
+              <span className="text-amber-700">
+                {', '}на проверке без исполнителя: {orphaned}
+              </span>
+            )}
+          </p>
 
           <div className="card mt-6">
             <div className="overflow-x-auto">

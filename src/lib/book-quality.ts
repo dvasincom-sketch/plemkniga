@@ -1,4 +1,5 @@
 import type { Payload } from 'payload'
+import { checkSpecByCode } from '@/lib/checks-registry'
 
 /**
  * Качество книги — сводка по всей базе, а не по выборке.
@@ -195,7 +196,31 @@ export async function bookQuality(payload: Payload): Promise<BookQuality | null>
     value: unknown,
     severity: QualityRow['severity'],
     hint?: string,
-  ): QualityRow => ({ key, label, count: n(value), severity, hint })
+  ): QualityRow => {
+    /*
+     * Название и существенность берутся из реестра проверок, а не отсюда.
+     *
+     * Коды здесь и там совпадали всегда, а тексты писались отдельно —
+     * и уже разошлись: в сводке стояло «Удой вне правдоподобных границ
+     * (500…25 000 кг)» с числами, вписанными руками. Пороги с тех пор
+     * стали настраиваемыми, и эта строка начала врать в тот день, когда
+     * Ассоциация впервые изменила границу: правило одно, а чисел два.
+     *
+     * Местный текст остаётся запасным — для четырёх кодов, которых
+     * в реестре нет: сводка разделяет отца и мать (`father-younger`,
+     * `mother-younger` и пара про пол), а реестр держит их одним правилом
+     * на обоих родителей. Разница осмысленная: проверке всё равно, кто
+     * из двоих, а Ассоциации при разборе книги — нет.
+     */
+    const spec = checkSpecByCode(key)
+    return {
+      key,
+      label: spec?.label ?? label,
+      count: n(value),
+      severity: spec?.severity ?? severity,
+      hint: spec?.why ?? hint,
+    }
+  }
 
   const rows: QualityRow[] = [
     row('self-parent', 'Животное записано собственным родителем', r.self_parent, 'fix'),
@@ -207,7 +232,7 @@ export async function bookQuality(payload: Payload): Promise<BookQuality | null>
     row('no-birth-date', 'Нет даты рождения', r.no_birth_date, 'fix'),
     row(
       'milk-implausible',
-      'Удой вне правдоподобных границ (500…25 000 кг)',
+      'Удой вне правдоподобных границ',
       r.milk_implausible,
       'fix',
     ),

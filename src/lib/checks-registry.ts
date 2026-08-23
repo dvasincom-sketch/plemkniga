@@ -734,6 +734,21 @@ export type HerdIssue = {
 export const checkSpec = (code: CheckCode): CheckSpec | undefined =>
   CHECKS.find((c) => c.code === code)
 
+/**
+ * То же по произвольной строке — для тех, кто приходит с кодом извне
+ * системы типов.
+ *
+ * Такой вызывающий один: сводка качества книги (`book-quality.ts`).
+ * Она считает противоречия своими запросами по всей базе и знает коды
+ * строками; часть из них в реестре есть, часть — нет (сводка разделяет
+ * отца и мать там, где реестр держит одно правило на обоих родителей).
+ * Приводить строку к `CheckCode` значило бы соврать системе типов
+ * о том, чего она проверить не может; честнее принять строку и вернуть
+ * `undefined`, если такой проверки нет.
+ */
+export const checkSpecByCode = (code: string): CheckSpec | undefined =>
+  ALL_CHECKS.find((c) => c.code === code)
+
 export const checksOfGroup = (group: CheckGroup): readonly CheckSpec[] =>
   CHECKS.filter((c) => c.group === group)
 

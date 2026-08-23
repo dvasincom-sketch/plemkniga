@@ -7,6 +7,8 @@ import { AccountNav } from '@/components/AccountNav'
 import { DataNav } from '@/components/DataNav'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { getClient, getCurrentUser } from '@/lib/payload'
+import { isAssociationUser } from '@/lib/association'
+import { AssociationNav } from '@/components/AssociationNav'
 import { isAssociation } from '@/access'
 import { CHECK_GROUPS } from '@/lib/checks-registry'
 import { resolveCheckSettings } from '@/lib/check-settings'
@@ -73,6 +75,17 @@ export default async function ChecksPage() {
   if (!user) redirect('/login')
 
   /*
+   * Каталог открыт обеим сторонам, а меню над ним у каждой своё.
+   *
+   * Раньше здесь всегда стояли разделы хозяйства, и эксперт Ассоциации,
+   * пришедший перечитать правило, по которому он же и судит, попадал
+   * в чужой кабинет: «Мои животные», «Доступы», «Настройки» — приглашения,
+   * которые никуда его не ведут. Та же беда была на странице профиля
+   * и там же решена.
+   */
+  const association = isAssociationUser(user)
+
+  /*
    * Показываются действующие правила, а не заложенные в код. Разница
    * существенна ровно тогда, когда Ассоциация что-то изменила: каталог,
    * показывающий умолчания при изменённой настройке, вводит в заблуждение
@@ -86,19 +99,27 @@ export default async function ChecksPage() {
 
   return (
     <>
-      <SiteHeader active="/account" />
+      <SiteHeader active={association ? "/association" : "/account"} />
 
       <main className="container-page pb-8">
-        <AccountNav active="data" />
-        <DataNav active="check" />
+        {association ? <AssociationNav active="quality" /> : <AccountNav active="data" />}
+        {!association && <DataNav active="check" />}
 
         <div className="min-w-0">
           <Breadcrumbs
-            items={[
-              { label: 'Личный кабинет', href: '/account' },
-              { label: 'Данные', href: '/account?tab=data' },
-              { label: 'Что проверяется автоматически' },
-            ]}
+            items={
+              association
+                ? [
+                    { label: 'Кабинет Ассоциации', href: '/association' },
+                    { label: 'Качество книги', href: '/association/quality' },
+                    { label: 'Что проверяется автоматически' },
+                  ]
+                : [
+                    { label: 'Личный кабинет', href: '/account' },
+                    { label: 'Данные', href: '/account?tab=data' },
+                    { label: 'Что проверяется автоматически' },
+                  ]
+            }
           />
 
           <h1 className="text-[30px] font-medium leading-tight sm:text-[36px]">

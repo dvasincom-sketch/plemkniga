@@ -15,7 +15,9 @@ import {
 import { StaleSchemaNotice } from '@/components/StaleSchemaNotice'
 import { VERIFICATION_PURPOSES, VERIFICATION_STATUSES } from '@/collections/VerificationRequests'
 import { labelOf } from '@/lib/dictionaries'
-import { dateRu } from '@/lib/format'
+import { dateRu, plural } from '@/lib/format'
+import { relId } from '@/lib/visibility'
+import { FilterChips } from '@/components/FilterChips'
 import type { VerificationRequest } from '@/payload-types'
 
 export const metadata: Metadata = { title: 'Заявки на верификацию' }
@@ -77,6 +79,45 @@ export default async function VerificationQueuePage({
     stale = true
   }
 
+  /*
+   * Пересечения открытых заявок по животным.
+   *
+   * Хозяйство теперь не может подать одни и те же записи дважды —
+   * но заявки, поданные до этого заслона, никуда не делись, и заслона
+   * с этой стороны не было вовсе. Эксперт открывает В-2026-002, разбирает
+   * семнадцать записей и не знает, что те же семнадцать лежат в В-2026-001.
+   * Это не только двойная работа: по двум заявкам можно вынести разные
+   * решения, и каждое будет верным относительно того, что видел эксперт.
+   *
+   * Считается в памяти по уже полученному списку: открытых заявок сотня,
+   * запрос за пересечениями стоил бы дороже самого сравнения.
+   */
+  const overlaps = new Map<number | string, { number: string; shared: number }[]>()
+
+  if (!closed) {
+    const sets = docs.map((r) => ({
+      r,
+      ids: new Set(
+        (r.animals ?? [])
+          .map((a) => relId(a))
+          .filter((v): v is number => typeof v === 'number'),
+      ),
+    }))
+
+    for (const a of sets) {
+      const list: { number: string; shared: number }[] = []
+      for (const b of sets) {
+        if (b.r.id === a.r.id) continue
+        let shared = 0
+        for (const id of a.ids) if (b.ids.has(id)) shared++
+        if (shared > 0) list.push({ number: String(b.r.number ?? `#${b.r.id}`), shared })
+      }
+      if (list.length) overlaps.set(a.r.id, list)
+    }
+  }
+
+  const overlapping = overlaps.size
+
   return (
     <>
       <SiteHeader active="/association" />
@@ -95,28 +136,43 @@ export default async function VerificationQueuePage({
             Подтверждение требуется перед выпуском племенного свидетельства.
           </p>
 
-          <div className="mt-6 flex flex-wrap gap-2 text-[14px]">
-            <Link
-              href="/association/verifications"
-              className={`rounded-lg px-3 py-2 transition-colors ${
-                !closed
-                  ? 'bg-forest-500 text-white'
-                  : 'bg-white shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] hover:bg-[#f6f6f6]'
-              }`}
-            >
-              Открытые
-            </Link>
-            <Link
-              href="/association/verifications?show=closed"
-              className={`rounded-lg px-3 py-2 transition-colors ${
-                closed
-                  ? 'bg-forest-500 text-white'
-                  : 'bg-white shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] hover:bg-[#f6f6f6]'
-              }`}
-            >
-              Закрытые
-            </Link>
-          </div>
+          <FilterChips
+            label="Отбор заявок"
+            active={closed ? 'closed' : 'open'}
+            items={[
+              {
+                key: 'open',
+                label: 'Открытые',
+                href: '/association/verifications',
+                count: closed ? null : docs.length,
+                hint: 'Поданные и взятые в работу',
+              },
+              {
+                key: 'closed',
+                label: 'Закрытые',
+                href: '/association/verifications?show=closed',
+                hint: 'Подтверждённые, отклонённые и отозванные хозяйством',
+              },
+            ]}
+          />
+
+          {/*
+             Предупреждение стоит над таблицей, а не только в строках:
+             эксперт решает, за что взяться, глядя на список целиком,
+             и узнать о двойной работе он должен до того, как откроет
+             первую заявку.
+          */}
+          {overlapping > 0 && (
+            <div className="mt-6 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-[14px] leading-relaxed text-ink-700">
+              <span className="font-medium">
+                {overlapping} {plural(overlapping, ['заявка', 'заявки', 'заявок'])}{' '}
+                {plural(overlapping, ['пересекается', 'пересекаются', 'пересекаются'])} с другими
+                по животным.
+              </span>{' '}
+              Разбирать их по отдельности значит смотреть одни и те же записи дважды и рисковать
+              вынести по ним разные решения. Пересечения отмечены в таблице.
+            </div>
+          )}
 
           {stale && (
             <div className="mt-6">
@@ -173,6 +229,20 @@ export default async function VerificationQueuePage({
                           >
                             {r.number ?? `#${r.id}`}
                           </Link>
+                          {/*
+                             Номер соседней заявки, а не просто значок:
+                             «пересекается» без ответа «с чем» заставляет
+                             искать пару глазами по всей таблице.
+                          */}
+                          {overlaps.has(r.id) && (
+                            <span className="mt-1 block text-[13px] leading-snug text-amber-700">
+                              те же записи в{' '}
+                              {overlaps
+                                .get(r.id)!
+                                .map((o) => `${o.number} (${o.shared})`)
+                                .join(', ')}
+                            </span>
+                          )}
                         </td>
                         <td>{nameOf(r.organization)}</td>
                         <td>{labelOf(VERIFICATION_PURPOSES, r.purpose)}</td>
