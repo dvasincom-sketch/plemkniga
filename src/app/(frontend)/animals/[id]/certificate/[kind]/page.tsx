@@ -15,6 +15,7 @@ import {
   type CertificateNode,
   type CertificateView,
 } from '@/lib/certificate-view'
+import { verifyUrl } from '@/lib/certificate-check'
 import { dateRu, nf, signed } from '@/lib/format'
 import { PrintButton } from '@/components/PrintButton'
 import type { Animal, Document } from '@/payload-types'
@@ -182,6 +183,36 @@ export default async function CertificatePage({
   /** Документ выдан, но снимка у него нет — выпущен до появления снимков. */
   const staleIssued = Boolean(issued && !snapshot)
 
+  /*
+   * Квадрат рисуется на сервере в SVG, а не скриптом в браузере.
+   *
+   * Бланк печатают. Печать из браузера снимает то, что уже нарисовано,
+   * и картинка, которую дорисовывает скрипт, на бумаге оказывается
+   * то целой, то пустым местом — в зависимости от того, успел он
+   * до печати или нет. SVG в разметке напечатается всегда и не потеряет
+   * чёткости на любом размере бумаги.
+   *
+   * Ошибка проглатывается: бланк без квадрата хуже бланка с квадратом,
+   * но неизмеримо лучше страницы, которая не открылась.
+   */
+  const publicCode = (issued as { publicCode?: string } | null)?.publicCode ?? null
+  let qr: { svg: string; code: string } | null = null
+  if (issued?.number && publicCode) {
+    try {
+      const QRCode = (await import('qrcode')).default
+      const base = process.env.NEXT_PUBLIC_SERVER_URL || ''
+      const svg = await QRCode.toString(verifyUrl(issued.number, publicCode, base), {
+        type: 'svg',
+        errorCorrectionLevel: 'M',
+        margin: 0,
+        width: 108,
+      })
+      qr = { svg, code: publicCode }
+    } catch {
+      qr = null
+    }
+  }
+
   return (
     <main className="mx-auto max-w-[900px] px-5 py-8 print:max-w-none print:px-0 print:py-0">
       {/* ----------------------------- Панель ----------------------------- */}
@@ -215,10 +246,37 @@ export default async function CertificatePage({
             info@holstein-russia.ru
           </p>
 
-          <div className="mt-4 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-            <h1 className="text-[24px] font-medium leading-tight">{meta.title}</h1>
-            {issued?.number && (
-              <p className="text-[16px] font-medium tabular-nums">№ {issued.number}</p>
+          <div className="mt-4 flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+            <div className="min-w-0">
+              <h1 className="text-[24px] font-medium leading-tight">{meta.title}</h1>
+              {issued?.number && (
+                <p className="mt-1 text-[16px] font-medium tabular-nums">№ {issued.number}</p>
+              )}
+            </div>
+
+            {/*
+               Квадрат проверки — на самом бланке, а не рядом со страницей.
+               Уйдёт бумага — уйдёт и способ её проверить; распечатанное
+               «откройте наш сайт» этого не заменяет.
+
+               Только у выданного документа с кодом: предпросмотру проверять
+               нечего, он не документ. У бумаг, выпущенных до появления
+               проверки, кода нет — квадрата тоже, и это честнее, чем
+               напечатать ведущий в никуда.
+            */}
+            {qr && issued?.number && (
+              <div className="flex-none text-center">
+                <div
+                  className="inline-block"
+                  aria-hidden="true"
+                  dangerouslySetInnerHTML={{ __html: qr.svg }}
+                />
+                <p className="mt-1.5 text-[11px] leading-tight text-ink-700">
+                  Проверка подлинности
+                  <br />
+                  <span className="font-mono text-[12px] tracking-[0.14em]">{qr.code}</span>
+                </p>
+              </div>
             )}
           </div>
 

@@ -11,6 +11,7 @@ import {
 } from '@/lib/certification'
 import { relId } from '@/lib/visibility'
 import { buildCertificateView } from '@/lib/certificate-view'
+import { newCertificateCode } from '@/lib/certificate-check'
 import type { Animal } from '@/payload-types'
 
 /**
@@ -131,6 +132,15 @@ export async function issueDocumentAction(
   const issuedAt = new Date().toISOString()
 
   /*
+   * Код проверки выпускается вместе с документом и печатается на бланке.
+   *
+   * Выпускать его позже нельзя: бланк уходит на руки в момент выдачи,
+   * и код, добавленный после, на бумаге не появится — а проверять будут
+   * именно по бумаге.
+   */
+  const publicCode = newCertificateCode()
+
+  /*
    * Снимок собирается тем же сборщиком, которым страница рисует бланк.
    *
    * Два независимых сборщика одного документа разошлись бы, и расхождение
@@ -152,6 +162,7 @@ export async function issueDocumentAction(
         animal: animal.id,
         organization: relId(animal.owner) ?? undefined,
         issuedBy: user.id,
+        publicCode,
         snapshot,
       } as never,
     })

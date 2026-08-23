@@ -34,6 +34,7 @@
     "audit:grants": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/audit-grants.ts",
     "audit:checks": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/audit-checks.ts",
     "audit:gate": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/audit-gate.ts",
+    "archive:purge": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/archive-purge.ts",
     "seed:checks": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/seed-checks.ts",
     "smoke": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/smoke.ts"
   },
@@ -48,6 +49,7 @@
     "graphql": "^16.9.0",
     "next": "16.3.1",
     "payload": "3.85.2",
+    "qrcode": "^1.5.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "sharp": "0.34.2"
@@ -55,6 +57,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.0",
     "@types/node": "^22.10.0",
+    "@types/qrcode": "^1.5.5",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "dotenv": "^17.4.2",

@@ -246,6 +246,21 @@ const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
     probe: { kind: 'column', table: 'verification_requests', column: 'withdrawn_for' },
     note: 'отзыв заявки в пользу новой: повторная подача тех же записей',
   },
+  {
+    name: '20260824_090000_archive_retention',
+    probe: { kind: 'table', name: 'animal_removals' },
+    note: 'срок хранения архива и реестр удалённых записей',
+  },
+  {
+    name: '20260824_140000_share_links',
+    probe: { kind: 'table', name: 'share_links' },
+    note: 'ссылки на просмотр со сроком — для тех, у кого нет учётной записи',
+  },
+  {
+    name: '20260824_180000_certificate_check',
+    probe: { kind: 'column', table: 'documents', column: 'public_code' },
+    note: 'код проверки подлинности на бланке (UC-03)',
+  },
 ]
 
 const { driverUri, uri, source, sslConfig } = resolveDatabase()

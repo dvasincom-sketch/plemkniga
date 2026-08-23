@@ -32,7 +32,10 @@ import * as migration_20260823_080000_dna_verdict from './20260823_080000_dna_ve
 import * as migration_20260823_120000_dismissed_issues from './20260823_120000_dismissed_issues';
 import * as migration_20260823_170000_check_thresholds from './20260823_170000_check_thresholds';
 import * as migration_20260823_200000_id_format_rus from './20260823_200000_id_format_rus';
-import * as migration_20260823_230000_verification_withdrawn from './20260823_230000_verification_withdrawn';
+import * as migration_20260823_230000_verification_withdrawn from './20260823_230000_verification_withdrawn'
+import * as migration_20260824_090000_archive_retention from './20260824_090000_archive_retention'
+import * as migration_20260824_140000_share_links from './20260824_140000_share_links'
+import * as migration_20260824_180000_certificate_check from './20260824_180000_certificate_check';
 
 export const migrations = [
   {
@@ -209,5 +212,20 @@ export const migrations = [
     up: migration_20260823_230000_verification_withdrawn.up,
     down: migration_20260823_230000_verification_withdrawn.down,
     name: '20260823_230000_verification_withdrawn',
+  },
+  {
+    up: migration_20260824_090000_archive_retention.up,
+    down: migration_20260824_090000_archive_retention.down,
+    name: '20260824_090000_archive_retention',
+  },
+  {
+    up: migration_20260824_140000_share_links.up,
+    down: migration_20260824_140000_share_links.down,
+    name: '20260824_140000_share_links',
+  },
+  {
+    up: migration_20260824_180000_certificate_check.up,
+    down: migration_20260824_180000_certificate_check.down,
+    name: '20260824_180000_certificate_check',
   },
 ];

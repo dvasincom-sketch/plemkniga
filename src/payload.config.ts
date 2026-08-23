@@ -25,6 +25,8 @@ import { CheckSettings } from '@/collections/CheckSettings'
 import { CheckThresholds } from '@/collections/CheckThresholds'
 import { AnimalEvaluations } from '@/collections/AnimalEvaluations'
 import { AnimalExteriors } from '@/collections/AnimalExteriors'
+import { AnimalRemovals } from '@/collections/AnimalRemovals'
+import { ShareLinks } from '@/collections/ShareLinks'
 import { AnimalRevisions } from '@/collections/AnimalRevisions'
 import { VerificationRequests } from '@/collections/VerificationRequests'
 import { IndexProfiles } from '@/collections/IndexProfiles'
@@ -71,11 +73,13 @@ export default buildConfig({
     AnimalEvaluations,
     AnimalExteriors,
     AnimalRevisions,
+    AnimalRemovals,
     DataSubmissions,
     VerificationRequests,
     AccessRequests,
     AccessGrants,
     AccessViews,
+    ShareLinks,
     CheckSettings,
     CheckThresholds,
     IndexProfiles,
