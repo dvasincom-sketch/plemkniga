@@ -6,6 +6,7 @@ import { isAssociationUser } from '@/lib/association'
 import { relId } from '@/lib/visibility'
 import { VERIFICATION_LIMIT } from '@/lib/verification-limit'
 import { OPEN_VERIFICATION_STATUSES } from '@/collections/VerificationRequests'
+import { dismissKey, heldAnimals } from '@/lib/verification-gate'
 
 /**
  * Полный цикл верификации: хозяйство подаёт — Ассоциация решает.
@@ -261,8 +262,6 @@ const plainDismissed = <T extends { animal?: unknown; by?: unknown }>(
     by: typeof d.by === 'object' && d.by ? (d.by as { id: number }).id : d.by,
   }))
 
-/** Ключ снятия: находка снимается для пары «животное + правило», а не вообще. */
-const dismissKey = (animal: unknown, code: unknown) => `${Number(animal)}|${String(code)}`
 
 /** Взять заявку в работу. */
 export async function takeVerificationAction(
@@ -485,19 +484,14 @@ export async function decideVerificationAction(
   }
 
   const findings = plainFindings(request.review?.findings)
-  const held = new Set(
-    findings
-      .filter((f) => ((f as { severity?: string }).severity ?? 'fix') === 'fix')
-      .map((f) => Number((f as { animal?: number }).animal))
-      /*
-       * `> 0` здесь не украшение. У замечания ко всему пакету животного нет,
-       * `Number(null)` даёт ноль, а ноль — конечное число: такое замечание
-       * попадало в набор исключённых записей под идентификатором 0.
-       * Ни одно животное этот идентификатор не носит, поэтому вреда не было —
-       * но набор «исключённые записи» содержал бы не запись.
-       */
-      .filter((n) => Number.isFinite(n) && n > 0),
-  )
+
+  /*
+   * Записи, выведенные из заявки замечанием «требует исправления».
+   * Считаются тем же кодом, что и в заслоне: два набора «исключённых»,
+   * посчитанные по-разному, однажды разойдутся, и подтверждено окажется
+   * то, что заслон считал неподтверждаемым.
+   */
+  const held = heldAnimals(request as never)
 
   const all = (request.animals ?? []).map((a) => relId(a)).filter((n): n is number => n !== null)
 
@@ -509,58 +503,16 @@ export async function decideVerificationAction(
    * система ставила знак наивысшей достоверности на данные, которые сама
    * же считала противоречивыми. Хозяйство при этом видело только знак.
    *
-   * Запретить подтверждение при существенной находке было нельзя:
-   * право эксперта счесть находку несущественной записано в каталоге
-   * проверок как обещание. Запрещено поэтому молчание — находка должна
-   * быть либо перенесена в замечания, либо снята с объяснением.
-   *
-   * Проверки гоняются здесь заново, а не берутся с экрана разбора.
-   * Между открытием страницы и нажатием кнопки хозяйство могло
-   * что-то поправить, а могло и испортить; решение обязано опираться
-   * на то, что в базе сейчас, а не на то, что эксперт видел утром.
+   * Само правило и его объяснение вынесены в `verification-gate.ts`:
+   * оно живёт отдельно от разбора формы и проверки прав, и потому его
+   * можно прогнать по настоящей базе скриптом, ничего не нажимая
+   * в браузере (`npm run audit:gate`). Пока правило сидело внутри
+   * действия, единственным способом его проверить был человек с мышью.
    */
-  const dismissed = new Set(
-    plainDismissed(request.review?.dismissed).map((d) => dismissKey(d.animal, d.code)),
-  )
-
-  const unresolved = new Map<number, string[]>()
-
-  if (decision === 'approved' && all.length) {
-    const { checkAnimals } = await import('@/lib/data-checks')
-    const { checkSpec } = await import('@/lib/checks-registry')
-
-    const { docs } = await payload.find({
-      collection: 'animals',
-      where: { id: { in: all } },
-      limit: all.length,
-      depth: 0,
-      overrideAccess: true,
-    })
-
-    const { issues } = await checkAnimals(payload, docs as never)
-
-    for (const i of issues) {
-      if (i.severity !== 'fix') continue
-      if (dismissed.has(dismissKey(i.animalId, i.code))) continue
-      if (held.has(i.animalId)) continue
-      unresolved.set(i.animalId, [
-        ...(unresolved.get(i.animalId) ?? []),
-        checkSpec(i.code)?.label ?? i.code,
-      ])
-    }
-  }
-
-  if (unresolved.size) {
-    const names = [...unresolved.values()].flat()
-    const uniq = [...new Set(names)]
-    return {
-      error:
-        `Записей с неразобранными существенными находками — ${unresolved.size}: ` +
-        `${uniq.slice(0, 3).join(', ')}${uniq.length > 3 ? ` и ещё ${uniq.length - 3}` : ''}. ` +
-        'Каждую нужно либо перенести в замечания, либо снять с объяснением. ' +
-        'Статус «Проверено ассоциацией» означает наивысшую достоверность — ' +
-        'ставить его поверх непогашенного противоречия нельзя.',
-    }
+  if (decision === 'approved') {
+    const { approvalBlockers, blockersMessage } = await import('@/lib/verification-gate')
+    const { blockers } = await approvalBlockers(payload, request as never)
+    if (blockers.length) return { error: blockersMessage(blockers) }
   }
 
   const approved = decision === 'approved' ? all.filter((id) => !held.has(id)) : []
