@@ -39,6 +39,15 @@ export type ImportState = {
    * пропущено ноль.
    */
   identMatches?: IdentMatch[]
+  /**
+   * Записи, с которых загрузка сняла знак Ассоциации.
+   *
+   * Отдельным списком, а не строкой в сводке: снятие знака — событие,
+   * о котором хозяйство обязано узнать поимённо. «Обновлено 40» ничего
+   * не говорит о том, что у двух из сорока пропало подтверждение,
+   * добытое неделей ожидания.
+   */
+  unverified?: { ident: string; fields: string[] }[]
 }
 
 /**
@@ -252,6 +261,103 @@ const describeDbError = (e: unknown): string => {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Что именно меняет строка файла                                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Поля, которые файл действительно меняет в уже записанной карточке.
+ *
+ * Нужно затем, чтобы отличить настоящую правку от повторной заливки
+ * того же файла. Повторная заливка — обычное дело: файл собрали, залили,
+ * нашли опечатку в трёх строках, залили весь файл заново. Считать
+ * такую заливку правкой всех пятисот записей значило бы снимать знак
+ * Ассоциации с тех, где не изменилось ни одного символа.
+ *
+ * Сравнение нарочно снисходительное. Дата из файла приходит полным
+ * временем (`2020-03-14T00:00:00.000Z`), в базе лежит так же, но может
+ * отличаться зоной или миллисекундами — сравниваются первые десять
+ * символов, то есть сам день. Числа сравниваются числами: «8450»
+ * и «8450.0» — одно значение. Пустое, пробел и `null` — тоже одно.
+ *
+ * Возвращаются человеческие имена полей, а не пути: список уходит прямо
+ * в сообщение хозяйству.
+ */
+const FIELD_TITLES: Record<string, string> = {
+  identNumber: 'индивидуальный номер',
+  name: 'кличку',
+  sex: 'пол',
+  birthDate: 'дату рождения',
+  breed: 'породу',
+  herd: 'стадо',
+  bloodPercent: 'кровность',
+  ageGroup: 'возрастную группу',
+  state: 'состояние',
+  inbreeding: 'инбридинг',
+  notes: 'примечание',
+  'summary.milkYield': 'удой',
+  'summary.fatPercent': 'жир, %',
+  'summary.proteinPercent': 'белок, %',
+  'summary.fatKg': 'жир, кг',
+  'summary.proteinKg': 'белок, кг',
+}
+
+const atPath = (obj: unknown, path: string): unknown => {
+  let cur: unknown = obj
+  for (const key of path.split('.')) {
+    if (cur === null || typeof cur !== 'object') return undefined
+    cur = (cur as Record<string, unknown>)[key]
+  }
+  return cur
+}
+
+/** Плоский список путей значений внутри собранного объекта строки. */
+const pathsOf = (obj: Record<string, unknown>, prefix = ''): string[] =>
+  Object.entries(obj).flatMap(([k, v]) => {
+    const path = prefix ? `${prefix}.${k}` : k
+    return v !== null && typeof v === 'object' && !Array.isArray(v)
+      ? pathsOf(v as Record<string, unknown>, path)
+      : [path]
+  })
+
+const sameValue = (a: unknown, b: unknown): boolean => {
+  const empty = (v: unknown) => v === null || v === undefined || String(v).trim() === ''
+  if (empty(a) && empty(b)) return true
+  if (empty(a) || empty(b)) return false
+
+  /* Связи в записи приходят объектом, в строке файла — числом. */
+  const idOf = (v: unknown) =>
+    v !== null && typeof v === 'object' && 'id' in (v as object)
+      ? (v as { id: unknown }).id
+      : v
+  const x = idOf(a)
+  const y = idOf(b)
+
+  const nx = Number(x)
+  const ny = Number(y)
+  if (Number.isFinite(nx) && Number.isFinite(ny)) return nx === ny
+
+  const sx = String(x)
+  const sy = String(y)
+  /* Даты сравниваются днём: время в них не значит ничего. */
+  const isDate = (v: string) => /^\d{4}-\d{2}-\d{2}T/.test(v)
+  if (isDate(sx) && isDate(sy)) return sx.slice(0, 10) === sy.slice(0, 10)
+
+  return sx.trim() === sy.trim()
+}
+
+const changedFields = (doc: Record<string, unknown>, data: Record<string, unknown>): string[] => {
+  const out: string[] = []
+  for (const path of pathsOf(data)) {
+    /* Служебные поля строки правкой не считаются: их ставим мы сами. */
+    if (path === 'owner' || path === 'author') continue
+    if (!sameValue(atPath(doc, path), atPath(data, path))) {
+      out.push(FIELD_TITLES[path] ?? path)
+    }
+  }
+  return out
+}
+
+/* ------------------------------------------------------------------ */
 /*  Совпадение цифр идентификаторов                                    */
 /* ------------------------------------------------------------------ */
 
@@ -421,6 +527,13 @@ async function importAnimals(
   ds: Dataset,
   rows: Row[],
   header: string[],
+  /**
+   * Разрешение трогать записи со знаком Ассоциации.
+   *
+   * Приходит отметкой из формы загрузки и по умолчанию снято: подпись
+   * Ассоциации не должна исчезать оттого, что кто-то залил файл, не читая.
+   */
+  updateVerified: boolean,
 ) {
   const cols = columnsOf(ds)
 
@@ -453,6 +566,8 @@ async function importAnimals(
   const touched: number[] = []
   /* Цифровые ядра принятых строк — для сверки одним запросом после разбора. */
   const accepted: Accepted[] = []
+  /* Записи, с которых эта загрузка сняла знак Ассоциации. */
+  const unverified: { ident: string; fields: string[] }[] = []
   const issues: { row: number; ident?: string; reason: string }[] = []
   let skipped = 0
   const skip = (line: number, reason: string, ident?: string) => {
@@ -550,10 +665,48 @@ async function importAnimals(
           skip(line, 'Запись принадлежит другой организации', identNumber)
           continue
         }
+
+        /*
+         * Запись со знаком Ассоциации файлом молча не переписывается.
+         *
+         * До сих пор переписывалась. Проверка владельца отбивала чужие
+         * строки — и только поэтому эталонная «Поляна» пережила загрузку
+         * набора с подменой; будь она записью того же хозяйства, файл
+         * переписал бы ей дату рождения, кровность и продуктивность,
+         * а знак Ассоциации остался бы стоять. Подпись под данными,
+         * которых Ассоциация не видела, — худшее, что может случиться
+         * с книгой: она обесценивает не одну запись, а сам знак.
+         *
+         * Запретить правку совсем нельзя: данные принадлежат хозяйству,
+         * и ошибку в подтверждённой записи оно вправе исправить. Поэтому
+         * не запрет и не молчание, а выбор — тот же приём, что
+         * с повторной заявкой: в форме загрузки есть отметка «обновлять
+         * подтверждённые записи», и вместе с обновлением знак снимается.
+         *
+         * Сравнение с тем, что уже записано, обязательно: повторная
+         * заливка того же файла — обычное дело, и снимать знак с записи,
+         * в которой ничего не изменилось, значило бы наказывать
+         * за аккуратность.
+         */
+        const changed = changedFields(doc as Record<string, unknown>, data)
+        const isVerified = Number((doc as { trustLevel?: unknown }).trustLevel ?? 0) >= 3
+
+        if (isVerified && changed.length > 0 && !updateVerified) {
+          skip(
+            line,
+            `Запись подтверждена Ассоциацией, а файл меняет ${changed.join(', ')}. ` +
+              'Отметьте «обновлять подтверждённые записи» — знак Ассоциации при этом снимется',
+            identNumber,
+          )
+          continue
+        }
+
         await payload.update({
           collection: 'animals',
           id: doc.id,
-          data: data as never,
+          data: (isVerified && changed.length > 0
+            ? { ...data, trustLevel: 0 }
+            : data) as never,
           overrideAccess: true,
           /*
            * Загрузка файлом в журнал правок не идёт: её след — сам пакет
@@ -565,6 +718,10 @@ async function importAnimals(
         })
         touched.push(doc.id as number)
         updated++
+
+        if (isVerified && changed.length > 0) {
+          unverified.push({ ident: identNumber, fields: changed })
+        }
         /*
          * Обновлённая строка сверяется наравне с новой. Она совпала
          * с записью по точному номеру — но третья запись, у которой те же
@@ -605,6 +762,7 @@ async function importAnimals(
     touched,
     unresolved: [...unresolved].slice(0, 20),
     identMatches,
+    unverified,
   }
 }
 
@@ -888,6 +1046,7 @@ async function importEvents(
     touched: [...touched],
     unresolved: [...unresolved].slice(0, 20),
     identMatches: [] as IdentMatch[],
+    unverified: [] as { ident: string; fields: string[] }[],
   }
 }
 
@@ -946,7 +1105,15 @@ export async function importDataAction(
 
   const res =
     ds.key === 'animals'
-      ? await importAnimals(payload, actor, orgId, ds, parsed.rows, parsed.header)
+      ? await importAnimals(
+          payload,
+          actor,
+          orgId,
+          ds,
+          parsed.rows,
+          parsed.header,
+          String(formData.get('updateVerified') || '') === '1',
+        )
       : await importEvents(payload, actor, orgId, ds, parsed.rows, parsed.header)
 
   /*
@@ -1016,5 +1183,6 @@ export async function importDataAction(
     unknownColumns: parsed.unknownColumns,
     unresolved: res.unresolved,
     identMatches: res.identMatches,
+    unverified: res.unverified,
   }
 }

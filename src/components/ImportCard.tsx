@@ -142,6 +142,37 @@ export function ImportCard({ datasets }: { datasets: (Choice & { hint: string })
                 Полный список колонок — в таблице ниже.
               </p>
 
+              {/*
+                 Отметка снята по умолчанию, и это главное в ней.
+
+                 Запись со знаком Ассоциации файлом молча не переписывается:
+                 подпись под данными, которых Ассоциация не видела,
+                 обесценивает не одну карточку, а сам знак. Но и запретить
+                 правку нельзя — данные принадлежат хозяйству. Поэтому
+                 выбор, и делается он до загрузки, а не постфактум.
+
+                 Проверяется только при `animals`: файл событий карточек
+                 не трогает, и отметка там означала бы обещание, которому
+                 нечего исполнять.
+              */}
+              {kind === 'animals' && (
+                <label className="flex items-start gap-2 text-[13px] leading-snug text-ink-700">
+                  <input
+                    type="checkbox"
+                    name="updateVerified"
+                    value="1"
+                    className="mt-0.5"
+                  />
+                  <span>
+                    Обновлять записи со знаком «Верифицировано ассоциацией».
+                    <span className="mt-0.5 block text-ink-500">
+                      У изменённых записей знак снимется — подтверждать их придётся заново.
+                      Без отметки такие строки не принимаются, и вы увидите, какие именно.
+                    </span>
+                  </span>
+                </label>
+              )}
+
               <button type="submit" className="btn btn-forest" disabled={pending}>
                 {pending ? 'Загружаем…' : 'Импортировать'}
               </button>
@@ -241,6 +272,35 @@ export function ImportCard({ datasets }: { datasets: (Choice & { hint: string })
                       <p className="mt-1 text-ink-500">
                         Строки приняты. Автоматически такие записи не объединяются: цифры
                         совпадают и у одного животного под разными номерами, и у двух разных.
+                      </p>
+                    </div>
+                  )}
+
+                  {/*
+                     Снятие знака — событие поимённое. «Обновлено 40»
+                     ничего не говорит о том, что у двух из сорока пропало
+                     подтверждение, добытое неделей ожидания.
+                  */}
+                  {!!state.unverified?.length && (
+                    <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-ink-700">
+                      <p className="font-medium">
+                        Снят знак «Верифицировано ассоциацией»: {state.unverified.length}
+                      </p>
+                      <ul className="mt-1 space-y-0.5">
+                        {state.unverified.slice(0, 5).map((u) => (
+                          <li key={u.ident} className="leading-snug">
+                            № {u.ident} — файл изменил {u.fields.join(', ')}
+                          </li>
+                        ))}
+                      </ul>
+                      {state.unverified.length > 5 && (
+                        <p className="mt-1 text-ink-500">
+                          и ещё {state.unverified.length - 5}
+                        </p>
+                      )}
+                      <p className="mt-1 text-ink-500">
+                        Данные записаны, уровень достоверности стал «Черновик». Подтвердить
+                        заново — заявкой на верификацию.
                       </p>
                     </div>
                   )}
