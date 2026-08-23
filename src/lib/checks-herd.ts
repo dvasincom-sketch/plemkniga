@@ -89,10 +89,24 @@ export type HerdCheckResult = {
   scanned: number
 }
 
+export type HerdCheckOptions = {
+  settings?: CheckSettingsMap
+  /**
+   * Куда сообщить об упавшем запросе.
+   *
+   * На экране текст ошибки PostgreSQL не нужен никому: хозяйство им ничего
+   * не починит, а эксперт не должен читать SQL. Но ревизии (`audit:checks`)
+   * он нужен целиком — там как раз и выясняется, что запрос, написанный
+   * без запуска, падает на приведении типа. Поэтому наружу идёт оговорка
+   * без подробностей, а подробности — тому, кто попросил.
+   */
+  onQueryError?: (label: string, error: unknown) => void
+}
+
 export async function herdIssues(
   payload: Payload,
   organizationId: number | null,
-  settings?: CheckSettingsMap,
+  opts: HerdCheckOptions = {},
 ): Promise<HerdCheckResult> {
   const issues: HerdIssue[] = []
   const limits: CheckLimits = []
@@ -100,7 +114,7 @@ export async function herdIssues(
   if (!organizationId) return { issues, limits, scanned: 0 }
 
   const resolved =
-    settings ?? (await resolveCheckSettings(payload).catch(() => defaultCheckSettings()))
+    opts.settings ?? (await resolveCheckSettings(payload).catch(() => defaultCheckSettings()))
 
   const pool = poolOf(payload)
   if (!pool) {
@@ -119,7 +133,10 @@ export async function herdIssues(
   ) => issues.push({ code, severity, text, examples })
 
   const ask = async (label: string, q: string, p: unknown[]) => {
-    const res = await pool.query(q, p).catch(() => null)
+    const res = await pool.query(q, p).catch((e: unknown) => {
+      opts.onQueryError?.(label, e)
+      return null
+    })
     if (!res) {
       limits.push(`${label}: запрос не выполнился, эта проверка пропущена.`)
       return null

@@ -1250,6 +1250,16 @@ export interface VerificationRequest {
           id?: string | null;
         }[]
       | null;
+    dismissed?:
+      | {
+          animal: number | Animal;
+          code: string;
+          reason: string;
+          by?: (number | null) | User;
+          at?: string | null;
+          id?: string | null;
+        }[]
+      | null;
   };
   updatedAt: string;
   createdAt: string;
@@ -2351,6 +2361,16 @@ export interface VerificationRequestsSelect<T extends boolean = true> {
               field?: T;
               severity?: T;
               text?: T;
+              id?: T;
+            };
+        dismissed?:
+          | T
+          | {
+              animal?: T;
+              code?: T;
+              reason?: T;
+              by?: T;
+              at?: T;
               id?: T;
             };
       };

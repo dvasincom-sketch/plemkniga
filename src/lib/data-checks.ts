@@ -180,7 +180,21 @@ function localIssues(a: Animal): Issue[] {
   if (a.disposalReason && a.state === 'alive') {
     push('disposal-vs-state', 'Указана причина выбытия, но животное числится в стаде', 'state')
   }
-  if (a.state !== 'alive' && !a.disposalReason) {
+  /*
+   * `a.state &&` здесь появилось после первой же ревизии на настоящих
+   * данных: проверка срабатывала на половине книги.
+   *
+   * Причина — пустое состояние. Условие `state !== 'alive'` истинно и когда
+   * животное продано, и когда о его состоянии вообще ничего не записано,
+   * а текст находки утверждал «животное выбыло» — то есть сообщал факт,
+   * которого в записи нет. Незаполненное поле и заполненное иначе — разные
+   * вещи, и путать их особенно дорого именно здесь: находка про выбытие
+   * заставляет искать причину выбытия, которого не было.
+   *
+   * Пустое состояние — тоже пробел, но другой, и ловить его должна
+   * отдельная проверка с отдельным текстом, а не эта.
+   */
+  if (a.state && a.state !== 'alive' && !a.disposalReason) {
     push('state-vs-disposal', 'Животное выбыло, но причина выбытия не указана', 'disposalReason', 'note')
   }
 
@@ -233,8 +247,9 @@ async function relationalIssues(
   payload: Payload,
   animals: Animal[],
   settings: CheckSettingsMap,
-): Promise<{ issues: Issue[]; limits: string[] }> {
+): Promise<{ issues: Issue[]; limits: string[]; coverage: CheckCoverage[] }> {
   const out: Issue[] = []
+  const coverage: CheckCoverage[] = []
   /*
    * Оговорки о полноте разбора.
    *
@@ -244,7 +259,7 @@ async function relationalIssues(
    * одинаково, а значат противоположное.
    */
   const limits: string[] = []
-  if (!animals.length) return { issues: out, limits }
+  if (!animals.length) return { issues: out, limits, coverage }
 
   const parentIds = new Set<number>()
   for (const a of animals) {
@@ -600,6 +615,14 @@ async function relationalIssues(
     ? animals.filter((a) => typeof a.inbreeding === 'number' && (a.father || a.mother))
     : []
 
+  if (withInbreeding.length) {
+    coverage.push({
+      code: 'inbreeding-mismatch',
+      looked: Math.min(withInbreeding.length, INBREEDING_CHECK_LIMIT),
+      eligible: withInbreeding.length,
+    })
+  }
+
   if (withInbreeding.length > INBREEDING_CHECK_LIMIT) {
     limits.push(
       `Инбридинг сверен у ${INBREEDING_CHECK_LIMIT} записей из ${withInbreeding.length}: ` +
@@ -657,7 +680,7 @@ async function relationalIssues(
     }
   }
 
-  return { issues: out, limits }
+  return { issues: out, limits, coverage }
 }
 
 /**
@@ -668,9 +691,33 @@ async function relationalIssues(
  * с потолком читается как разбор целиком, и «чисто» означает то ли
  * «ошибок нет», то ли «не смотрели».
  */
+/**
+ * Сколько записей проверка успела посмотреть, если смотрела не все.
+ *
+ * Появилось после ревизии на настоящих данных. `inbreeding-mismatch` дала
+ * 39 находок на 300 разобранных записей — тринадцать процентов, число
+ * спокойное. На самом деле она успела сверить пятьдесят записей из ста
+ * шестидесяти девяти, и настоящая доля расхождений — не тринадцать
+ * процентов, а семьдесят восемь. Разница между этими числами — разница
+ * между «бывает» и «расчёт надо разбирать сегодня».
+ *
+ * Оговорка словами про потолок была и раньше. Её оказалось мало: человек
+ * читает таблицу с долями, а прозу под ней — уже нет. Знаменатель обязан
+ * быть числом там же, где числитель.
+ */
+export type CheckCoverage = {
+  code: AnimalCheckCode
+  /** Сколько записей проверка посмотрела. */
+  looked: number
+  /** Сколько записей она должна была посмотреть, будь потолок снят. */
+  eligible: number
+}
+
 export type CheckResult = {
   issues: Issue[]
   limits: string[]
+  /** Только для проверок с потолком; для остальных знаменатель — весь набор. */
+  coverage: CheckCoverage[]
 }
 
 /**
@@ -720,7 +767,7 @@ export async function checkAnimals(
     return [rule ? { ...i, severity: rule.severity } : i]
   })
 
-  return { issues: applied, limits }
+  return { issues: applied, limits, coverage: rel.coverage }
 }
 
 /** Сводка для показа: сколько существенных, сколько на усмотрение. */
