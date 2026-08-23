@@ -4,7 +4,9 @@ import { useActionState } from 'react'
 import {
   addVerificationFindingAction,
   decideVerificationAction,
+  dismissAutoIssueAction,
   removeVerificationFindingAction,
+  restoreAutoIssueAction,
   takeVerificationAction,
   type VerificationState,
 } from '@/actions/verification'
@@ -62,9 +64,34 @@ export function TakeVerification({ id, taken }: { id: number | string; taken: st
   )
 }
 
+type Dismissed = {
+  id: string
+  code: string
+  reason: string
+  animal?: { id: number; identNumber?: string } | number | null
+}
+
+/**
+ * Автоматические находки в разборе заявки.
+ *
+ * ## Почему у существенной находки два исхода, а не один
+ *
+ * Раньше исход был один и необязательный: перенести находку в замечания.
+ * Не перенёс — запись подтверждалась молча, вместе с противоречием.
+ *
+ * Теперь существенная находка обязана быть разобрана, и разобрать её можно
+ * двумя способами. «В замечания» — согласиться: запись не подтверждается,
+ * хозяйство получает объяснение. «Не ошибка» — не согласиться с правилом
+ * на этой записи, и тогда нужна причина: через год разбирать, почему
+ * запись подтвердили вопреки проверке, будет другой человек.
+ *
+ * Права счесть находку несущественной эксперт не лишился — он лишился
+ * возможности не заметить её.
+ */
 export function VerificationAutoIssues({
   id,
   issues,
+  dismissed,
   readOnly,
 }: {
   id: number | string
@@ -76,12 +103,31 @@ export function VerificationAutoIssues({
     severity: string
     text: string
   }[]
+  dismissed: Dismissed[]
   readOnly: boolean
 }) {
   const [, addAction] = useActionState<VerificationState, FormData>(
     addVerificationFindingAction,
     {},
   )
+  const [dismissState, dismissAction, dismissing] = useActionState<VerificationState, FormData>(
+    dismissAutoIssueAction,
+    {},
+  )
+  const [, restoreAction] = useActionState<VerificationState, FormData>(
+    restoreAutoIssueAction,
+    {},
+  )
+
+  const isDismissed = (animalId: number, code: string) =>
+    dismissed.some(
+      (d) =>
+        d.code === code &&
+        (typeof d.animal === 'object' && d.animal ? d.animal.id : d.animal) === animalId,
+    )
+
+  const open = issues.filter((i) => !isDismissed(i.animalId, i.code))
+  const unresolvedFix = open.filter((i) => i.severity === 'fix').length
 
   if (!issues.length) {
     return (
@@ -95,20 +141,31 @@ export function VerificationAutoIssues({
     )
   }
 
-  const fix = issues.filter((i) => i.severity === 'fix').length
+  const fix = open.filter((i) => i.severity === 'fix').length
 
   return (
     <div className="card">
-      <h2 className="panel-heading">Автоматические проверки · {issues.length}</h2>
+      <h2 className="panel-heading">Автоматические проверки · {open.length}</h2>
 
       <p className="mb-5 max-w-[70ch] text-[15px] leading-relaxed text-ink-700">
-        {fix} существенных, {issues.length - fix} на усмотрение. Перенесённое в замечания
-        с пометкой «требует исправления» исключит своё животное из подтверждения — остальные
-        записи заявки это не затронет.
+        {fix} существенных, {open.length - fix} на усмотрение.{' '}
+        {unresolvedFix > 0 ? (
+          <>
+            <span className="font-medium">
+              Пока существенные не разобраны, заявку подтвердить нельзя.
+            </span>{' '}
+            Каждую нужно либо перенести в замечания — тогда её животное не подтверждается, —
+            либо снять как не-ошибку с объяснением.
+          </>
+        ) : (
+          'Существенных находок не осталось: все разобраны.'
+        )}
       </p>
 
+      <Result state={dismissState} />
+
       <ul className="divide-y divide-[#ededed]">
-        {issues.map((i, n) => (
+        {open.map((i, n) => (
           <li
             key={`${i.code}-${i.animalId}-${n}`}
             className="flex items-start justify-between gap-4 py-3"
@@ -131,23 +188,84 @@ export function VerificationAutoIssues({
             </div>
 
             {!readOnly && (
-              <form action={addAction} className="flex-none">
-                <input type="hidden" name="id" value={String(id)} />
-                <input type="hidden" name="animal" value={i.animalId} />
-                <input type="hidden" name="field" value={i.field ?? ''} />
-                <input type="hidden" name="severity" value={i.severity} />
-                <input type="hidden" name="text" value={i.text} />
-                <button
-                  type="submit"
-                  className="whitespace-nowrap text-[13px] text-ink-500 underline underline-offset-4 hover:text-forest-500"
-                >
-                  в замечания
-                </button>
-              </form>
+              <div className="flex flex-none flex-col items-end gap-2">
+                <form action={addAction}>
+                  <input type="hidden" name="id" value={String(id)} />
+                  <input type="hidden" name="animal" value={i.animalId} />
+                  <input type="hidden" name="field" value={i.field ?? ''} />
+                  <input type="hidden" name="severity" value={i.severity} />
+                  <input type="hidden" name="text" value={i.text} />
+                  <button
+                    type="submit"
+                    className="whitespace-nowrap text-[13px] text-ink-500 underline underline-offset-4 hover:text-forest-500"
+                  >
+                    в замечания
+                  </button>
+                </form>
+
+                {/*
+                   Причина не спрятана за подтверждением и не подставляется
+                   значением по умолчанию. Поле пустое и обязательное —
+                   единственный способ добиться, чтобы в нём оказалось
+                   объяснение, а не первое, что предложила форма.
+                */}
+                <form action={dismissAction} className="flex items-start gap-2">
+                  <input type="hidden" name="id" value={String(id)} />
+                  <input type="hidden" name="animal" value={i.animalId} />
+                  <input type="hidden" name="code" value={i.code} />
+                  <input
+                    type="text"
+                    name="reason"
+                    required
+                    placeholder="почему это не ошибка"
+                    className="w-[190px] rounded-lg border border-ink-200 px-2.5 py-1 text-[13px]"
+                  />
+                  <button
+                    type="submit"
+                    disabled={dismissing}
+                    className="whitespace-nowrap text-[13px] text-ink-500 underline underline-offset-4 hover:text-forest-500"
+                  >
+                    не ошибка
+                  </button>
+                </form>
+              </div>
             )}
           </li>
         ))}
       </ul>
+
+      {dismissed.length > 0 && (
+        <div className="mt-6 border-t border-ink-100 pt-5">
+          <h3 className="mb-3 text-[15px] font-medium">Снятые находки · {dismissed.length}</h3>
+          <ul className="space-y-3">
+            {dismissed.map((d) => (
+              <li key={d.id} className="flex items-start justify-between gap-4 text-[14px]">
+                <div className="min-w-0">
+                  <p className="text-ink-700">{d.reason}</p>
+                  <p className="mt-0.5 text-[13px] text-ink-500">
+                    {typeof d.animal === 'object' && d.animal
+                      ? `№ ${d.animal.identNumber ?? d.animal.id}`
+                      : `№ ${d.animal ?? '—'}`}{' '}
+                    · {d.code}
+                  </p>
+                </div>
+                {!readOnly && (
+                  <form action={restoreAction} className="flex-none">
+                    <input type="hidden" name="id" value={String(id)} />
+                    <input type="hidden" name="dismissed" value={d.id} />
+                    <button
+                      type="submit"
+                      className="whitespace-nowrap text-[13px] text-ink-500 underline underline-offset-4 hover:text-forest-500"
+                    >
+                      вернуть в разбор
+                    </button>
+                  </form>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }

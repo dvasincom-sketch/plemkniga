@@ -232,7 +232,20 @@ export default async function ReviewVerificationPage({
               </div>
             </div>
 
-            <VerificationAutoIssues id={request.id} issues={issues} readOnly={decided} />
+            <VerificationAutoIssues
+              id={request.id}
+              issues={issues}
+              dismissed={(request.review?.dismissed ?? []).map((d) => ({
+                id: String(d.id),
+                code: String(d.code),
+                reason: String(d.reason),
+                animal:
+                  typeof d.animal === 'object' && d.animal
+                    ? { id: d.animal.id as number, identNumber: d.animal.identNumber }
+                    : (d.animal ?? null),
+              }))}
+              readOnly={decided}
+            />
 
             {herd.issues.length > 0 && (
               <div className="card">

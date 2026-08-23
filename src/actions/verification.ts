@@ -130,6 +130,37 @@ const plainFindings = (findings: { animal?: unknown }[] | null | undefined) =>
     animal: typeof f.animal === 'object' && f.animal ? (f.animal as { id: number }).id : f.animal,
   }))
 
+/**
+ * Снятые находки — в том же виде, что и замечания.
+ *
+ * Отдельная функция, а не переиспользование `plainFindings`, потому что
+ * у снятой находки есть ещё одна связь — кто снял. Прогонять её через
+ * функцию, знающую только про животное, значило бы записать пользователя
+ * объектом и получить связь, которую Payload не примет.
+ */
+/*
+ * Обобщённая по типу строки, а не по `{ animal, by }`.
+ *
+ * Узкий тип параметра съедает всё остальное: `...d` в результате даёт
+ * ровно те поля, которые названы в сигнатуре, и `code` с `reason`
+ * пропадают из типа, хотя в значении остаются. Ошибка вылезает у
+ * вызывающей стороны и читается как «у снятой находки нет кода».
+ *
+ * Соседняя `plainFindings` живёт с этой же бедой, и обходят её приведением
+ * типа на месте чтения. Здесь сделано наоборот — тип сохраняется.
+ */
+const plainDismissed = <T extends { animal?: unknown; by?: unknown }>(
+  rows: T[] | null | undefined,
+) =>
+  (rows ?? []).map((d) => ({
+    ...d,
+    animal: typeof d.animal === 'object' && d.animal ? (d.animal as { id: number }).id : d.animal,
+    by: typeof d.by === 'object' && d.by ? (d.by as { id: number }).id : d.by,
+  }))
+
+/** Ключ снятия: находка снимается для пары «животное + правило», а не вообще. */
+const dismissKey = (animal: unknown, code: unknown) => `${Number(animal)}|${String(code)}`
+
 /** Взять заявку в работу. */
 export async function takeVerificationAction(
   _prev: VerificationState,
@@ -152,7 +183,16 @@ export async function takeVerificationAction(
     overrideAccess: true,
     data: {
       status: 'checking',
-      review: { ...(request.review ?? {}), assignee: user.id, findings: plainFindings(request.review?.findings) },
+      review: {
+        ...(request.review ?? {}),
+        assignee: user.id,
+        findings: plainFindings(request.review?.findings),
+        // Массивы со связями переписываются целиком при каждом обновлении
+        // группы. Оставить их в том виде, в каком они пришли из базы —
+        // с развёрнутыми объектами вместо идентификаторов, — значит
+        // отдать Payload связь, которую он не примет.
+        dismissed: plainDismissed(request.review?.dismissed),
+      },
     } as never,
   })
 
@@ -186,12 +226,98 @@ export async function addVerificationFindingAction(
       review: {
         ...(request.review ?? {}),
         findings: [...plainFindings(request.review?.findings), { animal, field, severity, text }],
+        dismissed: plainDismissed(request.review?.dismissed),
       },
     } as never,
   })
 
   revalidatePath(`/association/verifications/${request.id}`)
   return { message: 'Замечание записано' }
+}
+
+/**
+ * Снять автоматическую находку: «посмотрел, здесь не ошибка».
+ *
+ * Второй из двух возможных исходов разбора существенной находки. Первый —
+ * перенести её в замечания, и тогда запись не подтверждается. Молчание
+ * перестало быть исходом: `decideVerificationAction` не подтвердит запись,
+ * у которой осталась неразобранная существенная находка.
+ *
+ * Причина обязательна и хранится вместе со снятием. Через год разбирать,
+ * почему запись подтвердили вопреки проверке, будет другой человек,
+ * и «эксперт нажал кнопку» ему ничего не объяснит.
+ */
+export async function dismissAutoIssueAction(
+  _prev: VerificationState,
+  formData: FormData,
+): Promise<VerificationState> {
+  const ctx = await guard(String(formData.get('id') || ''))
+  if ('error' in ctx) return { error: ctx.error }
+  const { user, payload, request } = ctx
+
+  const animal = Number(formData.get('animal'))
+  const code = String(formData.get('code') || '').trim()
+  const reason = String(formData.get('reason') || '').trim()
+
+  if (!Number.isFinite(animal) || animal <= 0) return { error: 'Не указано животное' }
+  if (!code) return { error: 'Не указана проверка' }
+  if (!reason) {
+    return { error: 'Объясните, почему это не ошибка — иначе снятие неотличимо от невнимательности' }
+  }
+
+  const existing = plainDismissed(request.review?.dismissed)
+  const already = existing.some((d) => dismissKey(d.animal, d.code) === dismissKey(animal, code))
+  if (already) return { message: 'Эта находка уже снята' }
+
+  await payload.update({
+    collection: 'verification-requests',
+    id: request.id,
+    overrideAccess: true,
+    data: {
+      review: {
+        ...(request.review ?? {}),
+        findings: plainFindings(request.review?.findings),
+        dismissed: [
+          ...existing,
+          { animal, code, reason, by: user.id, at: new Date().toISOString() },
+        ],
+      },
+    } as never,
+  })
+
+  revalidatePath(`/association/verifications/${request.id}`)
+  return { message: 'Находка снята с объяснением' }
+}
+
+/** Вернуть снятую находку в разбор. */
+export async function restoreAutoIssueAction(
+  _prev: VerificationState,
+  formData: FormData,
+): Promise<VerificationState> {
+  const ctx = await guard(String(formData.get('id') || ''))
+  if ('error' in ctx) return { error: ctx.error }
+  const { payload, request } = ctx
+
+  const key = String(formData.get('dismissed') || '')
+  const dismissed = plainDismissed(request.review?.dismissed).filter(
+    (d) => String((d as { id?: string }).id) !== key,
+  )
+
+  await payload.update({
+    collection: 'verification-requests',
+    id: request.id,
+    overrideAccess: true,
+    data: {
+      review: {
+        ...(request.review ?? {}),
+        findings: plainFindings(request.review?.findings),
+        dismissed,
+      },
+    } as never,
+  })
+
+  revalidatePath(`/association/verifications/${request.id}`)
+  return { message: 'Находка возвращена в разбор' }
 }
 
 /** Убрать замечание. */
@@ -212,7 +338,13 @@ export async function removeVerificationFindingAction(
     collection: 'verification-requests',
     id: request.id,
     overrideAccess: true,
-    data: { review: { ...(request.review ?? {}), findings } } as never,
+    data: {
+      review: {
+        ...(request.review ?? {}),
+        findings,
+        dismissed: plainDismissed(request.review?.dismissed),
+      },
+    } as never,
   })
 
   revalidatePath(`/association/verifications/${request.id}`)
@@ -258,6 +390,69 @@ export async function decideVerificationAction(
   )
 
   const all = (request.animals ?? []).map((a) => relId(a)).filter((n): n is number => n !== null)
+
+  /*
+   * Автоматические проверки — часть решения, а не справка рядом с ним.
+   *
+   * До этой правки они эксперту только показывались. Запись получала
+   * «Проверено ассоциацией» с непогашенным `parent-younger` — то есть
+   * система ставила знак наивысшей достоверности на данные, которые сама
+   * же считала противоречивыми. Хозяйство при этом видело только знак.
+   *
+   * Запретить подтверждение при существенной находке было нельзя:
+   * право эксперта счесть находку несущественной записано в каталоге
+   * проверок как обещание. Запрещено поэтому молчание — находка должна
+   * быть либо перенесена в замечания, либо снята с объяснением.
+   *
+   * Проверки гоняются здесь заново, а не берутся с экрана разбора.
+   * Между открытием страницы и нажатием кнопки хозяйство могло
+   * что-то поправить, а могло и испортить; решение обязано опираться
+   * на то, что в базе сейчас, а не на то, что эксперт видел утром.
+   */
+  const dismissed = new Set(
+    plainDismissed(request.review?.dismissed).map((d) => dismissKey(d.animal, d.code)),
+  )
+
+  const unresolved = new Map<number, string[]>()
+
+  if (decision === 'approved' && all.length) {
+    const { checkAnimals } = await import('@/lib/data-checks')
+    const { checkSpec } = await import('@/lib/checks-registry')
+
+    const { docs } = await payload.find({
+      collection: 'animals',
+      where: { id: { in: all } },
+      limit: all.length,
+      depth: 0,
+      overrideAccess: true,
+    })
+
+    const { issues } = await checkAnimals(payload, docs as never)
+
+    for (const i of issues) {
+      if (i.severity !== 'fix') continue
+      if (dismissed.has(dismissKey(i.animalId, i.code))) continue
+      if (held.has(i.animalId)) continue
+      unresolved.set(i.animalId, [
+        ...(unresolved.get(i.animalId) ?? []),
+        checkSpec(i.code)?.label ?? i.code,
+      ])
+    }
+  }
+
+  if (unresolved.size) {
+    const names = [...unresolved.values()].flat()
+    const uniq = [...new Set(names)]
+    return {
+      error:
+        `Записей с неразобранными существенными находками — ${unresolved.size}: ` +
+        `${uniq.slice(0, 3).join(', ')}${uniq.length > 3 ? ` и ещё ${uniq.length - 3}` : ''}. ` +
+        'Каждую нужно либо перенести в замечания, либо снять с объяснением. ' +
+        'Статус «Проверено ассоциацией» означает наивысшую достоверность — ' +
+        'ставить его поверх непогашенного противоречия нельзя.',
+    }
+  }
+
   const approved = decision === 'approved' ? all.filter((id) => !held.has(id)) : []
 
   if (decision === 'approved' && approved.length === 0) {
@@ -294,6 +489,7 @@ export async function decideVerificationAction(
       review: {
         ...(request.review ?? {}),
         findings,
+        dismissed: plainDismissed(request.review?.dismissed),
         decidedBy: user.id,
         decidedAt: now,
         comment: comment || undefined,
