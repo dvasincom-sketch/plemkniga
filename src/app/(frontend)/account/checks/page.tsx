@@ -9,6 +9,11 @@ import { getClient, getCurrentUser } from '@/lib/payload'
 import { isAssociation } from '@/access'
 import { CHECK_GROUPS } from '@/lib/checks-registry'
 import { resolveCheckSettings } from '@/lib/check-settings'
+import {
+  resolveThresholds,
+  thresholdValue,
+  thresholdsOfCheck,
+} from '@/lib/check-thresholds'
 
 export const metadata: Metadata = { title: 'Что проверяется автоматически' }
 export const dynamic = 'force-dynamic'
@@ -73,7 +78,10 @@ export default async function ChecksPage() {
    * именно в том случае, ради которого его читают.
    */
   const payload = await getClient()
-  const settings = await resolveCheckSettings(payload)
+  const [settings, thresholds] = await Promise.all([
+    resolveCheckSettings(payload),
+    resolveThresholds(payload),
+  ])
 
   return (
     <>
@@ -185,11 +193,42 @@ export default async function ChecksPage() {
                             {c.why}
                           </p>
 
-                          {c.threshold && (
-                            <p className="mt-3 text-[13px] text-ink-500">
-                              <span className="text-ink-700">Граница:</span> {c.threshold}
-                            </p>
-                          )}
+                          {/*
+                             Границы показываются действующие, а не описанные
+                             словами в реестре. Раньше здесь стояла строка,
+                             написанная руками: «удой вне 500…25 000 кг».
+                             Пока числа менять было нельзя, она не могла
+                             разойтись с кодом. Теперь может — и первым,
+                             кто прочтёт устаревшую границу, будет хозяйство,
+                             пришедшее сюда починить данные до подачи.
+                          */}
+                          {(() => {
+                            const knobs = thresholdsOfCheck(c.code)
+                            if (!knobs.length) {
+                              return c.threshold ? (
+                                <p className="mt-3 text-[13px] text-ink-500">
+                                  <span className="text-ink-700">Граница:</span> {c.threshold}
+                                </p>
+                              ) : null
+                            }
+                            return (
+                              <dl className="mt-3 space-y-1 text-[13px] text-ink-500">
+                                {knobs.map((k) => (
+                                  <div key={k.key} className="flex flex-wrap gap-x-2">
+                                    <dt className="text-ink-700">{k.label}:</dt>
+                                    <dd className="tabular-nums">
+                                      {thresholdValue(k, thresholds[k.key as keyof typeof thresholds])}
+                                      {thresholds[k.key as keyof typeof thresholds] !== k.default && (
+                                        <span className="ml-2">
+                                          (заложено {thresholdValue(k, k.default)})
+                                        </span>
+                                      )}
+                                    </dd>
+                                  </div>
+                                ))}
+                              </dl>
+                            )
+                          })()}
 
                           {/* Правку Ассоциации видно вместе с причиной: правило,
                               изменённое молча, читается как ошибка в коде. */}

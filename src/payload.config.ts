@@ -22,6 +22,7 @@ import { AccessRequests } from '@/collections/AccessRequests'
 import { AccessGrants } from '@/collections/AccessGrants'
 import { AccessViews } from '@/collections/AccessViews'
 import { CheckSettings } from '@/collections/CheckSettings'
+import { CheckThresholds } from '@/collections/CheckThresholds'
 import { AnimalEvaluations } from '@/collections/AnimalEvaluations'
 import { AnimalExteriors } from '@/collections/AnimalExteriors'
 import { AnimalRevisions } from '@/collections/AnimalRevisions'
@@ -76,6 +77,7 @@ export default buildConfig({
     AccessGrants,
     AccessViews,
     CheckSettings,
+    CheckThresholds,
     IndexProfiles,
     IndexValues,
     IndexBases,

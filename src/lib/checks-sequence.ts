@@ -1,6 +1,7 @@
 import type { Payload } from 'payload'
 import type { Animal } from '@/payload-types'
-import { VOLUNTARY_WAIT_DAYS, type CheckLimits, type Issue } from '@/lib/checks-registry'
+import type { CheckLimits, Issue } from '@/lib/checks-registry'
+import { defaultThresholds, type Thresholds } from '@/lib/check-thresholds'
 
 /**
  * Проверки, которые смотрят на события во времени.
@@ -86,6 +87,7 @@ type InseminationRow = {
 export async function sequenceIssues(
   payload: Payload,
   animals: Animal[],
+  t: Thresholds = defaultThresholds(),
 ): Promise<{ issues: Issue[]; limits: CheckLimits }> {
   const out: Issue[] = []
   const limits: CheckLimits = []
@@ -296,11 +298,11 @@ export async function sequenceIssues(
       if (!prev) continue
 
       const days = Math.round((insAt - time(prev.date)!) / DAY)
-      if (days < VOLUNTARY_WAIT_DAYS) {
+      if (days < t.voluntaryWaitDays) {
         push(
           animalId,
           'insemination-too-soon',
-          `Осеменение ${asDate(ins.date)} — через ${days} дн. после отёла ${asDate(prev.date)}. Раньше ${VOLUNTARY_WAIT_DAYS} дней осеменять физически не в чем: ошибка в одной из дат`,
+          `Осеменение ${asDate(ins.date)} — через ${days} дн. после отёла ${asDate(prev.date)}. Раньше ${t.voluntaryWaitDays} дней осеменять физически не в чем: ошибка в одной из дат`,
           'inseminations',
         )
         break

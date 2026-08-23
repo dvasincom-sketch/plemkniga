@@ -1,12 +1,7 @@
 import type { Payload } from 'payload'
 import type { Animal } from '@/payload-types'
-import {
-  CYCLE_DEPTH,
-  GESTATION_MIN_DAYS,
-  PARENT_AGE,
-  type CheckLimits,
-  type Issue,
-} from '@/lib/checks-registry'
+import { CYCLE_DEPTH, type CheckLimits, type Issue } from '@/lib/checks-registry'
+import { defaultThresholds, type Thresholds } from '@/lib/check-thresholds'
 import { monthsBetween } from '@/lib/afc'
 
 /**
@@ -160,6 +155,7 @@ function findsItself(start: number, map: Map<number, Node>): boolean {
 export async function pedigreeIssues(
   payload: Payload,
   animals: Animal[],
+  t: Thresholds = defaultThresholds(),
 ): Promise<{ issues: Issue[]; limits: CheckLimits }> {
   const out: Issue[] = []
   const limits: CheckLimits = []
@@ -223,18 +219,18 @@ export async function pedigreeIssues(
        */
       if (months <= 0) continue
 
-      if (months < PARENT_AGE.minMonths) {
+      if (months < t.parentAgeMinMonths) {
         push(
           a,
           'parent-age-implausible',
-          `${label} № ${parent.identNumber} на момент рождения потомка был(а) в возрасте ${months} мес. — раньше ${PARENT_AGE.minMonths} потомства не бывает`,
+          `${label} № ${parent.identNumber} на момент рождения потомка был(а) в возрасте ${months} мес. — раньше ${t.parentAgeMinMonths} потомства не бывает`,
           side,
         )
-      } else if (months > PARENT_AGE.maxYears * 12) {
+      } else if (months > t.parentAgeMaxYears * 12) {
         push(
           a,
           'parent-age-implausible',
-          `${label} № ${parent.identNumber} на момент рождения потомка был(а) старше ${PARENT_AGE.maxYears} лет — проверьте, тот ли родитель связан`,
+          `${label} № ${parent.identNumber} на момент рождения потомка был(а) старше ${t.parentAgeMaxYears} лет — проверьте, тот ли родитель связан`,
           side,
         )
       }
@@ -247,7 +243,7 @@ export async function pedigreeIssues(
     const gone = time(father?.disposalDate)
     const bornAt = time(born)
 
-    if (gone !== null && bornAt !== null && bornAt - gone > GESTATION_MIN_DAYS * DAY) {
+    if (gone !== null && bornAt !== null && bornAt - gone > t.gestationMinDays * DAY) {
       const months = monthsBetween(father!.disposalDate, born)
       push(
         a,
@@ -317,7 +313,7 @@ export async function pedigreeIssues(
            * рождаются в один день. Именно поэтому проверка начинается
            * с единицы, а не с нуля.
            */
-          if (days < 1 || days >= GESTATION_MIN_DAYS) continue
+          if (days < 1 || days >= t.gestationMinDays) continue
 
           /*
            * Находка вешается на того из двоих, кто есть в разборе.

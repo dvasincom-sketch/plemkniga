@@ -84,6 +84,7 @@ export interface Config {
     'access-grants': AccessGrant;
     'access-views': AccessView;
     'check-settings': CheckSetting;
+    'check-thresholds': CheckThreshold;
     'index-profiles': IndexProfile;
     'index-values': IndexValue;
     'index-bases': IndexBase;
@@ -129,6 +130,7 @@ export interface Config {
     'access-grants': AccessGrantsSelect<false> | AccessGrantsSelect<true>;
     'access-views': AccessViewsSelect<false> | AccessViewsSelect<true>;
     'check-settings': CheckSettingsSelect<false> | CheckSettingsSelect<true>;
+    'check-thresholds': CheckThresholdsSelect<false> | CheckThresholdsSelect<true>;
     'index-profiles': IndexProfilesSelect<false> | IndexProfilesSelect<true>;
     'index-values': IndexValuesSelect<false> | IndexValuesSelect<true>;
     'index-bases': IndexBasesSelect<false> | IndexBasesSelect<true>;
@@ -1370,6 +1372,27 @@ export interface CheckSetting {
   createdAt: string;
 }
 /**
+ * Числа, по которым срабатывают автоматические проверки. Строка нужна только там, где значение отличается от заложенного.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "check-thresholds".
+ */
+export interface CheckThreshold {
+  id: number;
+  /**
+   * Совпадает с именем в реестре порогов
+   */
+  key: string;
+  value: number;
+  /**
+   * Через год объяснять, почему порог не такой, как в реестре, будет другой человек
+   */
+  note?: string | null;
+  updatedBy?: (number | null) | User;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "index-profiles".
  */
@@ -1641,6 +1664,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'check-settings';
         value: number | CheckSetting;
+      } | null)
+    | ({
+        relationTo: 'check-thresholds';
+        value: number | CheckThreshold;
       } | null)
     | ({
         relationTo: 'index-profiles';
@@ -2440,6 +2467,18 @@ export interface CheckSettingsSelect<T extends boolean = true> {
   code?: T;
   enabled?: T;
   severity?: T;
+  note?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "check-thresholds_select".
+ */
+export interface CheckThresholdsSelect<T extends boolean = true> {
+  key?: T;
+  value?: T;
   note?: T;
   updatedBy?: T;
   updatedAt?: T;

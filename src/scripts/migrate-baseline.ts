@@ -224,6 +224,11 @@ const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
     probe: { kind: 'table', name: 'verification_requests_review_dismissed' },
     note: 'снятые экспертом автоматические находки с объяснением',
   },
+  {
+    name: '20260823_170000_check_thresholds',
+    probe: { kind: 'table', name: 'check_thresholds' },
+    note: 'пороги проверок: отклонения от заложенных в реестр',
+  },
 ]
 
 const { driverUri, uri, source, sslConfig } = resolveDatabase()

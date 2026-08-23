@@ -1,10 +1,15 @@
 import type { Payload } from 'payload'
 import {
-  HERD_THRESHOLDS as T,
+  HERD_THRESHOLDS as CAPS,
   type CheckLimits,
   type HerdCheckCode,
   type HerdIssue,
 } from '@/lib/checks-registry'
+import {
+  defaultThresholds,
+  resolveThresholds,
+  type Thresholds,
+} from '@/lib/check-thresholds'
 import {
   defaultCheckSettings,
   resolveCheckSettings,
@@ -91,6 +96,7 @@ export type HerdCheckResult = {
 
 export type HerdCheckOptions = {
   settings?: CheckSettingsMap
+  thresholds?: Thresholds
   /**
    * Куда сообщить об упавшем запросе.
    *
@@ -113,8 +119,14 @@ export async function herdIssues(
 
   if (!organizationId) return { issues, limits, scanned: 0 }
 
-  const resolved =
-    opts.settings ?? (await resolveCheckSettings(payload).catch(() => defaultCheckSettings()))
+  const [resolved, t] = await Promise.all([
+    opts.settings
+      ? Promise.resolve(opts.settings)
+      : resolveCheckSettings(payload).catch(() => defaultCheckSettings()),
+    opts.thresholds
+      ? Promise.resolve(opts.thresholds)
+      : resolveThresholds(payload).catch(() => defaultThresholds()),
+  ])
 
   const pool = poolOf(payload)
   if (!pool) {
@@ -258,12 +270,12 @@ export async function herdIssues(
     const buckets = magRows.map((r) => ({ mag: num(r.mag), n: num(r.n) }))
     const total = buckets.reduce((s, b) => s + b.n, 0)
     const main = buckets.reduce((a, b) => (b.n > a.n ? b : a))
-    const factorMag = Math.log10(T.unitsFactor)
+    const factorMag = Math.log10(t.herdUnitsFactor)
 
     const off = buckets.filter((b) => Math.abs(b.mag - main.mag) >= factorMag)
     const offRows = off.reduce((s, b) => s + b.n, 0)
 
-    if (offRows >= T.unitsMinRows) {
+    if (offRows >= CAPS.unitsMinRows) {
       const other = off.reduce((a, b) => (b.n > a.n ? b : a))
       const factor = Math.pow(10, Math.abs(other.mag - main.mag))
       const smaller = other.mag < main.mag
@@ -281,9 +293,9 @@ export async function herdIssues(
 
   /* ------------------------- Круглые значения ------------------------- */
 
-  if (scanned >= T.minHerd) {
+  if (scanned >= t.herdMin) {
     const r500 = num(shape?.r500)
-    if (r500 / scanned > T.roundedShare) {
+    if (r500 / scanned > t.herdRoundedShare / 100) {
       push(
         'values-rounded',
         'note',
@@ -298,9 +310,9 @@ export async function herdIssues(
 
   const median = shape?.median != null ? Number(shape.median) : null
 
-  if (median !== null && median > 0 && scanned >= T.minHerd) {
-    const high = median * T.outlierFactor
-    const low = median / T.outlierFactor
+  if (median !== null && median > 0 && scanned >= t.herdMin) {
+    const high = median * t.herdOutlierFactor
+    const low = median / t.herdOutlierFactor
 
     const rows = await ask(
       'Выбросы по удою',
@@ -314,7 +326,7 @@ export async function herdIssues(
           and (a.summary_milk_yield > $2 or a.summary_milk_yield < $3)
         order by abs(a.summary_milk_yield::numeric - $4) desc
         limit $5`,
-      [organizationId, high, low, median, T.examples],
+      [organizationId, high, low, median, CAPS.examples],
     )
 
     if (rows?.length) {
@@ -323,7 +335,7 @@ export async function herdIssues(
         'outlier-vs-herd',
         'note',
         `Медиана удоя по стаду — ${kg(Math.round(median))} кг. ` +
-          `${total} записей отличаются от неё больше чем в ${T.outlierFactor} раза: ` +
+          `${total} записей отличаются от неё больше чем в ${t.herdOutlierFactor} раза: ` +
           `за пределами ${kg(Math.round(low))}…${kg(Math.round(high))} кг. ` +
           'Формально такие удои правдоподобны — неправдоподобны они именно в этом стаде',
         rows.map((r) => ({
@@ -338,7 +350,7 @@ export async function herdIssues(
 
   const born = num(birth?.n)
 
-  if (born >= T.minHerd) {
+  if (born >= t.herdMin) {
     const jan1 = num(birth?.jan1)
     const first = num(birth?.first_of_month)
 
@@ -348,7 +360,7 @@ export async function herdIssues(
      * одни и те же записи дважды. Первое января точнее — оно и берётся,
      * когда сработало.
      */
-    if (jan1 / born > T.jan1Share) {
+    if (jan1 / born > t.herdJan1Share / 100) {
       push(
         'birth-date-clustered',
         'note',
@@ -356,7 +368,7 @@ export async function herdIssues(
           'При настоящем учёте отёлов первого января около одного процента: ' +
           'похоже, у этих записей был известен только год, а день поставили началом',
       )
-    } else if (first / born > T.firstOfMonthShare) {
+    } else if (first / born > t.herdFirstOfMonthShare / 100) {
       push(
         'birth-date-clustered',
         'note',
@@ -442,7 +454,7 @@ export async function herdIssues(
      * что оно маленькое, а не что оно что-то потеряло. Проверка имеет
      * смысл там, где отёлы идут потоком и потому обязаны быть каждый год.
      */
-    if (gaps.length && total / span >= T.minHerd) {
+    if (gaps.length && total / span >= t.herdMin) {
       push(
         'event-year-gap',
         'note',

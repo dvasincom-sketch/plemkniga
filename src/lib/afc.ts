@@ -100,9 +100,22 @@ export const AFC_REFERENCE = {
 
 export type AfcVerdict = 'ok' | 'tooYoung' | 'tooOld'
 
-export const afcVerdict = (months: number): AfcVerdict => {
-  if (months < AFC_PLAUSIBLE.min) return 'tooYoung'
-  if (months > AFC_PLAUSIBLE.max) return 'tooOld'
+/**
+ * Границы можно передать снаружи — их настраивает Ассоциация.
+ *
+ * Умолчание оставлено намеренно: функцию зовут и там, где настроек нет
+ * под рукой (карточка животного, лента событий), и заставлять каждое такое
+ * место ходить в базу за двумя числами значило бы сделать подпись
+ * в интерфейсе дороже самого расчёта. Расхождение возможно только пока
+ * порог отличается от заложенного, и видно оно в каталоге проверок,
+ * где значения показываются действующие.
+ */
+export const afcVerdict = (
+  months: number,
+  bounds: { min: number; max: number } = AFC_PLAUSIBLE,
+): AfcVerdict => {
+  if (months < bounds.min) return 'tooYoung'
+  if (months > bounds.max) return 'tooOld'
   return 'ok'
 }
 

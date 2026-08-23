@@ -1,6 +1,6 @@
 import type { Payload } from 'payload'
 import type { Animal } from '@/payload-types'
-import { AFC_PLAUSIBLE, afcMonths, afcVerdict, monthsLabel } from '@/lib/afc'
+import { afcMonths, afcVerdict, monthsLabel } from '@/lib/afc'
 import { analyzeAncestry } from '@/lib/ancestry'
 import {
   defaultCheckSettings,
@@ -10,16 +10,18 @@ import {
 import { pedigreeIssues } from '@/lib/checks-pedigree'
 import { sequenceIssues } from '@/lib/checks-sequence'
 import {
-  BLOOD_TOLERANCE,
-  GESTATION_MIN_DAYS,
   INBREEDING_CHECK_LIMIT,
-  INBREEDING_TOLERANCE,
   PLAUSIBLE,
   type AnimalCheckCode,
   type CheckLimits,
   type CheckSeverity,
   type Issue,
 } from '@/lib/checks-registry'
+import {
+  defaultThresholds,
+  resolveThresholds,
+  type Thresholds,
+} from '@/lib/check-thresholds'
 
 /**
  * Автоматический поиск несостыковок в данных.
@@ -104,7 +106,7 @@ const sameIdent = (a?: string | null, b?: string | null): boolean => {
  * Отделены от тех, что ходят в базу: этих много, они дешёвые, и гонять
  * ради них запросы незачем.
  */
-function localIssues(a: Animal): Issue[] {
+function localIssues(a: Animal, t: Thresholds): Issue[] {
   const out: Issue[] = []
   const push = (code: AnimalCheckCode, text: string, field?: string, severity: CheckSeverity = 'fix') =>
     out.push({ code, animalId: a.id as number, ident: a.identNumber, field, severity, text })
@@ -117,7 +119,7 @@ function localIssues(a: Animal): Issue[] {
     push('birth-in-future', 'Дата рождения в будущем', 'birthDate')
   } else if (born !== null) {
     const age = (Date.now() - born) / (365.25 * 86_400_000)
-    if (age > PLAUSIBLE.ageYears && a.state === 'alive') {
+    if (age > t.ageMaxYears && a.state === 'alive') {
       push(
         'too-old-alive',
         `Возраст ${Math.floor(age)} лет, при этом животное числится в стаде — вероятно, не отмечено выбытие`,
@@ -138,23 +140,23 @@ function localIssues(a: Animal): Issue[] {
   const s = a.summary ?? {}
 
   const milk = s.milkYield
-  if (typeof milk === 'number' && (milk < PLAUSIBLE.milkYield.min || milk > PLAUSIBLE.milkYield.max)) {
+  if (typeof milk === 'number' && (milk < t.milkMin || milk > t.milkMax)) {
     push(
       'milk-implausible',
-      `Удой ${milk.toLocaleString('ru-RU')} ${PLAUSIBLE.milkYield.unit} вне правдоподобных границ — проверьте единицы измерения`,
+      `Удой ${milk.toLocaleString('ru-RU')} ${PLAUSIBLE.milkYield.unit} вне границ ${t.milkMin.toLocaleString('ru-RU')}…${t.milkMax.toLocaleString('ru-RU')} — проверьте единицы измерения`,
       'summary.milkYield',
     )
   }
 
   const fat = s.fatPercent
-  if (typeof fat === 'number' && (fat < PLAUSIBLE.fatPercent.min || fat > PLAUSIBLE.fatPercent.max)) {
+  if (typeof fat === 'number' && (fat < t.fatMin || fat > t.fatMax)) {
     push('fat-implausible', `Жир ${fat}% вне правдоподобных границ`, 'summary.fatPercent')
   }
 
   const protein = s.proteinPercent
   if (
     typeof protein === 'number' &&
-    (protein < PLAUSIBLE.proteinPercent.min || protein > PLAUSIBLE.proteinPercent.max)
+    (protein < t.proteinMin || protein > t.proteinMax)
   ) {
     push('protein-implausible', `Белок ${protein}% вне правдоподобных границ`, 'summary.proteinPercent')
   }
@@ -199,12 +201,41 @@ function localIssues(a: Animal): Issue[] {
   }
 
   // Инбридинг выше 25% — запись сохраняется, но требует ручного подтверждения
-  if (typeof a.inbreeding === 'number' && a.inbreeding > 25) {
+  if (typeof a.inbreeding === 'number' && a.inbreeding > t.inbreedingHigh) {
     push(
       'high-inbreeding',
-      `Коэффициент инбридинга ${a.inbreeding}% — требуется подтверждение происхождения`,
+      `Коэффициент инбридинга ${a.inbreeding}% — выше ${t.inbreedingHigh}%, требуется подтверждение происхождения`,
       'inbreeding',
     )
+  }
+
+  /*
+   * Собственная продуктивность у быка.
+   *
+   * Проверка кажется лишней — кто же запишет быку удой? — но именно так
+   * выглядит перенос из чужой таблицы, где пол хранился отдельной колонкой
+   * и не совпал со строкой. Цена не в самой записи: бык с удоем 8 000 кг
+   * попадает в среднее по стаду наравне с коровами и тянет его вверх,
+   * а объяснить потом, откуда взялась разница со сводкой хозяйства,
+   * не сможет никто.
+   *
+   * Смотрим на любое из полей продуктивности, а не только на удой: перенос
+   * ошибается целой строкой, и жир с белком приезжают вместе с ним.
+   */
+  if (a.kind === 'bull') {
+    const own =
+      typeof s.milkYield === 'number' ||
+      typeof s.fatPercent === 'number' ||
+      typeof s.proteinPercent === 'number' ||
+      (a.lactations ?? []).length > 0
+
+    if (own) {
+      push(
+        'bull-own-production',
+        'У быка заполнена собственная продуктивность — удой, жир, белок или лактации. Доить быка нечем: скорее всего, строка приехала из чужой таблицы или перепутан пол',
+        'summary.milkYield',
+      )
+    }
   }
 
   /*
@@ -247,6 +278,7 @@ async function relationalIssues(
   payload: Payload,
   animals: Animal[],
   settings: CheckSettingsMap,
+  t: Thresholds,
 ): Promise<{ issues: Issue[]; limits: string[]; coverage: CheckCoverage[] }> {
   const out: Issue[] = []
   const coverage: CheckCoverage[] = []
@@ -381,15 +413,15 @@ async function relationalIssues(
       const expected = (fb + mb) / 2
       const gap = Math.abs(expected - own)
 
-      if (gap > BLOOD_TOLERANCE.note) {
+      if (gap > t.bloodNote) {
         push(
           'blood-vs-parents',
           `Кровность ${own} % при родительских ${fb} % и ${mb} % — ожидалось около ${Math.round(expected * 10) / 10} %` +
-            (gap > BLOOD_TOLERANCE.fix
+            (gap > t.bloodFix
               ? '. Расхождение слишком велико для округления: проверьте, тот ли родитель связан'
               : ''),
           'bloodPercent',
-          gap > BLOOD_TOLERANCE.fix ? 'fix' : 'note',
+          gap > t.bloodFix ? 'fix' : 'note',
         )
       }
     }
@@ -495,14 +527,14 @@ async function relationalIssues(
         const months = first ? afcMonths(a.birthDate, first.date) : null
 
         if (months !== null) {
-          const verdict = afcVerdict(months)
+          const verdict = afcVerdict(months, { min: t.afcMin, max: t.afcMax })
 
           if (verdict === 'tooYoung') {
             push(
               'afc-too-young',
               months < 0
                 ? 'Первый отёл записан раньше даты рождения'
-                : `Возраст первого отёла ${monthsLabel(months)} — раньше ${AFC_PLAUSIBLE.min} месяцев отёл физически невозможен, ошибка в дате рождения или в дате отёла`,
+                : `Возраст первого отёла ${monthsLabel(months)} — раньше ${t.afcMin} месяцев отёл физически невозможен, ошибка в дате рождения или в дате отёла`,
               'birthDate',
             )
           } else if (verdict === 'tooOld') {
@@ -548,7 +580,7 @@ async function relationalIssues(
          */
         if (cur.number === prev.number + 1) {
           const days = Math.round((dCur - dPrev) / 86_400_000)
-          if (days < GESTATION_MIN_DAYS) {
+          if (days < t.gestationMinDays) {
             push(
               'calving-interval-short',
               `Между отёлами № ${prev.number} и № ${cur.number} — ${days} дней. Стельность длится около 279: либо ошибка в дате, либо вторая запись на самом деле аборт`,
@@ -637,7 +669,7 @@ async function relationalIssues(
     if (!report) continue
 
     const gap = Math.abs(report.coi - stated)
-    if (gap <= INBREEDING_TOLERANCE) continue
+    if (gap <= t.inbreedingTolerance) continue
 
     out.push({
       code: 'inbreeding-mismatch',
@@ -739,11 +771,24 @@ export async function checkAnimals(
   payload: Payload,
   animals: Animal[],
   settings?: CheckSettingsMap,
+  thresholds?: Thresholds,
 ): Promise<CheckResult> {
-  const resolved =
-    settings ?? (await resolveCheckSettings(payload).catch(() => defaultCheckSettings()))
+  /*
+   * Настройки и пороги достаются одинаково и по одной причине: разбор
+   * не должен требовать от вызывающей стороны знания о том, что они
+   * вообще есть. Передали — берём переданное (страница, разбирающая
+   * сотню заявок, достанет их один раз), не передали — читаем сами.
+   */
+  const [resolved, t] = await Promise.all([
+    settings
+      ? Promise.resolve(settings)
+      : resolveCheckSettings(payload).catch(() => defaultCheckSettings()),
+    thresholds
+      ? Promise.resolve(thresholds)
+      : resolveThresholds(payload).catch(() => defaultThresholds()),
+  ])
 
-  const local = animals.flatMap(localIssues)
+  const local = animals.flatMap((a) => localIssues(a, t))
 
   /*
    * Три источника, а не один. Дешёвые проверки идут по записи и её
@@ -753,9 +798,9 @@ export async function checkAnimals(
    * и за потомством матерей.
    */
   const [rel, ped, seq] = await Promise.all([
-    relationalIssues(payload, animals, resolved),
-    pedigreeIssues(payload, animals),
-    sequenceIssues(payload, animals),
+    relationalIssues(payload, animals, resolved, t),
+    pedigreeIssues(payload, animals, t),
+    sequenceIssues(payload, animals, t),
   ])
 
   const issues = [...rel.issues, ...ped.issues, ...seq.issues]
