@@ -41,6 +41,12 @@ export const ACCOUNT_TABS = [
     hint: 'Кому открыты ваши данные',
     href: '/account/access',
   },
+  {
+    key: 'team',
+    label: 'Сотрудники',
+    hint: 'Кто ведёт данные и что каждому можно',
+    href: '/account/team',
+  },
   { key: 'settings', label: 'Настройки', hint: 'Личные данные и видимость' },
 ] as const
 

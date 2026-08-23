@@ -266,6 +266,11 @@ const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
     probe: { kind: 'table', name: 'movements' },
     note: 'перемещения животных, карточки хозяйств вне книги, штамп владельца',
   },
+  {
+    name: '20260825_140000_team_roles',
+    probe: { kind: 'table', name: 'invitations' },
+    note: 'роли внутри хозяйства, приглашения, блокировка человека',
+  },
 ]
 
 const { driverUri, uri, source, sslConfig } = resolveDatabase()

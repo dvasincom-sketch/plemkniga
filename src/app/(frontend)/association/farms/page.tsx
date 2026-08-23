@@ -5,6 +5,8 @@ import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { AssociationNav } from '@/components/AssociationNav'
 import { ConfirmUser, MembershipDecision } from '@/components/MembershipDecision'
+import { UserBlock } from '@/components/UserBlock'
+import { orgRoleLabel } from '@/lib/roles'
 import { getClient } from '@/lib/payload'
 import { requireAssociation } from '@/lib/association'
 import { farmStats, verifiedShare } from '@/lib/farm-stats'
@@ -94,6 +96,7 @@ export default async function FarmsPage({
     waitingUsers.set(org, [...(waitingUsers.get(org) ?? []), u])
   }
 
+
   /*
    * На вкладке «Ждут решения» показываются и организации с заявкой,
    * и те, у кого просто есть неподтверждённые сотрудники: ожидание
@@ -112,6 +115,33 @@ export default async function FarmsPage({
     docs = [...docs, ...(extra.docs as Organization[]).filter((o) => !seen.has(o.id))].sort((a, b) =>
       String(a.name).localeCompare(String(b.name), 'ru'),
     )
+  }
+
+  const docsOrgIds = docs.map((o) => o.id as number)
+
+  /*
+   * Люди хозяйства показываются целиком, а не только неподтверждённые.
+   *
+   * Блокировка человека (ТЗ, №17) без списка людей — кнопка, которую негде
+   * нажать: до сих пор Ассоциация видела здесь только тех, кто ждёт
+   * подтверждения, а блокировать чаще приходится как раз давно
+   * подтверждённого. Список нужен и сам по себе: «кто у них работает»
+   * — первый вопрос при разборе спора о том, кто что записал.
+   */
+  const staff = await payload.find({
+    collection: 'users',
+    where: { organization: { in: docsOrgIds } },
+    limit: 500,
+    sort: 'lastName',
+    depth: 0,
+    overrideAccess: true,
+  })
+
+  const byOrg = new Map<number, User[]>()
+  for (const u of staff.docs as User[]) {
+    const org = typeof u.organization === 'object' && u.organization ? u.organization.id : u.organization
+    if (typeof org !== 'number') continue
+    byOrg.set(org, [...(byOrg.get(org) ?? []), u])
   }
 
   return (
@@ -181,6 +211,7 @@ export default async function FarmsPage({
                     const share = verifiedShare(s)
                     const membership = o.membership ?? 'none'
                     const pending = waitingUsers.get(o.id as number) ?? []
+                    const people = byOrg.get(o.id as number) ?? []
 
                     return (
                       <tr key={o.id}>
@@ -191,20 +222,35 @@ export default async function FarmsPage({
                           >
                             {o.shortName || o.name}
                           </Link>
-                          {pending.length > 0 && (
+                          {people.length > 0 && (
                             <div className="mt-2 rounded-lg bg-[#f6f6f6] px-3 py-2">
                               <p className="mb-1 text-[12px] text-ink-500">
-                                Ждут подтверждения учётные записи:
+                                {pending.length > 0
+                                  ? `Люди хозяйства · ждут подтверждения: ${pending.length}`
+                                  : 'Люди хозяйства'}
                               </p>
-                              {pending.map((u) => (
-                                <ConfirmUser
-                                  key={u.id}
-                                  userId={u.id as number}
-                                  confirmed={Boolean(u.confirmed)}
-                                  label={
-                                    [u.lastName, u.firstName].filter(Boolean).join(' ') || u.email
-                                  }
-                                />
+                              {people.map((u) => (
+                                <div key={u.id} className="border-t border-[#e6e6e6] py-1 first:border-0">
+                                  <ConfirmUser
+                                    userId={u.id as number}
+                                    confirmed={Boolean(u.confirmed)}
+                                    label={
+                                      [u.lastName, u.firstName].filter(Boolean).join(' ') || u.email
+                                    }
+                                  />
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className="text-[12px] text-ink-500">
+                                      {orgRoleLabel(u.orgRole)}
+                                      {u.blockedAt
+                                        ? ` · заблокирован${u.blockReason ? `: ${u.blockReason}` : ''}`
+                                        : ''}
+                                    </span>
+                                    <UserBlock
+                                      userId={u.id as number}
+                                      blocked={Boolean(u.blockedAt)}
+                                    />
+                                  </div>
+                                </div>
                               ))}
                             </div>
                           )}

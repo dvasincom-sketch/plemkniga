@@ -7,6 +7,7 @@ import { relId } from '@/lib/visibility'
 import { VERIFICATION_LIMIT } from '@/lib/verification-limit'
 import { OPEN_VERIFICATION_STATUSES } from '@/collections/VerificationRequests'
 import { dismissKey, heldAnimals } from '@/lib/verification-gate'
+import { assertCan } from '@/lib/roles'
 
 /**
  * Полный цикл верификации: хозяйство подаёт — Ассоциация решает.
@@ -52,6 +53,10 @@ export async function requestVerificationAction(
 
   const orgId = relId(user.organization)
   if (!orgId) return { error: 'У пользователя не заполнена организация' }
+
+  const guardPayload = await getClient()
+  const denied = await assertCan(guardPayload, user, 'submit')
+  if (denied) return { error: denied }
 
   const ids = formData
     .getAll('animals')

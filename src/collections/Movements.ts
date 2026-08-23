@@ -2,6 +2,7 @@ import type { Access, CollectionConfig, Where } from 'payload'
 import { isAdmin, isAssociation, isAssociationAccess, isAuthenticated } from '@/access'
 import { MOVEMENT_KINDS, movementEffect, type MovementKind } from '@/lib/movements'
 import { relId } from '@/lib/visibility'
+import { can } from '@/lib/roles'
 
 type U = { id: number | string; role?: string; organization?: number | string | { id: number } }
 
@@ -170,6 +171,15 @@ export const Movements: CollectionConfig = {
         // То же соглашение, что в `requireOwnAnimal` (`src/access/guards.ts`).
         if (!req.user) return data
         if (isAssociation(req.user)) return data
+        /*
+         * Роль проверяется и здесь, хотя действие её уже проверило:
+         * действие защищает форму, хук — прямое обращение к `/api/movements`.
+         * Продажа отдаёт карточку чужим рукам, и путей к ней должно быть
+         * ровно столько, сколько проверок написано.
+         */
+        if (!can(req.user as never, 'move')) {
+          throw new Error('Оформлять перемещения может руководитель хозяйства')
+        }
         const org = orgOf(req.user)
         if (!org) throw new Error('Записать перемещение может только хозяйство')
         if (relId(data?.from) !== org && relId(data?.to) !== org) {

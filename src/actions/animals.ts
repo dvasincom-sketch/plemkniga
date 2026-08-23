@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { relId } from '@/lib/visibility'
 import { collectFromForm } from '@/lib/animal-edit'
+import { assertCan } from '@/lib/roles'
 
 /**
  * Ручной ввод и правка карточки животного (ТЗ, п. 1.4 и 1.6).
@@ -73,6 +74,10 @@ export async function createAnimalAction(
 
   const orgId = orgOf(user)
   if (!orgId) return { error: 'У пользователя не заполнена организация' }
+
+  const guardPayload = await getClient()
+  const denied = await assertCan(guardPayload, user, 'data')
+  if (denied) return { error: denied }
 
   const identNumber = String(formData.get('identNumber') || '').trim()
   if (!identNumber) return { error: 'Индивидуальный номер обязателен' }

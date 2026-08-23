@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { relId } from '@/lib/visibility'
 import { forgetGrants } from '@/lib/grants'
+import { assertCan } from '@/lib/roles'
 
 export type GrantFormState = { error?: string; message?: string }
 
@@ -88,6 +89,10 @@ export async function replacePublicWithGrantsAction(
 
   const org = orgOf(user)
   if (!org) return { error: 'У вас нет организации' }
+
+  const guardPayload = await getClient()
+  const denied = await assertCan(guardPayload, user, 'share')
+  if (denied) return { error: denied }
 
   const animalId = Number(formData.get('animal'))
   if (!Number.isFinite(animalId) || animalId <= 0) return { error: 'Запись не определена' }

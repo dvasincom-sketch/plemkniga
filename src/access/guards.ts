@@ -1,6 +1,7 @@
 import type { CollectionBeforeChangeHook } from 'payload'
 import { isAssociation } from '@/access'
 import { relId } from '@/lib/visibility'
+import { can } from '@/lib/roles'
 
 /**
  * Проверки принадлежности на записи — то, чего не выражает правило доступа.
@@ -54,6 +55,18 @@ export const requireOwnAnimal: CollectionBeforeChangeHook = async ({ data, req, 
 
   const org = orgOf(user)
   if (!org) throw new Error('У вашей учётной записи нет организации')
+
+  /*
+   * Роль внутри хозяйства проверяется здесь, а не в каждом действии.
+   *
+   * Через этот хук проходит запись всех коллекций, привязанных к животному —
+   * отёлы, дойки, осеменения, здоровье, события, — и через него же идут
+   * серверные действия: хуки выполняются даже при `overrideAccess`.
+   * Одна проверка вместо восьми, и новая коллекция получает её даром.
+   */
+  if (!can(user as never, 'data')) {
+    throw new Error('Наблюдатель не может вносить данные. Попросите руководителя сменить роль.')
+  }
 
   const animalId = relId(data?.animal) ?? relId((originalDoc as { animal?: unknown })?.animal)
   if (!animalId) throw new Error('Запись не привязана к животному')

@@ -44,6 +44,26 @@ export async function loginAction(_prev: AuthState, formData: FormData): Promise
       data: { email, password },
     })
     if (!result.token) return { error: 'Не удалось войти. Попробуйте ещё раз.' }
+
+    /*
+     * Заблокированному отказываем после проверки пароля, а не до неё.
+     *
+     * До проверки отказ означал бы, что по форме входа можно узнать,
+     * какие учётные записи заблокированы, не зная пароля. После —
+     * узнаёт только тот, кто и так владеет записью, и узнаёт заодно
+     * причину: человек, которому не сказали, почему его не пускают,
+     * идёт звонить и тратит чужое время вместо того, чтобы исправить
+     * то, из-за чего его заблокировали.
+     */
+    const blocked = result.user as { blockedAt?: string | null; blockReason?: string | null }
+    if (blocked?.blockedAt) {
+      return {
+        error: blocked.blockReason
+          ? `Учётная запись заблокирована: ${blocked.blockReason}`
+          : 'Учётная запись заблокирована. Обратитесь к руководителю хозяйства или в Ассоциацию.',
+      }
+    }
+
     await setAuthCookie(result.token, result.exp)
   } catch {
     return { error: 'Неверный e-mail или пароль' }
@@ -125,6 +145,13 @@ export async function registerAction(
         email,
         password,
         role,
+        /*
+         * Первый человек хозяйства и есть его руководитель: он завёл
+         * организацию, ему и приглашать остальных. Без этого хозяйство
+         * появлялось бы без единого руководителя, и приглашать в него
+         * было бы некому.
+         */
+        orgRole: 'head',
         lastName: get('lastName') || '—',
         firstName: get('firstName') || '—',
         middleName: get('middleName') || undefined,

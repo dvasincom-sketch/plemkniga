@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { getClient, getCurrentUser } from '@/lib/payload'
+import { assertCan } from '@/lib/roles'
 
 export type SubmissionState = { error?: string; message?: string }
 
@@ -34,6 +35,10 @@ export async function publishSubmissionAction(
 
   const id = String(formData.get('id') || '')
   if (!id) return { error: 'Не указан пакет данных' }
+
+  const guardPayload = await getClient()
+  const denied = await assertCan(guardPayload, user, 'submit')
+  if (denied) return { error: denied }
   if (formData.get('agreed') !== 'on') {
     return { error: 'Отметьте согласие с результатом проверки' }
   }

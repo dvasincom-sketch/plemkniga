@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import { ROLES, toOptions } from '@/lib/dictionaries'
+import { ORG_ROLES } from '@/lib/roles'
 import { anyone, isAdmin, isAdminField, selfOrAdmin, selfOrAssociation } from '@/access'
 
 export const Users: CollectionConfig = {
@@ -62,6 +63,76 @@ export const Users: CollectionConfig = {
       name: 'position',
       type: 'text',
       label: 'Должность',
+    },
+    {
+      /**
+       * Роль внутри хозяйства.
+       *
+       * Отдельно от `role` намеренно: `role` отвечает на вопрос «кто это
+       * в системе» (фермер, эксперт Ассоциации, администратор), а эта —
+       * «что ему можно в его собственном хозяйстве». Смешать их значило бы
+       * заводить «фермер-руководитель» и «фермер-зоотехник» отдельными
+       * значениями, и каждая новая роль системы умножалась бы на три.
+       *
+       * Разбор возможностей — `src/lib/roles.ts`.
+       */
+      name: 'orgRole',
+      type: 'select',
+      label: 'Роль в хозяйстве',
+      defaultValue: 'head',
+      index: true,
+      options: ORG_ROLES.map((r) => ({ value: r.value, label: r.label })),
+      access: {
+        /*
+         * Роль себе не меняют. Поле лежит в записи пользователя, а её
+         * правит он сам (`selfOrAdmin`) — без ограничения зоотехник
+         * назначал бы себя руководителем одним запросом к API.
+         * Настоящая смена идёт через `changeOrgRoleAction`.
+         */
+        update: () => false,
+      },
+    },
+    {
+      /**
+       * Блокировка человека.
+       *
+       * Не удаление: за учётной записью стоит авторство записей, решений
+       * и заявок, и стереть её значило бы стереть ответ на вопрос «кто
+       * это внёс». Заблокированный не входит и ничего не меняет,
+       * а всё, что он сделал, остаётся подписанным его именем.
+       *
+       * Причина обязательна и видна самому заблокированному: человек,
+       * который не может войти и не знает почему, идёт звонить —
+       * и тратит чужое время вместо того, чтобы исправить то, из-за чего
+       * его заблокировали.
+       */
+      type: 'row',
+      admin: { position: 'sidebar' },
+      fields: [
+        {
+          name: 'blockedAt',
+          type: 'date',
+          label: 'Заблокирован',
+          index: true,
+          admin: { readOnly: true },
+          access: { update: () => false },
+        },
+        {
+          name: 'blockedBy',
+          type: 'relationship',
+          relationTo: 'users',
+          label: 'Кем',
+          admin: { readOnly: true },
+          access: { update: () => false },
+        },
+      ],
+    },
+    {
+      name: 'blockReason',
+      type: 'text',
+      label: 'Причина блокировки',
+      admin: { readOnly: true, position: 'sidebar' },
+      access: { update: () => false },
     },
     {
       name: 'confirmed',

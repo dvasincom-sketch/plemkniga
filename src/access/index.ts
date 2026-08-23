@@ -2,7 +2,13 @@ import type { Access, FieldAccess, Where } from 'payload'
 import type { AccessScope } from '@/lib/dictionaries'
 import { animalsWithScope, grantsForRequest, ownersWithScope } from '@/lib/grants'
 
-type U = { id: number | string; role?: string; organization?: number | string | { id: number } }
+type U = {
+  id: number | string
+  role?: string
+  orgRole?: string | null
+  blockedAt?: string | null
+  organization?: number | string | { id: number }
+}
 
 /**
  * Собрать условие из вариантов.
@@ -45,7 +51,19 @@ export const isAdminField: FieldAccess = ({ req: { user } }) => (user as U | nul
 
 export const anyone: Access = () => true
 
-export const isAuthenticated: Access = ({ req: { user } }) => Boolean(user)
+/**
+ * Заблокированный не пишет ничего.
+ *
+ * `getCurrentUser` уже возвращает для него `null`, и весь интерфейс
+ * считает его вошедшим никем. Но правила коллекций защищают другое —
+ * прямые обращения к API с ещё действующим токеном, минующие страницы
+ * вовсе. Отозвать выданный JWT нечем, поэтому решение принимается
+ * на каждом запросе по состоянию записи.
+ */
+const notBlocked = (user: unknown): boolean =>
+  Boolean(user) && !(user as { blockedAt?: string | null } | null)?.blockedAt
+
+export const isAuthenticated: Access = ({ req: { user } }) => notBlocked(user)
 
 /**
  * Чтение животных:
@@ -114,7 +132,7 @@ export const animalRead: Access = async ({ req }) => {
  */
 export const animalScopedMutate: Access = ({ req: { user } }) => {
   const u = user as U | null
-  if (!u) return false
+  if (!notBlocked(u)) return false
   if (isAssociation(u)) return true
   const org = orgId(u)
   if (!org) return false
@@ -124,7 +142,7 @@ export const animalScopedMutate: Access = ({ req: { user } }) => {
 /** Стадо правит его хозяйство. Читают стада все — их названия стоят в книге. */
 export const herdMutate: Access = ({ req: { user } }) => {
   const u = user as U | null
-  if (!u) return false
+  if (!notBlocked(u)) return false
   if (isAssociation(u)) return true
   const org = orgId(u)
   if (!org) return false
@@ -139,7 +157,7 @@ export const herdMutate: Access = ({ req: { user } }) => {
  */
 export const documentMutate: Access = ({ req: { user } }) => {
   const u = user as U | null
-  if (!u) return false
+  if (!notBlocked(u)) return false
   if (isAssociation(u)) return true
   const org = orgId(u)
   if (!org) return false
@@ -150,8 +168,10 @@ export const documentMutate: Access = ({ req: { user } }) => {
 /** Изменять животное может админ или пользователь той же организации. */
 export const animalMutate: Access = ({ req: { user } }) => {
   const u = user as U | null
-  if (!u) return false
+  if (!u || !notBlocked(u)) return false
   if (u.role === 'admin') return true
+  // Наблюдатель смотрит, но не правит — разбор ролей в `src/lib/roles.ts`
+  if (u.orgRole === 'viewer') return false
   const org = orgId(u)
   if (!org) return false
   return { owner: { equals: org } }

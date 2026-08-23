@@ -6,6 +6,7 @@ import { relId } from '@/lib/visibility'
 import { newShareToken, SHARE_ANIMALS_CAP, SHARE_MAX_DAYS } from '@/lib/share-links'
 import { ACCESS_SCOPES, type AccessScope } from '@/lib/dictionaries'
 import { identCore } from '@/lib/animal-id'
+import { assertCan } from '@/lib/roles'
 
 /**
  * Выпуск и отзыв ссылок на просмотр.
@@ -37,6 +38,10 @@ export async function createShareLinkAction(
 
   const orgId = relId(user.organization)
   if (!orgId) return { error: 'У пользователя не заполнена организация' }
+
+  const guardPayload = await getClient()
+  const denied = await assertCan(guardPayload, user, 'share')
+  if (denied) return { error: denied }
 
   const numbers = parseNumbers(String(formData.get('numbers') || ''))
   if (!numbers.length) return { error: 'Укажите хотя бы один индивидуальный номер' }

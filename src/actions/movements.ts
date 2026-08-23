@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { relId } from '@/lib/visibility'
 import { isAssociation } from '@/access'
+import { assertCan } from '@/lib/roles'
 import {
   findOrCreateCounterparty,
   normalizeInn,
@@ -110,6 +111,10 @@ export async function recordMovementAction(
 
   const org = relId(user.organization)
   if (!org) return { error: 'У вашей учётной записи нет хозяйства' }
+
+  const guardPayload = await getClient()
+  const denied = await assertCan(guardPayload, user, 'move')
+  if (denied) return { error: denied }
 
   const animalId = num(formData, 'animal')
   if (!animalId) return { error: 'Животное не выбрано' }

@@ -82,6 +82,7 @@ export interface Config {
     'animal-removals': AnimalRemoval;
     'data-submissions': DataSubmission;
     'verification-requests': VerificationRequest;
+    invitations: Invitation;
     'access-requests': AccessRequest;
     'access-grants': AccessGrant;
     'access-views': AccessView;
@@ -131,6 +132,7 @@ export interface Config {
     'animal-removals': AnimalRemovalsSelect<false> | AnimalRemovalsSelect<true>;
     'data-submissions': DataSubmissionsSelect<false> | DataSubmissionsSelect<true>;
     'verification-requests': VerificationRequestsSelect<false> | VerificationRequestsSelect<true>;
+    invitations: InvitationsSelect<false> | InvitationsSelect<true>;
     'access-requests': AccessRequestsSelect<false> | AccessRequestsSelect<true>;
     'access-grants': AccessGrantsSelect<false> | AccessGrantsSelect<true>;
     'access-views': AccessViewsSelect<false> | AccessViewsSelect<true>;
@@ -213,6 +215,10 @@ export interface User {
    */
   organization?: (number | null) | Organization;
   position?: string | null;
+  orgRole?: ('head' | 'operator' | 'viewer') | null;
+  blockedAt?: string | null;
+  blockedBy?: (number | null) | User;
+  blockReason?: string | null;
   confirmed?: boolean | null;
   acceptedPolicy?: boolean | null;
   notifySubmissions?: boolean | null;
@@ -1375,6 +1381,28 @@ export interface VerificationRequest {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "invitations".
+ */
+export interface Invitation {
+  id: number;
+  email: string;
+  orgRole: 'head' | 'operator' | 'viewer';
+  organization: number | Organization;
+  token: string;
+  expiresAt: string;
+  acceptedAt?: string | null;
+  revokedAt?: string | null;
+  invitedBy?: (number | null) | User;
+  acceptedBy?: (number | null) | User;
+  /**
+   * Видно только вам
+   */
+  note?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "access-requests".
  */
 export interface AccessRequest {
@@ -1795,6 +1823,10 @@ export interface PayloadLockedDocument {
         value: number | VerificationRequest;
       } | null)
     | ({
+        relationTo: 'invitations';
+        value: number | Invitation;
+      } | null)
+    | ({
         relationTo: 'access-requests';
         value: number | AccessRequest;
       } | null)
@@ -1956,6 +1988,10 @@ export interface UsersSelect<T extends boolean = true> {
   phone?: T;
   organization?: T;
   position?: T;
+  orgRole?: T;
+  blockedAt?: T;
+  blockedBy?: T;
+  blockReason?: T;
   confirmed?: T;
   acceptedPolicy?: T;
   notifySubmissions?: T;
@@ -2602,6 +2638,24 @@ export interface VerificationRequestsSelect<T extends boolean = true> {
               id?: T;
             };
       };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "invitations_select".
+ */
+export interface InvitationsSelect<T extends boolean = true> {
+  email?: T;
+  orgRole?: T;
+  organization?: T;
+  token?: T;
+  expiresAt?: T;
+  acceptedAt?: T;
+  revokedAt?: T;
+  invitedBy?: T;
+  acceptedBy?: T;
+  note?: T;
   updatedAt?: T;
   createdAt?: T;
 }
