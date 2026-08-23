@@ -191,8 +191,25 @@ export async function afcStats(payload: Payload, organizationId: number): Promis
          count(*)                                                     as cows,
          round(avg(afc)::numeric, 1)                                  as mean_afc,
          percentile_cont(0.5) within group (order by afc)             as median_afc,
-         round(100.0 * count(*) filter (where afc <= 24) / count(*), 1) as share_early,
-         round(100.0 * count(*) filter (where afc >= 30) / count(*), 1) as share_late,
+         /*
+          * nullif здесь не украшение, а починка боевой ошибки.
+          *
+          * Запрос без группировки на пустом наборе даёт count(*) = 0,
+          * и PostgreSQL честно считает 0 / 0 — деление на ноль, ошибка
+          * 22012, страница отдаёт 500. Проверка «если стадо пустое, ничего
+          * не показываем» на странице стоит, но выполняется она **после**
+          * запроса: падает сам запрос.
+          *
+          * Условие возникает у обычного хозяйства: животные есть, а коров
+          * с известными датой рождения и первым отёлом — ни одной. То есть
+          * ровно у того, кто открывает эту страницу впервые.
+          *
+          * nullif превращает ноль в NULL, деление на NULL даёт NULL,
+          * и наверху это читается как «нечего показывать» — что и есть
+          * правда.
+          */
+         round(100.0 * count(*) filter (where afc <= 24) / nullif(count(*), 0), 1) as share_early,
+         round(100.0 * count(*) filter (where afc >= 30) / nullif(count(*), 0), 1) as share_late,
          (select count(*) from (
             select father_id from valid
              where father_id is not null
@@ -206,7 +223,13 @@ export async function afcStats(payload: Payload, organizationId: number): Promis
        select
          width_bucket(afc, array[25, 28, 31])                         as bucket,
          count(*)                                                     as cows,
-         round(100.0 * count(*) filter (where survived2) / count(*), 1) as survived2,
+         /*
+          * Здесь группировка, и в группе строк не меньше одной — делить
+          * на ноль нечем. nullif всё равно стоит: запрос переживёт день,
+          * когда группировку уберут, а связь между «есть group by»
+          * и «безопасно» в голове читателя не удержится.
+          */
+         round(100.0 * count(*) filter (where survived2) / nullif(count(*), 0), 1) as survived2,
          round(avg(interval_days) filter (
            where interval_days between 250 and 900
          )::numeric, 0)                                               as interval_days

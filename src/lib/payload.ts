@@ -25,7 +25,17 @@ import type { User } from '@/payload-types'
  */
 let poolGuarded = false
 
-type PoolLike = { on?: (event: 'error', listener: (err: Error) => void) => void }
+type ClientLike = { on?: (event: 'error', listener: (err: Error) => void) => void }
+type PoolLike = {
+  on?: (event: 'error' | 'connect', listener: (arg: never, client?: ClientLike) => void) => void
+}
+
+const note = (what: string, err: Error): void => {
+  console.error(
+    `[plemkniga] ${what}: ${err.message}. ` +
+      'Пул откроет новое соединение при следующем запросе; состояние базы — на /healthz',
+  )
+}
 
 const guardPool = (client: unknown): void => {
   if (poolGuarded) return
@@ -33,12 +43,30 @@ const guardPool = (client: unknown): void => {
   if (typeof pool?.on !== 'function') return
 
   poolGuarded = true
-  pool.on('error', (err) => {
-    console.error(
-      `[plemkniga] Простаивающее соединение с базой оборвалось: ${err.message}. ` +
-        'Пул откроет новое при следующем запросе; состояние базы — на /healthz',
-    )
-  })
+
+  // Соединение, лежавшее в пуле без дела
+  pool.on('error', ((err: Error) => note('Простаивающее соединение с базой оборвалось', err)) as never)
+
+  /*
+   * И то, что сейчас на руках у запроса.
+   *
+   * Событие `error` пул поднимает у себя только для простаивающих
+   * соединений. У выданного клиента обрыв приходит на него самого,
+   * и если слушателя нет, Node превращает его в `uncaughtException`
+   * и убивает процесс. На проде это выглядело так: база на другом хосте
+   * перестала отвечать, в логе `⨯ uncaughtException: Error: read ETIMEDOUT`,
+   * контейнер умер и поднялся заново — и так по кругу, пока сеть
+   * не вернулась.
+   *
+   * Слушатель ничего не чинит: запрос всё равно завершится отказом,
+   * и страница покажет ошибку. Он лишь не даёт обрыву одного соединения
+   * решать судьбу всего приложения.
+   */
+  pool.on('connect', ((c: ClientLike) => {
+    if (typeof c?.on === 'function') {
+      c.on('error', (err) => note('Соединение с базой оборвалось во время запроса', err))
+    }
+  }) as never)
 }
 
 export const getClient = async () => {
