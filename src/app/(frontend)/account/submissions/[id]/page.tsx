@@ -106,20 +106,20 @@ export default async function SubmissionPage({
       <SiteHeader active="/account" />
 
       <main className="container-page pb-8">
-        <AccountNav active="events" />
+        <AccountNav active="data" />
 
         <div>
           <div className="min-w-0">
         <Breadcrumbs
           items={[
             { label: 'Личный кабинет', href: '/account' },
-            { label: 'События', href: '/account?tab=events' },
+            { label: 'Данные', href: '/account?tab=data&sub=check' },
             { label: 'Пакет данных' },
           ]}
         />
 
         <Link
-          href="/account?tab=events"
+          href="/account?tab=data&sub=check"
           className="inline-flex items-center gap-2 text-[15px] hover:text-forest-500"
         >
           <svg width="18" height="14" viewBox="0 0 20 14" fill="none" aria-hidden="true">
