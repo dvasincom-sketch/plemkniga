@@ -79,36 +79,55 @@ export function ColumnReference({ datasets }: { datasets: ReferenceDataset[] }) 
 
   return (
     <>
-      <nav
-        role="tablist"
-        aria-label="Наборы данных для загрузки"
-        className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4"
-      >
-        {datasets.map((d, i) => (
-          <button
-            key={d.key}
-            type="button"
-            role="tab"
-            id={`${baseId}-tab-${d.key}`}
-            aria-selected={d.key === current.key}
-            aria-controls={`${baseId}-panel-${d.key}`}
-            /*
-             * Из последовательности обхода убраны все вкладки, кроме
-             * открытой: внутри стрелочная навигация, снаружи Tab уводит
-             * сразу в содержимое. Иначе до таблицы пришлось бы нажимать
-             * Tab четыре лишних раза.
-             */
-            tabIndex={d.key === current.key ? 0 : -1}
-            ref={(el) => {
-              tabs.current[i] = el
-            }}
-            onClick={() => setActive(d.key)}
-            onKeyDown={(e) => onKey(e, i)}
-            className={`tab ${d.key === current.key ? 'tab-active' : ''}`}
-          >
-            {d.label}
-          </button>
-        ))}
+      {/*
+         Вид взят у переключателя разделов профиля, и это не вкусовщина.
+         Первая редакция использовала класс `.tab` — крупные плашки
+         во всю ширину, какими сделаны разделы карточки животного.
+         Там они уместны: это главная навигация страницы. Здесь же
+         переключатель стоит внутри справки, ниже основной работы,
+         и в том же весе, что и разделы карточки, читался как второе
+         главное меню на одной странице.
+
+         Один и тот же смысл — «равноправные разделы одного экрана» —
+         должен выглядеть одинаково во всех кабинетах: человек узнаёт
+         элемент по виду быстрее, чем читает подпись.
+      */}
+      <nav role="tablist" aria-label="Наборы данных для загрузки" className="mt-7">
+        <ul className="flex flex-wrap gap-2">
+          {datasets.map((d, i) => {
+            const isActive = d.key === current.key
+            return (
+              <li key={d.key}>
+                <button
+                  type="button"
+                  role="tab"
+                  id={`${baseId}-tab-${d.key}`}
+                  aria-selected={isActive}
+                  aria-controls={`${baseId}-panel-${d.key}`}
+                  /*
+                   * Из последовательности обхода убраны все вкладки, кроме
+                   * открытой: внутри стрелочная навигация, снаружи Tab
+                   * уводит сразу в содержимое. Иначе до таблицы пришлось бы
+                   * нажимать Tab четыре лишних раза.
+                   */
+                  tabIndex={isActive ? 0 : -1}
+                  ref={(el) => {
+                    tabs.current[i] = el
+                  }}
+                  onClick={() => setActive(d.key)}
+                  onKeyDown={(e) => onKey(e, i)}
+                  className={`block rounded-lg px-3.5 py-1.5 text-[14px] leading-6 transition-colors ${
+                    isActive
+                      ? 'bg-forest-500 text-white'
+                      : 'bg-white text-ink-900 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] hover:bg-[#f6f6f6]'
+                  }`}
+                >
+                  {d.label}
+                </button>
+              </li>
+            )
+          })}
+        </ul>
       </nav>
 
       <div
@@ -116,7 +135,7 @@ export function ColumnReference({ datasets }: { datasets: ReferenceDataset[] }) 
         id={`${baseId}-panel-${current.key}`}
         aria-labelledby={`${baseId}-tab-${current.key}`}
         tabIndex={0}
-        className="pt-8"
+        className="pt-7"
       >
         <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
           <p className="max-w-[80ch] text-[14px] leading-relaxed text-ink-500">{current.hint}</p>
