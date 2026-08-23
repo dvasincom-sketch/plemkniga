@@ -1,4 +1,5 @@
 import 'dotenv/config'
+import { randomUUID } from 'node:crypto'
 import { Pool, type PoolClient } from 'pg'
 import { maskUri, resolveDatabase } from '../lib/db-url'
 
@@ -218,6 +219,16 @@ async function drop(client: PoolClient) {
     if (r.rowCount) console.log(`  ${t}: ${r.rowCount}`)
   }
 
+  /*
+   * Дочерние таблицы массивов Payload держат родителя в `_parent_id`,
+   * а не в `animal_id`, поэтому в общий список они не попадают.
+   * Каскад по ним, скорее всего, отработал бы и сам — но «скорее всего»
+   * тут значит «пока схему не тронут», а `--drop` обязан убирать
+   * синтетику полностью и сегодня, и после следующей миграции.
+   */
+  const dna = await client.query(`delete from animals_dna_tests where _parent_id in (${scope})`)
+  if (dna.rowCount) console.log(`  animals_dna_tests: ${dna.rowCount}`)
+
   // Ссылки на быков-производителей из чужих осеменений
   await client.query(`update inseminations set bull_id = null where bull_id in (${scope})`)
   // Родительские ссылки внутри самой синтетики снимутся каскадом (nullable)
@@ -246,6 +257,8 @@ type Ctx = {
   herds: { id: number; org: number }[]
   breeds: number[]
   healthTypes: number[]
+  /** Пусто, если справочник типов ДНК-тестов не заполнен: тогда тесты не генерируются. */
+  dnaTypes: number[]
 }
 
 async function ensureScaffolding(client: PoolClient): Promise<Ctx> {
@@ -254,6 +267,9 @@ async function ensureScaffolding(client: PoolClient): Promise<Ctx> {
   )
   const healthTypes = (
     await client.query<{ id: number }>('select id from health_event_types limit 10')
+  ).rows.map((r) => r.id)
+  const dnaTypes = (
+    await client.query<{ id: number }>('select id from dna_test_types limit 5')
   ).rows.map((r) => r.id)
 
   const needHerds = Math.ceil(TOTAL / HERD_SIZE)
@@ -297,7 +313,10 @@ async function ensureScaffolding(client: PoolClient): Promise<Ctx> {
   const herds = herdIds.map((id, i) => ({ id, org: orgs[i % orgs.length]! }))
 
   console.log(`Хозяйств создано: ${orgs.length}, ферм: ${herds.length}`)
-  return { client, orgs, herds, breeds, healthTypes }
+  if (!dnaTypes.length) {
+    console.log('Справочник типов ДНК-тестов пуст — тесты не генерируются (npm run seed)')
+  }
+  return { client, orgs, herds, breeds, healthTypes, dnaTypes }
 }
 
 const ANIMAL_COLUMNS = [
@@ -584,6 +603,19 @@ async function generate(client: PoolClient) {
   /* --- История оценок и экстерьера --------------------------------------- */
 
   await fillEvaluations(client, all)
+
+  /*
+   * ДНК-тесты — только тем, у кого в карточке есть родители.
+   *
+   * Быки первого поколения записаны без отца и матери, и тест
+   * на происхождение для них — бессмыслица: подтверждать нечего.
+   * Проставить им «подтверждено» значило бы наполнить книгу записями,
+   * которые сама книга считает невозможными.
+   */
+  await fillDnaTests(client, ctx, [
+    ...damIds.map((id, j) => ({ id, birth: damBirths[j]! })),
+    ...daughterIds.map((id, j) => ({ id, birth: daughterBirths[j]! })),
+  ])
   /*
    * События получают не только идентификаторы, но и даты рождения.
    *
@@ -610,6 +642,78 @@ async function generate(client: PoolClient) {
       '  npm run backfill:index      — посчитать значения индекса по профилям\n' +
       '  npm run db:precheck         — убедиться, что данные проходят ограничения',
   )
+}
+
+/**
+ * ДНК-тесты на происхождение у части стада.
+ *
+ * ## Зачем это в нагрузочном сиде
+ *
+ * Отбор «Происхождение по ДНК» спрашивает не о наличии теста, а о его
+ * выводе, и проверить такой отбор на данных, где вывода нет ни у кого,
+ * нельзя: пустой ответ выглядит одинаково и когда отбор работает,
+ * и когда он сломан. До этой правки во всей базе был ровно один
+ * ДНК-тест — у показательной коровы сида, и тот без вывода.
+ *
+ * ## Почему исключения тоже генерируются
+ *
+ * Соблазн выдать всем «подтверждено» велик: тогда ни одна проверка
+ * не сработает и отчёты будут чистыми. Но именно исключённое
+ * происхождение — единственный случай, ради которого поле вывода
+ * заводилось, и `dna-parentage-excluded` без него не проверить ничем.
+ * Четыре процента — величина скромная: в настоящих стадах расхождение
+ * заявленного отцовства с ДНК доходит до десяти и выше. На стаде
+ * в 280 000 голов это примерно тысяча с небольшим находок
+ * `dna-parentage-excluded` в ревизии — они там не по ошибке.
+ *
+ * Доля тестируемых (12 %) взята из того же соображения: тест платный,
+ * его делают не всем, и отбор обязан оставаться отбором, а не
+ * синонимом «все коровы».
+ */
+async function fillDnaTests(
+  client: PoolClient,
+  ctx: Ctx,
+  animals: { id: number; birth: Date }[],
+) {
+  if (!ctx.dnaTypes.length) return
+
+  const cols = ['id', '_order', '_parent_id', 'type_id', 'date', 'verdict', 'result']
+  const VERDICTS = [
+    { value: 'confirmed', result: 'Происхождение подтверждено', upTo: 0.93 },
+    { value: 'excluded', result: 'Происхождение по отцу не подтверждено', upTo: 0.97 },
+    { value: 'inconclusive', result: 'Материала недостаточно для вывода', upTo: 1 },
+  ] as const
+
+  let rows: unknown[][] = []
+  let count = 0
+
+  for (const a of animals) {
+    if (!chance(0.12)) continue
+
+    /*
+     * Тест берут у взрослого животного, а не в день рождения: между
+     * рождением и пробой — от полугода до трёх лет. Дата раньше
+     * рождения провалила бы `sequence`-проверки, и синтетика начала бы
+     * давать находки, которых в жизни не бывает.
+     */
+    const date = new Date(a.birth.getTime() + int(180, 1_100) * 86_400_000)
+    if (date.getTime() > Date.now()) continue
+
+    const roll = rnd()
+    const v = VERDICTS.find((x) => roll < x.upTo) ?? VERDICTS[0]
+
+    rows.push([randomUUID(), 1, a.id, pick(ctx.dnaTypes), date, v.value, v.result])
+    count++
+
+    if (rows.length >= CHUNK * 5) {
+      await insertMany(client, 'animals_dna_tests', cols, rows)
+      rows = []
+      progress(`ДНК-тесты: ${count.toLocaleString('ru-RU')} (${elapsed()} с)`)
+    }
+  }
+
+  if (rows.length) await insertMany(client, 'animals_dna_tests', cols, rows)
+  done(`ДНК-тесты: ${count.toLocaleString('ru-RU')} (${elapsed()} с)`)
 }
 
 /**

@@ -852,17 +852,30 @@ const run = async () => {
         { type: ref('haplotype-types', 'HH1'), status: 'free', date: new Date(2024, 10, 6).toISOString() },
         { type: ref('haplotype-types', 'HH3'), status: 'free', date: new Date(2024, 10, 6).toISOString() },
       ],
+      /*
+       * Вывод теста проставлен явно, и это не украшение.
+       *
+       * Поле `verdict` появилось позже самого сида, и записи остались
+       * без него — при том что в `result` прямым текстом написано
+       * «происхождение подтверждено». Показательная запись книги
+       * от этого не могла получить свидетельство: `parentageRequirement`
+       * спрашивает вывод, а не текст протокола, и справедливо отвечал
+       * «у теста не проставлен вывод». Демонстрация упиралась в дыру
+       * в собственных данных.
+       */
       dnaTests: [
         {
           type: ref('dna-test-types', 'SNP60K'),
           date: new Date(2024, 10, 6).toISOString(),
           laboratory: serviceOrg.id,
+          verdict: 'confirmed',
           result: 'Геномная оценка выполнена, происхождение подтверждено',
         },
         {
           type: ref('dna-test-types', 'PARENT'),
           date: new Date(2024, 10, 6).toISOString(),
           laboratory: serviceOrg.id,
+          verdict: 'confirmed',
           result: 'Отцовство подтверждено',
         },
       ],
