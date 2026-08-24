@@ -91,6 +91,68 @@ async function main() {
   )
   check(Boolean(animals.id && animals.createdAt), 'служебные поля записи добавлены')
 
+  console.log('\nРазделы\n')
+
+  /*
+   * Раздел «Прочее» существует ради этой проверки и обязан оставаться
+   * пустым. Коллекцию заводят раз в месяц, а `SECTIONS` в `openapi.ts`
+   * лежит в другом файле — забыть про него легко, и забытая коллекция
+   * не сломает ничего: она просто окажется в конце списка из сорока имён,
+   * то есть потеряется. Молча приписать её к соседнему разделу нельзя —
+   * это решение того, кто её завёл.
+   */
+  const tagList = (doc.tags ?? []) as never as { name: string; description?: string }[]
+  check(tagList.length > 0, 'разделы попали в документ')
+
+  const orphans = tagList.filter((t) => t.name.startsWith('Прочее'))
+  check(
+    orphans.length === 0,
+    'у каждой коллекции назван раздел',
+    orphans.length ? `без раздела: ${orphans.map((t) => t.name).join(', ')}` : '',
+  )
+
+  /*
+   * Имя каждой группы ручек обязано совпадать с объявленным разделом.
+   * Разойтись они могут молча: Swagger UI выведет незнакомый ему тег
+   * в конец, ниже всех объявленных, и раздел просто окажется не на месте.
+   */
+  const usedTags = new Set<string>()
+  for (const path of Object.values((doc.paths ?? {}) as Record<string, object>)) {
+    for (const op of Object.values(path as Record<string, { tags?: string[] }>)) {
+      for (const t of op?.tags ?? []) usedTags.add(t)
+    }
+  }
+  const declared = new Set(tagList.map((t) => t.name))
+  const undeclared = [...usedTags].filter((t) => !declared.has(t))
+  check(
+    undeclared.length === 0,
+    'все разделы, встреченные у ручек, объявлены в корне',
+    undeclared.join(', '),
+  )
+
+  const unused = [...declared].filter((t) => !usedTags.has(t))
+  check(unused.length === 0, 'объявленных впустую разделов нет', unused.join(', '))
+
+  /*
+   * Порядок и есть смысл этой правки: без него Swagger UI выводит разделы
+   * так, как они впервые встретились среди ручек, и «Стадо · Животные»
+   * с «Стадо · Перемещения» оказываются в разных концах списка.
+   */
+  const sectionOrder = tagList.map((t) => t.name.split(' · ')[0])
+  const seen = new Set<string>()
+  const scattered: string[] = []
+  let previous = ''
+  for (const section of sectionOrder) {
+    if (section !== previous && seen.has(section)) scattered.push(section)
+    seen.add(section)
+    previous = section
+  }
+  check(
+    scattered.length === 0,
+    'ручки одного раздела идут подряд',
+    [...new Set(scattered)].join(', '),
+  )
+
   console.log('\nВход и адрес\n')
 
   check(

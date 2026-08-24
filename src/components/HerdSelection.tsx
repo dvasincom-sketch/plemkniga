@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { plural } from '@/lib/format'
 
 /**
  * Отметки в таблице стада и что с отмеченным делать.
@@ -184,8 +185,15 @@ export function HerdSelection({ children }: { children: React.ReactNode }) {
               }
               className="rounded-lg bg-white px-3 py-2 text-[14px] text-ink-900 transition-colors hover:bg-[#f0f0f0]"
             >
-              Сравнить {bulls.length > MAX_BULLS ? MAX_BULLS : bulls.length}{' '}
-              {bulls.length > MAX_BULLS ? 'из ' + bulls.length + ' быков' : 'быков'}
+              {/*
+                 Число в подписи — сколько возьмут, а не сколько отмечено.
+                 «Сравнить быков» без числа при семи отмеченных обещало бы
+                 семь, а показало бы шесть.
+              */}
+              Сравнить{' '}
+              {bulls.length > MAX_BULLS
+                ? `${MAX_BULLS} из ${bulls.length}`
+                : `${bulls.length} ${plural(bulls.length, ['быка', 'быков', 'быков'])}`}
             </button>
           )}
 

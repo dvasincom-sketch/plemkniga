@@ -393,11 +393,30 @@ export function buildOpenApi(payload: Payload, serverUrl: string): OpenApiDocume
   const schemas: Record<string, Schema> = {}
   const paths: Record<string, Schema> = {}
 
+  /*
+   * Список разделов собирается по ходу и кладётся в корень документа.
+   *
+   * Без него Swagger UI выводит разделы в том порядке, в каком они впервые
+   * встретились среди ручек, то есть в порядке коллекций из конфигурации
+   * Payload. Приставка раздела там же и теряет смысл: «Стадо · Животные»
+   * и «Стадо · Перемещения» оказываются в разных концах списка,
+   * а справочники — вперемешку с журналами.
+   */
+  const tags: { slug: string; name: string; description?: string }[] = []
+
   for (const collection of collections) {
-    const name = text(collection.labels?.plural) ?? collection.slug
+    const plural = text(collection.labels?.plural) ?? collection.slug
+    // Имя раздела приклеивается к имени коллекции: разделов в OpenAPI нет
+    const name = taggedName(collection.slug, plural)
     const singular = text(collection.labels?.singular) ?? collection.slug
     const schemaName = collection.slug
     const ref = `#/components/schemas/${schemaName}`
+
+    tags.push({
+      slug: collection.slug,
+      name,
+      description: text(collection.admin?.description),
+    })
 
     const properties = propertiesOf(collection.fields)
     properties.id = { type: 'integer', description: 'Идентификатор записи' }
@@ -433,7 +452,7 @@ export function buildOpenApi(payload: Payload, serverUrl: string): OpenApiDocume
     paths[`/api/${collection.slug}`] = {
       get: {
         tags: [name],
-        summary: `Список: ${name}`,
+        summary: `Список: ${plural}`,
         description: accessNote,
         parameters: LIST_PARAMS,
         responses: {
@@ -496,7 +515,7 @@ export function buildOpenApi(payload: Payload, serverUrl: string): OpenApiDocume
    */
   paths['/api/users/login'] = {
     post: {
-      tags: ['Доступ'],
+      tags: [`Доступ${SECTION_SEP}Вход`],
       summary: 'Войти и получить токен',
       requestBody: {
         content: {
@@ -532,11 +551,43 @@ export function buildOpenApi(payload: Payload, serverUrl: string): OpenApiDocume
 
   paths['/api/users/me'] = {
     get: {
-      tags: ['Доступ'],
+      tags: [`Доступ${SECTION_SEP}Вход`],
       summary: 'Кто я',
       responses: { '200': { description: 'Текущий пользователь или null' } },
     },
   }
+
+  /*
+   * Разделы идут в объявленном порядке, коллекции внутри раздела — в том,
+   * в каком они перечислены у него: это порядок по существу, а не
+   * по алфавиту. У «Стада» первыми стоят животные, а не стада, потому что
+   * приходят за животными.
+   *
+   * Ручки входа приписаны к «Доступу» и стоят в его начале: с них
+   * начинается работа с API, и искать их в конце списка из сорока имён —
+   * ровно та беда, ради которой заводились разделы.
+   */
+  const orderedTags = [
+    ...SECTIONS.flatMap((section) =>
+      (section.slugs as readonly string[])
+        .map((slug) => tags.find((t) => t.slug === slug))
+        .filter((t): t is (typeof tags)[number] => Boolean(t))
+        .map((t) => ({ name: t.name, ...(t.description ? { description: t.description } : {}) })),
+    ),
+    { name: `Доступ${SECTION_SEP}Вход`, description: 'Получить токен и узнать, кто вы.' },
+    /*
+     * Коллекции, для которых раздел не назван. В исправном описании этого
+     * списка нет вовсе; если он появился, значит завели коллекцию и забыли
+     * про `SECTIONS` — об этом скажет `check:openapi`.
+     */
+    ...tags
+      .filter((t) => sectionOf(t.slug) === 'Прочее')
+      .map((t) => ({ name: t.name, ...(t.description ? { description: t.description } : {}) })),
+  ]
+
+  const sectionList = SECTIONS.filter((s) => s.key !== 'Прочее')
+    .map((s) => `- **${s.key}** — ${s.description}`)
+    .join('\n')
 
   return {
     openapi: '3.1.0',
@@ -551,9 +602,14 @@ export function buildOpenApi(payload: Payload, serverUrl: string): OpenApiDocume
         '`payload-token`, которую ставит та же ручка.\n\n' +
         '**Чего здесь нет.** Прав доступа: одна и та же ручка отдаёт разное разным, ' +
         'и это свойство правил, а не схемы. Рядом с REST работает GraphQL ' +
-        'на /api/graphql — та же модель, другой способ спрашивать.',
+        'на /api/graphql — та же модель, другой способ спрашивать.\n\n' +
+        '**Разделы.** Имя каждой группы ручек начинается с раздела — ' +
+        '«Стадо · Животные». Разделов в самом формате OpenAPI нет, поэтому ' +
+        'они приклеены к именам; порядок ниже — тот же, что на странице.\n\n' +
+        sectionList,
     },
     servers: [{ url: serverUrl || '/' }],
+    tags: orderedTags,
     paths,
     components: {
       schemas,
