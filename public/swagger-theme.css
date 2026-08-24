@@ -1,0 +1,428 @@
+/*
+ * Swagger UI в оформлении книги.
+ *
+ * ## Зачем
+ *
+ * Библиотека приносит своё оформление целиком: системный `sans-serif` вместо
+ * Onest, серо-синий `#3b4151` вместо чернил книги, скругления в четыре
+ * пиксела вместо наших, синяя кнопка «Execute» и палитра методов из чужого
+ * набора. На странице книги это выглядит вставленным окном чужой программы,
+ * а не разделом сайта, — и первым делом об этом спрашивают: «почему тут
+ * другой шрифт».
+ *
+ * ## Почему отдельный файл, а не правила в globals.css
+ *
+ * Дело в порядке загрузки. Таблица Swagger UI подключается из кода, когда
+ * открыли `/api-docs`, то есть попадает в `<head>` позже нашей. При равной
+ * силе селекторов побеждает та, что подключена позже, — значит правила
+ * из `globals.css` проиграли бы, и пришлось бы завышать силу селекторов
+ * искусственно, приписывая каждому лишний класс. Файл, подключённый сразу
+ * после библиотеки, выигрывает без этого: селекторы здесь ровно те же,
+ * что у неё.
+ *
+ * Второй довод: правил много и все они про чужую разметку. В общей таблице
+ * стилей книги они читались бы как её собственные.
+ *
+ * ## Про цвета
+ *
+ * Берутся из переменных темы, а не переписываются числами: палитра книги
+ * объявлена в `globals.css` через `@theme`, и Tailwind выкладывает её
+ * на `:root`. Второй набор шестнадцатеричных чисел здесь означал бы, что
+ * при смене фирменного зелёного этот раздел останется прежнего цвета.
+ * Значения после запятой — на случай, если переменная почему-то
+ * не доехала: раздел должен выглядеть книгой, а не терять цвет вовсе.
+ */
+
+/* --------------------------- Шрифт и чернила --------------------------- */
+
+/*
+ * Библиотека ставит `font-family: sans-serif` сорока четырьмя правилами
+ * на разные части своей разметки, и селекторы у неё из трёх классов —
+ * например `.swagger-ui .opblock .opblock-summary-method`. Наследование
+ * от корня такое правило не перебивает, а перечислить все сорок четыре
+ * значит завести список, который молча отстанет от следующей версии
+ * библиотеки: правило добавят, мы не заметим, и на странице снова
+ * появится системный шрифт — но уже только в одном месте, где его никто
+ * не ищет.
+ *
+ * Поэтому здесь `!important`, и это единственное место в проекте, где он
+ * оправдан: мы правим чужую таблицу стилей, селекторы которой нам
+ * не принадлежат, и выигрыш нужен не у своего кода, а у поставщика.
+ * Обычный довод против `!important` — «дальше нечем перебить» — здесь
+ * не работает: перебивать это нечем и не нужно, шрифт на сайте один.
+ *
+ * Исключение сделано там, где моноширинный нужен по делу: код, примеры,
+ * значения полей. Оно ниже и тоже с `!important`, иначе этот же сплошной
+ * охват его и съел бы.
+ *
+ * ## Почему охват без `:not()`
+ *
+ * Сначала здесь стояло
+ * `*:not(code):not(pre):not(.microlight):not(.microlight *)` — казалось
+ * аккуратнее: исключения названы прямо в правиле. На живой странице
+ * оказалось, что моноширинный так и не появился, и причина в счёте силы
+ * селектора: каждое `:not()` добавляет силу своего содержимого, и они
+ * складываются, а не берутся по максимуму. Четыре исключения дали
+ * два класса и два элемента поверх `.swagger-ui` — то есть охват стал
+ * сильнее правил для кода, которые он же и должен был пропустить.
+ *
+ * Простой `*` слабее любого из них, и порядок работает сам: правила ниже
+ * называют место точнее и потому выигрывают. Проверено на живой странице
+ * (`npm run check:swagger-theme`).
+ */
+.swagger-ui,
+.swagger-ui * {
+  font-family: var(
+    --font-sans,
+    'Onest Variable',
+    'Onest',
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif
+  ) !important;
+}
+
+.swagger-ui,
+.swagger-ui .info .title,
+.swagger-ui .opblock-tag,
+.swagger-ui .opblock .opblock-summary-description,
+.swagger-ui .opblock-description-wrapper p,
+.swagger-ui table thead tr td,
+.swagger-ui table thead tr th,
+.swagger-ui .parameter__name,
+.swagger-ui .response-col_status,
+.swagger-ui .model-title,
+.swagger-ui .tab li,
+.swagger-ui label {
+  color: var(--color-ink-900, #17181a);
+}
+
+.swagger-ui .markdown p,
+.swagger-ui .renderedMarkdown p,
+.swagger-ui .opblock-description-wrapper p,
+.swagger-ui .parameter__type,
+.swagger-ui .parameter__in,
+.swagger-ui .response-col_description__inner p {
+  color: var(--color-ink-700, #3a3d42);
+}
+
+/*
+ * Моноширинный оставлен, но приведён к нормальному набору: `monospace`
+ * без уточнений отдаётся браузеру, и на части машин это оказывается
+ * шрифт вдвое крупнее соседнего текста.
+ */
+.swagger-ui .microlight,
+.swagger-ui .microlight *,
+.swagger-ui code,
+.swagger-ui pre,
+.swagger-ui .model,
+.swagger-ui .model *,
+.swagger-ui .prop-type,
+.swagger-ui .prop-format,
+.swagger-ui .parameter__default,
+.swagger-ui .opblock .opblock-summary-path,
+.swagger-ui .opblock .opblock-summary-path__deprecated {
+  font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas,
+    'Liberation Mono', monospace !important;
+  font-size: 12px;
+}
+
+/* ------------------------- Заголовок описания ------------------------- */
+
+/*
+ * Собственный заголовок Swagger UI в тридцать шесть пикселов стоял сразу
+ * под заголовком страницы «API» и читался как второй, более важный.
+ * Он не убран — в нём версия описания, и она нужна, — а приведён
+ * к размеру подзаголовка книги.
+ */
+.swagger-ui .info {
+  margin: 0 0 1.75rem;
+}
+
+.swagger-ui .info .title {
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.swagger-ui .info .title small {
+  background: var(--color-brand-50, #f1f8ec);
+  border-radius: 6px;
+}
+
+.swagger-ui .info .title small pre {
+  color: var(--color-forest-600, #27714a);
+  font-size: 11px;
+}
+
+/*
+ * Полоса выбора сервера — белый прямоугольник с серой тенью — стояла
+ * внутри нашей карточки и читалась как вторая карточка внутри первой.
+ * Тень и фон сняты: рамку здесь уже даёт страница.
+ */
+.swagger-ui .scheme-container {
+  background: transparent;
+  box-shadow: none;
+  margin: 0 0 1.25rem;
+  padding: 0;
+}
+
+.swagger-ui .wrapper {
+  padding: 0;
+}
+
+/* ----------------------------- Разделы ----------------------------- */
+
+.swagger-ui .opblock-tag {
+  border-bottom: 1px solid var(--color-ink-100, #e5e7eb);
+  font-size: 19px;
+  font-weight: 500;
+}
+
+.swagger-ui .opblock-tag:hover {
+  background: rgba(23, 24, 26, 0.02);
+}
+
+.swagger-ui .opblock {
+  border-radius: 12px;
+  box-shadow: none;
+  margin: 0 0 10px;
+}
+
+.swagger-ui .opblock .opblock-summary {
+  padding: 6px 10px;
+}
+
+/*
+ * Значок метода — прямоугольник со скруглением как у плашек книги,
+ * а не как у кнопок библиотеки.
+ */
+.swagger-ui .opblock .opblock-summary-method {
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  min-width: 76px;
+  text-shadow: none;
+}
+
+.swagger-ui .opblock .opblock-summary-path,
+.swagger-ui .opblock .opblock-summary-path__deprecated {
+  font-size: 13px;
+}
+
+/*
+ * Палитра методов переведена на фирменную.
+ *
+ * Своя у библиотеки построена от синего, которого в книге нет вовсе,
+ * и рядом с зелёными плашками кабинета читалась как чужая вставка.
+ * Смысл цветов сохранён: чтение спокойное, изменение заметное, удаление
+ * тревожное — тем же красным, каким книга помечает отозванные документы.
+ *
+ * Три значения здесь стоят числами, а не переменными, и это не небрежность:
+ * `#c0392b` и `#fdecea` — та самая пара, которой книга помечает отозванное
+ * и просроченное, она в палитре не объявлена и живёт числами в нескольких
+ * местах интерфейса. Заводить для неё переменную только ради этого файла
+ * значило бы оставить остальные места по-прежнему на числах, то есть
+ * получить третий источник правды вместо двух. Светлый оранжевый `#fdf4e3`
+ * — оттенок, которого в палитре нет вовсе: у акцентного цвета нет ступени
+ * 50, а изменяющим методам нужен фон светлее самого акцента.
+ */
+.swagger-ui .opblock.opblock-get {
+  background: var(--color-brand-50, #f1f8ec);
+  border-color: var(--color-forest-500, #2e8757);
+}
+.swagger-ui .opblock.opblock-get .opblock-summary-method {
+  background: var(--color-forest-500, #2e8757);
+}
+.swagger-ui .opblock.opblock-get .opblock-summary {
+  border-color: var(--color-forest-500, #2e8757);
+}
+
+.swagger-ui .opblock.opblock-post {
+  background: var(--color-brand-50, #f1f8ec);
+  border-color: var(--color-brand-500, #7cb342);
+}
+.swagger-ui .opblock.opblock-post .opblock-summary-method {
+  background: var(--color-brand-500, #7cb342);
+}
+.swagger-ui .opblock.opblock-post .opblock-summary {
+  border-color: var(--color-brand-500, #7cb342);
+}
+
+.swagger-ui .opblock.opblock-patch,
+.swagger-ui .opblock.opblock-put {
+  background: #fdf4e3;
+  border-color: var(--color-accent-500, #f5a623);
+}
+.swagger-ui .opblock.opblock-patch .opblock-summary-method,
+.swagger-ui .opblock.opblock-put .opblock-summary-method {
+  background: var(--color-accent-600, #e08f0d);
+}
+.swagger-ui .opblock.opblock-patch .opblock-summary,
+.swagger-ui .opblock.opblock-put .opblock-summary {
+  border-color: var(--color-accent-500, #f5a623);
+}
+
+.swagger-ui .opblock.opblock-delete {
+  background: #fdecea;
+  border-color: #c0392b;
+}
+.swagger-ui .opblock.opblock-delete .opblock-summary-method {
+  background: #c0392b;
+}
+.swagger-ui .opblock.opblock-delete .opblock-summary {
+  border-color: #c0392b;
+}
+
+.swagger-ui .opblock .opblock-section-header {
+  background: rgba(255, 255, 255, 0.75);
+  box-shadow: none;
+}
+
+.swagger-ui .opblock .opblock-section-header h4,
+.swagger-ui .opblock .opblock-section-header > label {
+  color: var(--color-ink-900, #17181a);
+  font-weight: 500;
+}
+
+/* ------------------------------ Кнопки ------------------------------ */
+
+/*
+ * Кнопки книги: без рамки, со скруглением и с фирменным цветом.
+ * У библиотеки они с двухпиксельной серой рамкой и жирным начертанием —
+ * рядом с нашими выглядят кнопками из другой эпохи.
+ */
+.swagger-ui .btn {
+  border: none;
+  border-radius: 10px;
+  box-shadow: none;
+  font-weight: 500;
+  padding: 8px 18px;
+}
+
+.swagger-ui .btn.execute {
+  background: var(--color-accent-500, #f5a623);
+  border-color: transparent;
+  color: #fff;
+}
+
+.swagger-ui .btn.execute:hover {
+  background: var(--color-accent-600, #e08f0d);
+}
+
+.swagger-ui .btn.try-out__btn,
+.swagger-ui .btn.cancel {
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(23 24 26 / 0.08);
+  color: var(--color-ink-900, #17181a);
+}
+
+.swagger-ui .btn.authorize {
+  background: var(--color-forest-500, #2e8757);
+  border-color: transparent;
+  color: #fff;
+}
+
+.swagger-ui .btn.authorize svg {
+  fill: #fff;
+}
+
+.swagger-ui .btn.authorize:hover {
+  background: var(--color-forest-600, #27714a);
+}
+
+/* ------------------------- Поля и таблицы ------------------------- */
+
+.swagger-ui select,
+.swagger-ui input[type='text'],
+.swagger-ui input[type='password'],
+.swagger-ui input[type='email'],
+.swagger-ui input[type='file'],
+.swagger-ui textarea {
+  border: 1px solid var(--color-ink-100, #e5e7eb);
+  border-radius: 10px;
+  box-shadow: none;
+  font-weight: 400;
+}
+
+.swagger-ui select:focus,
+.swagger-ui input[type='text']:focus,
+.swagger-ui textarea:focus {
+  border-color: var(--color-forest-500, #2e8757);
+  outline: none;
+}
+
+.swagger-ui table thead tr td,
+.swagger-ui table thead tr th {
+  border-bottom: 1px solid var(--color-ink-100, #e5e7eb);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.swagger-ui .parameter__name {
+  font-weight: 500;
+}
+
+/*
+ * Красная звёздочка обязательного параметра оставлена красной: это
+ * единственное место, где цвет несёт смысл, не связанный с фирменным
+ * набором, — и заменять его зелёным значило бы спрятать предупреждение.
+ */
+.swagger-ui .parameter__name.required:after {
+  color: #c0392b;
+}
+
+.swagger-ui .response-col_status {
+  font-weight: 500;
+}
+
+.swagger-ui .microlight {
+  border-radius: 10px;
+}
+
+/* ------------------------------ Модели ------------------------------ */
+
+.swagger-ui section.models {
+  border: 1px solid var(--color-ink-100, #e5e7eb);
+  border-radius: 12px;
+}
+
+.swagger-ui section.models .model-container {
+  background: rgba(23, 24, 26, 0.02);
+  border-radius: 10px;
+}
+
+.swagger-ui section.models h4 {
+  color: var(--color-ink-900, #17181a);
+  font-size: 17px;
+  font-weight: 500;
+}
+
+/* --------------------------- Мелкая уборка --------------------------- */
+
+/*
+ * Полоса библиотеки со ссылкой на swagger.io. На странице книги это
+ * реклама чужого продукта в разделе документации — и одновременно
+ * единственная ссылка на этой странице, ведущая наружу.
+ */
+.swagger-ui .topbar,
+.swagger-ui .info__tos,
+.swagger-ui .info hgroup.main a {
+  display: none;
+}
+
+/*
+ * Ссылки внутри описания — подчёркнутые, как в книге: у библиотеки они
+ * синие без подчёркивания, и на белом фоне карточки их не видно
+ * до наведения.
+ */
+.swagger-ui .renderedMarkdown a,
+.swagger-ui .markdown a,
+.swagger-ui .info a {
+  color: var(--color-forest-600, #27714a);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}

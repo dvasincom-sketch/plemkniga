@@ -46,6 +46,7 @@
     "check:movements": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-movements.ts",
     "check:pool": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-pool.ts",
     "check:nav": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-nav.ts",
+    "check:swagger-theme": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-swagger-theme.ts",
     "seed:checks": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/seed-checks.ts",
     "smoke": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/smoke.ts"
   },

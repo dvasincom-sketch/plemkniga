@@ -24,6 +24,19 @@ import { useEffect, useRef, useState } from 'react'
  * ни от какой библиотеки, и любой инструмент — Postman, Insomnia, свой
  * генератор клиента — принимает его как есть. Пустой экран вместо этого
  * означал бы, что документации нет вовсе.
+ *
+ * ## Почему две таблицы стилей и почему в таком порядке
+ *
+ * Библиотека приносит своё оформление целиком: системный `sans-serif`
+ * вместо Onest, серо-синие чернила, синюю кнопку «Execute» и палитру
+ * методов от синего, которого в книге нет. Вторая таблица —
+ * `/swagger-theme.css` — приводит это к оформлению книги и подключается
+ * строго после первой: при равной силе селекторов побеждает подключённая
+ * позже, и только так правила совпадают с чужими один в один, без
+ * приписывания каждому лишнего класса ради силы.
+ *
+ * Порядок здесь держится не на удаче: оба тега добавляются подряд,
+ * одним и тем же `appendChild`, в одном проходе.
  */
 export function SwaggerFrame({ specUrl }: { specUrl: string }) {
   const mount = useRef<HTMLDivElement>(null)
@@ -36,6 +49,12 @@ export function SwaggerFrame({ specUrl }: { specUrl: string }) {
     css.rel = 'stylesheet'
     css.href = '/swagger/swagger-ui.css'
     document.head.appendChild(css)
+
+    // Оформление книги поверх оформления библиотеки — обязательно после неё
+    const theme = document.createElement('link')
+    theme.rel = 'stylesheet'
+    theme.href = '/swagger-theme.css'
+    document.head.appendChild(theme)
 
     const script = document.createElement('script')
     script.src = '/swagger/swagger-ui-bundle.js'
@@ -73,6 +92,7 @@ export function SwaggerFrame({ specUrl }: { specUrl: string }) {
     return () => {
       cancelled = true
       css.remove()
+      theme.remove()
       script.remove()
     }
   }, [specUrl])
@@ -104,8 +124,14 @@ export function SwaggerFrame({ specUrl }: { specUrl: string }) {
          и на светлом фоне книги его собственный светлый фон незаметен,
          а на тёмной шапке — наоборот. Карточка ставит его в те же рамки,
          что и остальные блоки страницы.
+
+         Отступы теперь обычные, карточные. Были урезанные — библиотека
+         добавляла свои поверх, и вместе выходило вдвое больше нужного;
+         после того как полоса выбора сервера перестала быть второй
+         карточкой внутри первой, свои отступы библиотека сняла, и здесь
+         остались наши.
       */}
-      <div className="card overflow-x-auto px-2 py-2">
+      <div className="card overflow-x-auto">
         <div ref={mount} />
       </div>
     </div>
