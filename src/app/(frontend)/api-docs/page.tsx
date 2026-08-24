@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
-import { SwaggerFrame } from '@/components/SwaggerFrame'
+import { ApiReference } from '@/components/ApiReference'
 
 export const metadata: Metadata = { title: 'API' }
 export const dynamic = 'force-dynamic'
@@ -18,13 +18,33 @@ export const dynamic = 'force-dynamic'
  * стоит ли. Данные при этом защищены не тем, что о них не рассказали,
  * а правилами доступа.
  *
- * ## Почему на странице есть текст, а не только Swagger UI
+ * ## Почему на странице есть текст, а не только справочник
  *
- * Swagger UI отвечает на вопрос «какие есть ручки и что они принимают»
+ * Справочник отвечает на вопрос «какие есть ручки и что они принимают»
  * и не отвечает ни на один из тех, на которых спотыкаются на самом деле:
  * как войти, почему одна и та же ручка отдаёт разное разным, что делать
- * с `where`. Это не недостаток библиотеки — этого нет в самом формате.
+ * с `where`, с чего вообще начать. Это не недостаток библиотеки — этого
+ * нет в самом формате OpenAPI.
+ *
+ * ## Почему сценарии, а не только справочник
+ *
+ * Список из девяноста ручек отвечает тому, кто знает, что ищет. А приходят
+ * с задачей: «выгрузить своё стадо», «залить дойки за месяц», «найти
+ * дочерей быка». Между задачей и ручкой лежит шаг, который справочник
+ * не делает, — и он же тот самый, на котором бросают. Три сценария ниже
+ * закрывают, по нашему опыту переписки с хозяйствами, почти все первые
+ * обращения.
  */
+
+/** Готовая команда с подсветкой — одинаково выглядит в трёх местах страницы. */
+function Snippet({ children }: { children: React.ReactNode }) {
+  return (
+    <pre className="mt-3 overflow-x-auto rounded-lg bg-[#f6f6f6] p-3 text-[12px] leading-relaxed">
+      {children}
+    </pre>
+  )
+}
+
 export default function ApiDocsPage() {
   return (
     <>
@@ -51,9 +71,7 @@ export default function ApiDocsPage() {
                 <code>POST /api/users/login</code> с почтой и паролем возвращает токен.
                 Дальше его передают заголовком:
               </p>
-              <pre className="mt-3 overflow-x-auto rounded-md bg-[#f6f6f6] p-3 text-[12px]">
-                Authorization: JWT &lt;токен&gt;
-              </pre>
+              <Snippet>Authorization: JWT &lt;токен&gt;</Snippet>
               <p className="mt-3 text-[13px] leading-snug text-ink-500">
                 Браузеру проще: та же ручка ставит cookie, и дальше он ходит с ней сам.
               </p>
@@ -76,9 +94,9 @@ export default function ApiDocsPage() {
               <p className="text-[14px] leading-relaxed text-ink-700">
                 Условия передаются вложенными параметрами:
               </p>
-              <pre className="mt-3 overflow-x-auto rounded-md bg-[#f6f6f6] p-3 text-[12px]">
+              <Snippet>
                 ?where[state][equals]=alive{'\n'}&where[birthDate][greater_than]=2020-01-01
-              </pre>
+              </Snippet>
               <p className="mt-3 text-[13px] leading-snug text-ink-500">
                 Стандартными средствами OpenAPI этот язык не описывается — в спецификации
                 он объявлен строкой, чтобы не выглядеть точнее, чем есть.
@@ -86,9 +104,83 @@ export default function ApiDocsPage() {
             </div>
           </div>
 
-          <SwaggerFrame specUrl="/api-docs/openapi.json" />
+          {/* ------------------------- Сценарии ------------------------- */}
 
-          <p className="mt-6 max-w-[80ch] text-[13px] leading-relaxed text-ink-500">
+          <section className="mt-14">
+            <h2 className="section-title mb-3">С чего начать</h2>
+            <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
+              Три задачи, с которыми к нам приходят чаще всего. Дальше справочник:
+              в нём девяносто ручек, и он отвечает тому, кто уже знает, что ищет.
+            </p>
+
+            <div className="mt-7 grid grid-cols-1 gap-6 lg:grid-cols-3">
+              <div className="card">
+                <h3 className="panel-heading">1. Войти и получить токен</h3>
+                <p className="text-[14px] leading-relaxed text-ink-700">
+                  С него начинается всё остальное: без токена ручки отдают только
+                  публичное.
+                </p>
+                <Snippet>
+                  {`BASE=https://…            # адрес этой системы
+
+curl -X POST "$BASE/api/users/login" \\
+  -H 'content-type: application/json' \\
+  -d '{"email":"…","password":"…"}'`}
+                </Snippet>
+                <p className="mt-3 text-[13px] leading-snug text-ink-500">
+                  В ответе поле <code>token</code>. Срок жизни — в поле <code>exp</code>.
+                </p>
+              </div>
+
+              <div className="card">
+                <h3 className="panel-heading">2. Выгрузить своё стадо</h3>
+                <p className="text-[14px] leading-relaxed text-ink-700">
+                  Владельца в условии называть не нужно: выдача и так ограничена вашим
+                  хозяйством — правилами доступа, а не параметром запроса.
+                </p>
+                <Snippet>
+                  {`curl -H "Authorization: JWT $TOKEN" \\
+  "$BASE/api/animals\\
+?where[archived][not_equals]=true\\
+&limit=200&depth=0"`}
+                </Snippet>
+                <p className="mt-3 text-[13px] leading-snug text-ink-500">
+                  <code>depth=0</code> отдаёт связи идентификаторами — быстрее
+                  и предсказуемее, если сами связанные записи не нужны.
+                </p>
+              </div>
+
+              <div className="card">
+                <h3 className="panel-heading">3. Записать контрольную дойку</h3>
+                <p className="text-[14px] leading-relaxed text-ink-700">
+                  То, ради чего API чаще всего и подключают: дойки приходят каждый месяц
+                  и тысячами строк.
+                </p>
+                <Snippet>
+                  {`curl -X POST "$BASE/api/milk-tests" \\
+  -H "Authorization: JWT $TOKEN" \\
+  -H 'content-type: application/json' \\
+  -d '{"animal":123,"date":"2026-08-01",
+       "milkYield":28.4}'`}
+                </Snippet>
+                <p className="mt-3 text-[13px] leading-snug text-ink-500">
+                  Записать можно только животное своего хозяйства — это проверяется
+                  на сервере, а не в форме.
+                </p>
+              </div>
+            </div>
+
+            <p className="mt-6 max-w-[80ch] text-[13px] leading-relaxed text-ink-500">
+              В примерах два подставляемых значения: <code>$BASE</code> — адрес,
+              по которому открыта эта страница, и <code>$TOKEN</code> — то, что вернул
+              вход. В справочнике ниже подставлять не нужно ничего: адрес там уже наш,
+              а токен вводится один раз кнопкой авторизации.
+            </p>
+          </section>
+
+          <ApiReference specUrl="/api-docs/openapi.json" />
+
+          <p className="mt-8 max-w-[80ch] text-[13px] leading-relaxed text-ink-500">
             Рядом с REST работает GraphQL —{' '}
             <Link href="/api/graphql-playground" className="underline underline-offset-4">
               /api/graphql-playground

@@ -54,10 +54,29 @@ import { AFC_PLAUSIBLE } from '../lib/afc'
  * с базой при первом же ручном удалении. Запись, которая сама помнит,
  * откуда взялась, не разъедется ни с чем.
  *
+ * ## Про то, в какую базу он пишет
+ *
+ * В ту, которую назовёт `DATABASE_URI`, — а он берётся из `.env`, где стоит
+ * база разработки. Прогон «у себя» наполняет localhost и не трогает прод:
+ * прод ходит в управляемый PostgreSQL на другом хосте, и деплой кода данные
+ * туда не переносит. Ровно на этом здесь и споткнулись: страница
+ * на localhost ожила, на проде осталась пустой, и выглядело это как
+ * незавершённый деплой.
+ *
+ * Поэтому база печатается первой строкой, а запись в неместную требует
+ * `--remote`. Не из чрезмерной осторожности: скрипт сочиняет записи,
+ * и ошибиться базой здесь дороже, чем в скрипте, который только читает.
+ * Отката это не отменяет, но откат — уже уборка, а не отсутствие мусора.
+ *
  *   npm run seed:afc                       # демонстрационное хозяйство
  *   npm run seed:afc -- --org 3
+ *   npm run seed:afc -- --limit 100        # взять меньше коров
  *   npm run seed:afc -- --dry              # только показать, что сделает
  *   npm run seed:afc -- --undo             # убрать записанное этим скриптом
+ *
+ *   # прод: строку подключения берём из окружения развёртывания
+ *   DATABASE_URI='postgres://…' npm run seed:afc -- --dry
+ *   DATABASE_URI='postgres://…' npm run seed:afc -- --remote
  */
 
 const args = process.argv.slice(2)
@@ -67,7 +86,18 @@ const argOf = (name: string): string | undefined => {
 }
 const DRY = args.includes('--dry')
 const UNDO = args.includes('--undo')
+const REMOTE = args.includes('--remote')
 const ORG_ARG = argOf('org') ? Number(argOf('org')) : undefined
+
+/**
+ * Сколько коров брать за прогон.
+ *
+ * Потолок нужен из-за сети: на своей машине разница незаметна, а через
+ * канал до управляемой базы каждая запись — это обмен по сети, и стадо
+ * в несколько тысяч голов превращает демонстрацию в получасовое ожидание.
+ * Для отчёта столько и не нужно: он показывает распределение, а не перепись.
+ */
+const LIMIT = Number(argOf('limit') ?? 400)
 
 /**
  * Метка в комментарии записи.
@@ -129,9 +159,35 @@ const addDays = (d: Date, days: number): Date => {
 }
 const iso = (d: Date): string => d.toISOString()
 
+/**
+ * База на этой же машине?
+ *
+ * Проверка по хосту в строке подключения, а не по имени окружения:
+ * `NODE_ENV` говорит, как собрано приложение, и ничего не говорит о том,
+ * куда оно смотрит. Запустить сборку разработки против боевой базы —
+ * обычное дело, и именно этот случай надо поймать.
+ */
+const isLocal = (connection: string): boolean =>
+  /@(localhost|127\.0\.0\.1|\[::1\]|host\.docker\.internal)[:/]/.test(connection) ||
+  connection.includes('/var/run/postgresql')
+
 async function main() {
   console.log(`\nБаза: ${maskUri(uri ?? '')} (из ${source})`)
   if (DRY) console.log('Пробный прогон: ничего не записывается\n')
+
+  /*
+   * Отказ до подключения, а не после: узнать, что писали не туда, надо
+   * раньше первой записи, а не по её следам.
+   */
+  if (!DRY && !isLocal(uri ?? '') && !REMOTE) {
+    console.error(
+      '\nЭта база не на вашей машине, а скрипт сочиняет записи.\n' +
+        'Если вы правда хотите наполнить её — повторите с --remote:\n' +
+        '  npm run seed:afc -- --remote\n' +
+        'Посмотреть, что будет сделано, можно без ключа: npm run seed:afc -- --dry\n',
+    )
+    process.exit(1)
+  }
 
   const payload = await getPayload({ config })
 
@@ -240,6 +296,14 @@ async function main() {
     id: b.id as number,
     name: b.name ?? String(b.identNumber),
     shift: -2 + (i % 5) * 1.5,
+    /*
+     * Дата рождения быка нужна не для отчёта, а чтобы не сочинить
+     * невозможное: у карточки животного стоит проверка «потомок не может
+     * родиться раньше родителя», и она права. Скрипт проставлял отца
+     * случайным из стада — и на первом же быке, который моложе коровы,
+     * запись отвергалась, а прогон обрывался целиком.
+     */
+    birth: b.birthDate ? new Date(b.birthDate).getTime() : null,
   }))
 
   /* ------------------------------ Коровы ------------------------------ */
@@ -254,11 +318,36 @@ async function main() {
       ],
     },
     depth: 0,
-    limit: 1000,
+    limit: LIMIT,
     overrideAccess: true,
   })
 
-  console.log(`Коров в стаде: ${cows.docs.length}`)
+  console.log(`Коров в стаде: ${cows.docs.length} (потолок за прогон: ${LIMIT})`)
+
+  /*
+   * Кто уже отелился — одним запросом, а не по корове.
+   *
+   * Раньше на каждую корову шёл свой `count`, и на своей машине это ничего
+   * не стоило: тысяча запросов к базе на том же хосте укладывается в секунды.
+   * Через сеть до управляемой базы та же тысяча превращается в тысячу
+   * обменов по сети и в минуты ожидания — при том, что ответ на все
+   * умещается в один запрос.
+   */
+  const cowIds = cows.docs.map((c) => c.id as number)
+  const already = new Set<number>()
+  if (cowIds.length > 0) {
+    const existing = await payload.find({
+      collection: 'calvings',
+      where: { and: [{ animal: { in: cowIds } }, { number: { equals: 1 } }] },
+      depth: 0,
+      limit: 100_000,
+      overrideAccess: true,
+    })
+    for (const row of existing.docs) {
+      const id = typeof row.animal === 'number' ? row.animal : (row.animal as { id?: number })?.id
+      if (id) already.add(id)
+    }
+  }
 
   let withCalving = 0
   let born = 0
@@ -266,6 +355,9 @@ async function main() {
   let first = 0
   let second = 0
   let skipped = 0
+  let noSire = 0
+  /** Кого база не приняла и почему — печатается в конце, а не глотается. */
+  const rejected: string[] = []
 
   const today = new Date()
 
@@ -277,38 +369,54 @@ async function main() {
      * отёл было бы соблазнительно, но скрипт не знает, откуда взялся первый:
      * настоящую запись хозяйства он бы дополнил выдуманной.
      */
-    const existing = await payload.count({
-      collection: 'calvings',
-      where: { and: [{ animal: { equals: cowId } }, { number: { equals: 1 } }] },
-      overrideAccess: true,
-    })
-    if (existing.totalDocs > 0) {
+    if (already.has(cowId)) {
       withCalving += 1
       continue
     }
 
-    const sire = sires.length ? sires[int(0, sires.length - 1)] : null
-    const afc = drawAfc(sire?.shift ?? 0)
-
     /*
-     * Дата рождения: своя, если есть. Иначе такая, чтобы корова успела
-     * отелиться и пожить после — от года до пяти лет назад плюс сам возраст
-     * первого отёла. Родить сегодня и отелиться завтра она не может.
+     * Сначала дата рождения, потом отец — порядок обязателен.
+     *
+     * Отец выбирается из тех быков, что родились раньше коровы, а значит
+     * знать её дату надо до выбора. В обратном порядке — сначала случайный
+     * бык, потом дата — скрипт и сочинял невозможное: корову старше
+     * собственного отца.
+     *
+     * Дата берётся своя, если есть. Иначе такая, чтобы корова успела
+     * отелиться и пожить после: от года до пяти лет назад плюс сам возраст
+     * первого отёла. Возраст здесь считается без поправки на быка — она
+     * меньше пары месяцев и на выбор даты не влияет, а зависимость
+     * «дата от быка, бык от даты» замкнула бы круг.
      */
     const patch: Record<string, unknown> = {}
     const patched: string[] = []
     let birth = cow.birthDate ? new Date(cow.birthDate) : null
     if (!birth || Number.isNaN(birth.getTime())) {
-      birth = addMonths(today, -(afc + int(12, 60)))
+      birth = addMonths(today, -(drawAfc(0) + int(12, 60)))
       patch.birthDate = iso(birth)
       patched.push('дата рождения')
-      born += 1
     }
+
+    /*
+     * Бык без даты рождения годится: проверка сравнивает две даты и при
+     * отсутствии одной из них не срабатывает. Это не лазейка — про такого
+     * быка просто ничего не известно, и запретить связь было бы
+     * утверждением, которого никто не проверял.
+     */
+    const eligible = sires.filter((s) => s.birth === null || s.birth < birth.getTime())
+    const sire = eligible.length ? eligible[int(0, eligible.length - 1)] : null
+    const afc = drawAfc(sire?.shift ?? 0)
 
     if (!cow.father && sire) {
       patch.father = sire.id
       patched.push('отец')
-      fathered += 1
+    } else if (!cow.father && sires.length > 0) {
+      /*
+       * Быки в стаде есть, но все моложе этой коровы. Молча оставить её
+       * без отца можно — отчёт по стаду от этого не пострадает, — но
+       * в разрезе по быкам её не будет, и знать об этом полезно.
+       */
+      noSire += 1
     }
 
     const firstDate = addMonths(birth, afc)
@@ -324,14 +432,42 @@ async function main() {
 
     if (!DRY) {
       if (Object.keys(patch).length > 0) {
-        await payload.update({
-          collection: 'animals',
-          id: cowId,
-          data: patch as never,
-          overrideAccess: true,
-        })
+        /*
+         * Отказ на одной корове не должен обрывать прогон, но и молчать
+         * о нём нельзя: карточка могла копить противоречие годами, и запрет
+         * на запись — это отчёт о нём, а не помеха. Причина запоминается
+         * и печатается в конце; корова пропускается целиком, потому что
+         * без даты рождения отёл, который мы ей припишем, в отчёт всё равно
+         * не попадёт — получилась бы запись, не делающая ничего.
+         */
+        try {
+          await payload.update({
+            collection: 'animals',
+            id: cowId,
+            data: patch as never,
+            overrideAccess: true,
+          })
+        } catch (e) {
+          rejected.push(
+            `${cow.identNumber ?? cowId}: ${e instanceof Error ? e.message : String(e)}`,
+          )
+          continue
+        }
       }
+    }
 
+    /*
+     * Счётчики после записи, а не до неё.
+     *
+     * Считать в момент, когда поле только собрались записать, — значит
+     * посчитать и то, что база потом отвергла: итог показывал бы работу,
+     * которой не было. В пробном прогоне записи нет вовсе, и там считается
+     * намерение — это и есть его смысл.
+     */
+    if (patched.includes('дата рождения')) born += 1
+    if (patched.includes('отец')) fathered += 1
+
+    if (!DRY) {
       await payload.create({
         collection: 'calvings',
         data: {
@@ -382,6 +518,13 @@ async function main() {
   console.log(`  отец проставлен:          ${fathered}`)
   console.log(`  уже были с первым отёлом: ${withCalving}`)
   if (skipped > 0) console.log(`  пропущено (отёл вышел бы в будущем): ${skipped}`)
+  if (noSire > 0) console.log(`  осталось без отца (все быки моложе):  ${noSire}`)
+
+  if (rejected.length > 0) {
+    console.log(`\n  База не приняла ${rejected.length}:`)
+    for (const line of rejected.slice(0, 20)) console.log(`    ${line}`)
+    if (rejected.length > 20) console.log(`    …и ещё ${rejected.length - 20}`)
+  }
 
   /*
    * Разрез по быкам показывается только для тех, у кого не меньше трёх

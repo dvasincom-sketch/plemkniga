@@ -1,3 +1,21 @@
+/*
+ * Порядок слоёв объявлен до импорта Tailwind, и это не украшение.
+ *
+ * Справочник API (Scalar) раскладывает свои стили по слоям `scalar-*`,
+ * Tailwind v4 — по своим `theme, base, components, utilities`. Приоритет
+ * слоёв браузер берёт из того объявления, которое встретил первым; если
+ * не назвать порядок самим, слои Scalar оказываются выше `utilities`,
+ * и его переменные — вплоть до `--leading-normal` и `--ease-in` — начинают
+ * переопределять служебные классы Tailwind на всём сайте.
+ *
+ * Ломается при этом не страница справочника, а соседние: стили приезжают
+ * вместе с ней, а расходятся по всему, что открыто. Слои Scalar названы
+ * первыми, то есть с наименьшим приоритетом; объявление обязано стоять
+ * до `@import 'tailwindcss'` — Tailwind при импорте объявляет свой порядок
+ * сам, и наш должен успеть раньше.
+ */
+@layer scalar-base, scalar-theme, scalar-config, theme, base, components, utilities;
+
 @import 'tailwindcss';
 @import '@fontsource-variable/onest';
 @import '@fontsource-variable/unbounded';

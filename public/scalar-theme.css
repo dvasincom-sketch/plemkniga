@@ -1,0 +1,116 @@
+/*
+ * Справочник API в оформлении книги.
+ *
+ * ## Почему это переменные, а не переопределения
+ *
+ * У Swagger UI своего способа настройки не было, и оформление приходилось
+ * отбивать у чужой таблицы стилей — тремястами строк с `!important`,
+ * которые ломались бы от каждой смены версии. Scalar объявляет свои
+ * переменные и обещает их поддерживать; настроить его через них — это
+ * пользоваться библиотекой, а не бороться с ней.
+ *
+ * Отсюда и объём: файл короткий не потому, что оформления мало,
+ * а потому, что оно задаётся в предусмотренном месте.
+ *
+ * ## Про `.light-mode`
+ *
+ * Цвета Scalar раскладывает по двум наборам — дневному и ночному, —
+ * и вешает их на классы. У книги ночного вида нет, поэтому задан только
+ * дневной. Ночной не переопределяется намеренно: если он однажды
+ * понадобится, лучше завести его целиком и осознанно, чем получить
+ * полуготовый из остатков дневного.
+ */
+
+:root {
+  /*
+   * Шрифты книги. В настройке справочника при этом обязателен
+   * `withDefaultFonts: false` — иначе библиотека дополнительно тянет
+   * Inter и JetBrains Mono из своей сети, и страница перестаёт открываться
+   * там, где до этой сети не дотянуться.
+   */
+  --scalar-font: var(
+    --font-sans,
+    'Onest Variable',
+    'Onest',
+    ui-sans-serif,
+    system-ui,
+    sans-serif
+  );
+  --scalar-font-code: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas,
+    'Liberation Mono', monospace;
+
+  /* Скругления книги: карточки крупные, элементы внутри — помельче */
+  --scalar-radius: 10px;
+  --scalar-radius-lg: 12px;
+  --scalar-radius-xl: 16px;
+}
+
+.light-mode {
+  /* Чернила: основной текст, второстепенный, служебный */
+  --scalar-color-1: var(--color-ink-900, #17181a);
+  --scalar-color-2: var(--color-ink-700, #3a3d42);
+  --scalar-color-3: var(--color-ink-500, #6b7280);
+
+  /*
+   * Акцент — глубокий зелёный, а не яркий.
+   *
+   * Ярким (`brand-500`) книга красит кнопки-действия, и на длинном тексте
+   * справочника он звенит: акцентом здесь покрашены ссылки и активные
+   * пункты, а их на экране десятки. Глубокий читается спокойно и остаётся
+   * фирменным.
+   */
+  --scalar-color-accent: var(--color-forest-500, #2e8757);
+  --scalar-background-accent: rgb(46 135 87 / 0.08);
+
+  /*
+   * Подложки. Первая — белая, как карточки книги; вторая и третья
+   * серые, ими Scalar красит боковое меню и блоки кода.
+   */
+  --scalar-background-1: #ffffff;
+  --scalar-background-2: var(--color-canvas, #f2f2f2);
+  --scalar-background-3: #e9e9e9;
+
+  --scalar-border-color: var(--color-ink-100, #e5e7eb);
+}
+
+/*
+ * Боковое меню. Отдельный набор переменных, и без него оно остаётся
+ * серым от собственной темы — а это самая заметная часть экрана.
+ */
+.light-mode .sidebar {
+  --scalar-sidebar-background-1: var(--color-canvas, #f2f2f2);
+  --scalar-sidebar-color-1: var(--color-ink-900, #17181a);
+  --scalar-sidebar-color-2: var(--color-ink-500, #6b7280);
+  --scalar-sidebar-color-active: var(--color-forest-600, #27714a);
+  --scalar-sidebar-item-hover-color: currentColor;
+  --scalar-sidebar-item-hover-background: rgb(23 24 26 / 0.04);
+  --scalar-sidebar-item-active-background: #ffffff;
+  --scalar-sidebar-border-color: var(--color-ink-100, #e5e7eb);
+  --scalar-sidebar-search-background: #ffffff;
+  --scalar-sidebar-search-border-color: var(--color-ink-100, #e5e7eb);
+  --scalar-sidebar-search-color: var(--color-ink-500, #6b7280);
+}
+
+/*
+ * Цвета методов — те же, что книга даёт действиям: чтение спокойным
+ * зелёным, изменение оранжевым, удаление тем же красным, каким помечены
+ * отозванные документы. Набор библиотеки построен от синего, которого
+ * в книге нет вовсе.
+ */
+.light-mode {
+  --scalar-color-green: var(--color-forest-500, #2e8757);
+  --scalar-color-blue: var(--color-forest-500, #2e8757);
+  --scalar-color-orange: var(--color-accent-600, #e08f0d);
+  --scalar-color-red: #c0392b;
+  --scalar-color-yellow: var(--color-accent-500, #f5a623);
+  --scalar-color-purple: var(--color-brand-600, #6aa036);
+}
+
+/*
+ * Справочник встроен в страницу книги, а не занимает экран целиком:
+ * выше него — шапка сайта и наше вступление, ниже — подвал. Своя
+ * подложка ему здесь не нужна, её даёт страница.
+ */
+.scalar-api-reference {
+  background: transparent;
+}

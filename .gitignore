@@ -15,7 +15,8 @@ _to_delete/
 # см. docs/vneshnie-dannye.md.
 /data
 
-# Swagger UI копируется сюда перед сборкой из node_modules (src/scripts/copy-swagger.ts).
-# В репозитории это была бы третья копия библиотеки — рядом с package.json
-# и node_modules, — и первая же смена версии оставила бы её прежней.
-public/swagger/
+# Справочник API копируется сюда перед сборкой из node_modules
+# (src/scripts/copy-scalar.ts). В репозитории это была бы третья копия
+# библиотеки — рядом с package.json и node_modules, — и первая же смена
+# версии оставила бы её прежней.
+public/scalar/
