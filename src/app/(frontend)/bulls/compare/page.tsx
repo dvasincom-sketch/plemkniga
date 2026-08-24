@@ -3,6 +3,10 @@ import Link from 'next/link'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { BullPicker } from '@/components/BullPicker'
+import { AccountNav } from '@/components/AccountNav'
+import { HerdNav } from '@/components/HerdNav'
+import { Breadcrumbs } from '@/components/Breadcrumbs'
+import { isAssociationUser } from '@/lib/association'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { relId } from '@/lib/visibility'
 import { compareBulls, KINSHIP_DEPTH, MAX_BULLS, type BullRow } from '@/lib/bull-compare'
@@ -67,12 +71,48 @@ export default async function BullComparePage({
   const without = (id: number) =>
     `/bulls/compare${ids.filter((x) => x !== id).length ? `?ids=${ids.filter((x) => x !== id).join(',')}` : ''}`
 
+  /*
+   * Экран принадлежит стаду, и над ним стоят ряды стада.
+   *
+   * Он живёт по общему адресу `/bulls/…`, а не внутри `/account`, потому
+   * что ссылка на собранное сравнение пересылается — в том числе тому,
+   * у кого учётной записи нет. Но у вошедшего хозяйства это раздел
+   * кабинета: сюда ведёт «Стадо → Отчёты», и колонка родства считается
+   * от его родословной. Раз вход из кабинета, то и вернуться из экрана
+   * надо в кабинет, а не гадать, где ты оказался.
+   *
+   * Гостю ряды не показываются: разделов кабинета у него нет, и ряд
+   * из четырёх плашек, ни одна из которых ему не открыта, — приглашение,
+   * которое никуда не ведёт. Ему остаётся общая шапка и путь от книги.
+   */
+  const inCabinet = Boolean(user) && !isAssociationUser(user)
+
   return (
     <>
-      <SiteHeader />
+      <SiteHeader active={inCabinet ? '/account' : '/'} />
 
       <main className="container-page pb-8">
+        {inCabinet && (
+          <>
+            <AccountNav active="herd" />
+            <HerdNav active="reports" />
+          </>
+        )}
+
         <div className="min-w-0">
+          <Breadcrumbs
+            items={
+              inCabinet
+                ? [
+                    { label: 'Личный кабинет', href: '/account' },
+                    { label: 'Стадо', href: '/account?tab=herd' },
+                    { label: 'Отчёты', href: '/account?tab=herd&sub=reports' },
+                    { label: 'Сравнение быков' },
+                  ]
+                : [{ label: 'Племенная книга', href: '/' }, { label: 'Сравнение быков' }]
+            }
+          />
+
           <h1 className="text-[30px] font-medium leading-tight sm:text-[36px]">Сравнение быков</h1>
 
           <p className="mt-4 max-w-[80ch] text-[15px] leading-relaxed text-ink-700">

@@ -257,6 +257,132 @@ const listResponse = (ref: string): Schema => ({
   },
 })
 
+/**
+ * Разделы описания.
+ *
+ * ## Зачем
+ *
+ * Ручек девяносто, коллекций сорок с лишним, и в Swagger UI они шли одним
+ * списком в том порядке, в каком лежат в конфигурации Payload: «Пользователи,
+ * Организации, Стада, Животные, Перемещения…» и через тридцать строк
+ * «Масти, Группы крови, Методы воспроизводства». Найти в таком списке нужное
+ * можно только поиском по странице — то есть заранее зная, как оно называется.
+ * А приходят сюда с обратным вопросом: что вообще есть про животное.
+ *
+ * ## Почему приставка к имени, а не группы
+ *
+ * У OpenAPI нет разделов. Есть расширение `x-tagGroups`, но понимает его
+ * Redoc, а не Swagger UI, и в нашем случае оно означало бы разметку, которую
+ * никто не отобразит. Приставка работает везде: раздел виден в самом имени
+ * («Стадо · Животные»), а порядок задаётся списком `tags` в корне документа —
+ * Swagger UI выводит разделы именно в нём, а не по алфавиту.
+ *
+ * ## Про «Прочее»
+ *
+ * Раздел есть, и он обязан оставаться пустым. Новая коллекция, о которой
+ * здесь не сказано, попадёт в него — и это заметит `check:openapi`. Молча
+ * приписать её к соседнему разделу значило бы решить за того, кто её завёл;
+ * промолчать вовсе — потерять её в списке из сорока имён.
+ */
+const SECTIONS = [
+  {
+    key: 'Стадо',
+    description: 'Животные, их площадки и смена владельца.',
+    slugs: ['animals', 'herds', 'movements'],
+  },
+  {
+    key: 'События',
+    description:
+      'Что происходило с животным во времени. Отёлы, осеменения и дойки — ' +
+      'отдельными коллекциями: их пишут тысячами строк, и у каждой свои поля.',
+    slugs: ['calvings', 'inseminations', 'milk-tests', 'health-events', 'events'],
+  },
+  {
+    key: 'Оценка',
+    description:
+      'Племенная ценность и то, из чего она считается: признаки, экстерьер, ' +
+      'профили весов и базы сравнения.',
+    slugs: [
+      'animal-evaluations',
+      'animal-exteriors',
+      'index-profiles',
+      'index-values',
+      'index-bases',
+    ],
+  },
+  {
+    key: 'Проверка',
+    description:
+      'Путь данных от загрузки до подписи Ассоциации: пакеты, заявки ' +
+      'и правила, по которым записи сверяют.',
+    slugs: ['data-submissions', 'verification-requests', 'check-settings', 'check-thresholds'],
+  },
+  {
+    key: 'Документы',
+    description: 'Свидетельства, протоколы и файлы, которыми они подтверждены.',
+    slugs: ['documents', 'media'],
+  },
+  {
+    key: 'Люди',
+    description: 'Учётные записи, хозяйства и приглашения сотрудников.',
+    slugs: ['users', 'organizations', 'invitations'],
+  },
+  {
+    key: 'Доступ',
+    description:
+      'Вход в систему и то, кому открыты ваши записи: точечный доступ ' +
+      'хозяйствам и ссылки на просмотр для тех, у кого учётной записи нет.',
+    slugs: ['access-requests', 'access-grants', 'share-links'],
+  },
+  {
+    key: 'Журналы',
+    description:
+      'Что происходило с данными и кто это сделал. Журналы не пишутся ' +
+      'через API: записать в них можно только служебным вызовом.',
+    slugs: ['animal-revisions', 'operations', 'access-views', 'animal-removals'],
+  },
+  {
+    key: 'Справочники',
+    description:
+      'Ведутся Ассоциацией и одни на всю книгу: своя порода или своя причина ' +
+      'выбытия у каждого хозяйства сделала бы записи несравнимыми.',
+    slugs: [
+      'breeds',
+      'lines',
+      'breeding-categories',
+      'breeding-classes',
+      'animal-purposes',
+      'disposal-reasons',
+      'coat-colors',
+      'blood-groups',
+      'reproduction-methods',
+      'semen-types',
+      'insemination-results',
+      'dna-test-types',
+      'haplotype-types',
+      'health-event-types',
+      'technicians',
+    ],
+  },
+  {
+    key: 'Прочее',
+    description:
+      'Сюда попадает коллекция, для которой раздел не назван. Раздел обязан ' +
+      'оставаться пустым — это проверяет `npm run check:openapi`.',
+    slugs: [],
+  },
+] as const
+
+/** Разделитель раздела и имени. Точка на середине, а не дефис: дефис есть в самих именах. */
+const SECTION_SEP = ' · '
+
+const sectionOf = (slug: string): string =>
+  SECTIONS.find((s) => (s.slugs as readonly string[]).includes(slug))?.key ?? 'Прочее'
+
+/** Имя раздела в описании: «Стадо · Животные». */
+export const taggedName = (slug: string, name: string): string =>
+  `${sectionOf(slug)}${SECTION_SEP}${name}`
+
 export type OpenApiDocument = Record<string, unknown>
 
 export function buildOpenApi(payload: Payload, serverUrl: string): OpenApiDocument {

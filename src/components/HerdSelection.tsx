@@ -26,16 +26,44 @@ import { useRouter } from 'next/navigation'
  *
  * ## Что можно сделать с отмеченным
  *
- * Пока одно — выпустить ссылку на просмотр. Это не заглушка на будущее,
- * а закрытие настоящей дыры: форма ссылки принимает список номеров,
- * и до сих пор их приходилось набирать руками, глядя в ту же таблицу.
+ * Выпустить ссылку на просмотр — форма ссылки принимает список номеров,
+ * и до этого их набирали руками, глядя в ту же таблицу. И сравнить
+ * отмеченных быков.
+ *
  * Остальное («подать на верификацию», «выгрузить отмеченные») ждёт
  * сохранённых выборок — там отметка живёт дольше одной страницы,
  * и обещать это полосой, которая обнуляется при листании, нечестно.
+ *
+ * ## Почему сравнение предлагается только быкам
+ *
+ * Не из-за того, что экран называется «Сравнение быков». Сравнивать
+ * быка и корову — разные действия, и второго у нас нет.
+ *
+ * Быка сравнивают по дочерям: его собственных удоев не существует,
+ * и единственное, что о нём говорят числа, — разница со сверстницами
+ * у его дочерей. Такую таблицу глазами не собрать, для неё и написан
+ * отдельный экран.
+ *
+ * У коровы удой, жир, белок и ИПЦ стоят в её собственной строке,
+ * и таблица стада уже показывает их рядом — это и есть сравнение.
+ * Отдельный экран, который перенёс бы те же четыре числа из строк
+ * в колонки, ничего бы не добавил, а выглядел бы обещанием, что
+ * добавил.
+ *
+ * Поэтому кнопка появляется, когда отмечено хотя бы два быка,
+ * и берёт из отмеченного только их. Когда рядом с быками отмечены
+ * коровы, полоса говорит об этом вслух: молчаливое «взяли не всех»
+ * читается как поломка.
  */
+
+/** Столько быков помещается в сравнение — то же число, что на самом экране. */
+const MAX_BULLS = 6
+
+type Picked = { number: string; id: string; bull: boolean }
+
 export function HerdSelection({ children }: { children: React.ReactNode }) {
   const form = useRef<HTMLFormElement>(null)
-  const [picked, setPicked] = useState<string[]>([])
+  const [picked, setPicked] = useState<Picked[]>([])
   const router = useRouter()
 
   const boxes = () =>
@@ -55,7 +83,15 @@ export function HerdSelection({ children }: { children: React.ReactNode }) {
   const recount = () => {
     const all = boxes()
     const checked = all.filter((i) => i.checked)
-    setPicked(checked.map((i) => i.value).filter(Boolean))
+    setPicked(
+      checked
+        .filter((i) => i.value)
+        .map((i) => ({
+          number: i.value,
+          id: i.dataset.id ?? '',
+          bull: i.dataset.sex === 'male',
+        })),
+    )
 
     const m = master()
     if (m) {
@@ -84,6 +120,15 @@ export function HerdSelection({ children }: { children: React.ReactNode }) {
     }
     recount()
   }
+
+  /*
+   * Быки среди отмеченного — с идентификатором. Запись без него в сравнение
+   * не отправить, а промолчать о ней нельзя: она отмечена, и человек ждёт,
+   * что её возьмут. Такого в живой таблице не бывает, поэтому она просто
+   * не считается быком и попадает в объяснение вместе с коровами.
+   */
+  const bulls = picked.filter((p) => p.bull && p.id)
+  const cows = picked.length - bulls.length
 
   const clear = () => {
     for (const i of boxes()) i.checked = false
@@ -115,12 +160,52 @@ export function HerdSelection({ children }: { children: React.ReactNode }) {
           <button
             type="button"
             onClick={() =>
-              router.push(`/account/access?numbers=${encodeURIComponent(picked.join(', '))}`)
+              router.push(
+                `/account/access?numbers=${encodeURIComponent(
+                  picked.map((p) => p.number).join(', '),
+                )}`,
+              )
             }
             className="rounded-lg bg-white px-3 py-2 text-[14px] text-ink-900 transition-colors hover:bg-[#f0f0f0]"
           >
             Поделиться ссылкой
           </button>
+
+          {bulls.length >= 2 && (
+            <button
+              type="button"
+              onClick={() =>
+                router.push(
+                  `/bulls/compare?ids=${bulls
+                    .slice(0, MAX_BULLS)
+                    .map((p) => p.id)
+                    .join(',')}`,
+                )
+              }
+              className="rounded-lg bg-white px-3 py-2 text-[14px] text-ink-900 transition-colors hover:bg-[#f0f0f0]"
+            >
+              Сравнить {bulls.length > MAX_BULLS ? MAX_BULLS : bulls.length}{' '}
+              {bulls.length > MAX_BULLS ? 'из ' + bulls.length + ' быков' : 'быков'}
+            </button>
+          )}
+
+          {/*
+             Пояснение к кнопке, а не оправдание её отсутствия.
+
+             Оно появляется только тогда, когда отмеченное и взятое
+             в сравнение расходятся: рядом с быками отмечены коровы либо
+             быков больше, чем помещается. Молчаливое «взяли не всех»
+             читается как поломка, а объяснение, висящее всегда, —
+             как отговорка.
+          */}
+          {bulls.length >= 2 && (cows > 0 || bulls.length > MAX_BULLS) && (
+            <span className="text-[13px] leading-snug text-white/70">
+              {cows > 0 && `коров сравнение не берёт: их удои и так стоят рядом в таблице`}
+              {cows > 0 && bulls.length > MAX_BULLS && '; '}
+              {bulls.length > MAX_BULLS &&
+                `в таблицу помещается ${MAX_BULLS} — дальше она не читается без прокрутки вбок`}
+            </span>
+          )}
 
           <button
             type="button"
