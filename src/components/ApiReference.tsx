@@ -45,12 +45,77 @@ type ScalarGlobal = {
   createApiReference?: (target: string | Element, config: Record<string, unknown>) => void
 }
 
+/**
+ * Подписи, до которых не дотягивается словарь библиотеки.
+ *
+ * ## Почему это вообще понадобилось
+ *
+ * Встроенный русский словарь у Scalar хороший, но покрывает не всё: часть
+ * строк зашита прямо в разметку, а не взята из переводов. Две из них
+ * заметны на нашей странице.
+ *
+ * Первая — заполнитель поля, куда вставляют токен: `QUxMIFlPVVIgQkFTRSBB…`
+ * Это шутка авторов, base64 от «ALL YOUR BASE ARE BELONG TO US». Место для
+ * неё выбрано худшее из возможных: человек пришёл вставить токен и видит
+ * строку, похожую на образец значения или на требуемый формат. Кто-нибудь
+ * попробует вставить именно её.
+ *
+ * Вторая — подписи флажков у параметров запроса: «Include limit in
+ * request». Глазами их не видно, но читающая программа произносит
+ * их вслух, и на русской странице это единственное, что звучит
+ * по-английски.
+ *
+ * ## Почему подмена, а не форк библиотеки
+ *
+ * Обе строки зашиты в разметку — настройкой их не достать. Остаются два
+ * пути: держать свою сборку библиотеки ради двух строк либо поправить
+ * их на месте. Первое означает вечное слияние чужих изменений; второе —
+ * тридцать строк, которые перестают работать, если строка изменится.
+ *
+ * ## Почему это безопасно
+ *
+ * Правило привязано к точному тексту. Сменят авторы шутку или подпись —
+ * совпадения не будет, и наш код просто ничего не сделает: ни поломки,
+ * ни подмены не того. И замена сама себя останавливает — переписанное
+ * под правило больше не подходит, поэтому наблюдатель не зацикливается
+ * на собственной правке.
+ */
+const RUSSIFY: { attr: 'placeholder' | 'aria-label'; from: RegExp; to: (m: RegExpMatchArray) => string }[] = [
+  {
+    attr: 'placeholder',
+    from: /^QUxMIFlPVVIgQkFTRSBBUkUgQkVMT05HIFRPIFVT$/,
+    to: () => 'вставьте значение',
+  },
+  {
+    attr: 'aria-label',
+    from: /^Include (.+) in request$/,
+    /*
+     * `row` — не имя параметра, а заглушка библиотеки для строки без имени.
+     * Переносить её в русскую подпись значило бы произносить читалкой
+     * «Включить „роу“ в запрос»: имя параметра оставляем как есть,
+     * потому что оно и в запросе такое, а заглушку переводим.
+     */
+    to: (m) => (m[1] === 'row' ? 'Включить строку в запрос' : `Включить «${m[1]}» в запрос`),
+  },
+]
+
+const russify = (root: HTMLElement): void => {
+  for (const rule of RUSSIFY) {
+    for (const el of root.querySelectorAll<HTMLElement>(`[${rule.attr}]`)) {
+      const value = el.getAttribute(rule.attr) ?? ''
+      const match = value.match(rule.from)
+      if (match) el.setAttribute(rule.attr, rule.to(match))
+    }
+  }
+}
+
 export function ApiReference({ specUrl }: { specUrl: string }) {
   const mount = useRef<HTMLDivElement>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'missing'>('loading')
 
   useEffect(() => {
     let cancelled = false
+    let observer: MutationObserver | null = null
 
     const theme = document.createElement('link')
     theme.rel = 'stylesheet'
@@ -162,6 +227,23 @@ export function ApiReference({ specUrl }: { specUrl: string }) {
         operationsSorter: undefined,
       })
 
+      /*
+       * Справочник рисуется постепенно и дорисовывается при раскрытии
+       * разделов, поэтому один проход по разметке ничего бы не дал:
+       * половины подписей в ней ещё нет. Наблюдатель проходит по тому,
+       * что появилось, и на этом успокаивается — переписанное под правило
+       * больше не подходит.
+       */
+      russify(mount.current)
+      observer = new MutationObserver(() => {
+        if (mount.current) russify(mount.current)
+      })
+      observer.observe(mount.current, {
+        subtree: true,
+        childList: true,
+        attributeFilter: ['placeholder', 'aria-label'],
+      })
+
       setState('ready')
     }
 
@@ -173,6 +255,7 @@ export function ApiReference({ specUrl }: { specUrl: string }) {
 
     return () => {
       cancelled = true
+      observer?.disconnect()
       theme.remove()
       script.remove()
     }

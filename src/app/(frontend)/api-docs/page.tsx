@@ -36,10 +36,33 @@ export const dynamic = 'force-dynamic'
  * обращения.
  */
 
-/** Готовая команда с подсветкой — одинаково выглядит в трёх местах страницы. */
-function Snippet({ children }: { children: React.ReactNode }) {
+/**
+ * Готовый пример — одинаково выглядит во всех карточках страницы.
+ *
+ * ## Почему команда не переносится, а адрес переносится
+ *
+ * В карточку помещается сорок знаков, и строки длиннее обрезались правым
+ * краем: «BASE=https://… # адрес этой сис». Прокрутка внутри блока была
+ * и раньше, но обрезанная строка читается как поломка, а не как
+ * приглашение листать вбок.
+ *
+ * Чинится это по-разному для двух разных вещей. Команду переносить нельзя:
+ * её копируют целиком, и перенос по ширине окна в шелле означает совсем
+ * не то, что перенос по обратному слэшу, — читатель перестаёт отличать
+ * настоящее продолжение строки от нарисованного. Поэтому команды
+ * укорочены так, чтобы влезать, а прокрутка осталась запасным выходом
+ * для узкого экрана.
+ *
+ * Адрес с условиями отбора — не команда, а строка запроса, и её перенос
+ * ничего не искажает: читают её глазами, а не вставляют в терминал.
+ */
+function Snippet({ children, wrap = false }: { children: React.ReactNode; wrap?: boolean }) {
   return (
-    <pre className="mt-3 overflow-x-auto rounded-lg bg-[#f6f6f6] p-3 text-[12px] leading-relaxed">
+    <pre
+      className={`mt-3 rounded-lg bg-[#f6f6f6] p-3 text-[12px] leading-relaxed ${
+        wrap ? 'whitespace-pre-wrap break-all' : 'overflow-x-auto'
+      }`}
+    >
       {children}
     </pre>
   )
@@ -94,7 +117,7 @@ export default function ApiDocsPage() {
               <p className="text-[14px] leading-relaxed text-ink-700">
                 Условия передаются вложенными параметрами:
               </p>
-              <Snippet>
+              <Snippet wrap>
                 ?where[state][equals]=alive{'\n'}&where[birthDate][greater_than]=2020-01-01
               </Snippet>
               <p className="mt-3 text-[13px] leading-snug text-ink-500">
@@ -121,14 +144,16 @@ export default function ApiDocsPage() {
                   публичное.
                 </p>
                 <Snippet>
-                  {`BASE=https://…            # адрес этой системы
+                  {`BASE=https://…
 
-curl -X POST "$BASE/api/users/login" \\
-  -H 'content-type: application/json' \\
+curl -X POST \\
+  "$BASE/api/users/login" \\
+  -H content-type:application/json \\
   -d '{"email":"…","password":"…"}'`}
                 </Snippet>
                 <p className="mt-3 text-[13px] leading-snug text-ink-500">
-                  В ответе поле <code>token</code>. Срок жизни — в поле <code>exp</code>.
+                  В <code>BASE</code> — адрес этой системы. В ответе поле{' '}
+                  <code>token</code>, срок жизни — в поле <code>exp</code>.
                 </p>
               </div>
 
@@ -139,10 +164,10 @@ curl -X POST "$BASE/api/users/login" \\
                   хозяйством — правилами доступа, а не параметром запроса.
                 </p>
                 <Snippet>
-                  {`curl -H "Authorization: JWT $TOKEN" \\
-  "$BASE/api/animals\\
+                  {`curl "$BASE/api/animals\\
 ?where[archived][not_equals]=true\\
-&limit=200&depth=0"`}
+&limit=200&depth=0" \\
+  -H "Authorization: JWT $TOKEN"`}
                 </Snippet>
                 <p className="mt-3 text-[13px] leading-snug text-ink-500">
                   <code>depth=0</code> отдаёт связи идентификаторами — быстрее
@@ -156,12 +181,14 @@ curl -X POST "$BASE/api/users/login" \\
                   То, ради чего API чаще всего и подключают: дойки приходят каждый месяц
                   и тысячами строк.
                 </p>
+                {/* -X POST не нужен: с -d curl и так шлёт POST, а строка короче */}
                 <Snippet>
-                  {`curl -X POST "$BASE/api/milk-tests" \\
+                  {`curl "$BASE/api/milk-tests" \\
   -H "Authorization: JWT $TOKEN" \\
-  -H 'content-type: application/json' \\
-  -d '{"animal":123,"date":"2026-08-01",
-       "milkYield":28.4}'`}
+  -H content-type:application/json \\
+  -d '{"animal":123,
+      "date":"2026-08-01",
+      "milkYield":28.4}'`}
                 </Snippet>
                 <p className="mt-3 text-[13px] leading-snug text-ink-500">
                   Записать можно только животное своего хозяйства — это проверяется
