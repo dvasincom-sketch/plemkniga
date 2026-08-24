@@ -48,6 +48,7 @@
     "check:nav": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-nav.ts",
     "check:swagger-theme": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-swagger-theme.ts",
     "seed:checks": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/seed-checks.ts",
+    "seed:afc": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/seed-afc.ts",
     "smoke": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/smoke.ts"
   },
   "dependencies": {
