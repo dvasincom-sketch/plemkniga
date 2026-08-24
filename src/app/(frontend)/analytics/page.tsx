@@ -1,67 +1,35 @@
-import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { SiteHeader } from '@/components/SiteHeader'
-import { SiteFooter } from '@/components/SiteFooter'
-import { getClient, getCurrentUser } from '@/lib/payload'
-import type { Where } from 'payload'
-import { nf } from '@/lib/format'
+import { getCurrentUser } from '@/lib/payload'
 
-export const metadata: Metadata = { title: 'Аналитика' }
 export const dynamic = 'force-dynamic'
 
+/**
+ * Адрес живёт, страницы больше нет.
+ *
+ * «Аналитика» была отдельным разделом верхнего меню и показывала шесть чисел
+ * по стаду: поголовье, средний удой, жир, белок, ИПЦ, быков. Те же числа
+ * нужны в кабинете и нужны первыми — с них начинается ответ на вопрос
+ * «что у меня происходит», — поэтому они переехали в «Обзор».
+ *
+ * Переехали не ради стройности меню. Пока счёт стоял в двух местах, он
+ * расходился: кабинет считал без архива, «Аналитика» — вместе с ним,
+ * и на живом хозяйстве это выглядело как «74 животных» в одном разделе
+ * и «86 в стаде» в другом. Оба числа выглядели авторитетно. Теперь счёт
+ * один, в `herdSummary`, и берут его оба места из него.
+ *
+ * Адрес остаётся и уводит на новое место: он успел уйти в закладки, письма
+ * и старые страницы, и оттуда его не забрать. Тот же приём, что применён
+ * к `?tab=access` и `?tab=events`.
+ */
 export default async function AnalyticsPage() {
   const user = await getCurrentUser()
-  if (!user) redirect('/login')
+  if (!user) redirect('/login?next=%2Faccount%3Ftab%3Doverview')
 
-  const payload = await getClient()
-  const orgId =
-    typeof user.organization === 'object' && user.organization
-      ? user.organization.id
-      : (user.organization as number | undefined)
-
-  const scope: Where = orgId ? { owner: { equals: orgId } } : {}
-  const animals = await payload.find({
-    collection: 'animals',
-    where: scope,
-    limit: 2000,
-    overrideAccess: true,
-  })
-
-  const cows = animals.docs.filter((a) => a.sex === 'female')
-  const avg = (get: (a: (typeof cows)[number]) => number | null | undefined) => {
-    const vals = cows.map(get).filter((v): v is number => typeof v === 'number')
-    return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : null
-  }
-
-  const stats = [
-    { label: 'Животных в стаде', value: nf(animals.totalDocs, 0) },
-    { label: 'Средний удой, л', value: nf(avg((a) => a.summary?.milkYield), 0) },
-    { label: 'Средний жир, %', value: nf(avg((a) => a.summary?.fatPercent), 2) },
-    { label: 'Средний белок, %', value: nf(avg((a) => a.summary?.proteinPercent), 2) },
-    { label: 'Средний ИПЦ', value: nf(avg((a) => a.ipc), 1) },
-    { label: 'Быков-производителей', value: nf(animals.docs.filter((a) => a.sex === 'male').length, 0) },
-  ]
-
-  return (
-    <>
-      <SiteHeader active="/analytics" />
-      <main className="container-page pb-8">
-        <h1 className="text-[38px] font-medium sm:text-[46px]">Аналитика</h1>
-        <p className="mt-3 max-w-[70ch] text-[15px] text-ink-700">
-          Сводные показатели по стаду. В полной версии сюда добавляются динамика удоя по месяцам,
-          распределение ИПЦ, сравнение с породным стандартом и подбор быков.
-        </p>
-
-        <section className="mt-9 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {stats.map((s) => (
-            <div key={s.label} className="card">
-              <p className="text-sm text-ink-500">{s.label}</p>
-              <p className="stat-value mt-3 text-[34px] text-forest-500">{s.value}</p>
-            </div>
-          ))}
-        </section>
-      </main>
-      <SiteFooter />
-    </>
-  )
+  /*
+   * У сотрудника Ассоциации своего стада нет, и «Обзор» хозяйства ему
+   * показывать нечего: `/account` для него закрыт целиком. Его сводка —
+   * в собственном кабинете.
+   */
+  const association = user.role === 'expert' || user.role === 'admin'
+  redirect(association ? '/association' : '/account?tab=overview')
 }

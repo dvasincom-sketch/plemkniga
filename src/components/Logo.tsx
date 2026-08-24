@@ -11,6 +11,8 @@ import { findPublicAsset } from '@/lib/media'
 export function Logo({
   className = '',
   onDark = false,
+  href = '/',
+  label = 'На главную',
 }: {
   className?: string
   /**
@@ -21,16 +23,28 @@ export function Logo({
    * на светлую плашку: знак остаётся ровно таким, каким его утвердили.
    */
   onDark?: boolean
+  /**
+   * Куда ведёт знак.
+   *
+   * Всегда вёл на главную, и для гостя это верно. Для того, кто вошёл, —
+   * нет: главная страница общая и публичная, то есть знак работал кнопкой
+   * «выйти из кабинета». А знак в шапке — привычная кнопка «домой», и дом
+   * у вошедшего свой: кабинет хозяйства или кабинет Ассоциации. Подпись
+   * при этом обязана меняться вместе с адресом, иначе читающая программа
+   * произнесёт «на главную» про ссылку в кабинет.
+   */
+  href?: string
+  label?: string
 }) {
   const custom = findPublicAsset('logo')
 
   return (
     <Link
-      href="/"
+      href={href}
       className={`flex items-center gap-2.5 ${
         onDark ? 'rounded-xl bg-white px-3 py-2.5' : ''
       } ${className}`}
-      aria-label="На главную"
+      aria-label={label}
     >
       {custom ? (
         // eslint-disable-next-line @next/next/no-img-element

@@ -144,7 +144,7 @@ export default async function VerificationPage() {
             по документам. Раньше это происходило только вместе с проверкой загруженного файла —
             теперь подтвердить можно любые свои записи, независимо от того, когда они попали
             в систему. Это же требуется перед выпуском{' '}
-            <Link href="/account?tab=documents" className="underline underline-offset-4">
+            <Link href="/account?tab=herd&sub=documents" className="underline underline-offset-4">
               племенного свидетельства
             </Link>
             .

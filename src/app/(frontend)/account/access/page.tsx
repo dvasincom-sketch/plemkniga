@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { AccountNav } from '@/components/AccountNav'
+import { FarmNav } from '@/components/FarmNav'
 import { ShareLinkForm, ShareRevokeButton } from '@/components/ShareLinkForm'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { ReplacePublic, RevokeGrant } from '@/components/GrantActions'
@@ -82,7 +83,8 @@ export default async function AccessPage({
       <>
         <SiteHeader active="/account" />
         <main className="container-page pb-8">
-          <AccountNav active="access" />
+          <AccountNav active="farm" />
+          <FarmNav active="access" />
           <p className="card text-[15px] text-ink-700">
             У вашей учётной записи нет организации, поэтому выдавать и получать доступ
             не от чьего имени. Доступ выдаётся хозяйству, а не человеку: зоотехник может
@@ -184,10 +186,15 @@ export default async function AccessPage({
       <SiteHeader active="/account" />
 
       <main className="container-page pb-8">
-        <AccountNav active="access" />
+        <AccountNav active="farm" />
+        <FarmNav active="access" />
 
         <Breadcrumbs
-          items={[{ label: 'Личный кабинет', href: '/account' }, { label: 'Доступы' }]}
+          items={[
+            { label: 'Личный кабинет', href: '/account' },
+            { label: 'Хозяйство', href: '/account?tab=farm' },
+            { label: 'Доступы' },
+          ]}
         />
 
         <h1 className="mt-2 text-[28px] font-medium leading-tight sm:text-[32px]">Доступы</h1>

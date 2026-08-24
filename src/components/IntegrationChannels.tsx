@@ -95,7 +95,7 @@ export function IntegrationChannels() {
         Нужен канал, которого здесь нет, — напишите в Ассоциацию: список составлен по тем системам,
         которые чаще всего встречаются в хозяйствах. Технические подробности каждого канала описаны
         в документации проекта, раздел{' '}
-        <Link href="/account?tab=documents" className="underline underline-offset-4">
+        <Link href="/account?tab=herd&sub=documents" className="underline underline-offset-4">
           «Документы»
         </Link>
         .

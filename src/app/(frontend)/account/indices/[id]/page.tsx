@@ -4,6 +4,7 @@ import { notFound, redirect } from 'next/navigation'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { AccountNav } from '@/components/AccountNav'
+import { FarmNav } from '@/components/FarmNav'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { ProfileEditor } from '@/components/ProfileEditor'
 import { getClient, getCurrentUser } from '@/lib/payload'
@@ -96,12 +97,14 @@ export default async function EditIndexProfilePage({
       <SiteHeader active="/account" />
 
       <main className="container-page pb-8">
-        <AccountNav active="settings" />
+        <AccountNav active="farm" />
+        <FarmNav active="indices" />
 
         <Breadcrumbs
           items={[
             { label: 'Личный кабинет', href: '/account' },
-            { label: 'Профили индекса', href: '/account/indices' },
+            { label: 'Хозяйство', href: '/account?tab=farm' },
+            { label: 'Профили ИПЦ', href: '/account/indices' },
             { label: doc.name },
           ]}
         />

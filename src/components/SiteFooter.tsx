@@ -122,6 +122,20 @@ export function SiteFooter() {
           >
             API
           </Link>
+          {/*
+             «Аукционы» переехали сюда из основного меню. Раздел открывается
+             словами «в разработке», а стоял он в меню из трёх пунктов, то есть
+             занимал треть первого уровня и обещал несуществующее каждому
+             посетителю на каждой странице. В подвале, рядом с «Эволюцией»,
+             незаконченное обещание стоит законно: там ему и место, пока
+             не появится содержимое.
+          */}
+          <Link
+            href="/auctions"
+            className="text-[13px] text-white/50 underline underline-offset-4 transition-colors hover:text-white"
+          >
+            Аукционы
+          </Link>
           <Link
             href="/privacy"
             className="text-[13px] text-white/50 underline underline-offset-4 transition-colors hover:text-white"

@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { AccountNav } from '@/components/AccountNav'
-import { SettingsNav } from '@/components/SettingsNav'
+import { FarmNav } from '@/components/FarmNav'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { TeamPanel, type Invite, type Member } from '@/components/TeamPanel'
 import { getClient, getCurrentUser } from '@/lib/payload'
@@ -92,14 +92,14 @@ export default async function TeamPage() {
       <SiteHeader active="/account" />
 
       <main className="container-page pb-8">
-        <AccountNav active="settings" />
-        <SettingsNav active="team" />
+        <AccountNav active="farm" />
+        <FarmNav active="team" />
 
         <div className="min-w-0">
           <Breadcrumbs
             items={[
               { label: 'Личный кабинет', href: '/account' },
-              { label: 'Настройки', href: '/account?tab=settings' },
+              { label: 'Хозяйство', href: '/account?tab=farm' },
               { label: 'Сотрудники' },
             ]}
           />
@@ -107,15 +107,33 @@ export default async function TeamPage() {
           <h1 className="text-[30px] font-medium leading-tight sm:text-[36px]">Сотрудники</h1>
 
           <p className="mt-4 max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
-            Роль отвечает не на вопрос «кто важнее», а на вопрос «что можно отменить».
+            Права отвечают не на вопрос «кто важнее», а на вопрос «что можно отменить».
             Зоотехник вносит и правит данные — ошибку видно, и чините её вы сами.
             Руководитель делает то, чего своими силами не отменить: продажа отдаёт
             карточку чужим рукам, ссылка уходит наружу навсегда, приглашение впускает
             человека в стадо.
           </p>
 
+          {/*
+             Три слова, которые в системе означали одно и то же и потому
+             ничего не означали.
+
+             На этой странице «Зоотехник-селекционер» (должность из трудовой)
+             стоял вплотную к «Руководитель · Ведёт данные» (права
+             в хозяйстве), а в профиле того же человека — «Фермер/Заводчик»
+             (тип участника в системе). Три ответа на один с виду вопрос
+             «кто вы», и ни один из них не назывался своим именем.
+
+             Развести переименованием значений нельзя: «зоотехник» — слово
+             предметной области, и выбрано оно в решении №107 именно за это.
+             Поэтому разведены вопросы: должность отвечает «что написано
+             в трудовой», права — «что вам можно», тип участника — «в каком
+             качестве вы в книге». Названы они здесь один раз и рядом:
+             человек, который путается, ищет объяснение там, где путается,
+             а путается он на странице сотрудников.
+          */}
           <div className="card mt-6">
-            <h2 className="panel-heading">Что может каждая роль</h2>
+            <h2 className="panel-heading">Права в хозяйстве</h2>
             <dl className="space-y-3 text-[14px]">
               {ORG_ROLES.map((r) => (
                 <div key={r.value} className="flex flex-wrap gap-x-3">
@@ -124,11 +142,19 @@ export default async function TeamPage() {
                 </div>
               ))}
             </dl>
+            <p className="mt-5 max-w-[70ch] border-t border-[#e6e6e6] pt-4 text-[13px] leading-relaxed text-ink-500">
+              Права — не должность. Должность стоит рядом с именем свободным
+              текстом: она называет, кем человек работает, и на то, что ему
+              можно в системе, не влияет. Главный зоотехник хозяйства может
+              быть здесь наблюдателем, а руководителем — тот, кто отвечает
+              за данные. И то и другое не связано с типом участника
+              в Ассоциации: он у всей учётной записи один и стоит в профиле.
+            </p>
           </div>
 
           {!canManage && (
             <p className="mt-6 max-w-[70ch] rounded-md bg-[#f6f6f6] p-4 text-[14px] leading-relaxed text-ink-700">
-              Менять роли и приглашать может руководитель хозяйства. Ваша роль —{' '}
+              Менять права и приглашать может руководитель хозяйства. Ваши права —{' '}
               {ORG_ROLES.find((r) => r.value === (user.orgRole ?? 'head'))?.label}.
             </p>
           )}

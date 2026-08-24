@@ -150,11 +150,11 @@ async function main() {
   /** Кабинет: только вошедшему. */
   const authorized = [
     '/account',
-    '/account?tab=animals',
-    '/account?tab=animals&page=2',
+    '/account?tab=herd',
+    '/account?tab=herd&page=2',
     '/account?tab=events',
-    '/account?tab=documents',
-    '/account?tab=settings',
+    '/account?tab=herd&sub=documents',
+    '/account?tab=farm',
     '/account/indices',
     ids.profile ? `/account/indices/${ids.profile}` : null,
     '/account/import',

@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { AccountNav } from '@/components/AccountNav'
+import { HerdNav } from '@/components/HerdNav'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { denyAssociation } from '@/lib/association'
@@ -70,13 +71,15 @@ export default async function AfcPage() {
       <SiteHeader active="/account" />
 
       <main className="container-page pb-8">
-        <AccountNav active="animals" />
+        <AccountNav active="herd" />
+        <HerdNav active="reports" />
 
         <div className="min-w-0">
           <Breadcrumbs
             items={[
               { label: 'Личный кабинет', href: '/account' },
-              { label: 'Мои животные', href: '/account?tab=animals' },
+              { label: 'Стадо', href: '/account?tab=herd' },
+              { label: 'Отчёты', href: '/account?tab=herd&sub=reports' },
               { label: 'Возраст первого отёла' },
             ]}
           />
@@ -100,7 +103,7 @@ export default async function AfcPage() {
                 в стаде появятся коровы, у которых заполнено и то и другое, отчёт
                 соберётся сам.
               </p>
-              <Link href="/account?tab=animals" className="btn btn-accent mt-5">
+              <Link href="/account?tab=herd" className="btn btn-accent mt-5">
                 Перейти к стаду
               </Link>
             </div>

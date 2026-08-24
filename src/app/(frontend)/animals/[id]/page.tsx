@@ -11,6 +11,7 @@ import { AnimalOriginTab } from '@/components/AnimalOriginTab'
 import { TrustBadge } from '@/components/TrustBadge'
 import { InfoTip } from '@/components/InfoTip'
 import { AccountNav } from '@/components/AccountNav'
+import { HerdNav } from '@/components/HerdNav'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { LactationDynamics } from '@/components/LactationDynamics'
 import { AnimalPassport } from '@/components/AnimalPassport'
@@ -622,7 +623,7 @@ export default async function AnimalPage({
   const crumbs = isMine
     ? [
         { label: 'Личный кабинет', href: '/account' },
-        { label: 'Мои животные', href: '/account?tab=animals' },
+        { label: 'Стадо', href: '/account?tab=herd' },
         { label: animal.name ?? String(animal.identNumber) },
       ]
     : [
@@ -632,10 +633,25 @@ export default async function AnimalPage({
 
   return (
     <>
-      <SiteHeader active="/" />
+      <SiteHeader active={isMine ? '/account' : '/'} />
 
       <main className={`container-page pb-8 ${isForeign ? 'foreign-animal' : ''}`}>
-        {isMine && <AccountNav active="animals" />}
+        {/*
+           Своя карточка — это страница кабинета, и оба ряда над ней стоят
+           полностью: раздел и подраздел. Раньше стоял только раздел,
+           и получалось, что на карточке навигация обрывается на полпути —
+           ровно та болезнь, от которой в `DataNav` завели постоянный ряд.
+
+           В шапке при этом подсвечивается «Моё хозяйство», а не «Племенная
+           книга»: своя корова — это своё стадо, а не общая книга, хотя адрес
+           у карточки один на обе.
+        */}
+        {isMine && (
+          <>
+            <AccountNav active="herd" />
+            <HerdNav active="list" />
+          </>
+        )}
 
         {isForeign && (
           <p className="mb-5 flex flex-wrap items-center gap-2 rounded-xl bg-white px-5 py-3.5 text-[15px] text-ink-900 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)]">

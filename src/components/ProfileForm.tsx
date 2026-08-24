@@ -60,8 +60,19 @@ export function ProfileForm({ user, org, roleLabel, section }: Props) {
             <input name="middleName" defaultValue={user.middleName ?? ''} className="field field-on-light" />
           </label>
           <label>
+            {/*
+               Подпись под полем говорит, чего должность НЕ делает.
+               Слово «зоотехник» стоит и здесь, свободным текстом, и среди
+               прав в хозяйстве — как одно из трёх значений. Пока никто
+               не сказал обратного, естественно решить, что, написав здесь
+               «зоотехник», человек получает права зоотехника.
+            */}
             <span className={label}>Должность</span>
             <input name="position" defaultValue={user.position ?? ''} className="field field-on-light" />
+            <span className="mt-1 block text-[12px] leading-snug text-ink-500">
+              Как называется работа. На права в системе не влияет — их даёт
+              руководитель на странице «Сотрудники».
+            </span>
           </label>
           <label>
             <span className={label}>Телефон</span>

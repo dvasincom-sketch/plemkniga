@@ -60,8 +60,8 @@ async function main() {
   console.log('\nСлушатели пула')
   check(pool.listenerCount('error') === 1, 'обрыв простаивающего соединения слушает один',
     `их ${pool.listenerCount('error')}`)
-  check(pool.listenerCount('connect') === 1, 'новые соединения встречает один',
-    `их ${pool.listenerCount('connect')}`)
+  check(pool.listenerCount('acquire') === 1, 'выдачу соединения встречает один',
+    `их ${pool.listenerCount('acquire')}`)
 
   /*
    * Двадцать пересборок подряд. Число взято с запасом: предупреждение Node
@@ -75,13 +75,29 @@ async function main() {
   }
   check(pool.listenerCount('error') === 1, 'на пуле по-прежнему один слушатель обрыва',
     `их ${pool.listenerCount('error')}`)
-  check(pool.listenerCount('connect') === 1, 'на пуле по-прежнему один встречающий',
-    `их ${pool.listenerCount('connect')}`)
+  check(pool.listenerCount('acquire') === 1, 'на пуле по-прежнему один встречающий',
+    `их ${pool.listenerCount('acquire')}`)
 
   // ------------------ слушатель на выданном клиенте ------------------ //
+  /*
+   * Здесь и нашлась дыра, ради которой проверка писалась. При `connect`
+   * вместо `acquire` первое соединение — открытое самим `getPayload`
+   * до вызова `guardPool` — оставалось без слушателя навсегда, и именно
+   * оно достаётся запросам чаще прочих: пул отдаёт свободное, а не свежее.
+   *
+   * Соединение берётся дважды с возвратом в пул между: первый раз проверяем,
+   * что слушатель появился, второй — что он не удвоился. `acquire` наступает
+   * при каждой выдаче, и без отметки на клиенте очередь охранников выросла бы
+   * здесь, на соединении, вместо пула.
+   */
   console.log('\nСоединение, выданное запросу')
+  const first = await pool.connect()
+  check(first.listenerCount('error') === 1, 'у соединения ровно один слушатель обрыва',
+    `их ${first.listenerCount('error')}`)
+  first.release()
+
   const client = await pool.connect()
-  check(client.listenerCount('error') === 1, 'у соединения ровно один слушатель обрыва',
+  check(client.listenerCount('error') === 1, 'повторная выдача не добавила второго',
     `их ${client.listenerCount('error')}`)
 
   /*

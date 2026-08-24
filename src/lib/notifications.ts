@@ -383,7 +383,7 @@ export async function loadNotifications(
           ? `${kind}. Причина: ${raw.revoked.reason}`
           : `${kind}. Причина не указана.`
         : `${kind}. Ассоциация выпустила документ на вашу запись.`,
-      href: animalId ? `/animals/${animalId}?tab=documents` : '/account?tab=documents',
+      href: animalId ? `/animals/${animalId}?tab=documents` : '/account?tab=herd&sub=documents',
       linkLabel: 'К документам',
     })
   }

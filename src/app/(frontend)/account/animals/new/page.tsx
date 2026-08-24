@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { AccountNav } from '@/components/AccountNav'
+import { HerdNav } from '@/components/HerdNav'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { NewAnimalForm, type Scenario } from '@/components/NewAnimalForm'
 import { getClient, getCurrentUser } from '@/lib/payload'
@@ -71,13 +72,14 @@ export default async function NewAnimalPage({
       <SiteHeader active="/account" />
 
       <main className="container-page pb-8">
-        <AccountNav active="animals" />
+        <AccountNav active="herd" />
+        <HerdNav active="list" />
 
         <div className="min-w-0">
           <Breadcrumbs
             items={[
               { label: 'Личный кабинет', href: '/account' },
-              { label: 'Мои животные', href: '/account?tab=animals' },
+              { label: 'Стадо', href: '/account?tab=herd' },
               { label: 'Новое животное' },
             ]}
           />

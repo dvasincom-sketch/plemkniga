@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
-import { AccountNav } from '@/components/AccountNav'
+import { PersonalNav } from '@/components/PersonalNav'
 import { AssociationNav } from '@/components/AssociationNav'
 import { isAssociationUser } from '@/lib/association'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
@@ -80,18 +80,28 @@ export default async function NotificationsPage({
 
       <main className="container-page pb-8">
         {/*
-           Уведомления — личная страница, она открыта обеим сторонам.
-           А меню над ней у каждой своё: сотруднику Ассоциации показывать
-           «Мои животные» незачем, у него нет своего стада. То же исправление,
-           что и на странице профиля.
+           Уведомления — личная страница, и ряд разделов хозяйства над ней
+           больше не рисуется.
+
+           Раньше рисовался — и подсветить в нём было нечего: пять плашек,
+           ни одна не выделена. Такой ряд сообщает «вы вне разделов», стоя
+           при этом внутри кабинета, и человек начинает искать, куда попал.
+           Лента уведомлений и правда не раздел хозяйства: она уйдёт вместе
+           с человеком, когда он сменит работу.
+
+           Вместо него — ряд личных страниц. Вернуться в хозяйство есть чем:
+           пункт «Моё хозяйство» стоит в шапке первым.
+
+           У сотрудника Ассоциации ряд свой: его разделы — очередь проверки
+           и прочее, и лента у него та же, а хозяйства нет.
         */}
-        {association ? <AssociationNav /> : <AccountNav />}
+        {association ? <AssociationNav /> : <PersonalNav active="feed" />}
 
         <Breadcrumbs
           items={
             association
               ? [{ label: 'Кабинет Ассоциации', href: '/association' }, { label: 'Уведомления' }]
-              : [{ label: 'Личный кабинет', href: '/account' }, { label: 'Уведомления' }]
+              : [{ label: 'Личные страницы' }, { label: 'Уведомления' }]
           }
         />
 

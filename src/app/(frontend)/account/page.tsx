@@ -28,17 +28,20 @@ import {
   resolveSort,
   type SearchParams,
 } from '@/lib/animal-query'
-import { DOCUMENT_TYPES, ROLES, eventTypeLabel, labelOf } from '@/lib/dictionaries'
+import { DOCUMENT_TYPES, eventTypeLabel, labelOf } from '@/lib/dictionaries'
 import { SubmissionHistory } from '@/components/SubmissionHistory'
 import { DATA_SUBTABS, DataNav, type DataSub } from '@/components/DataNav'
-import { SettingsNav } from '@/components/SettingsNav'
+import { HERD_SUBTABS, HerdNav, type HerdSub } from '@/components/HerdNav'
+import { FarmNav } from '@/components/FarmNav'
+import { Breadcrumbs } from '@/components/Breadcrumbs'
+import { herdSummary } from '@/lib/herd-summary'
 import {
   FileUploadIcon,
   HerdScanIcon,
   RulesIcon,
   SingleRecordIcon,
 } from '@/components/CardIcons'
-import { dateRu } from '@/lib/format'
+import { dateRu, nf } from '@/lib/format'
 import { ARCHIVE_RETENTION_DAYS } from '@/lib/archive-retention'
 import { RANKING_CAP, rankByProfile } from '@/lib/index-column'
 import { indexValuesLag } from '@/lib/index-values'
@@ -63,46 +66,90 @@ export default async function AccountPage({
   if (!user) redirect('/login')
 
   const tabParam = one(sp.tab)
-  /*
-   * Старые адреса разделов не ломаем. «Личные данные» переехали в настройки
-   * отдельным блоком; «События» стали «Данными». Ссылок на `?tab=events`
-   * снаружи много — в письмах, в закладках, в наших же страницах, — и
-   * встречать их пустым разделом «Мои животные» значит наказывать человека
-   * за нашу правку.
-   */
-  const normalized =
-    tabParam === 'profile' ? 'settings' : tabParam === 'events' ? 'data' : tabParam
-  const tab: AccountTabKey = ACCOUNT_TABS.some((t) => t.key === normalized)
-    ? (normalized as AccountTabKey)
-    : 'animals'
 
   /*
-   * Раздел, у которого есть свой адрес, здесь не показывается — сюда
+   * Личные страницы отсюда ушли совсем: профиль, письма и биллинг —
+   * не разделы хозяйства, а страницы человека. Адрес `?tab=profile`
+   * при этом жив и уводит туда, где они теперь лежат.
+   */
+  if (tabParam === 'profile') redirect('/account/profile?tab=user')
+
+  /*
+   * Старые адреса разделов не ломаем.
+   *
+   * «Мои животные» стали «Стадом», «Настройки» — «Хозяйством», а «Документы»
+   * из раздела верхнего уровня стали подразделом стада: таблица там была
+   * из двух строк, и обе про животное. «События» стали «Данными» ещё раньше.
+   *
+   * Ссылок на прежние адреса снаружи много — в письмах, в закладках,
+   * в наших же страницах, — и встречать их не тем разделом значит наказывать
+   * человека за нашу правку.
+   */
+  const renamed: Record<string, AccountTabKey> = {
+    animals: 'herd',
+    documents: 'herd',
+    settings: 'farm',
+    events: 'data',
+  }
+  const normalized = renamed[tabParam] ?? tabParam
+  const tab: AccountTabKey = ACCOUNT_TABS.some((t) => t.key === normalized)
+    ? (normalized as AccountTabKey)
+    : 'overview'
+
+  /*
+   * Вкладки, у которых теперь свой адрес, здесь не показываются — отсюда
    * уводит редирект.
    *
-   * Такой раздел остаётся именем вкладки на этой странице, но содержимого
-   * у него тут нет: оно переехало. Без редиректа `/account?tab=access`
-   * открывался пустым экраном с заголовком — и открывался не по ошибке
-   * пользователя, а по ссылке из закладок, писем и старых страниц.
+   * Прежде такой раздел оставался именем вкладки на этой странице, а
+   * содержимого у него тут не было: оно переехало. Без редиректа
+   * `/account?tab=access` открывался пустым экраном с заголовком — и
+   * открывался не по ошибке пользователя, а по ссылке из закладок, писем
+   * и старых страниц. Ссылки в меню чинит `accountTabHref`, но чинить
+   * только их мало: адрес уже разошёлся по чужим закладкам, и оттуда его
+   * не забрать.
    *
-   * Ссылки в меню чиним отдельно (`accountTabHref`), но чинить только их
-   * мало: адрес уже разошёлся по чужим закладкам, и оттуда его не забрать.
+   * Список перечислен руками, а не выведен из состава вкладок. Раньше он
+   * выводился — искали вкладку с полем `href`, — и это работало, пока
+   * такая вкладка была. Теперь её нет: каждый из этих разделов стал
+   * подразделом «Хозяйства» со своим маршрутом, а вывод «найди вкладку
+   * с href» превратился в проверку, которая всегда ложна, то есть
+   * в мёртвый код, выглядящий работающим.
    */
-  const moved = ACCOUNT_TABS.find((t) => t.key === tab && 'href' in t)
-  if (moved && 'href' in moved) redirect(moved.href)
+  const relocated: Record<string, string> = {
+    access: '/account/access',
+    team: '/account/team',
+    journal: '/account/journal',
+    indices: '/account/indices',
+  }
+  if (relocated[tabParam]) redirect(relocated[tabParam])
 
   const tabTitle = ACCOUNT_TABS.find((t) => t.key === tab)?.label ?? 'Личный кабинет'
 
   /*
-   * Подраздел разбирается здесь, а не внутри `DataTab`: ряд его разделов
-   * стоит выше заголовка страницы — там же, где на страницах третьего
-   * уровня, — и знать выбранный подраздел нужно до того, как начнётся
-   * содержимое.
+   * Подраздел разбирается здесь, а не внутри вкладки: ряд подразделов стоит
+   * выше заголовка страницы — там же, где на страницах третьего уровня, —
+   * и знать выбранный подраздел нужно до того, как начнётся содержимое.
+   *
+   * Своё умолчание у каждого раздела, и оба выбраны, а не взяты первыми
+   * по списку: «Стадо» открывается списком, потому что за списком сюда
+   * и приходят, а «Данные» — формой записи, потому что запись — это работа,
+   * а проверка и лента — оглядка на сделанное.
    */
   const subParam = one(sp.sub)
-  const sub: DataSub = DATA_SUBTABS.some((s) => s.key === subParam)
+  const dataSub: DataSub = DATA_SUBTABS.some((s) => s.key === subParam)
     ? (subParam as DataSub)
     : 'write'
+  const herdSub: HerdSub = HERD_SUBTABS.some((s) => s.key === subParam)
+    ? (subParam as HerdSub)
+    : 'list'
+
+  /*
+   * «Документы» были разделом верхнего уровня и стали подразделом стада.
+   * Прежний адрес `?tab=documents` подраздела не называл, поэтому имя
+   * ему подставляется здесь: без этого ссылка из закладок открывала бы
+   * список животных, то есть уводила бы не туда молча.
+   */
+  const herdSubResolved: HerdSub = tabParam === 'documents' ? 'documents' : herdSub
 
   const org =
     typeof user.organization === 'object' && user.organization
@@ -134,16 +181,47 @@ export default async function AccountPage({
            разделы кабинета, разделы внутри раздела, путь, заголовок
            страницы, содержимое.
         */}
-        {tab === 'data' && <DataNav active={sub} />}
         {/*
-           Меню настроек стоит и на первой странице раздела тоже: ряд,
+           Ряд подразделов стоит и на первой странице раздела тоже: ряд,
            появляющийся только на внутренних страницах, читается как
            «вы куда-то ушли», а не как «вы в разделе».
+
+           У «Обзора» подразделов нет, и это не упущение: он отвечает
+           на один вопрос — что сегодня, — и делить его не на что.
         */}
-        {tab === 'settings' && <SettingsNav active="visibility" />}
+        {tab === 'herd' && <HerdNav active={herdSubResolved} />}
+        {tab === 'data' && <DataNav active={dataSub} />}
+        {tab === 'farm' && <FarmNav active="visibility" />}
 
         <div>
           <div className="min-w-0">
+            {/*
+               Путь стоит и здесь, на первой странице раздела.
+               Раньше он был только на страницах третьего уровня, и от этого
+               три ряда — плашки, подразделы, путь — отвечали на вопрос
+               «где я» вразнобой: на одной странице путь был, на соседней
+               нет. Теперь правило одно: плашки и подразделы отвечают,
+               куда идти, путь — где вы.
+            */}
+            <Breadcrumbs
+              items={[
+                { label: 'Личный кабинет', href: '/account' },
+                ...(tab === 'overview'
+                  ? [{ label: tabTitle }]
+                  : [
+                      { label: tabTitle, href: `/account?tab=${tab}` },
+                      {
+                        label:
+                          tab === 'herd'
+                            ? (HERD_SUBTABS.find((s) => s.key === herdSubResolved)?.label ?? '')
+                            : tab === 'data'
+                              ? (DATA_SUBTABS.find((s) => s.key === dataSub)?.label ?? '')
+                              : 'Видимость',
+                      },
+                    ]),
+              ]}
+            />
+
             <h1 className="text-[30px] font-medium leading-tight sm:text-[36px]">{tabTitle}</h1>
 
             {!user.confirmed && (
@@ -184,55 +262,54 @@ export default async function AccountPage({
               </div>
             )}
 
-            {tab === 'animals' && <AnimalsTab sp={sp} orgId={orgId} userId={user.id} viewer={viewer} />}
+            {tab === 'overview' && <OverviewTab orgId={orgId} />}
 
-            {tab === 'data' && <DataTab sub={sub} orgId={orgId} />}
-            {tab === 'documents' && <DocumentsTab orgId={orgId} />}
-
-            {tab === 'settings' && (
+            {tab === 'herd' && (
               <>
-                <section className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <h2 className="section-title lg:col-span-2">Видимость и доступ</h2>
-            <VisibilityFormWrapper orgId={orgId} />
-            <div className="card">
-              <h3 className="panel-heading">Личные данные</h3>
-              <p className="text-sm leading-relaxed text-ink-700">
-                Фамилия, телефон, реквизиты организации и роль в системе вынесены на отдельную
-                страницу — она открывается кликом по имени в шапке.
-              </p>
-              <Link
-                href="/account/profile"
-                className="mt-4 inline-block underline underline-offset-4 hover:text-forest-500"
-              >
-                Открыть профиль пользователя
-              </Link>
-            </div>
-
-            {/*
-              Профили весов — настройка уровня хозяйства, а не личная: её делает
-              главный генетик, и она меняет порядок животных для всех сотрудников.
-              Поэтому блок стоит рядом с видимостью данных, а не в профиле
-              пользователя.
-            */}
-            <IndexProfilesCard orgId={orgId} />
-
-            <div className="card">
-              <h3 className="panel-heading">Интеграции и API</h3>
-              <p className="text-sm leading-relaxed text-ink-700">
-                REST API системы доступен по адресу{' '}
-                <code className="rounded bg-canvas px-1.5 py-0.5">/api</code>, GraphQL — по адресу{' '}
-                <code className="rounded bg-canvas px-1.5 py-0.5">/api/graphql</code>. Авторизация —
-                по тому же токену, что и в веб-интерфейсе.
-              </p>
-              <p className="mt-4 text-sm leading-relaxed text-ink-700">
-                Административная панель Payload:{' '}
-                <Link href="/admin" className="underline underline-offset-4">
-                  /admin
-                </Link>
-              </p>
-            </div>
-                </section>
+                {herdSubResolved === 'list' && (
+                  <AnimalsTab sp={sp} orgId={orgId} userId={user.id} viewer={viewer} />
+                )}
+                {herdSubResolved === 'reports' && <HerdReports />}
+                {herdSubResolved === 'documents' && <DocumentsTab orgId={orgId} />}
               </>
+            )}
+
+            {tab === 'data' && <DataTab sub={dataSub} orgId={orgId} />}
+
+            {tab === 'farm' && (
+              <section className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <h2 className="section-title lg:col-span-2">Видимость в общей книге</h2>
+                <VisibilityFormWrapper orgId={orgId} />
+
+                {/*
+                   Карточек в этом разделе было четыре: видимость, личные
+                   данные, профили весов и API. Две ушли в меню — личное
+                   под имя, профили весов подразделом, — и ушли не ради
+                   стройности: карточка с абзацем и ссылкой на другую страницу
+                   это дверь, а двери место в меню, где их ищут. Пока
+                   «Профили ИПЦ» были карточкой в глубине настроек, на них
+                   вела единственная ссылка во всей системе.
+                */}
+                <div className="card">
+                  <h3 className="panel-heading">Интеграции и API</h3>
+                  <p className="text-sm leading-relaxed text-ink-700">
+                    REST API системы доступен по адресу{' '}
+                    <code className="rounded bg-canvas px-1.5 py-0.5">/api</code>, GraphQL — по адресу{' '}
+                    <code className="rounded bg-canvas px-1.5 py-0.5">/api/graphql</code>. Авторизация —
+                    по тому же токену, что и в веб-интерфейсе.
+                  </p>
+                  <p className="mt-4 text-sm leading-relaxed text-ink-700">
+                    Описание ручек —{' '}
+                    <Link href="/api-docs" className="underline underline-offset-4">
+                      /api-docs
+                    </Link>
+                    . Административная панель Payload:{' '}
+                    <Link href="/admin" className="underline underline-offset-4">
+                      /admin
+                    </Link>
+                  </p>
+                </div>
+              </section>
             )}
           </div>
         </div>
@@ -244,7 +321,233 @@ export default async function AccountPage({
 }
 
 /* ------------------------------------------------------------------ */
-/*                            Вкладка «Мои животные»                    */
+/*                              Вкладка «Обзор»                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Что сегодня.
+ *
+ * ## Зачем раздел
+ *
+ * Кабинет открывался списком стада, а панели состояния хозяйства не было
+ * вовсе. Полоса дел — «60 записей не подтверждены», «25 неполны» — лежала
+ * внутри списка животных: она отвечала на вопрос всего кабинета, стоя внутри
+ * одного его раздела, и первое, что видел человек, было таблицей на семьдесят
+ * строк. Между двумя заходами в кабинет меняется не состав стада, а состояние
+ * дел.
+ *
+ * Числа по стаду жили ещё дальше — на странице «Аналитика», в верхнем меню,
+ * рядом с общей книгой. Оттуда они и расходились с кабинетом: считали вместе
+ * с архивом, кабинет без, и хозяйство видело «74 животных» в одном разделе
+ * и «86 в стаде» в другом.
+ *
+ * ## Чего здесь нет
+ *
+ * Ленты событий. Соблазн показать «последние десять записей» велик и вреден:
+ * лента уже есть в «Данных», и вторая её копия здесь означала бы два места,
+ * которые обязаны показывать одно и то же и однажды разойдутся — ровно так,
+ * как разошлись числа стада. «Обзор» называет состояние и уводит туда, где
+ * с ним работают.
+ *
+ * Советов по стаду тоже нет, и по той же причине, что в `todo.ts`: возраст
+ * осеменения без живой массы советует неправильно, а массы в модели нет.
+ */
+async function OverviewTab({ orgId }: { orgId?: number }) {
+  const payload = await getClient()
+
+  /*
+   * Без организации нет ни стада, ни дел. Такой пользователь в системе
+   * бывает — например, человек, который зарегистрировался и ещё не подал
+   * заявку, — и показывать ему шесть прочерков вместо чисел значит
+   * показывать поломку там, где её нет.
+   */
+  if (!orgId) {
+    return (
+      <p className="mt-8 max-w-[70ch] rounded-xl bg-[#f6f6f6] px-5 py-4 text-[15px] leading-relaxed text-ink-700">
+        Ваша учётная запись пока не привязана к хозяйству. Числа по стаду
+        и дела появятся здесь, как только Ассоциация подтвердит вашу заявку.
+      </p>
+    )
+  }
+
+  const [todo, summary, profiles] = await Promise.all([
+    farmTodo(payload, orgId),
+    herdSummary(payload, orgId),
+    loadOwnProfiles(orgId),
+  ])
+
+  const activeProfile = profiles.defaultDoc ? profiles.defaultDoc.name : ASSOCIATION_PROFILE.name
+
+  /*
+   * Прочерк вместо нуля. Ноль — это утверждение «средний удой равен нулю»,
+   * которого система не проверяла; когда считать не по чему, честный ответ
+   * один — нечего показать.
+   */
+  const stats: { label: string; value: string; note?: string }[] = summary
+    ? [
+        {
+          label: 'Животных в работе',
+          value: nf(summary.total, 0),
+          note: summary.archived > 0 ? `в архиве ещё ${nf(summary.archived, 0)}` : undefined,
+        },
+        { label: 'Коров в стаде', value: nf(summary.cows, 0) },
+        { label: 'Быков-производителей', value: nf(summary.bulls, 0) },
+        {
+          label: 'Средний удой, кг',
+          value: summary.milkYield === null ? '—' : nf(summary.milkYield, 0),
+          note:
+            summary.milkYield === null
+              ? 'нет ни одной записи с удоем'
+              : `по ${nf(summary.milkBasis, 0)} из ${nf(summary.cows, 0)} коров`,
+        },
+        {
+          label: 'Жир / белок, %',
+          value:
+            summary.fatPercent === null && summary.proteinPercent === null
+              ? '—'
+              : `${summary.fatPercent === null ? '—' : nf(summary.fatPercent, 2)} / ${
+                  summary.proteinPercent === null ? '—' : nf(summary.proteinPercent, 2)
+                }`,
+        },
+        {
+          label: 'Средний ИПЦ',
+          value: summary.ipc === null ? '—' : nf(summary.ipc, 1),
+          note: `профиль «${activeProfile}»`,
+        },
+      ]
+    : []
+
+  return (
+    <>
+      {/*
+         Дела — первым, до чисел. Числа описывают состояние, дела называют
+         работу, и работа важнее: числа за сутки не меняются, а заключение
+         Ассоциации приходит именно за эти сутки. Когда дел нет, полосы нет
+         вовсе: строка «всё хорошо» занимает место и ничего не сообщает.
+      */}
+      {todo.length > 0 && (
+        <section className="mt-6">
+          <div className="flex flex-wrap gap-3">
+            {todo.map((t) => (
+              <Link
+                key={t.key}
+                href={t.href}
+                className={`min-w-[190px] flex-1 rounded-xl px-4 py-3 transition-colors ${
+                  t.urgent
+                    ? 'bg-[#fdecea] hover:bg-[#fbe0dc]'
+                    : 'bg-white shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] hover:bg-[#f6f6f6]'
+                }`}
+              >
+                <span className="block text-[15px] font-medium">
+                  {t.count > 0 && <span className="tabular-nums">{t.count} </span>}
+                  {t.label}
+                </span>
+                <span className="mt-0.5 block text-[12px] leading-snug text-ink-500">{t.hint}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {stats.length > 0 && (
+        <section className="mt-9">
+          <h2 className="section-title mb-6">Стадо в числах</h2>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {stats.map((s) => (
+              <div key={s.label} className="card">
+                <p className="text-sm text-ink-500">{s.label}</p>
+                <p className="stat-value mt-3 text-[34px] text-forest-500">{s.value}</p>
+                {/*
+                   Подпись под числом называет, из чего оно посчитано.
+                   Средний удой по двенадцати коровам из семидесяти
+                   и по семидесяти из семидесяти выглядят одинаково
+                   убедительно, а означают разное — тот же довод, что
+                   у числа дочерей в сравнении быков.
+                */}
+                {s.note && <p className="mt-1 text-[12px] text-ink-500">{s.note}</p>}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/*
+         Три частых действия ссылками — не дубль разделов, а короткий путь
+         к тому, зачем в кабинет заходят чаще всего. Полными карточками
+         с описаниями они стоят в «Данных»: там человек выбирает способ,
+         здесь — уже знает, чего хочет.
+      */}
+      <section className="mt-10">
+        <h2 className="section-title mb-6">Частые дела</h2>
+        <div className="flex flex-wrap gap-3">
+          <Link href="/account/events/new" className="btn btn-accent">
+            Записать событие
+          </Link>
+          <Link href="/account/import" className="btn">
+            Загрузить файл
+          </Link>
+          <Link href="/account/verification" className="btn">
+            Подать на верификацию
+          </Link>
+          <Link href="/account/checks/herd" className="btn">
+            Проверить моё стадо
+          </Link>
+        </div>
+      </section>
+    </>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*                          Отчёты по стаду                             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Подраздел «Стадо → Отчёты».
+ *
+ * Отчёт был один и стоял карточкой под таблицей животных — то есть ниже
+ * семидесяти строк и трёх экранов прокрутки, и ссылка на него была
+ * единственной во всей системе. Отчёты — не хвост списка, а свой ответ
+ * по стаду, и место им рядом со списком, а не под ним.
+ *
+ * Сравнение быков стоит здесь же, хотя быки — не только свои. Причина
+ * в том, зачем на него смотрят: колонка «родство с вашим стадом» считается
+ * из родословной покупателя, то есть отвечает на вопрос про стадо,
+ * а не про каталог.
+ */
+function HerdReports() {
+  return (
+    <section className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="card">
+        <h3 className="panel-heading">Возраст первого отёла</h3>
+        <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
+          Считается по датам, которые вы уже внесли, — рождение и первый отёл.
+          Показывает, как телились ваши коровы, что с ними было дальше и дочери
+          каких быков телятся раньше. Вводить для этого ничего не нужно.
+        </p>
+        <Link href="/account/afc" className="btn btn-accent mt-5">
+          Посмотреть отчёт
+        </Link>
+      </div>
+
+      <div className="card">
+        <h3 className="panel-heading">Сравнение быков</h3>
+        <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
+          До шести производителей рядом: разница со сверстницами, число дочерей,
+          на которых она посчитана, и родство с вашим стадом. Последнее не даст
+          ни один каталог — для него нужны разом родословная быка и родословная
+          вашего хозяйства.
+        </p>
+        <Link href="/bulls/compare" className="btn btn-accent mt-5">
+          Открыть сравнение
+        </Link>
+      </div>
+    </section>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*                              Вкладка «Стадо»                         */
 /* ------------------------------------------------------------------ */
 
 async function AnimalsTab({
@@ -328,19 +631,20 @@ async function AnimalsTab({
 
   const defaults: Record<string, string> = {}
   for (const key of Object.keys(sp)) defaults[key] = one(sp[key])
-  defaults.tab = 'animals'
+  defaults.tab = 'herd'
+  /*
+   * Подраздел из формы поиска убирается. Искать можно только в списке,
+   * и человек, пришедший из «Документов» и нажавший «Искать», должен
+   * оказаться в списке — иначе найденное осталось бы за кадром, на странице
+   * документов, и поиск выглядел бы сломанным.
+   */
+  delete defaults.sub
 
   // Сверка хранимых значений с книгой — только когда порядок построен по ним
   const lagMissing =
     profile && 'stored' in result && result.stored
       ? (await indexValuesLag(payload, profile.key)).missing
       : 0
-
-  /*
-   * Полоса дел. Считается только для хозяйства: у пользователя без
-   * организации своего стада нет, и дела ему не про что.
-   */
-  const todo = orgId ? await farmTodo(payload, orgId) : []
 
   /*
    * Пустая таблица объясняется по-разному.
@@ -353,14 +657,14 @@ async function AnimalsTab({
   const emptyText = archiveMode ? (
     <>
       В архиве пусто.{' '}
-      <Link href="/account?tab=animals" className="underline underline-offset-4">
+      <Link href="/account?tab=herd" className="underline underline-offset-4">
         Вернуться к стаду
       </Link>
     </>
   ) : filtered ? (
     <>
       По заданным условиям в вашем стаде ничего не найдено.{' '}
-      <Link href="/account?tab=animals" className="underline underline-offset-4">
+      <Link href="/account?tab=herd" className="underline underline-offset-4">
         Сбросить отбор
       </Link>
     </>
@@ -377,39 +681,12 @@ async function AnimalsTab({
   return (
     <>
       {/*
-         Дела — первым, до поиска.
+         Полоса дел отсюда ушла в «Обзор».
 
-         Раздел открывается таблицей, и таблица отвечает на вопрос «что
-         у меня есть». Между двумя заходами в кабинет меняется не состав
-         стада, а состояние дел, и увидеть их человек должен раньше, чем
-         начнёт листать. Когда дел нет, полосы нет вовсе: пустая строка
-         «всё хорошо» занимает место и ничего не сообщает.
+         Она отвечала на вопрос всего кабинета — что сегодня не так, —
+         стоя внутри одного его раздела, и от этого раздел «Стадо»
+         начинался не тем, зачем в него приходят. Приходят за списком.
       */}
-      {todo.length > 0 && (
-        <section className="mt-6">
-          <div className="flex flex-wrap gap-3">
-            {todo.map((t) => (
-              <Link
-                key={t.key}
-                href={t.href}
-                className={`min-w-[190px] flex-1 rounded-xl px-4 py-3 transition-colors ${
-                  t.urgent
-                    ? 'bg-[#fdecea] hover:bg-[#fbe0dc]'
-                    : 'bg-white shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] hover:bg-[#f6f6f6]'
-                }`}
-              >
-                <span className="block text-[15px] font-medium">
-                  {t.count > 0 && <span className="tabular-nums">{t.count} </span>}
-                  {t.label}
-                </span>
-                <span className="mt-0.5 block text-[12px] leading-snug text-ink-500">
-                  {t.hint}
-                </span>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
 
       {/*
          Раньше здесь одновременно жили два несовместимых сценария: крупные
@@ -427,7 +704,7 @@ async function AnimalsTab({
           openAdvanced={hasAdvancedValues(sp)}
           /* Поиск внутри архива обязан остаться внутри архива: иначе форма
              молча возвращает в стадо, и человек решает, что архив пропал */
-          hidden={archiveMode ? { tab: 'animals', archive: '1' } : { tab: 'animals' }}
+          hidden={archiveMode ? { tab: 'herd', archive: '1' } : { tab: 'herd' }}
         />
       </section>
 
@@ -450,7 +727,7 @@ async function AnimalsTab({
           hasActive={filtered}
           herds={herdsResult.docs.map((h) => ({ id: h.id as number, name: h.name }))}
           title={archiveMode ? 'Архив' : 'Мои животные'}
-          resetHref={archiveMode ? '/account?tab=animals&archive=1' : '/account?tab=animals'}
+          resetHref={archiveMode ? '/account?tab=herd&archive=1' : '/account?tab=herd'}
           /*
              Пояснение сжато до нескольких слов: оно стоит в одной строке
              с заголовком, и абзац про тридцать дней снова растянул бы
@@ -461,7 +738,7 @@ async function AnimalsTab({
             archiveMode ? (
               <>
                 хранятся {ARCHIVE_RETENTION_DAYS} дней, потом удаляются{' '}
-                <Link href="/account?tab=animals" className="underline underline-offset-4">
+                <Link href="/account?tab=herd" className="underline underline-offset-4">
                   к стаду
                 </Link>
               </>
@@ -469,7 +746,7 @@ async function AnimalsTab({
               <>
                 в архиве {archivedTotal.totalDocs.toLocaleString('ru-RU')}{' '}
                 <Link
-                  href="/account?tab=animals&archive=1"
+                  href="/account?tab=herd&archive=1"
                   className="underline underline-offset-4"
                 >
                   открыть
@@ -598,38 +875,20 @@ async function AnimalsTab({
           <Pagination
             page={result.page ?? 1}
             totalPages={result.totalPages ?? 1}
-            searchParams={{ ...sp, tab: 'animals' }}
+            searchParams={{ ...sp, tab: 'herd' }}
             basePath="/account"
           />
         </div>
       </section>
 
       {/*
-         Отчёты по стаду — под таблицей, а не в разделе данных.
+         Отчёты отсюда ушли в свой подраздел.
 
-         «Возраст первого отёла» стоял среди загрузок и заявок, и это была
-         ошибка раскладки: там всё про то, как данные попадают в систему
-         и что с ними делает Ассоциация, а отчёт — про стадо, и считается
-         он из того, что уже введено. Вводить для него нечего.
-
-         Раздел заведён с запасом на будущие отчёты, но пустым бы
-         не заводился: один отчёт — уже повод дать ему место, где его
-         станут искать.
+         Они стояли карточкой под таблицей — то есть ниже семидесяти строк
+         и трёх экранов прокрутки. Отчёт, до которого нужно доскроллить, —
+         это отчёт, о существовании которого не знают: ссылка на «Возраст
+         первого отёла» была единственной во всей системе.
       */}
-      <section className="mt-12">
-        <h2 className="section-title mb-6">Отчёты по стаду</h2>
-        <div className="card">
-          <h3 className="panel-heading">Возраст первого отёла</h3>
-          <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
-            Считается по датам, которые вы уже внесли, — рождение и первый отёл.
-            Показывает, как телились ваши коровы, что с ними было дальше и дочери
-            каких быков телятся раньше. Вводить для этого ничего не нужно.
-          </p>
-          <Link href="/account/afc" className="btn btn-accent mt-5">
-            Посмотреть отчёт
-          </Link>
-        </div>
-      </section>
     </>
   )
 }
@@ -1121,44 +1380,16 @@ async function VisibilityFormWrapper({ orgId }: { orgId?: number }) {
   )
 }
 
-/* ------------------------------------------------------------------ */
-/*                        Профили индекса — карточка                    */
-/* ------------------------------------------------------------------ */
-
-/**
- * Короткая справка о том, по какому профилю сейчас считается индекс.
+/*
+ * Карточка «Профиль индекса племенной ценности» отсюда убрана.
  *
- * Настройка живёт на отдельной странице: там одиннадцать весов, сравнение
- * с профилем Ассоциации и пересчёт порядка животных — в карточку настроек
- * это не помещается, да и заходят туда раз в сезон.
+ * Она была дверью: абзац текста и ссылка на `/account/indices`, лежавшая
+ * в глубине настроек, — и это была единственная ссылка на профили весов
+ * во всей системе. Дверям место в меню, где их ищут, поэтому «Профили ИПЦ»
+ * стали подразделом «Хозяйства».
+ *
+ * Единственное, что карточка сообщала помимо ссылки, — по какому профилю
+ * сейчас считается индекс. Это не настройка, а состояние стада, и оно
+ * переехало в «Обзор», подписью под средним ИПЦ: там она стоит рядом
+ * с числом, к которому относится.
  */
-async function IndexProfilesCard({ orgId }: { orgId?: number }) {
-  const { docs, defaultDoc } = await loadOwnProfiles(orgId)
-  const activeName = defaultDoc ? defaultDoc.name : ASSOCIATION_PROFILE.name
-
-  return (
-    <div className="card">
-      <h3 className="panel-heading">Профиль индекса племенной ценности</h3>
-      <p className="text-sm leading-relaxed text-ink-700">
-        Индекс считается по профилю{' '}
-        <span className="font-medium">{activeName}</span>
-        {defaultDoc ? ' — вашему собственному набору весов.' : ' — стандартному набору весов Ассоциации.'}{' '}
-        Свой профиль нужен, когда экономика хозяйства расходится со средней по отрасли:
-        белок дороже жира при сдаче на сыр, выбытие первотёлок, переполненный роддом.
-      </p>
-
-      {docs.length > 0 && (
-        <p className="mt-3 text-sm text-ink-500">
-          Профилей хозяйства: {docs.length}
-        </p>
-      )}
-
-      <Link
-        href="/account/indices"
-        className="mt-4 inline-block underline underline-offset-4 hover:text-forest-500"
-      >
-        {docs.length > 0 ? 'Настроить профили' : 'Создать свой профиль'}
-      </Link>
-    </div>
-  )
-}
