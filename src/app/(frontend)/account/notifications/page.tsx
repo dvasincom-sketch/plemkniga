@@ -4,7 +4,6 @@ import { redirect } from 'next/navigation'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { PersonalNav } from '@/components/PersonalNav'
-import { AssociationNav } from '@/components/AssociationNav'
 import { isAssociationUser } from '@/lib/association'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { AccessDecision } from '@/components/AccessDecision'
@@ -95,7 +94,14 @@ export default async function NotificationsPage({
            У сотрудника Ассоциации ряд свой: его разделы — очередь проверки
            и прочее, и лента у него та же, а хозяйства нет.
         */}
-        {association ? <AssociationNav /> : <PersonalNav active="feed" />}
+        {/*
+           Лента уведомлений — личная страница, и разделов кабинета над ней
+           нет ни у хозяйства, ни у Ассоциации. Ряд, в котором нечего
+           подсветить, сообщает «вы вне разделов», стоя внутри кабинета;
+           двухуровневый ряд Ассоциации к тому же подсвечивал первый раздел
+           и утверждал, что человек стоит в «Разборе».
+        */}
+        <PersonalNav active="feed" association={association} />
 
         <Breadcrumbs
           items={

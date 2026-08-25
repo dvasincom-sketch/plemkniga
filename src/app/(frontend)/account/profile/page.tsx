@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { AccountNav } from '@/components/AccountNav'
-import { AssociationNav } from '@/components/AssociationNav'
 import { isAssociationUser } from '@/lib/association'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { ProfileForm } from '@/components/ProfileForm'
@@ -95,12 +94,20 @@ export default async function ProfilePage({
            в нём было бы нечего, а ряд без подсветки сообщает «вы вне
            разделов», стоя внутри кабинета.
 
-           У сотрудника Ассоциации своего хозяйства нет вовсе, и над его
-           профилем стоят его собственные разделы. Раньше здесь всегда
-           стояли разделы хозяйства, и на профиле эксперта они выглядели
-           приглашением, которое никуда не ведёт.
+           У сотрудника Ассоциации то же самое, и это пришлось признать
+           дважды. Сначала над его профилем рисовались разделы хозяйства —
+           приглашение, которое никуда не ведёт. Потом их заменили разделами
+           кабинета Ассоциации, и стало хуже: ряд двухуровневый, подсветить
+           в нём нечего, а подсвечивается всё равно первый раздел. Человек
+           на странице «Профиль» видел выбранным «Разбор» и под ним «Очередь
+           проверки» — то есть меню утверждало, что он стоит там, где
+           не стоит.
+
+           Личная страница вне разделов кабинета по устройству: профиль
+           уходит вместе с человеком, а разделы остаются Ассоциации.
+           Вернуться отсюда есть чем — «Проверка данных» стоит в шапке
+           первым пунктом.
         */}
-        {association && <AssociationNav />}
         {!association && tab === 'org' && <AccountNav active="farm" />}
 
         {/*
@@ -117,6 +124,12 @@ export default async function ProfilePage({
           <SubTabs
             label="Разделы профиля"
             active={tab}
+            /*
+             * Своего ряда разделов над этим нет, значит и отрицательного
+             * отступа быть не должно: умолчание `-mt-4` рассчитано на то,
+             * что выше стоит меню кабинета со своим нижним отступом.
+             */
+            className="mb-8"
             items={tabs.map((t) => ({
               key: t.key,
               label: t.label,
@@ -127,7 +140,7 @@ export default async function ProfilePage({
         ) : tab === 'org' ? (
           <FarmNav active="org" />
         ) : (
-          <PersonalNav active={tab as PersonalSub} />
+          <PersonalNav active={tab as PersonalSub} association={association} />
         )}
 
         <Breadcrumbs

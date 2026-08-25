@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { PERSONAL_SUBTABS } from './PersonalNav'
+import { personalTabsFor } from './PersonalNav'
 
 /**
  * Меню под именем пользователя — личные страницы человека.
@@ -205,7 +205,7 @@ export function HeaderAccountMenu({
             className="account-menu fixed z-[100] overflow-hidden rounded-b-2xl rounded-tl-2xl bg-forest-500 py-1.5 shadow-[0_16px_40px_rgb(23_24_26_/_0.22)] sm:rounded-tl-none"
           >
             <ul>
-              {PERSONAL_SUBTABS.map((t) => (
+              {personalTabsFor(association).map((t) => (
                 <li key={t.key}>
                   <Link
                     href={t.href}

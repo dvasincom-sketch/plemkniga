@@ -58,12 +58,33 @@ export const PERSONAL_SUBTABS = [
     label: 'Биллинг',
     hint: 'Оплата платных услуг',
     href: '/account/profile?tab=billing',
+    /*
+     * Только хозяйству. У сотрудника Ассоциации нет ни организации,
+     * ни платных услуг: он сам эти услуги и оказывает. Пункт, ведущий
+     * на пустую страницу, — не безобидная лишняя строка: человек нажимает,
+     * ничего не находит и начинает искать, где спрятана оплата.
+     *
+     * На самой странице профиля вкладка отфильтрована давно, а в меню
+     * под именем осталась: два места с одним правилом, и они разошлись.
+     * Правило теперь одно и лежит здесь, рядом с пунктом.
+     */
+    farmOnly: true,
   },
 ] as const
 
 export type PersonalSub = (typeof PERSONAL_SUBTABS)[number]['key']
 
-export function PersonalNav({ active }: { active: PersonalSub }) {
+/** Пункты, которые видит этот человек: у Ассоциации нет биллинга. */
+export const personalTabsFor = (association: boolean) =>
+  PERSONAL_SUBTABS.filter((t) => !(association && 'farmOnly' in t && t.farmOnly))
+
+export function PersonalNav({
+  active,
+  association = false,
+}: {
+  active: PersonalSub
+  association?: boolean
+}) {
   return (
     <SubTabs
       label="Личные страницы"
@@ -74,7 +95,7 @@ export function PersonalNav({ active }: { active: PersonalSub }) {
        * выше стоит ряд разделов со своим нижним отступом.
        */
       className="mb-8"
-      items={PERSONAL_SUBTABS.map((s) => ({
+      items={personalTabsFor(association).map((s) => ({
         key: s.key,
         label: s.label,
         hint: s.hint,
