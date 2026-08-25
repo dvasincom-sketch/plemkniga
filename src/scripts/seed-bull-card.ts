@@ -281,6 +281,13 @@ async function main() {
   /* ---------------------------------------------------------------- */
   const toCreate = Math.max(0, need - free.docs.length)
 
+  /*
+   * Сколько стад будет задействовано — считается до записи, потому что
+   * это число нужно и предсказанию при `--dry`, и решению, хватит ли
+   * их для официальной оценки.
+   */
+  let plannedHerds = 0
+
   if (toCreate > 0) {
     /*
      * Заводить животных пришлось, хотя первая редакция скрипта обещала
@@ -304,7 +311,8 @@ async function main() {
     if (!herdsRes.docs.length) {
       console.log('  ! стад в книге нет — завести дочерей некуда. Сначала npm run seed')
     } else {
-      console.log(`  заводим новых: ${toCreate} в ${herdsRes.docs.length} стадах`)
+      plannedHerds = Math.min(herdsRes.docs.length, toCreate)
+      console.log(`  заводим новых: ${toCreate} в ${plannedHerds} стадах`)
 
       const stamp = String(Date.now()).slice(-7)
 
@@ -385,17 +393,34 @@ async function main() {
     overrideAccess: true,
   })
 
-  const daughters = after.docs.length
-  const herds = new Set(
+  const actual = after.docs.length
+  const actualHerds = new Set(
     after.docs
       .map((d) => (typeof d.herd === 'object' && d.herd ? (d.herd as { id: number }).id : d.herd))
       .filter((v) => v !== null && v !== undefined),
   ).size
 
+  /*
+   * Пробный прогон предсказывает, а не описывает текущее.
+   *
+   * Первая редакция при `--dry` печатала девять дочерей и надёжность
+   * 42 % — то есть состояние до работы, — а записал бы прогон пятьдесят
+   * пять и 82 %. Формально не соврала: «ничего не менялось» стояло тут же.
+   * По существу — бесполезна: пробный прогон затевают, чтобы увидеть,
+   * что будет, а не то, что и так на экране.
+   *
+   * Поэтому при `--dry` числа считаются ожидаемые, и сказано, что это
+   * прогноз. Стада при этом берутся из тех, где дочери появятся: на живой
+   * базе их двенадцать, и от их числа зависит статус не меньше, чем
+   * от числа дочерей.
+   */
+  const daughters = DRY ? Math.max(actual, DAUGHTERS) : actual
+  const herds = DRY ? Math.max(actualHerds, plannedHerds) : actualHerds
+
   const status = bullStatus(daughters, herds)
   console.log(
     DRY
-      ? `  сейчас: ${daughters} дочерей в ${herds} стадах (пробный прогон — ничего не менялось)`
+      ? `  сейчас ${actual} дочерей в ${actualHerds} стадах; станет ${daughters} в ${herds} → ${status.label.toLowerCase()}`
       : `  стало: ${daughters} дочерей в ${herds} стадах → ${status.label.toLowerCase()}`,
   )
   if (status.missing) console.log(`  ! до следующей ступени: ${status.missing}`)
