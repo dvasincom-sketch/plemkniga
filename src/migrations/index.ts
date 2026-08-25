@@ -45,6 +45,7 @@ import * as migration_20260826_180000_bench_runs from './20260826_180000_bench_r
 import * as migration_20260827_090000_semen_and_grade from './20260827_090000_semen_and_grade'
 import * as migration_20260828_090000_evaluation_source from './20260828_090000_evaluation_source'
 import * as migration_20260828_140000_linear_score from './20260828_140000_linear_score'
+import * as migration_20260828_180000_calving_roles from './20260828_180000_calving_roles'
 
 export const migrations = [
   {
@@ -281,5 +282,10 @@ export const migrations = [
     up: migration_20260828_140000_linear_score.up,
     down: migration_20260828_140000_linear_score.down,
     name: '20260828_140000_linear_score',
+  },
+  {
+    up: migration_20260828_180000_calving_roles.up,
+    down: migration_20260828_180000_calving_roles.down,
+    name: '20260828_180000_calving_roles',
   },
 ];

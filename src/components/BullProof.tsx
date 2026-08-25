@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { BULL_COMPARISON_MIN, type BullProof as Proof } from '@/lib/bull-proof'
 import { bullStatus } from '@/lib/bull-status'
+import { Computed } from '@/components/Computed'
 
 /**
  * Оценка быка по дочерям — блок карточки вместо собственной продуктивности.
@@ -115,7 +116,10 @@ export function BullStatusNote({ daughters, herds }: { daughters: number; herds:
       */}
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
         {[
-          { label: 'Надёжность по удою', value: `${status.reliability} %` },
+          {
+            label: 'Надёжность по удою',
+            value: <Computed formula="bullReliability">{`${status.reliability} %`}</Computed>,
+          },
           { label: 'Дочерей в книге', value: nf(daughters) },
           { label: herds === 1 ? 'Хозяйство' : 'Хозяйств', value: nf(herds) },
         ].map((s) => (
@@ -322,7 +326,7 @@ export function BullProofBlock({ data, bullId }: { data: Proof; bullId?: number 
         ) : (
           <div className="mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-2">
             <span className="text-[34px] font-medium leading-none tabular-nums">
-              {signed(data.vsMates)}
+              <Computed formula="vsMates">{signed(data.vsMates)}</Computed>
             </span>
             <span className="text-[15px] text-ink-700">
               кг молока к сверстницам, по {data.compared}{' '}

@@ -6,6 +6,7 @@ import {
   COMPLEX_GRADES,
   EXTERIOR_COMPOSITES,
   EXTERIOR_TRAITS,
+  CALVING_ROLE_TRAITS,
   HEALTH_TRAITS,
   ID_FORMATS,
   PRODUCTION_TRAITS,
@@ -542,6 +543,35 @@ export const Animals: CollectionConfig = {
                   fields: [...forecastFields({ unit: t.unit })],
                 })),
               ],
+            },
+            {
+              /**
+               * Отёлы в разрезе роли быка — SCE и DCE мировых каталогов.
+               *
+               * Разбор, зачем это два числа, а не одно, — в реестре
+               * `CALVING_ROLE_TRAITS`. Здесь важно другое: группа заведена
+               * до того, как данные появились, и это не задел «на всякий
+               * случай». Такие данные приходят не полем, а выгрузкой,
+               * в которой столбцы уже есть; без готового места первая же
+               * выгрузка либо потеряет половину, либо сложит оба числа
+               * в общее поле — и различить их потом будет нечем.
+               *
+               * Пустая группа у быка, о котором так не считали, — не пробел,
+               * а честный ответ: разделения в его оценке нет.
+               */
+              name: 'calvingRoles',
+              type: 'group',
+              label: 'Отёлы по роли быка (как отец телёнка и как дед по матери)',
+              fields: CALVING_ROLE_TRAITS.map((t) => ({
+                name: t.key,
+                type: 'group' as const,
+                label: t.label,
+                admin: { description: t.hint },
+                fields: [
+                  { name: 'forecast', type: 'number' as const, label: 'Прогноз' },
+                  { name: 'r', type: 'number' as const, label: 'R, %', min: 0, max: 100 },
+                ],
+              })),
             },
             {
               /**

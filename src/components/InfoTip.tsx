@@ -20,9 +20,25 @@ type Pos = { top: number; left: number; placement: 'below' | 'above' }
 export function InfoTip({
   children,
   label = 'Подсказка',
+  trigger,
 }: {
   children: React.ReactNode
   label?: string
+  /**
+   * Чем открывать подсказку, если кружок «i» не подходит.
+   *
+   * Понадобилось для посчитанных книгой чисел: у них подсказка про формулу
+   * висит на самом числе, подчёркнутом пунктиром, а не на значке рядом.
+   * Значок рядом с каждым таким числом превратил бы карточку в россыпь
+   * кружков — их на одном экране больше десятка, — и главное, разорвал бы
+   * связь: кружок объясняет «что-то поблизости», подчёркивание объясняет
+   * именно это число.
+   *
+   * Реализация одна на оба случая намеренно. Всплывающее окно — портал
+   * с пересчётом координат, обработкой краёв экрана, клавиатуры и прокрутки;
+   * второй такой же рядом разошёлся бы с первым в первую же правку.
+   */
+  trigger?: React.ReactNode
 }) {
   const [pos, setPos] = useState<Pos | null>(null)
   const anchorRef = useRef<HTMLButtonElement>(null)
@@ -70,14 +86,18 @@ export function InfoTip({
         aria-label={label}
         aria-expanded={pos !== null}
         aria-describedby={pos ? id : undefined}
-        className="inline-flex h-[18px] w-[18px] flex-none items-center justify-center rounded-full bg-ink-900 text-[11px] font-bold leading-none text-white transition-colors hover:bg-forest-500 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-brand-100"
+        className={
+          trigger
+            ? 'cursor-help border-b border-dashed border-ink-300 leading-none decoration-dotted transition-colors hover:border-forest-500 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-brand-100'
+            : 'inline-flex h-[18px] w-[18px] flex-none items-center justify-center rounded-full bg-ink-900 text-[11px] font-bold leading-none text-white transition-colors hover:bg-forest-500 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-brand-100'
+        }
         onMouseEnter={open}
         onMouseLeave={close}
         onFocus={open}
         onBlur={close}
         onClick={() => (pos ? close() : open())}
       >
-        i
+        {trigger ?? 'i'}
       </button>
 
       {pos !== null &&

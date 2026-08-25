@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { InfoTip } from './InfoTip'
+import { Computed } from './Computed'
 import { nf, signed } from '@/lib/format'
 import type { IndexResult } from '@/lib/breeding-index'
 
@@ -62,8 +63,10 @@ export function IndexBreakdown({
         </div>
 
         <div className="text-right">
+          {/* Само число индекса — первое, что читают, и первое, что нужно
+              уметь проверить: под пунктиром формула целиком */}
           <p className={`text-[30px] font-medium leading-none tabular-nums ${value < 0 ? 'text-[#c0392b]' : 'text-forest-600'}`}>
-            {signed(Math.round(value))}
+            <Computed formula="index">{signed(Math.round(value))}</Computed>
           </p>
           <p className="mt-1 text-[12px] text-ink-500">{economic ? '₽ за жизнь' : 'очков индекса'}</p>
         </div>
@@ -71,20 +74,20 @@ export function IndexBreakdown({
 
       <dl className="mb-5 grid grid-cols-2 gap-x-6 gap-y-3 border-y border-ink-100 py-4 sm:grid-cols-4">
         <div>
-          <dt className="flex items-center gap-1 text-[12px] text-ink-500">
-            Достоверность
-            <InfoTip>Доля объяснённой дисперсии: среднее достоверностей признаков, взвешенное по их вкладу в разброс индекса</InfoTip>
-          </dt>
-          <dd className="mt-0.5 text-[16px] tabular-nums">{nf(reliability, 0)} %</dd>
+          <dt className="text-[12px] text-ink-500">Достоверность</dt>
+          <dd className="mt-0.5 text-[16px] tabular-nums">
+            <Computed formula="combinedReliability">{nf(reliability, 0)} %</Computed>
+          </dd>
         </div>
 
         <div>
-          <dt className="flex items-center gap-1 text-[12px] text-ink-500">
-            Процентиль
-            <InfoTip>Сколько процентов группы сравнения животное превосходит. Группа — ровесники по книге</InfoTip>
-          </dt>
+          <dt className="text-[12px] text-ink-500">Процентиль</dt>
           <dd className="mt-0.5 text-[16px] tabular-nums">
-            {percentile ? percentile.percentile : '—'}
+            {percentile ? (
+              <Computed formula="percentile">{percentile.percentile}</Computed>
+            ) : (
+              '—'
+            )}
           </dd>
           {percentile && (
             <dd className="text-[11px] leading-tight text-ink-500">

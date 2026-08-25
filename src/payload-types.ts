@@ -466,6 +466,36 @@ export interface Animal {
       r?: number | null;
     };
   };
+  calvingRoles?: {
+    /**
+     * Насколько легко телятся коровы, осеменённые этим быком
+     */
+    easeSire?: {
+      forecast?: number | null;
+      r?: number | null;
+    };
+    /**
+     * Насколько легко телятся его дочери
+     */
+    easeMgs?: {
+      forecast?: number | null;
+      r?: number | null;
+    };
+    /**
+     * Доля мёртворождённых у коров, осеменённых этим быком
+     */
+    stillbirthSire?: {
+      forecast?: number | null;
+      r?: number | null;
+    };
+    /**
+     * Доля мёртворождённых у его дочерей
+     */
+    stillbirthMgs?: {
+      forecast?: number | null;
+      r?: number | null;
+    };
+  };
   linearScore?: {
     assessedAt?: string | null;
     height?: number | null;
@@ -2403,6 +2433,34 @@ export interface AnimalsSelect<T extends boolean = true> {
               r?: T;
             };
         calvingEase?:
+          | T
+          | {
+              forecast?: T;
+              r?: T;
+            };
+      };
+  calvingRoles?:
+    | T
+    | {
+        easeSire?:
+          | T
+          | {
+              forecast?: T;
+              r?: T;
+            };
+        easeMgs?:
+          | T
+          | {
+              forecast?: T;
+              r?: T;
+            };
+        stillbirthSire?:
+          | T
+          | {
+              forecast?: T;
+              r?: T;
+            };
+        stillbirthMgs?:
           | T
           | {
               forecast?: T;

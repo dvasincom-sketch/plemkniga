@@ -10,6 +10,7 @@ import { AnimalEventsTab } from '@/components/AnimalEventsTab'
 import { AnimalOriginTab } from '@/components/AnimalOriginTab'
 import { TrustBadge } from '@/components/TrustBadge'
 import { InfoTip } from '@/components/InfoTip'
+import { Computed } from '@/components/Computed'
 import { AccountNav } from '@/components/AccountNav'
 import { HerdNav } from '@/components/HerdNav'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
@@ -37,6 +38,7 @@ import { getClient, getCurrentUser } from '@/lib/payload'
 import { isAnimalLocked, relId, viewerOf } from '@/lib/visibility'
 import {
   ANIMAL_KINDS,
+  CALVING_ROLE_TRAITS,
   CALVING_TRAITS,
   DOCUMENT_TYPES,
   EXTERIOR_COMPOSITES,
@@ -336,6 +338,18 @@ export default async function AnimalPage({
    */
   const linearRaw = (animal.linearScore ?? {}) as Record<string, number | null | undefined>
   const hasLinearScore = EXTERIOR_TRAITS.some((t) => typeof linearRaw[t.key] === 'number')
+
+  /*
+   * Разделение отёлов по роли быка показывается, только когда оно есть
+   * в данных: у отечественных оценок его нет вовсе, и пустые строки
+   * читались бы как потеря.
+   */
+  const hasCalvingRoles = CALVING_ROLE_TRAITS.some(
+    (t) =>
+      typeof (
+        (animal.calvingRoles as Record<string, { forecast?: number | null }> | undefined)?.[t.key]
+      )?.forecast === 'number',
+  )
 
   // Животное «своё», если принадлежит организации пользователя. От этого
   // зависит, показывать ли навигацию кабинета и куда ведёт цепочка возврата.
@@ -1130,7 +1144,7 @@ export default async function AnimalPage({
                     </p>
                     <p className="mt-1 flex items-baseline gap-3">
                       <span className="text-[24px] font-medium leading-none tabular-nums">
-                        {nf(animal.inbreeding, 2)} %
+                        <Computed formula="inbreeding">{nf(animal.inbreeding, 2)} %</Computed>
                       </span>
                       <Link
                         href={`/animals/${id}?tab=origin`}
@@ -1149,7 +1163,7 @@ export default async function AnimalPage({
                     </p>
                     <p className="mt-1 flex items-baseline gap-3">
                       <span className="text-[24px] font-medium leading-none tabular-nums">
-                        {afcOwn}
+                        <Computed formula="afc">{afcOwn}</Computed>
                       </span>
                       <span className="text-[13px] text-ink-500">мес.</span>
                       <Link
@@ -1451,6 +1465,45 @@ export default async function AnimalPage({
                       return { label: t.label, unit: t.unit, forecast: v?.forecast, r: v?.r, digits: 1 }
                     })}
                   />
+
+                  {/*
+                     Разделение по роли быка показывается, только когда оно
+                     в данных есть.
+
+                     Пустые строки «как отец» и «как дед» на карточке быка,
+                     о котором так не считали, читались бы как потеря данных
+                     — а это не потеря: у отечественных оценок разделения нет
+                     вовсе. Появится выгрузка с двумя столбцами — появятся
+                     и строки, ничего доделывать не придётся.
+                  */}
+                  {hasCalvingRoles && (
+                    <>
+                      <p className="mt-5 max-w-[75ch] text-[14px] leading-relaxed text-ink-700">
+                        Ниже то же самое в разрезе роли быка. Он участвует в отёле дважды:
+                        когда им осеменяют корову — от него зависит телёнок; когда телится
+                        его дочь — от него зависит она сама. Числа не обязаны совпадать.
+                      </p>
+                      <div className="mt-3">
+                        <MetricTable
+                          head={['Роль быка', 'Прогноз', 'R, %']}
+                          rows={CALVING_ROLE_TRAITS.map((t) => {
+                            const v = (
+                              animal!.calvingRoles as
+                                | Record<string, { forecast?: number | null; r?: number | null }>
+                                | undefined
+                            )?.[t.key]
+                            return {
+                              label: t.label,
+                              unit: t.unit,
+                              forecast: v?.forecast,
+                              r: v?.r,
+                              digits: 1,
+                            }
+                          })}
+                        />
+                      </div>
+                    </>
+                  )}
                 </Collapsible>
               </div>
 

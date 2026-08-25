@@ -306,6 +306,11 @@ const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
     probe: { kind: 'column', table: 'animals', column: 'linear_score_height' },
     note: 'собственный промер коровы по шкале 1–9 отдельно от передачи потомству',
   },
+  {
+    name: '20260828_180000_calving_roles',
+    probe: { kind: 'column', table: 'animals', column: 'calving_roles_ease_sire_forecast' },
+    note: 'отёлы по роли быка: как отец телёнка и как дед по матери',
+  },
 ]
 
 const { driverUri, uri, source, sslConfig } = resolveDatabase()
