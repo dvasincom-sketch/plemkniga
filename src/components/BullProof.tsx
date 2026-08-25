@@ -77,26 +77,36 @@ const plural = (n: number, one: string, few: string, many: string) => {
 export function BullStatusNote({ daughters, herds }: { daughters: number; herds: number }) {
   const status = bullStatus(daughters, herds)
 
-  const tone =
+  /*
+   * Статус различается точкой, а не заливкой всего блока.
+   *
+   * Первая редакция красила панель целиком — жёлтым для предварительной
+   * оценки, зелёным для официальной. На странице, где всё остальное белые
+   * карточки, это читалось как предупреждение системы о неполадке, хотя
+   * предварительная оценка — обычное состояние молодого быка, а не сбой.
+   * Цвет остался ровно там, где несёт смысл: в точке у названия.
+   */
+  const dot =
     status.key === 'official'
-      ? 'border-forest-500/40 bg-brand-50'
+      ? 'bg-brand-500'
       : status.key === 'preliminary'
-        ? 'border-amber-300 bg-[#fff6e5]'
-        : 'border-ink-200 bg-canvas'
+        ? 'bg-accent-500'
+        : 'bg-ink-300'
 
   return (
-    <div className={`rounded-xl border px-4 py-3 ${tone}`}>
+    <div className="card">
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-        <p className="text-[15px] font-medium">{status.label}</p>
+        <h2 className="panel-heading mb-0 flex items-center gap-2">
+          <span className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${dot}`} />
+          {status.label}
+        </h2>
         <p className="text-[13px] text-ink-500">
           надёжность по удою {status.reliability} % · дочерей {daughters} в {herds}{' '}
           {herds === 1 ? 'хозяйстве' : 'хозяйствах'}
         </p>
       </div>
 
-      <p className="mt-1.5 max-w-[80ch] text-[14px] leading-relaxed text-ink-700">
-        {status.what}
-      </p>
+      <p className="mt-2 max-w-[80ch] text-[15px] leading-relaxed text-ink-700">{status.what}</p>
 
       {status.missing && (
         <p className="mt-1 text-[13px] leading-snug text-ink-500">
@@ -222,8 +232,27 @@ export function BullProofBlock({ data, bullId }: { data: Proof; bullId?: number 
 
       {/* ----------------------------- Что дали ----------------------------- */}
 
-      <div className="mt-8 border-t border-ink-100 pt-6">
-        <h3 className="text-[17px] font-medium">Что дали дочери</h3>
+      {/*
+         Две таблицы стоят рядом, а не одна под другой.
+
+         В каждой по три колонки, и растянутые на всю ширину экрана они
+         давали строку в полтора метра пустоты между показателем и числом:
+         глаз терял строку на полпути. Рядом они к тому же читаются
+         как одно — «что дали дочери» и «когда эти дочери родились», —
+         а это и есть один вопрос: чего стоит бык и не устарел ли ответ.
+
+         На узком экране колонки складываются обратно в столбик.
+      */}
+      {/* Вторая колонка появляется только вместе со второй таблицей: одна
+          таблица в половину ширины оставила бы рядом пустую половину,
+          и это читалось бы как «здесь что-то не загрузилось» */}
+      <div
+        className={`mt-8 grid grid-cols-1 gap-8 border-t border-ink-100 pt-6 ${
+          data.byYear.length > 1 ? 'lg:grid-cols-2' : ''
+        }`}
+      >
+        <div>
+          <h3 className="text-[17px] font-medium">Что дали дочери</h3>
         <p className="mt-1.5 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
           Среднее без поправки на хозяйство. Само по себе оно быков не сравнивает — для этого
           строка выше.
@@ -276,7 +305,7 @@ export function BullProofBlock({ data, bullId }: { data: Proof; bullId?: number 
       {/* ------------------------- Дочери по годам -------------------------- */}
 
       {data.byYear.length > 1 && (
-        <div className="mt-8 border-t border-ink-100 pt-6">
+        <div>
           <h3 className="text-[17px] font-medium">Дочери по годам рождения</h3>
           <p className="mt-1.5 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
             По ряду видно, работает бык сейчас или отработал: у семени долгий срок хранения,
@@ -305,6 +334,7 @@ export function BullProofBlock({ data, bullId }: { data: Proof; bullId?: number 
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }
