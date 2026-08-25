@@ -8,6 +8,7 @@ import {
   type CheckSettingsMap,
 } from '@/lib/check-settings'
 import { pedigreeIssues } from '@/lib/checks-pedigree'
+import { expectedFatKg, expectedProteinKg, KG_TOLERANCE } from '@/lib/pta-consistency'
 import { sequenceIssues } from '@/lib/checks-sequence'
 import {
   INBREEDING_CHECK_LIMIT,
@@ -159,6 +160,62 @@ function localIssues(a: Animal, t: Thresholds): Issue[] {
     (protein < t.proteinMin || protein > t.proteinMax)
   ) {
     push('protein-implausible', `Белок ${protein}% вне правдоподобных границ`, 'summary.proteinPercent')
+  }
+
+  /*
+   * То же согласие килограммов с удоем и процентами — но в оценках,
+   * а не в фактических показателях.
+   *
+   * Проверка ниже смотрит на фенотип: что корова надоила. Эта смотрит
+   * на племенную ценность: что она передаёт потомству. Числа разной
+   * природы, а связь между ними одна и та же, и нарушается она чаще
+   * именно в оценках: фенотип приходит из одной выгрузки целиком,
+   * а оценки собирают из разных — удой из одного отчёта, килограммы
+   * из другого.
+   *
+   * Разбор формулы и допусков — в `src/lib/pta-consistency.ts`.
+   */
+  const pta = a.production as
+    | Record<string, { forecast?: number | null } | undefined>
+    | undefined
+
+  const ptaMilk = pta?.milk?.forecast
+  if (typeof ptaMilk === 'number') {
+    const pairs = [
+      {
+        code: 'eval-fat-kg-mismatch' as const,
+        name: 'жиру',
+        percent: pta?.fatPercent?.forecast,
+        kg: pta?.fatKg?.forecast,
+        expected: expectedFatKg,
+        tolerance: KG_TOLERANCE.fat,
+        path: 'production.fatKg.forecast',
+      },
+      {
+        code: 'eval-protein-kg-mismatch' as const,
+        name: 'белку',
+        percent: pta?.proteinPercent?.forecast,
+        kg: pta?.proteinKg?.forecast,
+        expected: expectedProteinKg,
+        tolerance: KG_TOLERANCE.protein,
+        path: 'production.proteinKg.forecast',
+      },
+    ]
+
+    for (const p of pairs) {
+      if (typeof p.percent !== 'number' || typeof p.kg !== 'number') continue
+      const expected = p.expected(ptaMilk, p.percent)
+      const gap = Math.abs(p.kg - expected)
+      if (gap <= p.tolerance) continue
+
+      push(
+        p.code,
+        `Оценка по ${p.name}: ${p.kg} кг при удое ${ptaMilk} кг и ${p.percent} % — ` +
+          `из этих двух следует около ${Math.round(expected)} кг, ` +
+          `расхождение ${Math.round(gap)} кг`,
+        p.path,
+      )
+    }
   }
 
   /*

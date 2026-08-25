@@ -46,6 +46,7 @@ import {
   labelOf,
 } from '@/lib/dictionaries'
 import { THRESHOLDS } from '@/lib/bull-status'
+import { afcMonths } from '@/lib/afc'
 import { dateRu, nf, signed } from '@/lib/format'
 import { IndexBreakdown } from '@/components/IndexBreakdown'
 import { EvaluationHistory } from '@/components/EvaluationHistory'
@@ -143,16 +144,25 @@ const CARRIER_LABEL: Record<string, string> = {
  */
 const ReliabilityNote = ({ value }: { value?: number | null }) => (
   <span className="inline-flex items-center gap-1.5 text-[13px] leading-none text-ink-500">
-    Достоверность оценки:{' '}
+    По документу:{' '}
     <span className="font-medium tabular-nums text-ink-900">{value ?? '—'}</span>
     <span>из 5</span>
-    <InfoTip label="Что означает достоверность оценки">
-      <p className="mb-2 font-medium text-ink-900">Достоверность оценки</p>
+    <InfoTip label="Откуда взялась эта пятибалльная оценка">
+      <p className="mb-2 font-medium text-ink-900">Уровень достоверности по документу</p>
+      <p className="mb-2">
+        Это оценка того, кто прислал данные, а не наш расчёт. Расчётный центр ставит её
+        по своим правилам: 1 — оценка предварительная, 5 — подтверждена большим массивом
+        данных. Мы её показываем как есть и в индексе не используем.
+      </p>
+      <p className="mb-2">
+        <b>Не путайте с колонкой «R, %» в таблице рядом.</b> Там надёжность каждого признака
+        по отдельности — она посчитана из числа учтённых потомков и лактаций и у разных
+        признаков разная. Пятибалльная оценка одна на весь блок и приходит извне; совпадать
+        они не обязаны и часто не совпадают.
+      </p>
       <p>
-        Насколько надёжен прогноз племенной ценности: зависит от числа учтённых потомков,
-        лактаций и полноты родословной. 1 — оценка предварительная, 5 — подтверждена большим
-        массивом данных. Не путайте с уровнем достоверности записи в шапке карточки: тот
-        показывает, кем проверены сами данные.
+        И ни то ни другое — не уровень достоверности записи в шапке карточки: тот показывает,
+        кем проверены сами данные.
       </p>
     </InfoTip>
   </span>
@@ -631,6 +641,38 @@ export default async function AnimalPage({
     tab === 'evaluation' && isBull ? await bullProof(payload, animal.id as number) : null
 
   /*
+   * Возраст первого отёла коровы — на вкладке оценки, а не только в событиях.
+   *
+   * У быка он есть по дочерям и стоит рядом с остальной оценкой; у коровы
+   * своего не было нигде на этом экране, хотя это признак того же ряда,
+   * что удой и долголетие: раннее плодотворное осеменение экономит корма
+   * и сдвигает всю продуктивную жизнь. Зоотехник, разбирающий племенную
+   * ценность, смотрит его вместе с остальным, а не переходя на другую
+   * вкладку и обратно.
+   *
+   * Берётся из `calvings`, а не из массива лактаций в карточке. Оба места
+   * содержат дату отёла, но источник истины — отдельная таблица (решение
+   * про ленту событий), и лента на соседней вкладке считает по ней. Взяв
+   * здесь другое, мы получили бы два возраста первого отёла на одной
+   * карточке.
+   */
+  const firstCalving =
+    tab === 'evaluation' && !isBull && maySee('production')
+      ? (
+          await payload.find({
+            collection: 'calvings',
+            where: { animal: { equals: animal.id } },
+            sort: 'date',
+            limit: 1,
+            depth: 0,
+            overrideAccess: true,
+          })
+        ).docs[0]
+      : null
+
+  const afcOwn = firstCalving ? afcMonths(animal.birthDate, firstCalving.date) : null
+
+  /*
    * Индекс считается по профилю смотрящего: хозяйство со своим набором весов
    * должно видеть карточку своими глазами. У гостя и у хозяйства без своего
    * профиля это стандартный профиль Ассоциации.
@@ -975,6 +1017,64 @@ export default async function AnimalPage({
                   percentile={indexBlock.percentile}
                   href={isMine ? '/account/indices' : undefined}
                 />
+              </section>
+            )}
+
+            {/*
+               Инбридинг и возраст первого отёла — рядом с племенной ценностью.
+
+               Оба живут на других вкладках и оба нужны здесь. Инбридинг —
+               потому что ценность и родственное спаривание читают вместе:
+               высокий индекс при F = 12 % означает не то же, что при нуле,
+               и решение о подборе принимают по обоим числам сразу.
+               Возраст первого отёла — потому что это признак того же ряда,
+               что удой и долголетие.
+
+               Показаны, а не перенесены: разбор родословной остаётся
+               на своей вкладке, сюда вынесено одно число со ссылкой.
+               Дублирование здесь дешевле, чем переход туда и обратно
+               посреди чтения оценки.
+            */}
+            {(typeof animal.inbreeding === 'number' || afcOwn !== null) && (
+              <section className="mt-6 flex flex-wrap gap-4">
+                {typeof animal.inbreeding === 'number' && (
+                  <div className="min-w-[220px] flex-1 rounded-xl bg-canvas px-4 py-3.5">
+                    <p className="text-[13px] leading-snug text-ink-500">
+                      Коэффициент инбридинга
+                    </p>
+                    <p className="mt-1 flex items-baseline gap-3">
+                      <span className="text-[24px] font-medium leading-none tabular-nums">
+                        {nf(animal.inbreeding, 2)} %
+                      </span>
+                      <Link
+                        href={`/animals/${id}?tab=origin`}
+                        className="text-[13px] underline underline-offset-4 hover:text-forest-500"
+                      >
+                        разбор родословной
+                      </Link>
+                    </p>
+                  </div>
+                )}
+
+                {afcOwn !== null && (
+                  <div className="min-w-[220px] flex-1 rounded-xl bg-canvas px-4 py-3.5">
+                    <p className="text-[13px] leading-snug text-ink-500">
+                      Возраст первого отёла
+                    </p>
+                    <p className="mt-1 flex items-baseline gap-3">
+                      <span className="text-[24px] font-medium leading-none tabular-nums">
+                        {afcOwn}
+                      </span>
+                      <span className="text-[13px] text-ink-500">мес.</span>
+                      <Link
+                        href={`/animals/${id}?tab=events`}
+                        className="text-[13px] underline underline-offset-4 hover:text-forest-500"
+                      >
+                        отёлы
+                      </Link>
+                    </p>
+                  </div>
+                )}
               </section>
             )}
 

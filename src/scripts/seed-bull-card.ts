@@ -4,6 +4,7 @@ import config from '@payload-config'
 import { EXTERIOR_COMPOSITES, EXTERIOR_TRAITS, HEALTH_TRAITS } from '@/lib/dictionaries'
 import { bullStatus, reliabilityOf } from '@/lib/bull-status'
 import { TRAIT_BASE } from '@/lib/breeding-index'
+import { expectedFatKg, expectedProteinKg } from '@/lib/pta-consistency'
 
 /**
  * Эталонная карточка быка: показать, к чему стремиться.
@@ -459,11 +460,18 @@ async function main() {
    * ровно того рода, ради которой эталон и заводится: неправдоподобное
    * число в образце учит неправдоподобию.
    */
-  const BASE_FAT = 3.8
-  const BASE_MILK_PER_PERCENT = 90
-
-  const fatKg = round((milk * BASE_FAT) / 100 + fatPercent * BASE_MILK_PER_PERCENT, 1)
-  const proteinKg = round((milk * 3.2) / 100 + proteinPercent * BASE_MILK_PER_PERCENT, 1)
+  /*
+   * Формула переехала в `src/lib/pta-consistency.ts` и стала общей
+   * с проверкой данных.
+   *
+   * Держать её здесь копией было нельзя: та же связь теперь ловит
+   * противоречия в чужих оценках, и разойдись эти два места — эталонный
+   * бык провалил бы проверку, написанную по его же образцу. Разбираться
+   * в таком расхождении пришлось бы с нуля, потому что виноватым выглядел
+   * бы кто угодно, кроме двух одинаковых на вид формул.
+   */
+  const fatKg = round(expectedFatKg(milk, fatPercent), 1)
+  const proteinKg = round(expectedProteinKg(milk, proteinPercent), 1)
 
   const production = {
     milk: { forecast: milk, r: rOf(0.3) },
