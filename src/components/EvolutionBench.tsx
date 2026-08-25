@@ -1,10 +1,4 @@
-import {
-  benchCell,
-  benchReports,
-  benchScenarios,
-  hasBench,
-  type BenchMeasurement,
-} from '@/lib/bench-report'
+import { benchCell, type BenchMeasurement } from '@/lib/bench-report'
 import { dateRu } from '@/lib/format'
 
 /**
@@ -31,6 +25,14 @@ import { dateRu } from '@/lib/format'
  * «Поиск 59 мс» — не факт о системе, пока не сказано, на какой машине
  * и на каком объёме. Пока железо не названо, читатель достраивает его
  * сам, обычно щедро.
+ *
+ * ## Почему список приходит снаружи
+ *
+ * Замеры лежат в двух местах: снятый здесь — в базе этой машины,
+ * привезённые из других сред — файлом в репозитории. Сводит их страница;
+ * здесь остаётся только показ. Читай компонент оба источника сам, он
+ * перестал бы быть показом и стал бы вторым местом, где решают, какой
+ * замер важнее.
  */
 
 const ms = (v: number) => `${v.toLocaleString('ru-RU')} мс`
@@ -82,14 +84,34 @@ function ServerCard({ m }: { m: BenchMeasurement }) {
   )
 }
 
-export function EvolutionBench() {
-  if (!hasBench) {
+export function EvolutionBench({ reports }: { reports: BenchMeasurement[] }) {
+  const benchReports = reports
+
+  const benchScenarios = (): { group: string; what: string; limitMs?: number }[] => {
+    /*
+     * Сценарии собираются по всем замерам сразу, а не по первому:
+     * у сред могут отличаться версии кода, и сценарий, появившийся
+     * позже, есть только в новом замере. Взяв за основу один, мы молча
+     * выбросили бы строки, которых в нём нет.
+     */
+    const seen = new Map<string, { group: string; what: string; limitMs?: number }>()
+    for (const m of benchReports)
+      for (const r of m.rows) {
+        const key = `${r.group} ${r.what}`
+        if (!seen.has(key)) seen.set(key, { group: r.group, what: r.what, limitMs: r.limitMs })
+      }
+    return [...seen.values()]
+  }
+
+  if (!benchReports.length) {
     return (
       <div className="card">
         <h3 className="text-[19px] font-medium">Замер ещё не проводился</h3>
         <p className="mt-2 max-w-[75ch] text-[15px] leading-relaxed text-ink-700">
-          Отчёт появится здесь после прогона <code>npm run bench -- --save</code> на базе
-          нужного объёма. До этого показывать нечего, и придумывать цифры мы не будем.
+          На этой машине его ещё не снимали. Со своей —{' '}
+          <code>npm run bench -- --save</code>; на боевой — закрытым маршрутом{' '}
+          <code>/bench</code>, и тогда результат появится здесь сразу. До первого прогона
+          показывать нечего, а придумывать цифры мы не будем.
         </p>
       </div>
     )
@@ -116,7 +138,7 @@ export function EvolutionBench() {
       {benchReports.length === 1 && (
         <p className="max-w-[80ch] text-[14px] leading-relaxed text-ink-500">
           Пока здесь один замер, и сравнивать его не с чем. Второй появится после прогона
-          в другой среде: <code>npm run bench -- --save --label Прод</code>.
+          в другой среде.
         </p>
       )}
 

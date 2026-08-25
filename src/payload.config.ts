@@ -14,6 +14,7 @@ import { Events } from '@/collections/Events'
 import { Movements } from '@/collections/Movements'
 import { Documents } from '@/collections/Documents'
 import { SavedSearches } from '@/collections/SavedSearches'
+import { BenchRuns } from '@/collections/BenchRuns'
 import { Media } from '@/collections/Media'
 import { Inseminations } from '@/collections/Inseminations'
 import { MilkTests } from '@/collections/MilkTests'
@@ -96,6 +97,7 @@ export default buildConfig({
     Documents,
     Media,
     SavedSearches,
+    BenchRuns,
     ...DICTIONARY_COLLECTIONS,
   ],
   editor: lexicalEditor(),

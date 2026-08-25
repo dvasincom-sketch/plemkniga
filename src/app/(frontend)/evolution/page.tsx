@@ -7,6 +7,8 @@ import { EvolutionStages } from '@/components/EvolutionStages'
 import { EvolutionDocs } from '@/components/EvolutionDocs'
 import { EvolutionRoadmap } from '@/components/EvolutionRoadmap'
 import { EvolutionBench } from '@/components/EvolutionBench'
+import { loadBenchReports } from '@/lib/bench-report'
+import { getClient } from '@/lib/payload'
 import { CURRENT_VERSION } from '@/lib/product-versions'
 
 export const metadata: Metadata = {
@@ -75,6 +77,13 @@ export default async function EvolutionPage({
   const { tab: tabParam, change } = await searchParams
   const tab: TabKey = TABS.some((t) => t.key === tabParam) ? (tabParam as TabKey) : 'versions'
 
+  /*
+   * Замеры читаются только на своей вкладке. Страница открыта всем,
+   * и ходить в базу ради раздела, который сейчас не смотрят, — это
+   * запрос на каждый просмотр «Версий» и «Дорожной карты».
+   */
+  const benchReports = tab === 'bench' ? await loadBenchReports(await getClient()) : []
+
   return (
     <>
       <SiteHeader />
@@ -119,7 +128,7 @@ export default async function EvolutionPage({
           {tab === 'versions' && <EvolutionVersions openVersion={change} />}
           {tab === 'stages' && <EvolutionStages />}
           {tab === 'roadmap' && <EvolutionRoadmap />}
-          {tab === 'bench' && <EvolutionBench />}
+          {tab === 'bench' && <EvolutionBench reports={benchReports} />}
           {tab === 'docs' && <EvolutionDocs />}
         </div>
       </main>

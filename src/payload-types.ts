@@ -97,6 +97,7 @@ export interface Config {
     documents: Document;
     media: Media;
     'saved-searches': SavedSearch;
+    'bench-runs': BenchRun;
     breeds: Breed;
     lines: Line;
     'breeding-categories': BreedingCategory;
@@ -149,6 +150,7 @@ export interface Config {
     documents: DocumentsSelect<false> | DocumentsSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
     'saved-searches': SavedSearchesSelect<false> | SavedSearchesSelect<true>;
+    'bench-runs': BenchRunsSelect<false> | BenchRunsSelect<true>;
     breeds: BreedsSelect<false> | BreedsSelect<true>;
     lines: LinesSelect<false> | LinesSelect<true>;
     'breeding-categories': BreedingCategoriesSelect<false> | BreedingCategoriesSelect<true>;
@@ -1824,6 +1826,55 @@ export interface SavedSearch {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bench-runs".
+ */
+export interface BenchRun {
+  id: number;
+  /**
+   * Имя среды: «Прод». Повторный замер той же среды заменяет прежний — два замера одного места это не сравнение, а история
+   */
+  label: string;
+  measuredAt: string;
+  /**
+   * Половина смысла всех остальных цифр: на разном объёме они разные
+   */
+  animals: number;
+  runs: number;
+  server?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  rows:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  /**
+   * То, из-за чего цифры можно понять неверно: объём базы, нехватка данных
+   */
+  notes?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -1965,6 +2016,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'saved-searches';
         value: number | SavedSearch;
+      } | null)
+    | ({
+        relationTo: 'bench-runs';
+        value: number | BenchRun;
       } | null)
     | ({
         relationTo: 'breeds';
@@ -3037,6 +3092,21 @@ export interface SavedSearchesSelect<T extends boolean = true> {
   scope?: T;
   author?: T;
   organization?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bench-runs_select".
+ */
+export interface BenchRunsSelect<T extends boolean = true> {
+  label?: T;
+  measuredAt?: T;
+  animals?: T;
+  runs?: T;
+  server?: T;
+  rows?: T;
+  notes?: T;
   updatedAt?: T;
   createdAt?: T;
 }
