@@ -659,10 +659,12 @@ async function AnimalsTab({
   delete defaults.sub
 
   // Сверка хранимых значений с книгой — только когда порядок построен по ним
-  const lagMissing =
+  const lag =
     profile && 'stored' in result && result.stored
-      ? (await indexValuesLag(payload, profile.key)).missing
-      : 0
+      ? await indexValuesLag(payload, profile.key)
+      : { missing: 0, stale: 0 }
+  const lagMissing = lag.missing
+  const lagStale = lag.stale
 
   /*
    * Пустая таблица объясняется по-разному.
@@ -840,6 +842,14 @@ async function AnimalsTab({
               <>
                 {' '}· пересчёт не охватил {lagMissing.toLocaleString('ru-RU')} записей —
                 выполните <code className="rounded bg-canvas px-1.5 py-0.5">npm run backfill:index</code>
+              </>
+            )}
+            {/* Устаревшее значение — не то же, что пропущенное: запись в списке
+                есть, но стоит по признакам, которых у животного уже нет */}
+            {lagStale > 0 && (
+              <>
+                {' '}· у {lagStale.toLocaleString('ru-RU')} записей индекс посчитан раньше
+                последней правки животного — они стоят по прежним признакам
               </>
             )}
           </p>

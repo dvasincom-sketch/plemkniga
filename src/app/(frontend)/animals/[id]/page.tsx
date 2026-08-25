@@ -200,8 +200,6 @@ function MetricTable({
   head: string[]
   rows: { label: string; unit?: string; forecast?: number | null; r?: number | null; digits?: number }[]
 }) {
-  const weak = rows.some((r) => typeof r.r === 'number' && r.r > 0 && r.r < WEAK_RELIABILITY)
-
   return (
     <>
       <table className="metric-table">
@@ -235,18 +233,29 @@ function MetricTable({
         </tbody>
       </table>
 
-      {/* Пояснение появляется только там, где есть что пояснять: постоянная
-          строка под каждой таблицей превратилась бы в фон и перестала
-          читаться ровно тогда, когда понадобится */}
-      {weak && (
-        <p className="mt-3 max-w-[70ch] text-[13px] leading-relaxed text-ink-500">
-          Бледным показаны прогнозы с надёжностью ниже {nf(WEAK_RELIABILITY, 0)} %: у таких
-          признаков накопленных данных пока меньше половины нужного, и значение может заметно
-          измениться. Это не ошибка в карточке — у признаков с низкой наследуемостью надёжность
-          растёт медленнее, и одного и того же числа дочерей им хватает на меньшее.
-        </p>
-      )}
     </>
+  )
+}
+
+/**
+ * Пояснение про бледные прогнозы — одно на карточку.
+ *
+ * Стояло под каждой таблицей, где нашлась слабая надёжность, и на быке
+ * с заполненными данными напечаталось трижды: под воспроизводством,
+ * под семенем и под отёлами. Повтор через два абзаца — не настойчивость,
+ * а шум: третий раз его уже не читают, а место он занимает в каждом блоке.
+ *
+ * Условие показа осталось прежним по смыслу: если бледного на карточке
+ * нет, объяснять нечего.
+ */
+function WeakNote() {
+  return (
+    <p className="-mt-2 mb-6 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
+      Бледным ниже показаны прогнозы с надёжностью меньше {nf(WEAK_RELIABILITY, 0)} %: данных
+      по таким признакам накоплено меньше половины нужного, и значение может заметно измениться.
+      Это не ошибка в карточке — у признаков с низкой наследуемостью надёжность растёт
+      медленнее, и одного и того же числа дочерей им хватает на меньшее.
+    </p>
   )
 }
 
@@ -561,6 +570,27 @@ export default async function AnimalPage({
    * животного.
    */
   const isBull = animal.kind === 'bull'
+
+  /*
+   * Есть ли на карточке хоть один слабый прогноз — считается один раз
+   * и здесь, а не внутри каждой таблицы: пояснение к бледному шрифту
+   * должно стоять над блоками единожды, а не повторяться под каждым.
+   *
+   * Перебираются те же наборы признаков, что и показываются ниже. Если
+   * появится новый набор, он попадёт сюда же — иначе бледные числа
+   * останутся без объяснения, что хуже, чем объяснение без бледных чисел.
+   */
+  const rOf = (v: unknown) => (v as { r?: number | null } | undefined)?.r
+  const group = (g: unknown, keys: readonly { key: string }[]) =>
+    keys.map((t) => rOf((g as Record<string, unknown> | undefined)?.[t.key]))
+
+  const hasWeakReliability = [
+    ...group(animal.production, PRODUCTION_TRAITS),
+    ...group(animal.health, LONGEVITY_TRAITS),
+    ...group(animal.health, CALVING_TRAITS),
+    rOf(animal.reproduction?.fertility),
+    rOf(animal.semen?.conception),
+  ].some((r) => typeof r === 'number' && r > 0 && r < WEAK_RELIABILITY)
 
   const proof =
     tab === 'evaluation' && isBull ? await bullProof(payload, animal.id as number) : null
@@ -988,6 +1018,8 @@ export default async function AnimalPage({
                 </>
               )}
             </p>
+
+            {hasWeakReliability && <WeakNote />}
 
             <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <div className="space-y-6">

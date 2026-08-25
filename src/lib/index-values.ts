@@ -696,7 +696,14 @@ export async function percentileFromStored(
 const LAG_TTL_MS = 60_000
 const lagCache = new Map<string, { at: number; value: IndexValuesLag }>()
 
-export type IndexValuesLag = { animals: number; values: number; missing: number }
+export type IndexValuesLag = {
+  animals: number
+  values: number
+  /** Животных без строки значения: в порядок по индексу они не попали. */
+  missing: number
+  /** Строк, посчитанных раньше последней правки животного. */
+  stale: number
+}
 
 export async function indexValuesLag(
   payload: Payload,
@@ -705,18 +712,54 @@ export async function indexValuesLag(
   const cached = lagCache.get(profileKey)
   if (cached && Date.now() - cached.at < LAG_TTL_MS) return cached.value
 
-  const [animals, values] = await Promise.all([
+  const [animals, values, stale] = await Promise.all([
     payload.count({ collection: 'animals', overrideAccess: true }),
     payload.count({
       collection: 'index-values',
       where: { profileKey: { equals: profileKey } } as Where,
       overrideAccess: true,
     }),
+    /*
+     * Устаревшее значение — то, что посчитано раньше последней правки
+     * животного.
+     *
+     * Пропуск (`missing`) книга замечала и раньше: строки нет, значит
+     * животное в порядок не попало. А вот несогласие она не замечала
+     * вовсе — и оно опаснее. Строка есть, число выглядит посчитанным,
+     * но посчитано оно из признаков, которых у животного больше нет:
+     * правка сохранилась, а пересчёт следом за ней не прошёл. Так
+     * случилось у эталонного быка — оборвалась связь, хук упал, в лог
+     * это попало, а в карточке остался индекс от прежнего жира и белка.
+     * Заметить это читатель не может: разбор по признакам и таблица
+     * оценок выглядят одинаково достоверно, просто числа в них разные.
+     *
+     * Сравнение по времени правки, а не по слепку значений. Слепок был бы
+     * точнее — он отличал бы правку клички от правки удоя, — но требовал бы
+     * хранить лишнюю колонку и поддерживать её в согласии с формулой
+     * индекса, то есть завёл бы вторую вещь, которая расходится молча.
+     * Время правки такой опасности не создаёт: в худшем случае пересчёт
+     * назовут нужным там, где он ничего не изменит.
+     *
+     * Запрос прямой: Payload не умеет сравнивать поле одной коллекции
+     * с полем другой, а обходной путь — вычитать обе таблицы в память —
+     * на трёхстах тысячах животных не путь вовсе.
+     */
+    poolOf(payload)
+      .query(
+        `select count(*)::int as n
+           from index_values v
+           join animals a on a.id = v.animal_id
+          where v.profile_key = $1
+            and v.archived is not true
+            and a.updated_at > v.updated_at`,
+        [profileKey],
+      )
+      .then((r) => Number((r.rows?.[0] as { n?: number } | undefined)?.n ?? 0)),
   ])
 
   const a = animals.totalDocs ?? 0
   const v = values.totalDocs ?? 0
-  const value = { animals: a, values: v, missing: Math.max(0, a - v) }
+  const value = { animals: a, values: v, missing: Math.max(0, a - v), stale }
 
   lagCache.set(profileKey, { at: Date.now(), value })
   return value

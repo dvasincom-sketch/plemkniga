@@ -184,10 +184,12 @@ export default async function HerdbookPage({
    * по хранимым значениям: в остальных случаях список и так собран
    * из живых данных, и сверять нечего.
    */
-  const lagMissing =
+  const lag =
     profile && 'stored' in result && result.stored
-      ? (await indexValuesLag(payload, profile.key)).missing
-      : 0
+      ? await indexValuesLag(payload, profile.key)
+      : { missing: 0, stale: 0 }
+  const lagMissing = lag.missing
+  const lagStale = lag.stale
   const hasMore = found > animals.length
   // Гостю книга открыта на три экрана, дальше предлагаем бесплатную регистрацию
   const canShowMore = Boolean(user) || shown < ANON_SHOW_LIMIT
@@ -427,6 +429,30 @@ export default async function HerdbookPage({
                 {lagMissing.toLocaleString('ru-RU')}{' '}
                 {plural(lagMissing, 'запись', 'записи', 'записей')} — их нет в этом порядке.
                 Полный пересчёт: <code className="rounded bg-canvas px-1.5 py-0.5">npm run backfill:index</code>
+              </p>
+            )}
+
+            {/*
+               Устаревшие значения названы отдельно от пропущенных,
+               и это не дробление сообщения.
+
+               Пропуск означает «животного нет в списке» — читатель видит
+               неполный порядок и может это заметить сам. Устаревшее
+               значение означает «животное в списке стоит не там»: число
+               посчитано из признаков, которые с тех пор изменились.
+               Второе опаснее ровно тем, что незаметно, и требует другого
+               действия — не «дождаться пересчёта», а пересчитать
+               эти записи.
+            */}
+            {lagStale > 0 && (
+              <p className="mb-4 rounded-xl bg-[#fff6e5] px-4 py-3 text-[14px] leading-relaxed">
+                У {lagStale.toLocaleString('ru-RU')}{' '}
+                {plural(lagStale, 'записи', 'записей', 'записей')} индекс посчитан раньше
+                последней правки животного: в порядке они стоят по прежним признакам.
+                Пересчёт одной записи:{' '}
+                <code className="rounded bg-canvas px-1.5 py-0.5">
+                  npm run backfill:index -- --ident НОМЕР
+                </code>
               </p>
             )}
 
