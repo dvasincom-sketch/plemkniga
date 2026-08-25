@@ -56,6 +56,23 @@ export const reliabilityOf = (daughters: number, heritability = MILK_HERITABILIT
 export const daughtersFor = (r: number, heritability = MILK_HERITABILITY): number =>
   Math.ceil((r * reliabilityK(heritability)) / (1 - r))
 
+/**
+ * Ключи ступеней. `official` здесь — имя в коде, а не слово на экране.
+ *
+ * На экране верхняя ступень называется «Оценка устойчива». Прежнее
+ * «Официальная оценка» пришлось убрать: официальность в племенном деле
+ * присваивает орган — государственная служба, ассоциация, расчётный центр,
+ * — и слово это означает решение, а не свойство данных. Наш порог решения
+ * не выражает: это арифметика надёжности, посчитанная по числу дочерей
+ * и хозяйств. Карточка, называющая результат формулы официальным,
+ * приписывает ему полномочие, которого у него нет, — и хуже всего это
+ * сработало бы там, где документ на основании такой карточки предъявляют
+ * покупателю.
+ *
+ * Ключ при этом оставлен прежним намеренно. Он не виден никому, кроме
+ * кода, а переименование потянуло бы за собой проверки, журнал решений
+ * и всё, что на него ссылается, — ради нуля пользы.
+ */
 export type BullStatusKey = 'insufficient' | 'preliminary' | 'official'
 
 export type BullStatus = {
@@ -66,7 +83,7 @@ export type BullStatus = {
   /** Чего не хватает до следующей ступени. Пусто у официальной. */
   missing: string | null
   /**
-   * То же самое числами, а не строкой.
+   * Путь до порога числами, а не строкой.
    *
    * Строка `missing` отвечает на вопрос словами и годится для журнала
    * и для проверок. Карточке нужен другой ответ на тот же вопрос:
@@ -74,8 +91,19 @@ export type BullStatus = {
    * — как расстояние, и расстояние до цели понятно раньше, чем прочитано.
    * Собирать числа обратно разбором строки было бы способом сломать
    * показ ближайшей правкой формулировки.
+   *
+   * На верхней ступени поле не исчезает, а получает `done`. Убирать его
+   * было бы естественно и неверно: хозяйство, которое довело быка
+   * до устойчивой оценки, в этот момент видело бы меньше, чем видело
+   * по дороге, — блок с полосами просто пропадал бы. Достигнутый порог
+   * стоит показать достигнутым, иначе книга благодарит за работу
+   * исчезновением.
    */
-  next: { label: string; steps: { what: string; have: number; need: number }[] } | null
+  progress: {
+    label: string
+    done: boolean
+    steps: { what: string; have: number; need: number }[]
+  }
   /** Надёжность по удою на этом числе дочерей, проценты. */
   reliability: number
 }
@@ -115,8 +143,9 @@ export function bullStatus(daughters: number, herds: number): BullStatus {
         'Надёжность ниже половины: прогноз ошибается чаще, чем угадывает. ' +
         'Числа ниже показаны как есть, но опираться на них при выборе быка рано.',
       missing: gaps.join(', '),
-      next: {
-        label: 'Предварительная оценка',
+      progress: {
+        label: 'До предварительной оценки',
+        done: false,
         steps: [
           { what: 'Дочерей', have: daughters, need: needDaughters },
           { what: 'Хозяйств', have: herds, need: THRESHOLDS.preliminary.herds },
@@ -144,8 +173,9 @@ export function bullStatus(daughters: number, herds: number): BullStatus {
         'Оценка есть, но будет заметно меняться с новыми дочерями: ' +
         'по мере их появления число сдвигается, иногда на заметную величину.',
       missing: gaps.join(', '),
-      next: {
-        label: 'Официальная оценка',
+      progress: {
+        label: 'До устойчивой оценки',
+        done: false,
         steps: [
           { what: 'Дочерей', have: daughters, need: THRESHOLDS.official.daughters },
           { what: 'Хозяйств', have: herds, need: THRESHOLDS.official.herds },
@@ -157,10 +187,19 @@ export function bullStatus(daughters: number, herds: number): BullStatus {
 
   return {
     key: 'official',
-    label: 'Официальная оценка',
-    what: 'Оценка устоялась: новые дочери сдвигают её незначительно.',
+    label: 'Оценка устойчива',
+    what:
+      'Данных накоплено достаточно: новые дочери сдвигают оценку незначительно, ' +
+      'и на это число можно опираться при выборе быка.',
     missing: null,
-    next: null,
+    progress: {
+      label: 'Порог пройден',
+      done: true,
+      steps: [
+        { what: 'Дочерей', have: daughters, need: THRESHOLDS.official.daughters },
+        { what: 'Хозяйств', have: herds, need: THRESHOLDS.official.herds },
+      ],
+    },
     reliability,
   }
 }

@@ -143,36 +143,78 @@ export function BullStatusNote({ daughters, herds }: { daughters: number; herds:
          (дочерей хватает, а хозяйств нет) должно выглядеть выполненным,
          а не выпирающим.
       */}
-      {status.next && (
-        <div className="mt-5 rounded-xl border border-ink-100 px-4 py-3.5">
-          <p className="text-[13px] text-ink-500">
-            До ступени «{status.next.label}»
-          </p>
+      <div
+        className={`mt-5 rounded-xl border px-4 py-3.5 ${
+          status.progress.done ? 'border-brand-300 bg-brand-50' : 'border-ink-100'
+        }`}
+      >
+        <p className="flex items-center gap-2 text-[13px] text-ink-500">
+          {/*
+             Галочка — единственное украшение на карточке, и оно заслужено.
 
-          <div className="mt-3 space-y-3">
-            {status.next.steps.map((s) => {
-              const done = s.have >= s.need
-              const share = Math.min(100, Math.round((s.have / s.need) * 100))
-              return (
-                <div key={s.what}>
-                  <div className="flex items-baseline justify-between gap-4 text-[13px]">
-                    <span className={done ? 'text-ink-500' : 'text-ink-900'}>{s.what}</span>
-                    <span className="tabular-nums text-ink-500">
-                      {done ? `${nf(s.have)} — хватает` : `${nf(s.have)} из ${nf(s.need)}`}
-                    </span>
-                  </div>
-                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-ink-100">
-                    <div
-                      className={`h-full rounded-full ${done ? 'bg-brand-300' : 'bg-accent-500'}`}
-                      style={{ width: `${share}%` }}
-                    />
-                  </div>
+             Довести быка до устойчивой оценки — это полсотни дочерей,
+             занесённых в книгу разными хозяйствами за годы. Работа
+             долгая, а видел её раньше только тот, кто помнил, как
+             блок выглядел вчера. Отметка о пройденном пороге — про неё,
+             и стоит она ровно один раз: если ставить знак достижения
+             на каждую мелочь, он перестанет что-либо значить.
+          */}
+          {status.progress.done && (
+            <span
+              className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-500 text-white"
+              aria-hidden="true"
+            >
+              <svg viewBox="0 0 20 20" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="3">
+                <path d="M4 10.5 8 14.5 16 6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
+          )}
+          {status.progress.label}
+        </p>
+
+        <div className="mt-3 space-y-3">
+          {status.progress.steps.map((s) => {
+            const done = s.have >= s.need
+            const share = Math.min(100, Math.round((s.have / s.need) * 100))
+            return (
+              <div key={s.what}>
+                <div className="flex items-baseline justify-between gap-4 text-[13px]">
+                  <span className={done ? 'text-ink-500' : 'text-ink-900'}>{s.what}</span>
+                  <span className="tabular-nums text-ink-500">
+                    {done ? `${nf(s.have)} — хватает` : `${nf(s.have)} из ${nf(s.need)}`}
+                  </span>
                 </div>
-              )
-            })}
-          </div>
+                <div
+                  className={`mt-1 h-1.5 overflow-hidden rounded-full ${
+                    status.progress.done ? 'bg-brand-100' : 'bg-ink-100'
+                  }`}
+                >
+                  <div
+                    className={`h-full rounded-full ${done ? 'bg-brand-500' : 'bg-accent-500'}`}
+                    style={{ width: `${share}%` }}
+                  />
+                </div>
+              </div>
+            )
+          })}
         </div>
-      )}
+
+        {/*
+           Строка про смысл порога — только на пройденном.
+
+           До порога человек и так читает, чего не хватает; после —
+           полосы сами по себе ничего не объясняют, и без подписи блок
+           превращается в две зелёные черты. Нужно сказать, что именно
+           сделано и почему это ценно, — иначе мотивации в отметке нет.
+        */}
+        {status.progress.done && (
+          <p className="mt-3 max-w-[70ch] text-[13px] leading-relaxed text-ink-700">
+            Дочерей достаточно и они стоят в разных хозяйствах — значит разница по ним говорит
+            о быке, а не об условиях одного стада. Это та полнота данных, к которой книга
+            и ведёт: собрана она хозяйствами, которые вносили отёлы и дойки годами.
+          </p>
+        )}
+      </div>
 
       {/*
          Ссылка на практику CDCB — не украшение и не ссылка на авторитет.
