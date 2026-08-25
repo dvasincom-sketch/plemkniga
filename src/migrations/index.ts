@@ -46,6 +46,7 @@ import * as migration_20260827_090000_semen_and_grade from './20260827_090000_se
 import * as migration_20260828_090000_evaluation_source from './20260828_090000_evaluation_source'
 import * as migration_20260828_140000_linear_score from './20260828_140000_linear_score'
 import * as migration_20260828_180000_calving_roles from './20260828_180000_calving_roles'
+import * as migration_20260829_090000_pending_columns from './20260829_090000_pending_columns'
 
 export const migrations = [
   {
@@ -287,5 +288,10 @@ export const migrations = [
     up: migration_20260828_180000_calving_roles.up,
     down: migration_20260828_180000_calving_roles.down,
     name: '20260828_180000_calving_roles',
+  },
+  {
+    up: migration_20260829_090000_pending_columns.up,
+    down: migration_20260829_090000_pending_columns.down,
+    name: '20260829_090000_pending_columns',
   },
 ];

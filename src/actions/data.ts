@@ -7,6 +7,7 @@ import { detectTableKind, readSpreadsheet } from '@/lib/xlsx'
 import { columnsOf, datasetByKey, headerMapOf, type Dataset } from '@/lib/import-format'
 import { IDENT_FIELD_LABEL, IDENT_VALUES_SQL, identCore } from '@/lib/animal-id'
 import { DOMAIN_RULES } from '@/lib/db-constraints'
+import { quarantineColumns } from '@/lib/pending-columns'
 
 export type ImportState = {
   error?: string
@@ -524,6 +525,27 @@ function readTable(rows: string[][], ds: Dataset) {
   const header = rawHeader.map((h) => map[norm(h)] ?? '')
   const unknownColumns = rawHeader.filter((h, i) => h !== '' && header[i] === '')
 
+  /*
+   * Неопознанные колонки не просто называются, а забираются вместе
+   * со значениями.
+   *
+   * Прежде их перечисляли в отчёте и на этом теряли: хозяйство прислало
+   * то, что у него есть, а книга ответила «такого признака у меня нет».
+   * Между тем именно так и приходит всё новое — не полем в требованиях,
+   * а колонкой в чужой выгрузке.
+   *
+   * Значения собираются здесь, потому что дальше строки уже разбираются
+   * по известным ключам, и лишние столбцы после этого не восстановить.
+   */
+  const unknownData = rawHeader
+    .map((title, i) => ({ title, i }))
+    .filter(({ title, i }) => title !== '' && header[i] === '')
+    .map(({ title, i }) => ({
+      title,
+      normalized: norm(title),
+      values: rows.slice(1).map((r) => (r[i] ?? '').trim()),
+    }))
+
   const required = columnsOf(ds).filter((c) => c.required)
   const missing = required.filter((c) => !header.includes(c.key))
 
@@ -533,10 +555,11 @@ function readTable(rows: string[][], ds: Dataset) {
         .map((c) => `«${c.title}»`)
         .join(', ')}. Скачайте шаблон, чтобы свериться`,
       unknownColumns,
+      unknownData,
     }
   }
 
-  return { rows, header, unknownColumns }
+  return { rows, header, unknownColumns, unknownData }
 }
 
 /* ------------------------------------------------------------------ */
@@ -1179,6 +1202,24 @@ export async function importDataAction(
     organization: orgId,
     role: (user as { role?: string }).role,
   }
+
+  /*
+   * Неопознанные колонки уходят в карантин до разбора строк.
+   *
+   * До разбора — потому что дальше строки раскладываются по известным
+   * ключам, и лишние столбцы после этого не восстановить. А ещё потому,
+   * что файл может не приняться целиком: колонка при этом всё равно
+   * приезжала, и знать о ней Ассоциации полезно независимо от судьбы
+   * самих строк.
+   *
+   * Загрузка этого не ждёт: карантин — заметка рядом с данными, а не сами
+   * данные, и его отказ не должен отвергать файл, который в остальном
+   * хорош. Разбор в `src/lib/pending-columns.ts`.
+   */
+  await quarantineColumns(payload, parsed.unknownData, {
+    datasetLabel: ds.label,
+    organizationId: orgId,
+  })
 
   const res =
     ds.key === 'animals'

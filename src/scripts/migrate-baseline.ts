@@ -311,6 +311,11 @@ const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
     probe: { kind: 'column', table: 'animals', column: 'calving_roles_ease_sire_forecast' },
     note: 'отёлы по роли быка: как отец телёнка и как дед по матери',
   },
+  {
+    name: '20260829_090000_pending_columns',
+    probe: { kind: 'table', name: 'pending_columns' },
+    note: 'карантин неопознанных колонок загрузки',
+  },
 ]
 
 const { driverUri, uri, source, sslConfig } = resolveDatabase()

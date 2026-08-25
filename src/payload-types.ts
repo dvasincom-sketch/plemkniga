@@ -98,6 +98,7 @@ export interface Config {
     media: Media;
     'saved-searches': SavedSearch;
     'bench-runs': BenchRun;
+    'pending-columns': PendingColumn;
     breeds: Breed;
     lines: Line;
     'breeding-categories': BreedingCategory;
@@ -151,6 +152,7 @@ export interface Config {
     media: MediaSelect<false> | MediaSelect<true>;
     'saved-searches': SavedSearchesSelect<false> | SavedSearchesSelect<true>;
     'bench-runs': BenchRunsSelect<false> | BenchRunsSelect<true>;
+    'pending-columns': PendingColumnsSelect<false> | PendingColumnsSelect<true>;
     breeds: BreedsSelect<false> | BreedsSelect<true>;
     lines: LinesSelect<false> | LinesSelect<true>;
     'breeding-categories': BreedingCategoriesSelect<false> | BreedingCategoriesSelect<true>;
@@ -1954,6 +1956,55 @@ export interface BenchRun {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "pending-columns".
+ */
+export interface PendingColumn {
+  id: number;
+  /**
+   * Проставляется автоматически, нужен для доступа прежнего владельца
+   */
+  ownerOrg?: (number | null) | Organization;
+  title: string;
+  normalized: string;
+  /**
+   * Паспорт, оценки, отёлы и так далее
+   */
+  dataset?: string | null;
+  status?: ('new' | 'accepted' | 'declined' | 'duplicate') | null;
+  /**
+   * Ключ признака в реестре, если колонка оказалась известной величиной под чужим названием
+   */
+  mapsTo?: string | null;
+  decision?: {
+    /**
+     * Отказ без объяснения возвращается тем же вопросом через полгода — от другого хозяйства
+     */
+    comment?: string | null;
+    decidedBy?: (number | null) | User;
+    decidedAt?: string | null;
+  };
+  seenTimes?: number | null;
+  /**
+   * Колонка из одного заполненного поля и колонка на три тысячи строк — разный разговор
+   */
+  rowsWithValue?: number | null;
+  firstSeenAt?: string | null;
+  lastSeenAt?: string | null;
+  samples?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  organizations?: (number | Organization)[] | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -2099,6 +2150,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'bench-runs';
         value: number | BenchRun;
+      } | null)
+    | ({
+        relationTo: 'pending-columns';
+        value: number | PendingColumn;
       } | null)
     | ({
         relationTo: 'breeds';
@@ -3251,6 +3306,33 @@ export interface BenchRunsSelect<T extends boolean = true> {
   server?: T;
   rows?: T;
   notes?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "pending-columns_select".
+ */
+export interface PendingColumnsSelect<T extends boolean = true> {
+  ownerOrg?: T;
+  title?: T;
+  normalized?: T;
+  dataset?: T;
+  status?: T;
+  mapsTo?: T;
+  decision?:
+    | T
+    | {
+        comment?: T;
+        decidedBy?: T;
+        decidedAt?: T;
+      };
+  seenTimes?: T;
+  rowsWithValue?: T;
+  firstSeenAt?: T;
+  lastSeenAt?: T;
+  samples?: T;
+  organizations?: T;
   updatedAt?: T;
   createdAt?: T;
 }

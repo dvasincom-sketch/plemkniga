@@ -18,6 +18,7 @@
     "backfill:name-key": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/backfill-name-key.ts",
     "backfill:index": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/backfill-index.ts",
     "rebase:index": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/rebase-index.ts",
+    "repair:pta-kg": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/repair-pta-kg.ts",
     "repair:uuid": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/repair-uuid.ts",
     "payload": "cross-env NODE_OPTIONS=--no-deprecation payload",
     "generate:types": "cross-env NODE_OPTIONS=--no-deprecation payload generate:types",
