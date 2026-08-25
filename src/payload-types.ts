@@ -388,6 +388,14 @@ export interface Animal {
     forecast?: number | null;
     r?: number | null;
     percentile?: number | null;
+    /**
+     * Расчётный центр или организация: CDCB, Lactanet, региональный центр, сама Ассоциация
+     */
+    center?: string | null;
+    /**
+     * Как названа база у источника: CDCB-2025, Interbull-2024, «база 2020 года по области»
+     */
+    base?: string | null;
   };
   evaluationDate?: string | null;
   production?: {
@@ -2285,6 +2293,8 @@ export interface AnimalsSelect<T extends boolean = true> {
         forecast?: T;
         r?: T;
         percentile?: T;
+        center?: T;
+        base?: T;
       };
   evaluationDate?: T;
   production?:

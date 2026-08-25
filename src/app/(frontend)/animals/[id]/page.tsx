@@ -47,6 +47,7 @@ import {
 } from '@/lib/dictionaries'
 import { THRESHOLDS } from '@/lib/bull-status'
 import { afcMonths } from '@/lib/afc'
+import { cowEvidence } from '@/lib/cow-evidence'
 import { dateRu, nf, signed } from '@/lib/format'
 import { IndexBreakdown } from '@/components/IndexBreakdown'
 import { EvaluationHistory } from '@/components/EvaluationHistory'
@@ -673,6 +674,16 @@ export default async function AnimalPage({
   const afcOwn = firstCalving ? afcMonths(animal.birthDate, firstCalving.date) : null
 
   /*
+   * На чём стоит оценка коровы — то же, что у быка «55 дочерей
+   * в 17 хозяйствах», только для собственных наблюдений. Разбор
+   * в `src/lib/cow-evidence.ts`.
+   */
+  const evidence =
+    tab === 'evaluation' && !isBull && maySee('evaluation')
+      ? await cowEvidence(payload, animal.id as number)
+      : null
+
+  /*
    * Индекс считается по профилю смотрящего: хозяйство со своим набором весов
    * должно видеть карточку своими глазами. У гостя и у хозяйства без своего
    * профиля это стандартный профиль Ассоциации.
@@ -1021,6 +1032,72 @@ export default async function AnimalPage({
             )}
 
             {/*
+               На чём стоит оценка коровы.
+
+               У быка это блок «Оценка по дочерям» с числом дочерей
+               и хозяйств. У коровы такого не было: надёжность стояла
+               в колонке, а откуда она взялась — нигде. Показаны ровно
+               те величины, из которых она и складывается: собственные
+               наблюдения и родители в книге.
+            */}
+            {evidence && (
+              <section className="card mt-8">
+                <h2 className="panel-heading mb-0">На чём стоит оценка</h2>
+                <p className="mt-2 max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
+                  Надёжность в колонке «R, %» считается из числа собственных наблюдений
+                  и из того, что известно о родителях. Вот это основание целиком.
+                </p>
+
+                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  {[
+                    { label: 'Отёлов в книге', value: nf(evidence.lactations, 0) },
+                    { label: 'Контрольных доек', value: nf(evidence.milkTests, 0) },
+                    {
+                      label: 'Родители в книге',
+                      value:
+                        evidence.hasSire && evidence.hasDam
+                          ? 'оба'
+                          : evidence.hasSire
+                            ? 'только отец'
+                            : evidence.hasDam
+                              ? 'только мать'
+                              : 'нет',
+                    },
+                  ].map((s) => (
+                    <div key={s.label} className="rounded-xl bg-canvas px-4 py-3.5">
+                      <p className="text-[13px] leading-snug text-ink-500">{s.label}</p>
+                      <p className="mt-1 text-[24px] font-medium leading-none tabular-nums">
+                        {s.value}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                {/*
+                   Предупреждение об одной лактации — по той же причине,
+                   по какой у быка предупреждение об одном хозяйстве:
+                   среднее по одному наблюдению не среднее, а само
+                   наблюдение, и знать об этом надо до килограммов.
+                */}
+                {evidence.lactations <= 1 && (
+                  <p className="mt-4 max-w-[75ch] text-[14px] leading-relaxed text-ink-700">
+                    {evidence.lactations === 0
+                      ? 'Отёлов в книге нет: оценка опирается только на происхождение, и собственных наблюдений за этим животным нет ни одного.'
+                      : 'Учтён один отёл. Оценка по одной лактации сдвинется с каждой следующей — она пока говорит об этом годе, а не о животном.'}
+                  </p>
+                )}
+
+                {!evidence.hasSire && !evidence.hasDam && (
+                  <p className="mt-2 max-w-[75ch] text-[14px] leading-relaxed text-ink-700">
+                    Ни один из родителей не найден в книге связью. Четверть надёжности,
+                    которую даёт происхождение, здесь не работает — даже если родители
+                    записаны текстом в родословной.
+                  </p>
+                )}
+              </section>
+            )}
+
+            {/*
                Инбридинг и возраст первого отёла — рядом с племенной ценностью.
 
                Оба живут на других вкладках и оба нужны здесь. Инбридинг —
@@ -1156,9 +1233,37 @@ export default async function AnimalPage({
 
             <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <div className="space-y-6">
+                {/*
+                   Заголовок называет источник, если он известен.
+
+                   «Оценка расчётного центра» без имени — это вопрос,
+                   а не подпись: индекс TPI из американского каталога
+                   и индекс областного центра разные величины, и читать
+                   их надо по-разному. Пока источник не заполнен, честнее
+                   сказать «источник не указан», чем оставить безымянность
+                   незамеченной: незаполненное поле, о котором молчат,
+                   не заполняют никогда.
+                */}
                 <Collapsible
-                  title="Оценка расчётного центра"
-                  note="Привезена вместе с данными о животном. Индекс выше система считает сама — числа не совпадают, потому что это разные оценки на разных базах."
+                  title={
+                    animal.ipcDetails?.center
+                      ? `Оценка: ${animal.ipcDetails.center}`
+                      : 'Оценка расчётного центра'
+                  }
+                  note={
+                    [
+                      animal.ipcDetails?.base
+                        ? `База сравнения: ${animal.ipcDetails.base}`
+                        : null,
+                      animal.evaluationDate ? `оценка от ${dateRu(animal.evaluationDate)}` : null,
+                      !animal.ipcDetails?.center && !animal.ipcDetails?.base
+                        ? 'Источник не указан — без него сравнивать эту оценку с расчётом книги не с чем'
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ') ||
+                    'Привезена вместе с данными о животном'
+                  }
                   defaultOpen
                 >
                   <table className="metric-table">

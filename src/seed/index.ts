@@ -432,6 +432,14 @@ const run = async () => {
             forecast: between(400, 2600, 1),
             r: between(78, 96, 1),
             percentile: int(60, 99),
+            /*
+             * Источник у быков импортный: их оценки приходят из каталогов
+             * вместе с семенем, и в жизни это чаще всего CDCB. Заполнено
+             * не для красоты — без имени источника карточка не может
+             * объяснить, почему привезённое число расходится с нашим.
+             */
+            center: 'CDCB (США)',
+            base: 'CDCB-2025',
           },
           evaluationDate: new Date(2025, 2, 12).toISOString(),
           production: {
@@ -592,6 +600,9 @@ const run = async () => {
           forecast: between(-1200, 2400, 1),
           r: between(35, 88, 1),
           percentile: int(3, 99),
+          // У коров оценка отечественная: её считает региональный центр
+          center: 'Региональный центр племенного животноводства',
+          base: 'Голштин РФ-2025',
         },
         evaluationDate: new Date(2025, 2, 12).toISOString(),
         production: {
@@ -935,7 +946,13 @@ const run = async () => {
        */
       inbreeding: 8.57,
       ipc: 1284.5,
-      ipcDetails: { forecast: 1284.5, r: 71.4, percentile: 88 },
+      ipcDetails: {
+        forecast: 1284.5,
+        r: 71.4,
+        percentile: 88,
+        center: 'Региональный центр племенного животноводства',
+        base: 'Голштин РФ-2025',
+      },
       evaluationDate: new Date(2025, 2, 12).toISOString(),
       production: {
         reliabilityLevel: 3,

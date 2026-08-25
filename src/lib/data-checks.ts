@@ -9,6 +9,7 @@ import {
 } from '@/lib/check-settings'
 import { pedigreeIssues } from '@/lib/checks-pedigree'
 import { expectedFatKg, expectedProteinKg, KG_TOLERANCE } from '@/lib/pta-consistency'
+import { ASSOCIATION_PROFILE } from '@/lib/breeding-index'
 import { sequenceIssues } from '@/lib/checks-sequence'
 import {
   INBREEDING_CHECK_LIMIT,
@@ -399,11 +400,98 @@ async function relationalIssues(
     for (const d of docs) parents.set(d.id as number, d as Animal)
   }
 
+  /*
+   * Место животного по нашему расчёту — из хранимых значений индекса.
+   *
+   * Считать его здесь заново нельзя: процентиль это положение среди всей
+   * популяции, а не свойство записи. Хранимое значение для того и заведено;
+   * если оно устарело, об этом скажет отдельная проверка книги, и валить
+   * две разные беды в одну находку незачем.
+   *
+   * Профиль берётся ассоциативный: сравнивать привезённую оценку
+   * с расчётом по чьим-то частным весам бессмысленно — расхождение тогда
+   * означало бы разницу во вкусах хозяйства, а не ошибку в данных.
+   */
+  const ourPercentile = new Map<number, number>()
+  const withImported = animals.filter(
+    (a) => typeof (a.ipcDetails as { percentile?: number } | undefined)?.percentile === 'number',
+  )
+
+  if (withImported.length) {
+    const { docs } = await payload
+      .find({
+        collection: 'index-values',
+        where: {
+          and: [
+            { animal: { in: withImported.map((a) => a.id) } },
+            { profileKey: { equals: ASSOCIATION_PROFILE.key } },
+          ],
+        },
+        limit: withImported.length,
+        depth: 0,
+        overrideAccess: true,
+      })
+      .catch(() => ({ docs: [] as Record<string, unknown>[] }))
+
+    for (const d of docs) {
+      const row = d as { animal?: unknown; percentile?: number | null }
+      const id = idOf(row.animal)
+      if (id && typeof row.percentile === 'number') ourPercentile.set(id, row.percentile)
+    }
+
+    if (!docs.length) limits.push('расхождение с привезённой оценкой не проверено: расчёт книги ещё не проставлен')
+  }
+
   for (const a of animals) {
     const push = (code: AnimalCheckCode, text: string, field?: string, severity: CheckSeverity = 'fix') =>
       out.push({ code, animalId: a.id as number, ident: a.identNumber, field, severity, text })
 
     const born = time(a.birthDate)
+
+    /*
+     * Привезённая оценка против расчёта книги — и сначала о том, названа ли
+     * она вообще.
+     *
+     * Сравниваются процентили, а не очки. Очки индекса у разных центров
+     * несопоставимы по устройству: у одного шкала в рублях, у другого
+     * в баллах, у третьего центрирована на другую популяцию. Место
+     * в своей популяции — единственная общая величина, и именно оно
+     * должно совпадать хотя бы приблизительно: оценки на разных базах
+     * не обязаны давать одно число, но обязаны быть об одном животном.
+     *
+     * Порог в сорок процентилей выбран так, чтобы не спорить о вкусах.
+     * Разные веса признаков легко двигают животное на двадцать-тридцать
+     * мест из ста — это нормальная разница между «нам важен белок»
+     * и «нам важно долголетие». Сорок и больше означает другое: перепутан
+     * столбец, приехала оценка чужого животного или индекс другой породы.
+     */
+    const imported = a.ipcDetails as
+      | { percentile?: number | null; forecast?: number | null; center?: string | null; base?: string | null }
+      | undefined
+
+    if (typeof imported?.forecast === 'number' && !imported.center && !imported.base) {
+      push(
+        'eval-source-unnamed',
+        'Есть привезённая оценка, но не сказано, чей это расчётный центр и по какой базе',
+        'ipcDetails.center',
+        'note',
+      )
+    }
+
+    const ours = ourPercentile.get(a.id as number)
+    if (typeof imported?.percentile === 'number' && typeof ours === 'number') {
+      const gap = Math.abs(ours - imported.percentile)
+      if (gap > 40) {
+        push(
+          'eval-vs-book-divergence',
+          `Привезённая оценка ставит животное в ${imported.percentile}-й процентиль, ` +
+            `расчёт книги — в ${ours}-й: расхождение ${Math.round(gap)}` +
+            (imported.center ? ` (источник: ${imported.center})` : ''),
+          'ipcDetails.percentile',
+          'note',
+        )
+      }
+    }
 
     for (const [side, label, expectedSex, textKey] of [
       ['father', 'Отец', 'male', 'fatherId'],
