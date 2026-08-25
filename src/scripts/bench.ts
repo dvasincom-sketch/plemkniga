@@ -46,6 +46,17 @@ import { isLocalDatabase, resolveDatabase } from '@/lib/db-url'
  *   npm run bench -- --parallel 50    — проверить одновременных читателей
  *   npm run bench -- --save           — записать отчёт для вкладки «Замер»
  *   npm run bench -- --save --label Прод   — записать под своим именем среды
+ *   npm run bench -- --save --out /tmp/b.json  — положить отчёт в другое место
+ *
+ * ## Запуск в боевом контейнере
+ *
+ * Замер прода делается на проде, а не со своей машины против прод-базы:
+ * во втором случае меряется канал до неё, и на сценариях в двадцать
+ * миллисекунд задержка сети и будет всем результатом.
+ *
+ * В образе нет ни исходников, ни `tsx`, поэтому при сборке замер
+ * собирается в один файл (`npm run bench:bundle`) и кладётся рядом
+ * с приложением. Порядок — в `docs/razvertyvanie.md`.
  *
  * Скрипт ничего не пишет в базу. Объём набирается отдельно:
  * `npm run seed:bulk -- --animals 50000`.
@@ -73,8 +84,28 @@ const SAVE = process.argv.includes('--save')
  */
 const labelArg = (): string => {
   const i = process.argv.indexOf('--label')
-  const v = i === -1 ? '' : (process.argv[i + 1] ?? '')
-  return v && !v.startsWith('--') ? v : os.hostname()
+  if (i === -1) return os.hostname()
+
+  /*
+   * Метка собирается из всех слов до следующего ключа, а не из одного.
+   *
+   * «Локальная машина» — два слова, и в оболочке без кавычек второе
+   * теряется: в отчёт попадает замер с именем «Локальная», а рядом
+   * остаётся прежний под правильным именем. Так уже случилось, и вышло
+   * хуже, чем просто некрасивое имя: два замера одной и той же среды
+   * встали колонками рядом, изображая сравнение.
+   *
+   * Требовать кавычек было бы правильно и бесполезно: команду набирают
+   * руками, а имя среды по-русски почти всегда из двух слов.
+   */
+  const words: string[] = []
+  for (let k = i + 1; k < process.argv.length; k++) {
+    const w = process.argv[k]!
+    if (w.startsWith('--')) break
+    words.push(w)
+  }
+
+  return words.length ? words.join(' ') : os.hostname()
 }
 
 /**
@@ -87,7 +118,17 @@ const labelArg = (): string => {
  * и коммитится он тем же коммитом. Запись в базе означала бы, что цифры
  * с чьей-то машины попадают в базу прода и показываются как его цифры.
  */
-const REPORT_PATH = 'src/lib/bench-report.json'
+const REPORT_PATH = (): string => {
+  const i = process.argv.indexOf('--out')
+  const v = i === -1 ? '' : (process.argv[i + 1] ?? '')
+  /*
+   * Путь можно назвать, потому что в боевом контейнере исходников нет:
+   * там замер лежит одним собранным файлом, а отчёт пишется во временный
+   * каталог и забирается наружу. Умолчание остаётся местным — на своей
+   * машине отчёт должен ложиться туда, откуда его коммитят.
+   */
+  return v && !v.startsWith('--') ? v : 'src/lib/bench-report.json'
+}
 
 /** Пороги из раздела о критериях приёмки. Отсутствие порога — просто замер. */
 type Scenario = {
@@ -618,7 +659,7 @@ async function main() {
      * два замера одного и того же места — это не сравнение, а история,
      * а история здесь ни к чему.
      */
-    const before = await readFile(REPORT_PATH, 'utf8')
+    const before = await readFile(REPORT_PATH(), 'utf8')
       .then((t) => JSON.parse(t) as { reports?: unknown[] })
       .catch(() => ({ reports: [] as unknown[] }))
 
@@ -628,8 +669,8 @@ async function main() {
 
     const out = { reports: [...kept, measured] }
 
-    await writeFile(REPORT_PATH, JSON.stringify(out, null, 2) + '\n', 'utf8')
-    console.log(`Отчёт записан: ${REPORT_PATH} (среда «${label}»)`)
+    await writeFile(REPORT_PATH(), JSON.stringify(out, null, 2) + '\n', 'utf8')
+    console.log(`Отчёт записан: ${REPORT_PATH()} (среда «${label}»)`)
     console.log(`  ${server.cpu}, ядер ${server.cores}, память ${server.memoryGb} ГБ`)
     console.log(`  ${server.postgres}, база ${server.databaseSize}`)
     if (server.remoteDatabase)

@@ -52,6 +52,7 @@
     "check:time": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-time.ts",
     "check:searches": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-searches.ts",
     "bench": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/bench.ts",
+    "bench:bundle": "esbuild src/scripts/bench.ts --bundle --platform=node --format=esm --packages=external --tsconfig=tsconfig.json --outfile=dist/bench.mjs",
     "seed:checks": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/seed-checks.ts",
     "seed:afc": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/seed-afc.ts",
     "smoke": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/smoke.ts"
@@ -81,6 +82,7 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "dotenv": "^17.4.2",
+    "esbuild": "0.25.12",
     "tailwindcss": "^4.1.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"

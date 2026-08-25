@@ -21,6 +21,18 @@ ENV PAYLOAD_SECRET=build-time-placeholder-secret-value
 
 RUN npm run build
 
+# Замер собирается в один файл ради запуска в боевом контейнере.
+#
+# В рантайм-образе нет ни исходников, ни tsx, ни devDependencies — там
+# только собранное приложение. А замер прода надо делать на проде: со своей
+# машины против прод-базы меряется канал до неё, и на сценариях в двадцать
+# миллисекунд задержка сети и будет всем результатом.
+#
+# Пакеты остаются внешними (--packages=external): бандлится только наш код,
+# а зависимости берутся из node_modules, который Next кладёт в standalone.
+# Собирать их внутрь значило бы дублировать в образе то, что в нём уже есть.
+RUN npm run bench:bundle
+
 ##############################  Рантайм  ##############################
 FROM node:22.12-alpine AS runner
 RUN apk add --no-cache libc6-compat
@@ -39,6 +51,12 @@ RUN addgroup --system --gid 1001 nodejs \
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+
+# Замер лежит рядом с приложением и сам по себе ничего не делает: он
+# запускается руками через docker exec и пишет отчёт во временный каталог.
+# Ручки наружу у него нет — открытый маршрут замера означал бы, что нагрузить
+# боевую базу может кто угодно, кто узнал адрес.
+COPY --from=builder --chown=nextjs:nodejs /app/dist/bench.mjs ./bench.mjs
 
 USER nextjs
 EXPOSE 3000

@@ -1,6 +1,5 @@
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { cookies } from 'next/headers'
 import type { User } from '@/payload-types'
 
 /**
@@ -139,6 +138,21 @@ export const AUTH_COOKIE = 'payload-token'
  */
 export const getCurrentUser = async (): Promise<User | null> => {
   try {
+    /*
+     * `next/headers` подгружается здесь, а не импортом наверху файла,
+     * и это не стилистика.
+     *
+     * Модуль нужен внутри запроса и только там, а сам файл — библиотечный:
+     * из него берут `getClient` серверные скрипты, которые ни к какому
+     * запросу не относятся. Пока импорт стоял наверху, любой такой скрипт
+     * тянул за собой контекст Next целиком — и замер, собранный отдельным
+     * файлом для запуска в боевом контейнере, падал на резолве
+     * `next/headers` ещё до первой строки работы.
+     *
+     * Ленивая загрузка стоит одного `await` на запрос и снимает
+     * зависимость библиотеки от среды, в которой её позвали.
+     */
+    const { cookies } = await import('next/headers')
     const jar = await cookies()
     const token = jar.get(AUTH_COOKIE)?.value
     if (!token) return null
