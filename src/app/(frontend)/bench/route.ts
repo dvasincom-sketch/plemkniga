@@ -47,8 +47,13 @@ export const maxDuration = 300
  * Пока она стоит, адрес живой, и это осознанная плата за отсутствие
  * консоли; убрать её — вопрос одной правки в панели, и маршрут исчезает.
  *
- *     GET /bench?token=…&label=Прод
- *     GET /bench?token=…&label=Прод&runs=3
+ *     GET /bench?token=…
+ *     GET /bench?token=…&runs=3
+ *
+ * Метка среды необязательна: без неё замер записывается как «Прод».
+ * Класть её в адрес кириллицей нельзя — обратный прокси отвечает
+ * `400 Bad Request` на незакодированные не-ASCII байты, и до приложения
+ * запрос не доходит вовсе. Проверено.
  */
 export async function GET(request: Request) {
   const expected = process.env.BENCH_TOKEN ?? ''
@@ -97,6 +102,27 @@ export async function GET(request: Request) {
 
   const label = (searchParams.get('label') ?? '').trim().slice(0, 60) || 'Прод'
 
+  /*
+   * Разбор выгрузки по слоям — только по явному требованию, и требование
+   * это стоит понимать буквально.
+   *
+   * Первый замер на боевом сервере дошёл до этих сценариев и уронил
+   * контейнер: `Reached heap limit — JavaScript heap out of memory`.
+   * Двадцать тысяч документов Payload со всеми группами не помещаются
+   * в память боевой машины. Замер, валящий то, что он меряет, —
+   * не измерение, а поломка, и по умолчанию его здесь нет.
+   *
+   * Ключ оставлен на случай, если вопрос «сколько стоит слой» вернётся.
+   * Но запускать его на проде — значит сознательно ронять прод, о чём
+   * лог и предупреждает.
+   */
+  const heavy = searchParams.get('heavy') === '1'
+  if (heavy)
+    console.warn(
+      '[bench] запрошен разбор по слоям: на боевой машине он однажды ' +
+        'уже исчерпал память и убил процесс',
+    )
+
   const payload = await getClient()
 
   /*
@@ -122,6 +148,7 @@ export async function GET(request: Request) {
   const measured = await runBench(payload, {
     runs,
     label,
+    heavy,
     onGroup: (name) => console.info(`[bench] ${name}`),
     onNote: (t) => {
       notes.push(t)

@@ -47,6 +47,25 @@ import type { BenchMeasurement, BenchRow, BenchServer } from '@/lib/bench-report
 export type BenchOptions = {
   runs?: number
   label?: string
+  /**
+   * Прогонять ли разбор выгрузки по слоям.
+   *
+   * По умолчанию — нет, и это не осторожность, а вывод из случившегося.
+   * Первый же замер на боевом сервере дошёл до этих сценариев и **уронил
+   * контейнер**: `Reached heap limit — JavaScript heap out of memory`.
+   * Двадцать тысяч документов Payload со всеми группами не помещаются
+   * в память боевой машины, и замер, который валит то, что меряет,
+   * не замер, а поломка.
+   *
+   * Сценарии эти написаны были ради одного разового вопроса — где именно
+   * теряются секунды, — и на него они ответили: прямой запрос 122 мс
+   * против 6 349 у Payload. Ответ получен, выгрузка переведена на прямой
+   * запрос, и повторять опыт при каждом замере незачем.
+   *
+   * Остаются доступными по явному требованию: вопрос может вернуться,
+   * а способ ответить на него — нет.
+   */
+  heavy?: boolean
   /** Зовётся на каждой готовой строке — скрипту, чтобы печатать по ходу. */
   onRow?: (row: BenchRow) => void
   /** Зовётся на каждом новом разделе. */
@@ -353,47 +372,24 @@ export async function runBench(
    * Меряется она потому, что это единственное место, где система
    * сознательно берёт двадцать тысяч записей разом.
    *
-   * Пять сценариев подряд — это разбор по слоям, а не перечисление.
-   * Первая догадка была «дело в глубине связей», и она объяснила шесть
-   * секунд из двадцати; остальные четырнадцать объяснились только тем,
-   * что Payload собирает из каждой строки полный документ на сто с лишним
-   * полей. Прямой запрос — нижняя граница, быстрее не будет никогда;
-   * разница между ним и любым сценарием через Payload и есть цена слоя.
+   * ## Почему по умолчанию меряется только прямой запрос
+   *
+   * Потому что именно им выгрузка теперь и работает. Замер обязан мерить
+   * то, что система делает сегодня, а не то, что она делала до починки.
+   *
+   * Есть и вторая причина, весомее первой. Прогон через Payload
+   * на боевом сервере **уронил контейнер**: двадцать тысяч документов
+   * со всеми группами не поместились в память, и процесс умер
+   * с `Reached heap limit`. Замер, валящий то, что он меряет, — поломка,
+   * а не измерение. Разбор по слоям остаётся доступным по явному
+   * требованию: он ответил на свой вопрос один раз и может понадобиться
+   * снова, но не при каждом запуске.
    */
-  await measure({
-    what: `выгрузка ${EXPORT_LIMIT.toLocaleString('ru-RU')} записей (таблица)`,
-    runs: 3,
-    run: async () => {
-      const res = await payload.find({
-        collection: 'animals',
-        limit: EXPORT_LIMIT,
-        depth: 0,
-        sort: 'identNumber',
-        overrideAccess: true,
-      })
-      return res.docs.length
-    },
-  })
-
-  await measure({
-    what: 'то же с развёрнутыми связями (JSON)',
-    runs: 3,
-    run: async () => {
-      const res = await payload.find({
-        collection: 'animals',
-        limit: EXPORT_LIMIT,
-        depth: 1,
-        sort: 'identNumber',
-        overrideAccess: true,
-      })
-      return res.docs.length
-    },
-  })
-
   const pool = poolOf(payload)
+
   if (pool)
     await measure({
-      what: 'нижняя граница: прямой запрос к базе',
+      what: `выгрузка ${EXPORT_LIMIT.toLocaleString('ru-RU')} записей (как в кабинете)`,
       runs: 3,
       run: async () => {
         const r = await pool.query(
@@ -407,47 +403,75 @@ export async function runBench(
       },
     })
 
-  await measure({
-    what: 'через Payload, но только нужные поля',
-    runs: 3,
-    run: async () => {
-      const res = await payload.find({
-        collection: 'animals',
-        limit: EXPORT_LIMIT,
-        depth: 0,
-        select: exportSelect,
-        sort: 'identNumber',
-        overrideAccess: true,
-      })
-      return res.docs.length
-    },
-  })
+  if (options.heavy) {
+    /*
+     * Разбор по слоям: сколько стоит сам Payload на двадцати тысячах
+     * записей. Прямой запрос выше — нижняя граница; разница с ним и есть
+     * цена слоя. Здесь она измерена трижды: с полным документом,
+     * с развёрнутыми связями и с просьбой отдать только нужные поля.
+     *
+     * Запускать это на боевом сервере нельзя — проверено падением.
+     */
+    startGroup('Выгрузка стада: разбор по слоям')
 
-  /*
-   * И то же без подсчёта общего числа записей. Постраничная навигация
-   * выгрузке не нужна, а `count(*)` по полумиллиону строк — отдельный
-   * запрос на каждый вызов.
-   *
-   * Число строк здесь не для красоты: если Payload при `pagination: false`
-   * перестанет уважать `limit`, сценарий вернёт не двадцать тысяч, а всё
-   * стадо — и это будет видно тут, а не в выгрузке у хозяйства.
-   */
-  await measure({
-    what: 'то же без подсчёта общего числа',
-    runs: 3,
-    run: async () => {
-      const res = await payload.find({
-        collection: 'animals',
-        limit: EXPORT_LIMIT,
-        depth: 0,
-        pagination: false,
-        select: exportSelect,
-        sort: 'identNumber',
-        overrideAccess: true,
-      })
-      return res.docs.length
-    },
-  })
+    const exportSelect = {
+      identNumber: true,
+      name: true,
+      sex: true,
+      state: true,
+      ageGroup: true,
+      birthDate: true,
+      summary: true,
+      ipc: true,
+      owner: true,
+    } as const
+
+    await measure({
+      what: 'через Payload, полный документ',
+      runs: 3,
+      run: async () => {
+        const res = await payload.find({
+          collection: 'animals',
+          limit: EXPORT_LIMIT,
+          depth: 0,
+          sort: 'identNumber',
+          overrideAccess: true,
+        })
+        return res.docs.length
+      },
+    })
+
+    await measure({
+      what: 'то же с развёрнутыми связями (JSON)',
+      runs: 3,
+      run: async () => {
+        const res = await payload.find({
+          collection: 'animals',
+          limit: EXPORT_LIMIT,
+          depth: 1,
+          sort: 'identNumber',
+          overrideAccess: true,
+        })
+        return res.docs.length
+      },
+    })
+
+    await measure({
+      what: 'через Payload, только нужные поля',
+      runs: 3,
+      run: async () => {
+        const res = await payload.find({
+          collection: 'animals',
+          limit: EXPORT_LIMIT,
+          depth: 0,
+          select: exportSelect,
+          sort: 'identNumber',
+          overrideAccess: true,
+        })
+        return res.docs.length
+      },
+    })
+  }
 
   return {
     label: options.label ?? os.hostname(),

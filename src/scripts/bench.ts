@@ -21,6 +21,7 @@ import { buildAnimalWhere, resolveSort } from '@/lib/animal-query'
  *   npm run bench -- --save                — записать отчёт для вкладки «Замер»
  *   npm run bench -- --save --label Прод   — записать под своим именем среды
  *   npm run bench -- --save --out /tmp/b.json  — положить отчёт в другое место
+ *   npm run bench -- --heavy              — разбор выгрузки по слоям (только у себя)
  *
  * ## Замер прода
  *
@@ -42,6 +43,15 @@ const arg = (name: string, fallback: number): number => {
 const RUNS = arg('runs', 10)
 const PARALLEL = arg('parallel', 0)
 const SAVE = process.argv.includes('--save')
+
+/**
+ * Разбор выгрузки по слоям — по требованию.
+ *
+ * На своей машине он безопасен и полезен: именно он показал, что прямой
+ * запрос идёт 122 мс против 6 349 у Payload. На боевой — исчерпал память
+ * и убил процесс, поэтому в общий прогон он больше не входит.
+ */
+const HEAVY = process.argv.includes('--heavy')
 
 /**
  * Как называется среда, в которой мерили.
@@ -115,6 +125,7 @@ async function main() {
   const measured = await runBench(payload, {
     runs: RUNS,
     label: labelArg(),
+    heavy: HEAVY,
     onGroup: (name) => console.log(`\n${name}\n`),
     onNote: (text) => console.log(`  ! ${text}`),
     onRow: printRow,
