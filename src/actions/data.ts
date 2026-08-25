@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { getClient, getCurrentUser } from '@/lib/payload'
-import { parseCsv } from '@/lib/csv'
+import { decodeText, parseCsv, type TextEncodingName } from '@/lib/csv'
 import { detectTableKind, readSpreadsheet } from '@/lib/xlsx'
 import { columnsOf, datasetByKey, headerMapOf, type Dataset } from '@/lib/import-format'
 import { IDENT_FIELD_LABEL, IDENT_VALUES_SQL, identCore } from '@/lib/animal-id'
@@ -58,6 +58,15 @@ export type ImportState = {
    * целиком книга, и разницу видно только тому, кто знает, что искать.
    */
   sheet?: { name: string; others: string[]; truncated?: boolean }
+  /**
+   * Кодировка текстового файла, если она не UTF-8.
+   *
+   * Названа вслух не ради полноты отчёта, а потому что распознавание
+   * может ошибиться — редко, но может, — и тогда человек увидит
+   * в кличках вопросительные знаки и эту строку рядом. Без неё
+   * он ищет причину в своих данных.
+   */
+  encoding?: TextEncodingName
 }
 
 /**
@@ -1110,10 +1119,15 @@ export async function importDataAction(
    * одинаковую матрицу. Различать их пришлось бы, только если бы мы
    * умели один и не умели другой.
    */
-  const read =
-    kind === 'text'
-      ? { rows: parseCsv(new TextDecoder('utf-8').decode(bytes)) }
-      : readSpreadsheet(bytes)
+  /*
+   * Кодировка распознаётся, а не предполагается. Выгрузки российских
+   * программ учёта приходят в windows-1251, и раньше такой файл
+   * принимался целиком, а в книгу ложились клички из вопросительных
+   * знаков — разбор в `src/lib/csv.ts`.
+   */
+  const decoded = kind === 'text' ? decodeText(bytes) : null
+
+  const read = decoded ? { rows: parseCsv(decoded.text) } : readSpreadsheet(bytes)
 
   if ('error' in read) return { error: read.error, dataset: ds.label }
 
@@ -1122,6 +1136,13 @@ export async function importDataAction(
       ? { name: read.sheet, others: read.otherSheets, truncated: read.truncated || undefined }
       : undefined
 
+  /*
+   * Про кодировку сообщаем, только когда она не UTF-8. У правильно
+   * сохранённого файла эта строка говорила бы «всё хорошо», а такие
+   * строки перестают читать — вместе с теми, в которых сказано важное.
+   */
+  const encoding = decoded && decoded.encoding !== 'utf-8' ? decoded.encoding : undefined
+
   const parsed = readTable(read.rows, ds)
   if ('error' in parsed) {
     return {
@@ -1129,6 +1150,7 @@ export async function importDataAction(
       unknownColumns: parsed.unknownColumns,
       dataset: ds.label,
       sheet,
+      encoding,
     }
   }
 
@@ -1262,5 +1284,6 @@ export async function importDataAction(
     identMatches: res.identMatches,
     unverified: res.unverified,
     sheet,
+    encoding,
   }
 }

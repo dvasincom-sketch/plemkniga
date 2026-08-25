@@ -66,6 +66,29 @@ function SheetNote({ sheet }: { sheet?: ImportState['sheet'] }) {
   )
 }
 
+/**
+ * Кодировка, если она оказалась не UTF-8.
+ *
+ * Говорится потому, что распознавание может ошибиться, и тогда рядом
+ * с вопросительными знаками в кличках будет стоять объяснение, откуда
+ * они взялись. Без него человек ищет причину в своих данных — и не
+ * находит, потому что в его данных всё в порядке.
+ */
+function EncodingNote({ encoding }: { encoding?: ImportState['encoding'] }) {
+  if (!encoding) return null
+
+  const name = encoding === 'utf-16' ? 'UTF-16' : 'windows-1251'
+
+  return (
+    <div className="mt-2 rounded-lg border border-ink-200 bg-ink-50 px-3 py-2 text-ink-700">
+      <p className="leading-snug">
+        Файл прочитан в кодировке {name}. Если в кличках и названиях появились вопросительные
+        знаки или незнакомые буквы, сохраните файл в UTF-8 и загрузите заново.
+      </p>
+    </div>
+  )
+}
+
 export function ImportCard({ datasets }: { datasets: (Choice & { hint: string })[] }) {
   const [state, formAction, pending] = useActionState<ImportState, FormData>(importDataAction, {})
   const [open, setOpen] = useState(false)
@@ -184,7 +207,8 @@ export function ImportCard({ datasets }: { datasets: (Choice & { hint: string })
               <p className="text-xs leading-relaxed text-ink-500">
                 Книга Excel (.xlsx или .xls) — читается первый лист, до{' '}
                 {XLSX_MAX_ROWS.toLocaleString('ru-RU')} строк. Либо таблица CSV или TXT:
-                разделитель «точка с запятой», запятая или табуляция, кодировка UTF-8. До 8 МБ.
+                разделитель «точка с запятой», запятая или табуляция. Кодировку определяем сами —
+                и UTF-8, и windows-1251. До 8 МБ.
               </p>
 
               {/*
@@ -271,6 +295,7 @@ export function ImportCard({ datasets }: { datasets: (Choice & { hint: string })
                      человек идёт править заголовки, которые в порядке.
                   */}
                   <SheetNote sheet={state.sheet} />
+                  <EncodingNote encoding={state.encoding} />
                 </div>
               )}
 
@@ -282,6 +307,7 @@ export function ImportCard({ datasets }: { datasets: (Choice & { hint: string })
                   </p>
 
                   <SheetNote sheet={state.sheet} />
+                  <EncodingNote encoding={state.encoding} />
 
                   {/*
                      Причины отказа — прямо здесь, а не только в пакете.

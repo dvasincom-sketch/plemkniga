@@ -46,9 +46,10 @@
     "check:movements": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-movements.ts",
     "check:pool": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-pool.ts",
     "check:nav": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-nav.ts",
-    "check:landing": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-landing.ts",
     "check:api-docs": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-api-docs.ts",
     "check:xlsx": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-xlsx.ts",
+    "check:csv": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-csv.ts",
+    "check:time": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-time.ts",
     "seed:checks": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/seed-checks.ts",
     "seed:afc": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/seed-afc.ts",
     "smoke": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/smoke.ts"
