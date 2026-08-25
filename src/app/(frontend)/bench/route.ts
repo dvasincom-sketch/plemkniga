@@ -57,13 +57,30 @@ export async function GET(request: Request) {
    * Отсутствие переменной и неверный токен отвечают одинаково —
    * несуществующей страницей. Разные ответы на эти два случая
    * рассказывали бы, что здесь что-то есть.
+   *
+   * А вот в лог причина пишется поимённо, и это не противоречие.
+   * Снаружи маршрут обязан быть неотличим от несуществующего адреса;
+   * изнутри — обязан объяснять, почему не пустил. Без этого владелец
+   * системы оказывается в положении злоумышленника: дёрнул, получил
+   * «не найдено» и не может отличить незаданную переменную от опечатки
+   * в ключе. Так и вышло при первом же запуске.
+   *
+   * Попытка с неверным ключом попадает в лог ещё и как след: подбор
+   * ключа выглядит именно так.
    */
-  const deny = () => new NextResponse('Not found', { status: 404 })
+  const deny = (why: string) => {
+    console.warn(`[bench] запрос отклонён: ${why}`)
+    return new NextResponse('Not found', { status: 404 })
+  }
 
-  if (!expected || expected.length < 16) return deny()
+  if (!expected) return deny('переменная BENCH_TOKEN не задана')
+  if (expected.length < 16)
+    return deny(`BENCH_TOKEN короче шестнадцати знаков (сейчас ${expected.length})`)
 
   const { searchParams } = new URL(request.url)
   const given = searchParams.get('token') ?? ''
+
+  if (!given) return deny('в адресе нет параметра token')
 
   /*
    * Длины сравниваются отдельно и до `timingSafeEqual`: он требует
@@ -72,7 +89,8 @@ export async function GET(request: Request) {
    */
   const a = Buffer.from(given)
   const b = Buffer.from(expected)
-  if (a.length !== b.length || !timingSafeEqual(a, b)) return deny()
+  if (a.length !== b.length || !timingSafeEqual(a, b))
+    return deny(`токен не подошёл (прислано знаков: ${given.length}, ожидается: ${expected.length})`)
 
   const runsParam = Number(searchParams.get('runs'))
   const runs = Number.isFinite(runsParam) && runsParam > 0 ? Math.min(runsParam, 50) : 10
@@ -89,11 +107,32 @@ export async function GET(request: Request) {
    */
   const notes: string[] = []
 
+  /*
+   * Ход замера пишется в лог, а не только в ответ.
+   *
+   * Замер идёт секундами, и всё это время у смотрящего в панель нет
+   * никаких признаков, что он вообще начался. Молчащий процесс, который
+   * что-то делает минуту, неотличим от зависшего, — а перезапустить
+   * контейнер посреди замера значит не получить ничего и не узнать
+   * почему.
+   */
+  console.info(`[bench] замер начат: среда «${label}», прогонов ${runs}`)
+  const startedAt = Date.now()
+
   const measured = await runBench(payload, {
     runs,
     label,
-    onNote: (t) => notes.push(t),
+    onGroup: (name) => console.info(`[bench] ${name}`),
+    onNote: (t) => {
+      notes.push(t)
+      console.info(`[bench] ${t}`)
+    },
   })
+
+  console.info(
+    `[bench] замер закончен за ${Math.round((Date.now() - startedAt) / 1000)} с, ` +
+      `строк ${measured.rows.length}, животных ${measured.animals}`,
+  )
 
   return NextResponse.json(
     { ...measured, notes },
