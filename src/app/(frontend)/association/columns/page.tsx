@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { AssociationNav } from '@/components/AssociationNav'
-import { Breadcrumbs } from '@/components/Breadcrumbs'
+import { CabinetPage } from '@/components/CabinetPage'
 import { ColumnDecision } from '@/components/ColumnDecision'
 import { Moment } from '@/components/Moment'
 import { getClient } from '@/lib/payload'
@@ -153,25 +153,20 @@ export default async function ColumnsPage() {
     <>
       <SiteHeader active="/association" />
 
-      <main className="container-page pb-8">
-        <Breadcrumbs
-          items={[
-            { label: 'Кабинет Ассоциации', href: '/association' },
-            { label: 'Новые колонки' },
-          ]}
-        />
-
-        <h1 className="mb-2 mt-6 text-[30px] font-medium leading-tight">Новые колонки</h1>
-        <p className="mb-6 max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
-          Заголовки, которых книга не знает, но которые хозяйства присылают. Раньше такие
-          колонки просто не принимались; теперь они сохраняются вместе с примерами значений
-          и ждут решения. Числа из них в карточках не показываются: признак — это не столбец,
-          а шкала с границами, полюсами и наследуемостью, и до тех пор, пока всего этого нет,
-          показывать значения значило бы выдавать их за оценку.
-        </p>
-
-        <AssociationNav active="columns" />
-
+      <CabinetPage
+        nav={<AssociationNav active="columns" />}
+        title="Новые колонки"
+        intro={
+          <>
+            Заголовки, которых книга не знает, но которые хозяйства присылают. Раньше такие
+            колонки просто не принимались; теперь они сохраняются вместе с примерами значений
+            и ждут решения. Числа из них в карточках не показываются: признак — это не столбец,
+            а шкала с границами, полюсами и наследуемостью, и до тех пор, пока всего этого нет,
+            показывать значения значило бы выдавать их за оценку.
+          </>
+        }
+      >
+        <div className="mt-8">
         {docs.length === 0 ? (
           <div className="card">
             <p className="text-[15px] leading-relaxed text-ink-700">
@@ -202,7 +197,8 @@ export default async function ColumnsPage() {
             )}
           </>
         )}
-      </main>
+        </div>
+      </CabinetPage>
 
       <SiteFooter />
     </>
