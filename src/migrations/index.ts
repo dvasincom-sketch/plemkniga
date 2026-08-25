@@ -42,6 +42,7 @@ import * as migration_20260825_200000_media_access from './20260825_200000_media
 import * as migration_20260826_090000_operations from './20260826_090000_operations'
 import * as migration_20260826_140000_saved_searches from './20260826_140000_saved_searches'
 import * as migration_20260826_180000_bench_runs from './20260826_180000_bench_runs'
+import * as migration_20260827_090000_semen_and_grade from './20260827_090000_semen_and_grade'
 
 export const migrations = [
   {
@@ -263,5 +264,10 @@ export const migrations = [
     up: migration_20260826_180000_bench_runs.up,
     down: migration_20260826_180000_bench_runs.down,
     name: '20260826_180000_bench_runs',
+  },
+  {
+    up: migration_20260827_090000_semen_and_grade.up,
+    down: migration_20260827_090000_semen_and_grade.down,
+    name: '20260827_090000_semen_and_grade',
   },
 ];

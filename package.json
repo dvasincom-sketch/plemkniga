@@ -55,6 +55,7 @@
     "bench:bundle": "esbuild src/scripts/bench.ts --bundle --platform=node --format=esm --packages=external --tsconfig=tsconfig.json --outfile=dist/bench.mjs",
     "seed:checks": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/seed-checks.ts",
     "seed:afc": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/seed-afc.ts",
+    "seed:bull-card": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/seed-bull-card.ts",
     "smoke": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/smoke.ts"
   },
   "dependencies": {

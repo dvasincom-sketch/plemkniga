@@ -346,6 +346,10 @@ export interface Animal {
   sex: 'female' | 'male';
   state?: ('alive' | 'sold' | 'culled' | 'dead') | null;
   ageGroup?: ('calf' | 'heifer' | 'firstCalf' | 'cow2' | 'cow3' | 'bull') | null;
+  /**
+   * По инструкции бонитировки, из племенных документов
+   */
+  grade?: ('eliteRecord' | 'elite' | 'first' | 'second' | 'outOfClass') | null;
   birthDate?: string | null;
   breed?: (number | null) | Breed;
   bloodPercent?: number | null;
@@ -414,10 +418,26 @@ export interface Animal {
     };
   };
   reproduction?: {
+    /**
+     * У быка это способность его дочерей приходить в охоту и оплодотворяться — не его собственная. Собственная лежит в группе «Семя»
+     */
     fertility?: {
       forecast?: number | null;
       r?: number | null;
     };
+  };
+  /**
+   * Собственный признак быка, а не прогноз по дочерям
+   */
+  semen?: {
+    /**
+     * Отклонение стельности от среднего по породе в процентных пунктах: +2 означает, что в стаде со средней стельностью 30 % это семя даёт 32 %
+     */
+    conception?: {
+      forecast?: number | null;
+      r?: number | null;
+    };
+    inseminations?: number | null;
   };
   health?: {
     reliabilityLevel?: number | null;
@@ -2231,6 +2251,7 @@ export interface AnimalsSelect<T extends boolean = true> {
   sex?: T;
   state?: T;
   ageGroup?: T;
+  grade?: T;
   birthDate?: T;
   breed?: T;
   bloodPercent?: T;
@@ -2316,6 +2337,17 @@ export interface AnimalsSelect<T extends boolean = true> {
               forecast?: T;
               r?: T;
             };
+      };
+  semen?:
+    | T
+    | {
+        conception?:
+          | T
+          | {
+              forecast?: T;
+              r?: T;
+            };
+        inseminations?: T;
       };
   health?:
     | T

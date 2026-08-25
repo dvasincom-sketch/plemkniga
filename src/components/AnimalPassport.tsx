@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import type { Animal } from '@/payload-types'
-import { AGE_GROUPS, DISPOSAL_HINT, labelOf } from '@/lib/dictionaries'
+import { AGE_GROUPS, COMPLEX_GRADES, DISPOSAL_HINT, labelOf } from '@/lib/dictionaries'
 import { dateRu } from '@/lib/format'
 
 /**
@@ -99,6 +99,18 @@ export function AnimalPassport({ animal }: { animal: Animal }) {
             typeof animal.bloodPercent === 'number' ? `${animal.bloodPercent} %` : '—'
           }
         />
+
+        {/*
+           Комплексный класс стоит в паспорте, рядом с линией и кровностью,
+           а не в оценках.
+           
+           Это не прогноз и не расчёт, а присвоенная категория, записанная
+           в племенных документах хозяйства, — и читают её вместе с ними.
+           Ни в одном мировом каталоге такого понятия нет; в российской
+           карточке без него не обойтись, иначе она не стыкуется с бумагами,
+           которые лежат у зоотехника на столе.
+        */}
+        <Cell label="Комплексный класс" value={labelOf(COMPLEX_GRADES, animal.grade)} />
 
         <div className="col-span-2 sm:col-span-4">
           <Cell

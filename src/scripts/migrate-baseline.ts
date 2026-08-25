@@ -291,6 +291,11 @@ const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
     probe: { kind: 'table', name: 'bench_runs' },
     note: 'замеры производительности',
   },
+  {
+    name: '20260827_090000_semen_and_grade',
+    probe: { kind: 'column', table: 'animals', column: 'semen_conception_forecast' },
+    note: 'семя быка и комплексный класс',
+  },
 ]
 
 const { driverUri, uri, source, sslConfig } = resolveDatabase()
