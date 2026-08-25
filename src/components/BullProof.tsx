@@ -87,12 +87,18 @@ export function BullProofBlock({ data, bullId }: { data: Proof; bullId?: number 
 
       {/* --------------------------- Сколько и где --------------------------- */}
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      {/*
+         «Сыновей» отсюда убрано. Число это ни на какой вопрос покупателя
+         семени не отвечает и ни на что в карточке не влияет: сыновья быка
+         — не его оценка, а факт о чужих закупках. Плитка на витрине
+         обещает важное самим тем, что она на витрине, и пустое обещание
+         занимает место рядом с тремя нужными.
+      */}
+      <div className="grid grid-cols-3 gap-4">
         {[
           { label: 'Дочерей в книге', value: nf(data.daughters) },
           { label: 'Хозяйств', value: nf(data.farms) },
           { label: 'С законченной лактацией', value: nf(data.withMilk) },
-          { label: 'Сыновей', value: nf(data.sons) },
         ].map((s) => (
           <div key={s.label} className="rounded-xl bg-canvas px-4 py-3.5">
             <p className="text-[13px] leading-snug text-ink-500">{s.label}</p>
@@ -178,11 +184,20 @@ export function BullProofBlock({ data, bullId }: { data: Proof; bullId?: number 
                 <td className="text-right tabular-nums">{nf(data.proteinMean, 2)}</td>
                 <td className="text-right tabular-nums">{nf(data.withMilk)}</td>
               </tr>
-              <tr>
-                <td>Возраст первого отёла, мес.</td>
-                <td className="text-right tabular-nums">{nf(data.afcMean, 1)}</td>
-                <td className="text-right tabular-nums">{nf(data.afcCows)}</td>
-              </tr>
+              {/*
+                 Строка возраста первого отёла показывается, только если
+                 есть по чему считать. Прочерк при нулевом числе записей
+                 — не ответ «мало данных», а строка, которая выглядит
+                 измерением и им не является; читатель идёт искать,
+                 кто не завёл данные, вместо того чтобы читать карточку.
+              */}
+              {data.afcCows > 0 && (
+                <tr>
+                  <td>Возраст первого отёла, мес.</td>
+                  <td className="text-right tabular-nums">{nf(data.afcMean, 1)}</td>
+                  <td className="text-right tabular-nums">{nf(data.afcCows)}</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

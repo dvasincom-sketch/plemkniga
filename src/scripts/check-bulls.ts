@@ -2,6 +2,7 @@ import 'dotenv/config'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { compareBulls, MAX_BULLS } from '@/lib/bull-compare'
+import { EXTERIOR_TRAITS, exteriorDirection } from '@/lib/dictionaries'
 
 /**
  * Проверка сравнения быков на живой базе.
@@ -168,6 +169,83 @@ async function main() {
   await payload.delete({ collection: 'herds', id: herd.id, overrideAccess: true })
   await payload.delete({ collection: 'organizations', id: org.id, overrideAccess: true })
   void granddaughter
+
+  /* ---------------------------------------------------------------- */
+  console.log('\nЛинейные признаки экстерьера\n')
+
+  /*
+   * Реестр признаков проверяется здесь, а не отдельным скриптом: карточка
+   * быка — то место, где линейная оценка и читается, а неполный реестр
+   * ломает именно её.
+   */
+  const noPoles = EXTERIOR_TRAITS.filter((t) => !t.minus.trim() || !t.plus.trim())
+  check(
+    noPoles.length === 0,
+    'у каждого признака названы оба полюса шкалы',
+    noPoles.map((t) => t.label).join(', '),
+  )
+
+  /*
+   * Число признаков с оптимумом посередине проверяется точным числом,
+   * а не «больше нуля». Это не придирка: отметка `middle` решает,
+   * в каком блоке признак покажется и каким цветом, — и снять её
+   * у «Длины сосков» ничего не сломает на вид, а полоса вправо снова
+   * начнёт читаться как «лучше».
+   */
+  const middle = EXTERIOR_TRAITS.filter((t) => t.optimum === 'middle')
+  check(
+    middle.length === 9,
+    `девять признаков с оптимумом посередине (сейчас ${middle.length})`,
+    middle.map((t) => t.label).join(', '),
+  )
+
+  for (const key of ['udderDepth', 'teatLength', 'rumpAngle', 'rearLegsSide', 'hoofAngle'])
+    check(
+      EXTERIOR_TRAITS.find((t) => t.key === key)?.optimum === 'middle',
+      `«${EXTERIOR_TRAITS.find((t) => t.key === key)?.label ?? key}» — оптимум посередине`,
+    )
+
+  /*
+   * Направление — словом, а не знаком. Проверяется на трёх значениях:
+   * отрицательном, положительном и близком к нулю. Последнее важнее
+   * прочих: «средний по породе» отвечает на вопрос лучше, чем «−0,1»,
+   * и потерять его легко — достаточно сравнить с нулём точно.
+   */
+  const udder = EXTERIOR_TRAITS.find((t) => t.key === 'udderDepth')!
+  check(
+    exteriorDirection(udder, -1.49) === udder.minus,
+    'отрицательная оценка описана левым полюсом',
+    String(exteriorDirection(udder, -1.49)),
+  )
+  check(
+    exteriorDirection(udder, 1.2) === udder.plus,
+    'положительная — правым',
+    String(exteriorDirection(udder, 1.2)),
+  )
+  check(
+    exteriorDirection(udder, 0.1) === 'средний по породе',
+    'близкое к нулю названо средним по породе',
+    String(exteriorDirection(udder, 0.1)),
+  )
+  check(exteriorDirection(udder, null) === null, 'пустая оценка не описывается словами')
+
+  /*
+   * Ключи реестра обязаны совпадать с полями коллекции: разойдись они —
+   * и признак останется в таблице с пустой полосой, то есть будет
+   * выглядеть неизмеренным, а не потерянным.
+   */
+  const exterior = payload.config.collections.find((c) => c.slug === 'animal-exteriors')
+  const linear = exterior?.fields.find(
+    (f) => (f as { name?: string }).name === 'linear',
+  ) as { fields?: { name?: string }[] } | undefined
+  const known = new Set((linear?.fields ?? []).map((f) => f.name))
+
+  const orphan = EXTERIOR_TRAITS.filter((t) => known.size > 0 && !known.has(t.key))
+  check(
+    orphan.length === 0,
+    `все ${EXTERIOR_TRAITS.length} признака есть в коллекции экстерьера`,
+    orphan.map((t) => t.key).join(', '),
+  )
 
   console.log(failures === 0 ? '\nВсё сошлось.' : `\nНе сошлось: ${failures}`)
   process.exit(failures === 0 ? 0 : 1)
