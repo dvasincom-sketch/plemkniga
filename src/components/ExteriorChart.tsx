@@ -82,9 +82,18 @@ function Bar({ value, middle }: { value?: number | null; middle?: boolean }) {
 const digits = (v?: number | null) =>
   v !== null && v !== undefined && Math.abs(v % 1) > 0.05 ? 2 : 1
 
+/**
+ * Шапка таблицы признаков.
+ *
+ * На узком экране прячется целиком: четыре колонки там разложены
+ * в столбик (см. `TraitRows`), и заголовки колонок, которых больше нет,
+ * только занимали бы место. Подпись шкалы для мобильного стоит отдельной
+ * строкой над таблицей — там она читается, а в ячейке шириной
+ * в полсантиметра деления налезали друг на друга.
+ */
 function ScaleHead({ middle }: { middle?: boolean }) {
   return (
-    <thead>
+    <thead className="max-sm:hidden">
       <tr className="bg-[#f0f0f0] text-ink-700">
         <th className="w-[40%] rounded-tl-lg px-3.5 pb-1.5 pt-2.5 text-left font-normal">
           Признак
@@ -133,12 +142,36 @@ function ScaleHead({ middle }: { middle?: boolean }) {
   )
 }
 
+/**
+ * Строки признаков: таблица на широком экране, столбик на узком.
+ *
+ * ## Почему на телефоне таблица не работает
+ *
+ * Колонок четыре, и три из них текстовые: название с полюсами, «что это
+ * значит» и оценка. Четвёртая — шкала, и ей нужна ширина по существу:
+ * полоса длиной в сантиметр не показывает ничего. На четырёхстах точках
+ * они делят место так, что проигрывают все — шкала сжимается до пятидесяти
+ * точек с наложенными делениями, «глубокое, ниже скакательного» рвётся
+ * на две строки, а название на три.
+ *
+ * Поэтому ниже `sm` строка перестаёт быть строкой таблицы и раскладывается
+ * в четыре яруса: название и оценка рядом, под ними шкала во всю ширину,
+ * под ней словесное значение. Порядок задан `order`, а не переписыванием
+ * разметки: две копии одного и того же разошлись бы при первой же правке,
+ * и расходились бы молча — на широком экране всё выглядело бы верно.
+ *
+ * Шкала при этом получает всю ширину карточки, то есть примерно втрое
+ * больше прежнего, и деления наконец различимы.
+ */
 function TraitRows({ rows, middle }: { rows: (ExteriorRow & { trait: ExteriorTrait })[]; middle?: boolean }) {
   return (
     <tbody>
       {rows.map((t) => (
-        <tr key={t.key} className="border-b border-[#ededed] last:border-0">
-          <td className="py-2.5 pr-3 align-middle leading-snug">
+        <tr
+          key={t.key}
+          className="border-b border-[#ededed] last:border-0 max-sm:flex max-sm:flex-wrap max-sm:items-baseline max-sm:py-3"
+        >
+          <td className="py-2.5 pr-3 align-middle leading-snug max-sm:order-1 max-sm:w-[70%] max-sm:py-0">
             {t.label}
             {/*
                Полюса подписаны у самого признака, мелко. Вынести их
@@ -150,13 +183,13 @@ function TraitRows({ rows, middle }: { rows: (ExteriorRow & { trait: ExteriorTra
               {t.trait.minus} ← → {t.trait.plus}
             </span>
           </td>
-          <td className="px-3 align-middle">
+          <td className="px-3 align-middle max-sm:order-3 max-sm:w-full max-sm:px-0 max-sm:pt-1">
             <Bar value={t.value} middle={middle} />
           </td>
-          <td className="py-2.5 pl-3 text-right align-middle text-[13px] leading-snug text-ink-700">
+          <td className="py-2.5 pl-3 text-right align-middle text-[13px] leading-snug text-ink-700 max-sm:order-4 max-sm:w-full max-sm:py-0 max-sm:pl-0 max-sm:text-left">
             {exteriorDirection(t.trait, t.value) ?? '—'}
           </td>
-          <td className="py-2.5 pl-3 text-right align-middle tabular-nums">
+          <td className="py-2.5 pl-3 text-right align-middle tabular-nums max-sm:order-2 max-sm:w-[30%] max-sm:py-0">
             {signed(t.value, digits(t.value))}
           </td>
         </tr>
@@ -212,6 +245,9 @@ export function ExteriorChart({
       </h4>
       <p className="mb-3 max-w-[75ch] text-[13px] leading-relaxed text-ink-500">
         Здесь правый край шкалы — желаемое направление, и чем длиннее полоса вправо, тем лучше.
+        {/* Подпись шкалы для узкого экрана: шапку таблицы там прячем, а без
+            границ диапазона полоса перестаёт быть измерением */}
+        <span className="sm:hidden"> Шкала — от −2 до +2, ноль посередине.</span>
       </p>
       <table className="w-full text-sm">
         <ScaleHead />
@@ -227,6 +263,7 @@ export function ExteriorChart({
             У этих признаков лучшее значение среднее, а не крайнее: слишком мелкое вымя так же
             нежелательно, как слишком глубокое. Отклонение в любую сторону читается одинаково,
             поэтому и полоса здесь одного цвета.
+            <span className="sm:hidden"> Шкала — от −2 до +2, оптимум посередине.</span>
           </p>
           <table className="w-full text-sm">
             <ScaleHead middle />
