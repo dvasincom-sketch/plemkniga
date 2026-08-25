@@ -1,0 +1,204 @@
+{
+  "reports": [
+    {
+      "label": "Локальная машина",
+      "animals": 550680,
+      "runs": 10,
+      "server": {
+        "at": "2026-08-25T13:00:00.801Z",
+        "node": "v25.9.0",
+        "platform": "darwin 24.6.0 x64",
+        "cpu": "Intel(R) Core(TM) i5-8257U CPU @ 1.40GHz",
+        "cores": 8,
+        "memoryGb": 8,
+        "postgres": "PostgreSQL 16.14 (Homebrew)",
+        "databaseSize": "5596 MB",
+        "settings": {
+          "effective_cache_size": "524288 8kB",
+          "max_connections": "100",
+          "max_parallel_workers_per_gather": "2",
+          "shared_buffers": "16384 8kB",
+          "work_mem": "4096 kB"
+        },
+        "remoteDatabase": false
+      },
+      "rows": [
+        {
+          "group": "Поиск по книге",
+          "what": "первая страница без условий",
+          "runs": 10,
+          "medianMs": 81,
+          "worstMs": 332,
+          "coldMs": 751,
+          "rows": 25,
+          "limitMs": 1000,
+          "ok": true
+        },
+        {
+          "group": "Поиск по книге",
+          "what": "номер по подстроке",
+          "runs": 10,
+          "medianMs": 259,
+          "worstMs": 262,
+          "coldMs": 1679,
+          "rows": 25,
+          "limitMs": 1000,
+          "ok": true
+        },
+        {
+          "group": "Поиск по книге",
+          "what": "кличка по подстроке",
+          "runs": 10,
+          "medianMs": 317,
+          "worstMs": 322,
+          "coldMs": 319,
+          "rows": 25,
+          "limitMs": 1000,
+          "ok": true
+        },
+        {
+          "group": "Поиск по книге",
+          "what": "порог по удою и жиру",
+          "runs": 10,
+          "medianMs": 195,
+          "worstMs": 212,
+          "coldMs": 231,
+          "rows": 25,
+          "limitMs": 1000,
+          "ok": true
+        },
+        {
+          "group": "Поиск по книге",
+          "what": "быки-производители (плашка)",
+          "runs": 10,
+          "medianMs": 322,
+          "worstMs": 422,
+          "coldMs": 343,
+          "rows": 25,
+          "limitMs": 1000,
+          "ok": true
+        },
+        {
+          "group": "Поиск по книге",
+          "what": "порядок по ИПЦ",
+          "runs": 10,
+          "medianMs": 78,
+          "worstMs": 90,
+          "coldMs": 79,
+          "rows": 25,
+          "limitMs": 1000,
+          "ok": true
+        },
+        {
+          "group": "Поиск по книге",
+          "what": "страница 200 того же отбора",
+          "runs": 10,
+          "medianMs": 76,
+          "worstMs": 89,
+          "coldMs": 73,
+          "rows": 25,
+          "limitMs": 1000,
+          "ok": true
+        },
+        {
+          "group": "Поиск по книге",
+          "what": "страница на 500 строк",
+          "runs": 10,
+          "medianMs": 521,
+          "worstMs": 547,
+          "coldMs": 554,
+          "rows": 500,
+          "limitMs": 1000,
+          "ok": true
+        },
+        {
+          "group": "Карточка и родословная",
+          "what": "родословная, три ряда",
+          "runs": 10,
+          "medianMs": 14,
+          "worstMs": 15,
+          "coldMs": 17,
+          "rows": 2,
+          "limitMs": 1000,
+          "ok": true
+        },
+        {
+          "group": "Карточка и родословная",
+          "what": "родословная, девять рядов",
+          "runs": 10,
+          "medianMs": 15,
+          "worstMs": 15,
+          "coldMs": 15,
+          "rows": 2
+        },
+        {
+          "group": "Карточка и родословная",
+          "what": "свидетельство целиком (порог ТЗ — 5000 мс)",
+          "runs": 10,
+          "medianMs": 21,
+          "worstMs": 22,
+          "coldMs": 108,
+          "rows": 14,
+          "limitMs": 5000,
+          "ok": true
+        },
+        {
+          "group": "Кабинет хозяйства",
+          "what": "сводка по стаду (Обзор)",
+          "runs": 10,
+          "medianMs": 24,
+          "worstMs": 28,
+          "coldMs": 134,
+          "rows": 1,
+          "limitMs": 1000,
+          "ok": true
+        },
+        {
+          "group": "Выгрузка стада",
+          "what": "выгрузка 20 000 записей (таблица)",
+          "runs": 3,
+          "medianMs": 13703,
+          "worstMs": 15706,
+          "coldMs": 14156,
+          "rows": 20000
+        },
+        {
+          "group": "Выгрузка стада",
+          "what": "то же с развёрнутыми связями (JSON)",
+          "runs": 3,
+          "medianMs": 19929,
+          "worstMs": 23642,
+          "coldMs": 19000,
+          "rows": 20000
+        },
+        {
+          "group": "Выгрузка стада",
+          "what": "нижняя граница: прямой запрос к базе",
+          "runs": 3,
+          "medianMs": 122,
+          "worstMs": 131,
+          "coldMs": 197,
+          "rows": 20000
+        },
+        {
+          "group": "Выгрузка стада",
+          "what": "через Payload, но только нужные поля",
+          "runs": 3,
+          "medianMs": 6349,
+          "worstMs": 6411,
+          "coldMs": 6721,
+          "rows": 20000
+        },
+        {
+          "group": "Выгрузка стада",
+          "what": "то же без подсчёта общего числа",
+          "runs": 3,
+          "medianMs": 6521,
+          "worstMs": 7340,
+          "coldMs": 5819,
+          "rows": 20000
+        }
+      ]
+    }
+  ]
+}

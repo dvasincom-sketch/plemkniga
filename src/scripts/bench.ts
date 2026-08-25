@@ -1,4 +1,6 @@
 import 'dotenv/config'
+import os from 'node:os'
+import { readFile, writeFile } from 'node:fs/promises'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import type { Animal } from '@/payload-types'
@@ -7,6 +9,7 @@ import { buildCertificateView } from '@/lib/certificate-view'
 import { buildPedigree } from '@/lib/pedigree'
 import { herdSummary } from '@/lib/herd-summary'
 import { EXPORT_LIMIT } from '@/lib/export-formats'
+import { isLocalDatabase, resolveDatabase } from '@/lib/db-url'
 
 /**
  * Замер по критериям приёмки: поиск, свидетельство, выгрузка.
@@ -41,6 +44,8 @@ import { EXPORT_LIMIT } from '@/lib/export-formats'
  *   npm run bench
  *   npm run bench -- --runs 20        — больше прогонов на сценарий
  *   npm run bench -- --parallel 50    — проверить одновременных читателей
+ *   npm run bench -- --save           — записать отчёт для вкладки «Замер»
+ *   npm run bench -- --save --label Прод   — записать под своим именем среды
  *
  * Скрипт ничего не пишет в базу. Объём набирается отдельно:
  * `npm run seed:bulk -- --animals 50000`.
@@ -55,13 +60,75 @@ const arg = (name: string, fallback: number): number => {
 
 const RUNS = arg('runs', 10)
 const PARALLEL = arg('parallel', 0)
+const SAVE = process.argv.includes('--save')
+
+/**
+ * Как называется среда, в которой мерили.
+ *
+ * Задаётся руками, потому что машина о себе этого не знает: имя хоста
+ * у ноутбука и у контейнера одинаково бессмысленно для читателя,
+ * а вопрос «где эти цифры получены» требует ответа «на проде»
+ * или «на моей машине». Без метки — имя хоста, чтобы замеры хотя бы
+ * не затирали друг друга.
+ */
+const labelArg = (): string => {
+  const i = process.argv.indexOf('--label')
+  const v = i === -1 ? '' : (process.argv[i + 1] ?? '')
+  return v && !v.startsWith('--') ? v : os.hostname()
+}
+
+/**
+ * Куда ложится отчёт.
+ *
+ * Файл в репозитории, а не запись в базе, и это решение, а не удобство.
+ * Замер — факт об одной версии кода на одном железе: он не «текущее
+ * состояние системы», которое надо где-то держать свежим, а измерение,
+ * сделанное такого-то числа. Его место рядом с кодом, который он мерил,
+ * и коммитится он тем же коммитом. Запись в базе означала бы, что цифры
+ * с чьей-то машины попадают в базу прода и показываются как его цифры.
+ */
+const REPORT_PATH = 'src/lib/bench-report.json'
 
 /** Пороги из раздела о критериях приёмки. Отсутствие порога — просто замер. */
 type Scenario = {
   what: string
   limitMs?: number
   run: () => Promise<number>
+  /**
+   * Прогонов именно у этого сценария.
+   *
+   * Нужно тяжёлым: выгрузка двадцати тысяч записей с развёрнутыми связями
+   * идёт секундами, и десять прогонов превращают замер в трёхминутное
+   * ожидание ради разброса, которого там нет. У быстрых сценариев разброс
+   * есть и важен — там прогонов много. Число печатается в отчёте, чтобы
+   * «медиана из трёх» не выдавала себя за «медиану из десяти».
+   */
+  runs?: number
 }
+
+/**
+ * Строка отчёта — то же, что печатается, только пригодное для чтения
+ * страницей.
+ *
+ * Собирается по ходу замера, а не парсится потом из напечатанного:
+ * разбор собственного вывода — способ однажды поменять формат печати
+ * и молча сломать отчёт.
+ */
+type Row = {
+  group: string
+  what: string
+  /** Сколько раз прогоняли: у тяжёлых сценариев меньше, чем у прочих. */
+  runs: number
+  medianMs: number
+  worstMs: number
+  coldMs: number
+  rows: number
+  limitMs?: number
+  ok?: boolean
+}
+
+const report: Row[] = []
+let group = ''
 
 const ms = (v: number) => `${Math.round(v)} мс`
 
@@ -80,11 +147,12 @@ const timed = async <T,>(fn: () => Promise<T>): Promise<[T, number]> => {
 let failures = 0
 
 async function measure(s: Scenario) {
+  const runs = s.runs ?? RUNS
   const [, cold] = await timed(s.run)
 
   const warm: number[] = []
   let rows = 0
-  for (let i = 0; i < RUNS; i++) {
+  for (let i = 0; i < runs; i++) {
     const [n, took] = await timed(s.run)
     warm.push(took)
     rows = n
@@ -96,6 +164,18 @@ async function measure(s: Scenario) {
   const verdict = s.limitMs === undefined ? '' : worst <= s.limitMs ? '  укладывается' : '  ПРЕВЫШЕН'
   if (s.limitMs !== undefined && worst > s.limitMs) failures += 1
 
+  report.push({
+    group,
+    what: s.what,
+    runs,
+    medianMs: Math.round(med),
+    worstMs: Math.round(worst),
+    coldMs: Math.round(cold),
+    rows,
+    limitMs: s.limitMs,
+    ok: s.limitMs === undefined ? undefined : worst <= s.limitMs,
+  })
+
   console.log(
     `  ${s.what.padEnd(46)} медиана ${ms(med).padStart(8)}` +
       `   худшее ${ms(worst).padStart(8)}` +
@@ -103,6 +183,75 @@ async function measure(s: Scenario) {
       (rows ? `   строк ${rows}` : '') +
       verdict,
   )
+}
+
+/**
+ * На чём мерили.
+ *
+ * Без этого блока весь отчёт — набор чисел без единицы измерения.
+ * «Поиск 59 мс» ничего не значит, пока не сказано, на какой машине,
+ * с какой базой и на каком объёме: те же 59 мс на ноутбуке разработчика
+ * и на контейнере с одним ядром — два разных утверждения о системе,
+ * и второе из первого не следует.
+ *
+ * Настройки PostgreSQL спрашиваются у самой базы, а не берутся
+ * из конфигурации: между тем, что написано в файле, и тем, с чем
+ * работает сервер, лежит его перезапуск.
+ */
+async function serverInfo(payload: Awaited<ReturnType<typeof getPayload>>) {
+  const pool = (payload.db as unknown as { pool?: { query: (q: string) => Promise<{ rows: Record<string, string>[] }> } }).pool
+
+  const ask = async (q: string): Promise<Record<string, string>[]> => {
+    if (!pool) return []
+    return pool
+      .query(q)
+      .then((r) => r.rows ?? [])
+      /*
+       * Отказ печатается, а не проглатывается. Пустая строка «версия
+       * PostgreSQL» в отчёте выглядит так же, как «не спросили», —
+       * а означает разное.
+       */
+      .catch((e: unknown) => {
+        console.error('[bench] не удалось спросить у базы:', e)
+        return []
+      })
+  }
+
+  const [version] = await ask('select version() as v')
+  const settings = await ask(
+    `select name, setting, unit from pg_settings
+      where name in ('shared_buffers','work_mem','effective_cache_size','max_connections','max_parallel_workers_per_gather')`,
+  )
+  const [size] = await ask(
+    'select pg_size_pretty(pg_database_size(current_database())) as size',
+  )
+
+  const cpus = os.cpus()
+  const { uri } = resolveDatabase()
+
+  return {
+    at: new Date().toISOString(),
+    /*
+     * Признак «база не здесь» — половина смысла замера против прода.
+     *
+     * Запуск скрипта со своей машины против удалённой базы меряет
+     * не прод, а «моя машина плюс сеть до прода»: каждый запрос везёт
+     * с собой задержку канала, и на мелких сценариях она и есть весь
+     * результат. Настоящий замер прода делается на самом проде. Отчёт
+     * обязан различать эти два случая, иначе цифры сравнят как равные.
+     */
+    remoteDatabase: !isLocalDatabase(uri),
+    node: process.version,
+    platform: `${os.platform()} ${os.release()} ${os.arch()}`,
+    cpu: cpus[0]?.model?.trim() ?? '',
+    cores: cpus.length,
+    memoryGb: Math.round((os.totalmem() / 1024 ** 3) * 10) / 10,
+    postgres: (version?.v ?? '').split(' on ')[0] ?? '',
+    databaseSize: size?.size ?? '',
+    settings: Object.fromEntries(
+      settings.map((r) => [r.name, `${r.setting}${r.unit ? ` ${r.unit}` : ''}`]),
+    ),
+  }
 }
 
 async function main() {
@@ -127,6 +276,7 @@ async function main() {
   }
 
   /* ---------------------------------------------------------------- */
+  group = 'Поиск по книге'
   console.log('Поиск по книге (порог ТЗ — 1000 мс)\n')
 
   const find = (sp: SearchParams, limit = 25) => async () => {
@@ -187,11 +337,20 @@ async function main() {
   })
 
   /* ---------------------------------------------------------------- */
+  group = 'Карточка и родословная'
   console.log('\nКарточка и родословная\n')
 
   const sample = await payload.find({
     collection: 'animals',
-    where: { and: [{ sire: { exists: true } }, { dam: { exists: true } }] },
+    /*
+     * Поля родителей называются `father` и `mother`, а не `sire` и `dam`.
+     * Первая редакция замера спрашивала по-английски, как в мировых
+     * каталогах, и падала на `The following paths cannot be queried`.
+     * Ошибка полезная: она напомнила, что Payload проверяет пути запроса
+     * по конфигурации, а не подставляет пустоту, — молчаливого «ничего
+     * не нашлось» здесь не бывает.
+     */
+    where: { and: [{ father: { exists: true } }, { mother: { exists: true } }] },
     limit: 1,
     depth: 0,
     overrideAccess: true,
@@ -232,6 +391,7 @@ async function main() {
   }
 
   /* ---------------------------------------------------------------- */
+  group = 'Кабинет хозяйства'
   console.log('\nКабинет хозяйства\n')
 
   const org = await payload.find({
@@ -257,6 +417,7 @@ async function main() {
   }
 
   /* ---------------------------------------------------------------- */
+  group = 'Выгрузка стада'
   console.log('\nВыгрузка стада\n')
 
   /*
@@ -264,14 +425,135 @@ async function main() {
    * Меряется она потому, что это единственное место, где система
    * сознательно берёт двадцать тысяч записей разом, — и если что-то
    * упрётся в память или время, упрётся оно здесь.
+   *
+   * Так и вышло: первый прогон дал шестнадцать секунд при том, что всё
+   * остальное укладывалось в полсекунды. Причина была не в объёме,
+   * а в `depth: 1` — Payload разворачивал связь с владельцем у каждой
+   * из двадцати тысяч строк ради одной колонки. Оба сценария оставлены
+   * рядом намеренно: разница между ними и есть цена развёрнутых связей,
+   * и увидеть её надо не при следующем таком же замере, а сразу.
    */
   await measure({
-    what: `выгрузка ${EXPORT_LIMIT.toLocaleString('ru-RU')} записей из базы`,
+    what: `выгрузка ${EXPORT_LIMIT.toLocaleString('ru-RU')} записей (таблица)`,
+    runs: 3,
+    run: async () => {
+      const res = await payload.find({
+        collection: 'animals',
+        limit: EXPORT_LIMIT,
+        depth: 0,
+        sort: 'identNumber',
+        overrideAccess: true,
+      })
+      return res.docs.length
+    },
+  })
+
+  await measure({
+    what: `то же с развёрнутыми связями (JSON)`,
+    runs: 3,
     run: async () => {
       const res = await payload.find({
         collection: 'animals',
         limit: EXPORT_LIMIT,
         depth: 1,
+        sort: 'identNumber',
+        overrideAccess: true,
+      })
+      return res.docs.length
+    },
+  })
+
+  /*
+   * Разбор по слоям: где именно уходят четырнадцать секунд.
+   *
+   * Первая догадка была «в глубине связей», и она оказалась неверной:
+   * `depth: 0` снял шесть секунд из двадцати, а четырнадцать остались.
+   * Догадка вторая — что дорога сама сборка документа: у карточки
+   * животного больше ста полей, и Payload превращает каждую строку базы
+   * в документ со всеми группами, проверками и хуками чтения. Двадцать
+   * тысяч раз.
+   *
+   * Три сценария ниже отвечают на это замером, а не рассуждением.
+   * Прямой запрос — нижняя граница, быстрее не будет никогда. `select`
+   * оставляет Payload на месте, но просит у него четырнадцать полей
+   * вместо ста. Разница между этими двумя и есть цена слоя.
+   */
+  const pool = (payload.db as unknown as { pool?: { query: (q: string) => Promise<{ rows: unknown[] }> } }).pool
+
+  if (pool) {
+    await measure({
+      what: 'нижняя граница: прямой запрос к базе',
+      runs: 3,
+      run: async () => {
+        const r = await pool.query(
+          `select ident_number, name, sex, state, age_group, birth_date,
+                  summary_milk_yield, summary_fat_percent, summary_protein_percent,
+                  summary_fat_kg, summary_protein_kg, summary_fat_protein_sum, ipc, owner_id
+             from animals
+            order by ident_number
+            limit ${EXPORT_LIMIT}`,
+        )
+        return r.rows.length
+      },
+    })
+  }
+
+  await measure({
+    what: 'через Payload, но только нужные поля',
+    runs: 3,
+    run: async () => {
+      const res = await payload.find({
+        collection: 'animals',
+        limit: EXPORT_LIMIT,
+        depth: 0,
+        select: {
+          identNumber: true,
+          name: true,
+          sex: true,
+          state: true,
+          ageGroup: true,
+          birthDate: true,
+          summary: true,
+          ipc: true,
+          owner: true,
+        },
+        sort: 'identNumber',
+        overrideAccess: true,
+      })
+      return res.docs.length
+    },
+  })
+
+  /*
+   * И то же без подсчёта общего числа записей. Постраничная навигация
+   * выгрузке не нужна, а `count(*)` по полумиллиону строк — отдельный
+   * запрос на каждый вызов.
+   *
+   * Число строк здесь печатается не для красоты: если Payload при
+   * `pagination: false` перестанет уважать `limit`, сценарий вернёт
+   * не двадцать тысяч, а всё стадо — и это будет видно сразу, до того
+   * как такая правка уедет в выгрузку.
+   */
+  await measure({
+    what: 'то же без подсчёта общего числа',
+    runs: 3,
+    run: async () => {
+      const res = await payload.find({
+        collection: 'animals',
+        limit: EXPORT_LIMIT,
+        depth: 0,
+        pagination: false,
+        select: {
+          identNumber: true,
+          name: true,
+          sex: true,
+          state: true,
+          ageGroup: true,
+          birthDate: true,
+          summary: true,
+          ipc: true,
+          owner: true,
+        },
         sort: 'identNumber',
         overrideAccess: true,
       })
@@ -310,6 +592,51 @@ async function main() {
       ? '\nВсе пороги выдержаны.\n'
       : `\nПорогов превышено: ${failures}.\n`,
   )
+
+  if (SAVE) {
+    const server = await serverInfo(payload)
+    const label = labelArg()
+
+    const measured = {
+      label,
+      /*
+       * Объём записан в замер, а не выведен из него потом. Число животных
+       * — половина смысла всех остальных цифр, и отчёт, в котором его нет,
+       * читается как утверждение о системе вообще. У разных сред объём
+       * разный, поэтому число лежит у каждого замера своё.
+       */
+      animals: total.totalDocs,
+      runs: RUNS,
+      server,
+      rows: report,
+    }
+
+    /*
+     * Замеры копятся списком, а не переписывают друг друга: вкладка
+     * показывает их рядом, и в этом весь смысл — «на моей машине» против
+     * «на проде». Совпавшая метка заменяет прежний замер той же среды:
+     * два замера одного и того же места — это не сравнение, а история,
+     * а история здесь ни к чему.
+     */
+    const before = await readFile(REPORT_PATH, 'utf8')
+      .then((t) => JSON.parse(t) as { reports?: unknown[] })
+      .catch(() => ({ reports: [] as unknown[] }))
+
+    const kept = (before.reports ?? []).filter(
+      (r) => (r as { label?: string }).label !== label,
+    )
+
+    const out = { reports: [...kept, measured] }
+
+    await writeFile(REPORT_PATH, JSON.stringify(out, null, 2) + '\n', 'utf8')
+    console.log(`Отчёт записан: ${REPORT_PATH} (среда «${label}»)`)
+    console.log(`  ${server.cpu}, ядер ${server.cores}, память ${server.memoryGb} ГБ`)
+    console.log(`  ${server.postgres}, база ${server.databaseSize}`)
+    if (server.remoteDatabase)
+      console.log('  ! База не местная — в цифрах сидит задержка сети до неё')
+    console.log()
+  }
+
   process.exit(failures === 0 ? 0 : 1)
 }
 

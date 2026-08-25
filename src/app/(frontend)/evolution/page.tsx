@@ -6,6 +6,7 @@ import { EvolutionVersions } from '@/components/EvolutionVersions'
 import { EvolutionStages } from '@/components/EvolutionStages'
 import { EvolutionDocs } from '@/components/EvolutionDocs'
 import { EvolutionRoadmap } from '@/components/EvolutionRoadmap'
+import { EvolutionBench } from '@/components/EvolutionBench'
 import { CURRENT_VERSION } from '@/lib/product-versions'
 
 export const metadata: Metadata = {
@@ -34,6 +35,12 @@ const TABS = [
   { key: 'versions', label: 'Версии' },
   { key: 'stages', label: 'Этапы зрелости' },
   { key: 'roadmap', label: 'Дорожная карта' },
+  /*
+     «Замер» стоит перед документацией, а не после: это факт о системе,
+     а документация — рассказ о ней. Факты читают раньше рассказа,
+     и на приёмке спрашивают в том же порядке.
+  */
+  { key: 'bench', label: 'Замер' },
   { key: 'docs', label: 'Документация' },
 ] as const
 
@@ -51,6 +58,10 @@ const LEAD: Record<TabKey, string> = {
   roadmap:
     'Что предстоит сделать до 2028 года: ближайшие работы, интеграции, геномная оценка ' +
     'и выход в промышленную эксплуатацию. Сроки — намерения, а не обязательства.',
+  bench:
+    'Критерии приёмки требуют поиска быстрее секунды на пятидесяти тысячах записей ' +
+    'и свидетельства не дольше пяти секунд. Здесь — что получилось на самом деле, ' +
+    'на каком железе и чего эти цифры не говорят.',
   docs:
     'Техническое описание системы для тех, кому предстоит с ней работать: модель данных, ' +
     'процессы, архитектура, контракты обмена, развёртывание и — отдельно — ограничения.',
@@ -108,6 +119,7 @@ export default async function EvolutionPage({
           {tab === 'versions' && <EvolutionVersions openVersion={change} />}
           {tab === 'stages' && <EvolutionStages />}
           {tab === 'roadmap' && <EvolutionRoadmap />}
+          {tab === 'bench' && <EvolutionBench />}
           {tab === 'docs' && <EvolutionDocs />}
         </div>
       </main>
