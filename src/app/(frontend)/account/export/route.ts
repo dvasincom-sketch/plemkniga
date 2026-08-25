@@ -3,6 +3,7 @@ import { getClient, getCurrentUser } from '@/lib/payload'
 import { toCsv } from '@/lib/csv'
 import { AGE_GROUPS, STATES } from '@/lib/dictionaries'
 import { EXPORT_LIMIT, exportFormat, toTsv, toXml } from '@/lib/export-formats'
+import { toXlsx } from '@/lib/xlsx'
 
 /**
  * Выгрузка стада файлом.
@@ -17,11 +18,11 @@ import { EXPORT_LIMIT, exportFormat, toTsv, toXml } from '@/lib/export-formats'
  *
  * ## Почему у JSON свой состав, а у остальных общий
  *
- * CSV, TXT и XML отдают один и тот же набор из четырнадцати полей: это
- * табличные форматы, и получателю нужен постоянный, предсказуемый состав
- * колонок. JSON отдаёт записи целиком, как они лежат в книге, — за ним
- * приходят именно тогда, когда таблицы мало. Разница намеренная, и она
- * названа в подсказке к каждому формату, чтобы не выяснялась опытом.
+ * XLSX, CSV, TXT и XML отдают один и тот же набор из четырнадцати полей:
+ * это табличные форматы, и получателю нужен постоянный, предсказуемый
+ * состав колонок. JSON отдаёт записи целиком, как они лежат в книге, —
+ * за ним приходят именно тогда, когда таблицы мало. Разница намеренная,
+ * и она названа в подсказке к каждому формату, чтобы не выяснялась опытом.
  */
 
 const label = (arr: readonly { value: string; label: string }[], v?: string | null) =>
@@ -35,21 +36,38 @@ const label = (arr: readonly { value: string; label: string }[], v?: string | nu
  * в середину колонка сдвигала все значения вправо, и заметить это можно
  * было только глазами, открыв файл.
  */
-const COLUMNS: { key: string; title: string }[] = [
-  { key: 'identNumber', title: 'Инд.№' },
-  { key: 'name', title: 'Кличка' },
-  { key: 'sex', title: 'Пол' },
-  { key: 'state', title: 'Состояние' },
-  { key: 'ageGroup', title: 'Возраст' },
-  { key: 'birthDate', title: 'Дата рождения' },
-  { key: 'milkYield', title: 'Удой, кг' },
-  { key: 'fatPercent', title: 'Жир, %' },
-  { key: 'proteinPercent', title: 'Белок, %' },
-  { key: 'fatKg', title: 'Жир, кг' },
-  { key: 'proteinKg', title: 'Белок, кг' },
-  { key: 'fatProteinSum', title: 'СБП, кг' },
-  { key: 'ipc', title: 'ИПЦ' },
-  { key: 'owner', title: 'Владелец' },
+/*
+ * Признак `numeric` нужен только книге Excel: в ней у ячейки есть тип,
+ * и от него зависит, сложится ли колонка и как она отсортируется.
+ * В CSV, TXT и XML типов нет вовсе, и признак там просто не смотрят.
+ *
+ * Проставлен он вручную, а не выведен из содержимого. Вывод по содержимому
+ * означал бы, что колонка номера становится числовой в тех хозяйствах,
+ * где номера записаны одними цифрами, — то есть ровно там, где ведущий
+ * ноль и теряется.
+ *
+ * Дата рождения намеренно уходит текстом `ГГГГ-ММ-ДД`, а не датой Excel.
+ * Настоящая дата показывается в том виде, какой стоит у читателя
+ * в системе, — и файл, выгруженный у нас и открытый у него, выглядит
+ * по-разному. А главное, эта же колонка возвращается к нам загрузкой,
+ * и разбор дат уже умеет `ГГГГ-ММ-ДД`: круг сходится без единого
+ * преобразования по дороге.
+ */
+const COLUMNS: { key: string; title: string; numeric?: boolean; width?: number }[] = [
+  { key: 'identNumber', title: 'Инд.№', width: 18 },
+  { key: 'name', title: 'Кличка', width: 22 },
+  { key: 'sex', title: 'Пол', width: 6 },
+  { key: 'state', title: 'Состояние', width: 16 },
+  { key: 'ageGroup', title: 'Возраст', width: 18 },
+  { key: 'birthDate', title: 'Дата рождения', width: 15 },
+  { key: 'milkYield', title: 'Удой, кг', numeric: true },
+  { key: 'fatPercent', title: 'Жир, %', numeric: true },
+  { key: 'proteinPercent', title: 'Белок, %', numeric: true },
+  { key: 'fatKg', title: 'Жир, кг', numeric: true },
+  { key: 'proteinKg', title: 'Белок, кг', numeric: true },
+  { key: 'fatProteinSum', title: 'СБП, кг', numeric: true },
+  { key: 'ipc', title: 'ИПЦ', numeric: true },
+  { key: 'owner', title: 'Владелец', width: 28 },
 ]
 
 export async function GET(request: Request) {
@@ -113,6 +131,23 @@ export async function GET(request: Request) {
   ])
 
   const titles = COLUMNS.map((c) => c.title)
+
+  /*
+   * Книга уходит раньше остальных форматов, потому что она единственная
+   * двоичная: `NextResponse` со строкой в теле пережёвывает её в UTF-8
+   * и отдаёт битый архив. Ветка стоит до общей сборки тела, чтобы это
+   * не могло случиться по недосмотру.
+   */
+  if (format.value === 'xlsx') {
+    const buf = toXlsx(COLUMNS, rows, { sheetName: 'Стадо' })
+    return new NextResponse(new Uint8Array(buf), {
+      headers: {
+        'Content-Type': format.mime,
+        'Content-Disposition': file(format.ext),
+        'Content-Length': String(buf.length),
+      },
+    })
+  }
 
   const body =
     format.value === 'xml'

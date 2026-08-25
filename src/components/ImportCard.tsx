@@ -5,6 +5,7 @@ import { useActionState, useState } from 'react'
 import { importDataAction, type ImportState } from '@/actions/data'
 import { Select } from '@/components/Select'
 import { FileUploadIcon } from '@/components/CardIcons'
+import { XLSX_MAX_ROWS } from '@/lib/table-limits'
 
 /**
  * Загрузка файлом — одна карточка на четыре набора данных.
@@ -29,6 +30,41 @@ import { FileUploadIcon } from '@/components/CardIcons'
 
 
 type Choice = { value: string; label: string }
+
+/**
+ * Что прочитали из книги — и, главное, чего не прочитали.
+ *
+ * Показывается только тогда, когда есть о чём сказать: у книги с одним
+ * листом, уместившейся в потолок, эта строка сообщала бы «всё хорошо»,
+ * а такие строки читать перестают, и вместе с ними перестают читать те,
+ * в которых сказано важное.
+ *
+ * Стоит первым среди замечаний, потому что это самая крупная из потерь:
+ * непрочитанный лист — это не строка и не колонка, это целая таблица,
+ * которой в стаде не окажется.
+ */
+function SheetNote({ sheet }: { sheet?: ImportState['sheet'] }) {
+  if (!sheet) return null
+  if (!sheet.others.length && !sheet.truncated) return null
+
+  return (
+    <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-ink-700">
+      <p className="font-medium">Прочитан лист «{sheet.name}»</p>
+      {!!sheet.others.length && (
+        <p className="mt-1 leading-snug">
+          Остальные листы не читались: {sheet.others.map((s) => `«${s}»`).join(', ')}. Чтобы
+          загрузить их, сохраните каждый отдельным файлом.
+        </p>
+      )}
+      {sheet.truncated && (
+        <p className="mt-1 leading-snug">
+          В листе больше {XLSX_MAX_ROWS.toLocaleString('ru-RU')} строк — прочитаны первые{' '}
+          {XLSX_MAX_ROWS.toLocaleString('ru-RU')}, остальные не загружены. Разделите файл.
+        </p>
+      )}
+    </div>
+  )
+}
 
 export function ImportCard({ datasets }: { datasets: (Choice & { hint: string })[] }) {
   const [state, formAction, pending] = useActionState<ImportState, FormData>(importDataAction, {})
@@ -113,14 +149,24 @@ export function ImportCard({ datasets }: { datasets: (Choice & { hint: string })
               {current && <p className="text-[13px] leading-snug text-ink-500">{current.hint}</p>}
 
               <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-ink-300 px-4 py-3 text-sm text-ink-700 hover:border-brand-400">
+                {/*
+                   Расширения и типы перечислены вместе и оба неполно —
+                   это не дублирование, а признание того, что ни одному
+                   из двух списков верить нельзя. Тип браузер выводит
+                   из расширения по таблице системы, и на книге, названной
+                   `.xls`, регулярно отдаёт `application/octet-stream`.
+                   Список здесь — подсказка окну выбора файла, а не заслон:
+                   настоящий вид файла определяется на сервере по первым
+                   байтам, потому что имя ставит человек.
+                */}
                 <input
                   type="file"
                   name="file"
-                  accept=".csv,.txt,text/csv,text/plain"
+                  accept=".xlsx,.xls,.csv,.txt,text/csv,text/plain,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                   className="sr-only"
                   onChange={(e) => setFileName(e.target.files?.[0]?.name ?? '')}
                 />
-                <span className="truncate">{fileName || 'Выберите файл CSV или TXT…'}</span>
+                <span className="truncate">{fileName || 'Выберите файл Excel, CSV или TXT…'}</span>
               </label>
 
               {/*
@@ -129,14 +175,45 @@ export function ImportCard({ datasets }: { datasets: (Choice & { hint: string })
                  принимала, а подсказка о них молчала. Список переехал в таблицу
                  на странице и собирается из того же реестра, что и разбор.
               */}
+              {/*
+                 Потолок строк назван здесь, до нажатия, а не в ответе
+                 после него. Книга на семьдесят тысяч строк выглядит
+                 принятой ровно так же, как книга на пять тысяч, и разницу
+                 видно только тому, кто пойдёт пересчитывать карточки.
+              */}
               <p className="text-xs leading-relaxed text-ink-500">
-                Разделитель «точка с запятой» или запятая, кодировка UTF-8, до 8 МБ.{' '}
+                Книга Excel (.xlsx или .xls) — читается первый лист, до{' '}
+                {XLSX_MAX_ROWS.toLocaleString('ru-RU')} строк. Либо таблица CSV или TXT:
+                разделитель «точка с запятой», запятая или табуляция, кодировка UTF-8. До 8 МБ.
+              </p>
+
+              {/*
+                 Две ссылки на один шаблон, а не выпадающий список из двух
+                 пунктов: выбор здесь делается один раз и ни на что дальше
+                 не влияет, а список потребовал бы нажать дважды ради того,
+                 что решается наведением глаза.
+
+                 XLSX стоит первым, потому что шаблон открывают в Excel,
+                 а Excel, открывая CSV, портит колонку номера: `0987654321`
+                 он читает числом и теряет ведущий ноль ещё до того, как
+                 человек начнёт заполнять.
+              */}
+              <p className="text-xs leading-relaxed text-ink-500">
+                Скачать шаблон:{' '}
+                <a
+                  href={`/account/import/template?kind=${kind}&format=xlsx`}
+                  download
+                  className="underline underline-offset-4"
+                >
+                  XLSX
+                </a>{' '}
+                или{' '}
                 <a
                   href={`/account/import/template?kind=${kind}`}
                   download
                   className="underline underline-offset-4"
                 >
-                  Скачать шаблон
+                  CSV
                 </a>{' '}
                 — в нём правильные заголовки и строка с примером; её перед загрузкой удалите.
                 Полный список колонок — в таблице ниже.
@@ -186,6 +263,14 @@ export function ImportCard({ datasets }: { datasets: (Choice & { hint: string })
                       {state.unknownColumns.map((c) => `«${c}»`).join(', ')}
                     </p>
                   )}
+                  {/*
+                     Имя листа нужнее всего именно при отказе. «Не найдены
+                     обязательные колонки» у книги с тремя листами почти
+                     всегда означает не отсутствие колонок, а то, что
+                     заголовки лежат на втором листе, — и без этой строки
+                     человек идёт править заголовки, которые в порядке.
+                  */}
+                  <SheetNote sheet={state.sheet} />
                 </div>
               )}
 
@@ -195,6 +280,8 @@ export function ImportCard({ datasets }: { datasets: (Choice & { hint: string })
                     {state.dataset ? `${state.dataset}: ` : ''}создано {state.created}
                     {state.updated ? `, обновлено ${state.updated}` : ''}, пропущено {state.skipped}
                   </p>
+
+                  <SheetNote sheet={state.sheet} />
 
                   {/*
                      Причины отказа — прямо здесь, а не только в пакете.

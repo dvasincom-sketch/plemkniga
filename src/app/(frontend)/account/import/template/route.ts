@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/payload'
 import { toCsv } from '@/lib/csv'
 import { datasetByKey, templateRowsOf } from '@/lib/import-format'
+import { toXlsx } from '@/lib/xlsx'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,6 +46,42 @@ export async function GET(request: Request) {
   if (!ds) return new NextResponse('Неизвестный вид данных', { status: 404 })
 
   const { headers, example } = templateRowsOf(ds)
+
+  /*
+   * Шаблон книгой — не украшение, а починка того самого места, ради
+   * которого шаблон и заведён.
+   *
+   * Человек скачивает его, открывает в Excel и заполняет. Скачав CSV,
+   * он открывает не файл, а результат догадок Excel о нём: индивидуальный
+   * номер `0987654321` читается числом, ведущий ноль пропадает, и файл
+   * возвращается к нам с номером, которого нет ни у одного животного.
+   * Строку примера мы для того и клали, чтобы формат был виден — а Excel
+   * успевает испортить её раньше, чем человек её увидит.
+   *
+   * В книге у ячейки есть тип, и весь шаблон уходит текстом. Это ровно
+   * тот случай, когда «всё текстом» — не лень, а утверждение: колонок
+   * с числами в шаблоне нет, потому что заполнять его будут поверх
+   * примера, а пример показывает написание, а не величину.
+   *
+   * CSV остался и остаётся по умолчанию: его открывает то, что книгу
+   * не откроет, — и в выгрузках хозяйств такое до сих пор встречается.
+   */
+  if (new URL(request.url).searchParams.get('format') === 'xlsx') {
+    const buf = toXlsx(
+      headers.map((title) => ({ title })),
+      [example],
+      { sheetName: ds.label },
+    )
+    return new NextResponse(new Uint8Array(buf), {
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="plemkniga-shablon-${ds.key}.xlsx"`,
+        'Content-Length': String(buf.length),
+        'Cache-Control': 'no-store',
+      },
+    })
+  }
+
   const body = toCsv(headers, [example])
 
   return new NextResponse(body, {

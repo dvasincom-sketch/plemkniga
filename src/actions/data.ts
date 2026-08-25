@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { parseCsv } from '@/lib/csv'
+import { detectTableKind, readSpreadsheet } from '@/lib/xlsx'
 import { columnsOf, datasetByKey, headerMapOf, type Dataset } from '@/lib/import-format'
 import { IDENT_FIELD_LABEL, IDENT_VALUES_SQL, identCore } from '@/lib/animal-id'
 import { DOMAIN_RULES } from '@/lib/db-constraints'
@@ -48,6 +49,15 @@ export type ImportState = {
    * добытое неделей ожидания.
    */
   unverified?: { ident: string; fields: string[] }[]
+  /**
+   * Что именно прочитали из книги Excel.
+   *
+   * Только для книг: у CSV листа нет, и поле остаётся пустым. Сказано
+   * оно вслух по той же причине, что и `unknownColumns`, — прочитанный
+   * первый лист из трёх выглядит на экране точно так же, как прочитанная
+   * целиком книга, и разницу видно только тому, кто знает, что искать.
+   */
+  sheet?: { name: string; others: string[]; truncated?: boolean }
 }
 
 /**
@@ -485,14 +495,18 @@ const readerFor = (header: string[], row: Row): Reader => (key) => {
 }
 
 /**
- * Разбор файла и заголовка — общая часть всех наборов.
+ * Разбор заголовка — общая часть всех наборов и всех форматов файла.
+ *
+ * Принимает матрицу строк, а не сам файл, и это главное в ней: CSV, TXT
+ * и книга Excel различаются ровно до этой точки и одинаковы после. Пока
+ * функция читала текст сама, добавление второго формата означало бы
+ * ветвление здесь и во всём, что ниже.
  *
  * Неизвестные колонки не отбрасываются молча: они собираются
  * и возвращаются человеку. «Файл принят» при потерянной колонке — это
  * ложь, из-за которой данные считаются загруженными, а их нет.
  */
-function readFile(text: string, ds: Dataset) {
-  const rows = parseCsv(text)
+function readTable(rows: string[][], ds: Dataset) {
   if (rows.length < 2)
     return { error: 'В файле нет строк с данными' as const, unknownColumns: [] as string[] }
 
@@ -1078,9 +1092,44 @@ export async function importDataAction(
   if (!(file instanceof File) || file.size === 0) return { error: 'Выберите файл' }
   if (file.size > 8 * 1024 * 1024) return { error: 'Файл больше 8 МБ' }
 
-  const parsed = readFile(await file.text(), ds)
+  /*
+   * Файл читается в байты один раз на весь разбор.
+   *
+   * Раньше он читался дважды: `file.text()` для разбора и
+   * `file.arrayBuffer()` ниже, для сохранения исходника. С книгой Excel
+   * так уже нельзя — `text()` вернул бы распакованный мусор, — но дело
+   * не только в этом: восьмимегабайтный файл в памяти дважды и есть
+   * восьмимегабайтный файл в памяти дважды.
+   */
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  const kind = detectTableKind(bytes)
+
+  /*
+   * Старый `.xls` и новый `.xlsx` различаются форматом до последнего
+   * байта, но для нас это одна ветка: библиотека читает оба и отдаёт
+   * одинаковую матрицу. Различать их пришлось бы, только если бы мы
+   * умели один и не умели другой.
+   */
+  const read =
+    kind === 'text'
+      ? { rows: parseCsv(new TextDecoder('utf-8').decode(bytes)) }
+      : readSpreadsheet(bytes)
+
+  if ('error' in read) return { error: read.error, dataset: ds.label }
+
+  const sheet =
+    'sheet' in read
+      ? { name: read.sheet, others: read.otherSheets, truncated: read.truncated || undefined }
+      : undefined
+
+  const parsed = readTable(read.rows, ds)
   if ('error' in parsed) {
-    return { error: parsed.error, unknownColumns: parsed.unknownColumns, dataset: ds.label }
+    return {
+      error: parsed.error,
+      unknownColumns: parsed.unknownColumns,
+      dataset: ds.label,
+      sheet,
+    }
   }
 
   const payload = await getClient()
@@ -1150,9 +1199,22 @@ export async function importDataAction(
        */
       data: { alt: `Файл импорта ${file.name}`, owner: orgId, visibility: 'private' },
       file: {
-        data: Buffer.from(await file.arrayBuffer()),
+        data: Buffer.from(bytes),
         name: file.name,
-        mimetype: file.type || 'text/csv',
+        /*
+         * Тип берётся от того, что в файле нашлось на самом деле, а не
+         * от того, что о нём сказал браузер. Браузер выводит тип из
+         * расширения по таблице операционной системы, и книга, названная
+         * `.csv`, приехала бы в хранилище с типом `text/csv` — то есть
+         * с ярлыком, по которому её потом не откроют. Умолчание остаётся
+         * для текстового файла: там браузер обычно молчит.
+         */
+        mimetype:
+          kind === 'xlsx'
+            ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            : kind === 'xls'
+              ? 'application/vnd.ms-excel'
+              : file.type || 'text/csv',
         size: file.size,
       },
     })
@@ -1199,5 +1261,6 @@ export async function importDataAction(
     unresolved: res.unresolved,
     identMatches: res.identMatches,
     unverified: res.unverified,
+    sheet,
   }
 }
