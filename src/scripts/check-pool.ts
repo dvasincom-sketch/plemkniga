@@ -34,7 +34,7 @@ const check = (ok: boolean, what: string, detail = '') => {
 type Countable = { listenerCount: (event: string) => number }
 type PgPool = Countable & {
   connect: () => Promise<PgClient>
-  query: (sql: string) => Promise<{ rows: Record<string, unknown>[] }>
+  query: (sql: string, params?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }>
 }
 type PgClient = Countable & {
   emit: (event: string, err: Error) => boolean
@@ -119,6 +119,70 @@ async function main() {
   // Пул обязан пережить потерю соединения и открыть новое
   const after = await pool.query('select 1 as ok')
   check(after.rows[0]?.ok === 1, 'после потери соединения пул открыл новое')
+
+  /* ---------------------------------------------------------------- */
+  /*  Отказ базы попадает в лог вместе с текстом запроса                */
+  /* ---------------------------------------------------------------- */
+
+  /*
+   * Проверяется не «есть ли обёртка», а то, ради чего она поставлена:
+   * после отказа в логе оказался текст запроса, а сам отказ дошёл
+   * до вызывающего неизменным.
+   *
+   * Проверка нужна именно такая. Прежняя история с `guardPool` уже
+   * научила: утверждение «слушатель есть» было верным и бесполезным,
+   * потому что не говорило, на чём именно он есть.
+   *
+   * Деление на ноль выбрано не случайно — это ровно тот отказ, который
+   * третий день висит в прод-логах без единого признака источника.
+   */
+  const said: string[] = []
+  const realError = console.error
+  console.error = (...args: unknown[]) => {
+    said.push(args.map(String).join(' '))
+  }
+
+  let rethrown: unknown = null
+  try {
+    await pool.query('select 1 / (select count(*) - count(*) from animals) as boom')
+  } catch (e) {
+    rethrown = e
+  } finally {
+    console.error = realError
+  }
+
+  const logged = said.join('\n')
+
+  check(rethrown !== null, 'отказ базы дошёл до вызывающего, а не проглочен')
+  check(
+    (rethrown as { code?: string } | null)?.code === '22012',
+    'отказ дошёл тем же самым: деление на ноль',
+    String((rethrown as { code?: string } | null)?.code),
+  )
+  check(logged.includes('Отказ базы 22012'), 'в лог попал код отказа')
+  check(logged.includes('as boom'), 'в лог попал текст запроса', logged.slice(0, 200))
+
+  /*
+   * И то, чего в логе быть не должно: длинное значение параметра.
+   * В параметрах ездят клички, номера и адреса хозяйств; для поиска
+   * причины хватает вида «строка, N знаков».
+   */
+  said.length = 0
+  const longValue = 'я'.repeat(200)
+  console.error = (...args: unknown[]) => {
+    said.push(args.map(String).join(' '))
+  }
+  try {
+    await pool.query('select 1 / 0 as boom, $1::text as payload', [longValue])
+  } catch {
+    /* ожидаемо */
+  } finally {
+    console.error = realError
+  }
+
+  const second = said.join('\n')
+  check(!second.includes(longValue), 'длинное значение параметра в лог не попало')
+  check(second.includes('строка, 200 знаков'), 'вместо него записана длина', second.slice(0, 200))
 
   console.log(failures === 0 ? '\nВсё сошлось.' : `\nНе сошлось: ${failures}`)
   process.exit(failures === 0 ? 0 : 1)

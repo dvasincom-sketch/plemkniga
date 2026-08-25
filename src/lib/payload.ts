@@ -54,6 +54,95 @@ type Guarded = { [GUARDED]?: true }
 type ClientLike = { on?: (event: 'error', listener: (err: Error) => void) => void }
 type PoolLike = {
   on?: (event: 'error' | 'acquire', listener: (arg: never, client?: ClientLike) => void) => void
+  query?: (...args: unknown[]) => Promise<unknown>
+}
+
+/**
+ * Отдельная отметка для перехвата запросов — не та же, что у слушателей.
+ *
+ * Обёртку и слушателей ставит один и тот же `guardPool`, но проверять
+ * их одним флагом нельзя: тогда порядок «поставили слушателей, потом
+ * добавили обёртку» дал бы пул, на котором флаг уже стоит, а обёртки нет,
+ * — и она не появилась бы никогда.
+ */
+const QUERY_LOGGED: unique symbol = Symbol.for('plemkniga.pool-query-logged')
+type QueryLogged = { [QUERY_LOGGED]?: true }
+
+/**
+ * Ошибка PostgreSQL с текстом запроса, который её вызвал.
+ *
+ * ## Зачем
+ *
+ * В логе прода третий день висят четырнадцать `division by zero`.
+ * Всё, что о них известно: `numeric.c`, `div_var`, минифицированный стек
+ * вида `chunks/ssr/src_0ry4r9p.js:1:840`. Ни пути страницы, ни таблицы,
+ * ни запроса. Я дважды прошёл все деления в коде и не нашёл ни одного
+ * незакрытого — и это ровно то положение, в котором дальше можно только
+ * гадать.
+ *
+ * Причина потери простая: текст запроса есть у ошибки drizzle
+ * (`DrizzleQueryError` несёт `query` и `params` — их видно в выводе
+ * скриптов), но до лога Next доходит не он, а внутреннее исключение `pg`,
+ * у которого этих полей нет. Поймать надо там, где запрос ещё известен,
+ * то есть в самом пуле.
+ *
+ * ## Почему обёртка над `pool.query`, а не над нашими вызовами
+ *
+ * Через `pool.query` идут все запросы — и наши прямые, и те, что строит
+ * drizzle для Payload. Обернув свои вызовы, мы получили бы диагностику
+ * ровно там, где она и так есть: у собственных запросов текст известен
+ * и в месте написания.
+ *
+ * ## Что попадает в лог, а что нет
+ *
+ * Запрос обрезается до полутора тысяч знаков: полный `select` карточки
+ * животного — это пять экранов перечисления колонок, и в логе он вытеснит
+ * всё остальное. Первых полутора тысяч хватает, чтобы узнать запрос.
+ *
+ * Параметры логируются, но длинные значения заменяются длиной. В них
+ * попадают клички, номера и адреса — данные хозяйств, и класть их в лог
+ * целиком незачем: для поиска причины хватает вида «строка, 42 знака».
+ * Числа и короткие строки остаются как есть — по ним и ищут.
+ */
+const MAX_QUERY_IN_LOG = 1500
+const MAX_PARAM_IN_LOG = 40
+
+const shortParam = (v: unknown): unknown => {
+  if (typeof v === 'string' && v.length > MAX_PARAM_IN_LOG) return `строка, ${v.length} знаков`
+  if (v instanceof Date) return v.toISOString()
+  if (v && typeof v === 'object') return `объект ${Object.prototype.toString.call(v)}`
+  return v
+}
+
+const logQueryFailure = (err: unknown, args: unknown[]): void => {
+  const e = err as { code?: string; routine?: string; message?: string }
+
+  /*
+   * Логируются только отказы самой базы — у них есть пятизначный код
+   * SQLSTATE. Обрыв соединения сюда не попадает: о нём уже сообщает
+   * `note`, и второй строкой об одном событии лог не улучшить.
+   */
+  if (!e?.code || !/^[0-9A-Z]{5}$/.test(e.code)) return
+
+  const first = args[0]
+  const text =
+    typeof first === 'string'
+      ? first
+      : typeof (first as { text?: string })?.text === 'string'
+        ? (first as { text: string }).text
+        : '(запрос не в текстовом виде)'
+
+  const params = Array.isArray(args[1])
+    ? (args[1] as unknown[]).map(shortParam)
+    : Array.isArray((first as { values?: unknown[] })?.values)
+      ? ((first as { values: unknown[] }).values ?? []).map(shortParam)
+      : []
+
+  console.error(
+    `[plemkniga] Отказ базы ${e.code}${e.routine ? ` (${e.routine})` : ''}: ${e.message ?? ''}\n` +
+      `  запрос: ${text.slice(0, MAX_QUERY_IN_LOG)}${text.length > MAX_QUERY_IN_LOG ? ' …' : ''}\n` +
+      `  параметры: ${JSON.stringify(params)}`,
+  )
 }
 
 const note = (what: string, err: Error): void => {
@@ -66,6 +155,35 @@ const note = (what: string, err: Error): void => {
 export const guardPool = (client: unknown): void => {
   const pool = (client as { db?: { pool?: PoolLike } })?.db?.pool
   if (typeof pool?.on !== 'function') return
+
+  /*
+   * Перехват запросов ставится до слушателей и своей отметкой: ниже
+   * стоит ранний выход, и с общим флагом обёртка не появилась бы вовсе
+   * на пуле, у которого слушатели уже есть.
+   *
+   * Обёртка не глотает и не меняет поведения: она пишет строку в лог
+   * и отдаёт тот же отказ дальше. Ошибка доходит до страницы ровно такой,
+   * какой была.
+   */
+  const q = pool as PoolLike & QueryLogged
+  if (typeof q.query === 'function' && !q[QUERY_LOGGED]) {
+    q[QUERY_LOGGED] = true
+    const original = q.query.bind(pool)
+    q.query = (...args: unknown[]) => {
+      /*
+       * `pool.query` умеет и обратный вызов вместо обещания. В нашем коде
+       * так никто не пишет, но Payload и drizzle — чужой код, и подменять
+       * им способ вызова нельзя. Такие вызовы пропускаются мимо перехвата
+       * целиком: лучше не залогировать, чем сломать.
+       */
+      if (typeof args[args.length - 1] === 'function') return original(...args)
+
+      return original(...args).catch((err: unknown) => {
+        logQueryFailure(err, args)
+        throw err
+      })
+    }
+  }
 
   const marked = pool as PoolLike & Guarded
   if (marked[GUARDED]) return
