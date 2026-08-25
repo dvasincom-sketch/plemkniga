@@ -2,7 +2,13 @@ import 'dotenv/config'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { compareBulls, MAX_BULLS } from '@/lib/bull-compare'
-import { EXTERIOR_TRAITS, exteriorDirection } from '@/lib/dictionaries'
+import {
+  CALVING_TRAITS,
+  EXTERIOR_TRAITS,
+  HEALTH_TRAITS,
+  LONGEVITY_TRAITS,
+  exteriorDirection,
+} from '@/lib/dictionaries'
 import { bullStatus, daughtersFor, reliabilityOf } from '@/lib/bull-status'
 
 /**
@@ -289,6 +295,34 @@ async function main() {
     bullStatus(10, 4).missing?.includes('13') === true,
     'сказано, сколько дочерей не хватает',
     String(bullStatus(10, 4).missing),
+  )
+
+  /* ---------------------------------------------------------------- */
+  console.log('\nМакет карточки: признаки разложены без потерь\n')
+
+  /*
+   * Карточка показывает признаки здоровья двумя группами — долголетие
+   * и отёлы, — а хранятся они одним списком. Разойтись этим двум местам
+   * ничего не мешает: достаточно завести пятый признак здоровья
+   * и не вспомнить про показ. Тогда он тихо исчезнет с карточки,
+   * оставаясь в базе, в выгрузке и в расчёте индекса, — и обнаружится
+   * это не раньше, чем кто-нибудь спросит, куда делось число.
+   *
+   * Проверяются оба направления. Потеря — признак есть в хранении,
+   * но не показан. Двойной показ — признак попал в обе группы и стоит
+   * в карточке дважды, изображая два разных.
+   */
+  const shown = [...LONGEVITY_TRAITS, ...CALVING_TRAITS].map((t) => t.key)
+  const lost = HEALTH_TRAITS.filter((t) => !shown.includes(t.key))
+  check(
+    lost.length === 0,
+    `все ${HEALTH_TRAITS.length} признака здоровья попали в карточку`,
+    `потеряны: ${lost.map((t) => t.label).join(', ')}`,
+  )
+  check(
+    new Set(shown).size === shown.length,
+    'ни один признак не показан дважды',
+    shown.join(', '),
   )
 
   console.log(failures === 0 ? '\nВсё сошлось.' : `\nНе сошлось: ${failures}`)

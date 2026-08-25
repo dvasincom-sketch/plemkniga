@@ -169,6 +169,42 @@ export function ExteriorChart({
 
   return (
     <div>
+      {/*
+         Композиты стоят первыми, а не последними.
+
+         Раньше они лежали в подвале блока — после восемнадцати линейных
+         признаков, то есть после самой подробной таблицы карточки.
+         Порядок был обратен тому, как экстерьер читают: сначала смотрят
+         три сводных числа и решают, интересно ли вымя вообще, и только
+         потом идут разбираться, из чего это вымя сложено. Так устроены
+         и чужие каталоги — сводное сверху, разложение под ним.
+
+         Восемнадцать строк перед итогом означали, что до итога дочитает
+         не всякий, а первым в глаза бросится самый частный признак.
+      */}
+      <h4 className="mb-3 text-[15px] font-medium text-forest-500">Сводные индексы</h4>
+      <table className="w-full text-sm">
+        <tbody>
+          {composites.map((t) => (
+            <tr key={t.key} className="border-b border-[#ededed] last:border-0">
+              <td className="w-[40%] py-2.5 pr-3 align-middle">{t.label}</td>
+              <td className="px-3 align-middle">
+                <Bar value={t.value} />
+              </td>
+              <td className="w-[34%] py-2.5 pl-3 text-right align-middle tabular-nums">
+                {signed(t.value, 2)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <h4 className="mb-1 mt-7 text-[15px] font-medium text-forest-500">
+        Признаки «чем больше, тем лучше»
+      </h4>
+      <p className="mb-3 max-w-[75ch] text-[13px] leading-relaxed text-ink-500">
+        Здесь правый край шкалы — желаемое направление, и чем длиннее полоса вправо, тем лучше.
+      </p>
       <table className="w-full text-sm">
         <ScaleHead />
         <TraitRows rows={directed} />
@@ -190,23 +226,6 @@ export function ExteriorChart({
           </table>
         </>
       )}
-
-      <h4 className="mb-3 mt-7 text-[15px] font-medium text-forest-500">Индексы экстерьера</h4>
-      <table className="w-full text-sm">
-        <tbody>
-          {composites.map((t) => (
-            <tr key={t.key} className="border-b border-[#ededed] last:border-0">
-              <td className="w-[40%] py-2.5 pr-3 align-middle">{t.label}</td>
-              <td className="px-3 align-middle">
-                <Bar value={t.value} />
-              </td>
-              <td className="w-[34%] py-2.5 pl-3 text-right align-middle tabular-nums">
-                {signed(t.value, 2)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   )
 }

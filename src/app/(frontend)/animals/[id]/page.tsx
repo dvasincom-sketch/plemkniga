@@ -37,13 +37,15 @@ import { getClient, getCurrentUser } from '@/lib/payload'
 import { isAnimalLocked, relId, viewerOf } from '@/lib/visibility'
 import {
   ANIMAL_KINDS,
+  CALVING_TRAITS,
   DOCUMENT_TYPES,
   EXTERIOR_COMPOSITES,
   EXTERIOR_TRAITS,
-  HEALTH_TRAITS,
+  LONGEVITY_TRAITS,
   PRODUCTION_TRAITS,
   labelOf,
 } from '@/lib/dictionaries'
+import { THRESHOLDS } from '@/lib/bull-status'
 import { dateRu, nf, signed } from '@/lib/format'
 import { IndexBreakdown } from '@/components/IndexBreakdown'
 import { EvaluationHistory } from '@/components/EvaluationHistory'
@@ -156,7 +158,41 @@ const ReliabilityNote = ({ value }: { value?: number | null }) => (
   </span>
 )
 
-/** Таблица «Показатель | Прогноз | R,%» */
+/**
+ * Ниже этой надёжности прогноз показывается приглушённо.
+ *
+ * Порог не выбран для красоты: при R = 50 % половина изменчивости
+ * прогноза ничем не объяснена, и число ошибается примерно так же часто,
+ * как угадывает. Та же граница отделяет предварительную оценку
+ * от недостаточной в `src/lib/bull-status.ts`, и разъезжаться этим двум
+ * местам нельзя — иначе карточка назовёт оценку предварительной
+ * и тут же покажет её наравне с надёжной.
+ */
+const WEAK_RELIABILITY = THRESHOLDS.preliminary.reliability * 100
+
+/**
+ * Таблица «Показатель | Прогноз | R,%».
+ *
+ * ## Почему ненадёжное показано бледнее
+ *
+ * Первая редакция печатала все числа одинаково. На эталонной карточке
+ * это сразу вылезло: удой стоял с надёжностью 82 %, фертильность дочерей
+ * — с 36 %, и оба обычным шрифтом. Разница не в аккуратности данных,
+ * а в природе признаков: у фертильности наследуемость 0,04, и той же
+ * полусотни дочерей ей хватает на треть надёжности вместо четырёх пятых.
+ * Читатель, не знающий этого, складывает два числа в одну картину быка
+ * и получает уверенность, которой нет.
+ *
+ * Колонка R стояла рядом и всё это честно сообщала — но колонка сообщает
+ * тому, кто в неё посмотрел, а бледный шрифт виден раньше, чем прочитан.
+ *
+ * ## Почему бледнее, а не спрятано
+ *
+ * Соблазн был прятать прогноз до порога надёжности. Так делать нельзя:
+ * слабая оценка — это всё же оценка, и она нужна тому, кто выбирает
+ * молодого быка осознанно. Спрятать её значит решить за покупателя;
+ * приглушить — предупредить его.
+ */
 function MetricTable({
   head,
   rows,
@@ -164,28 +200,53 @@ function MetricTable({
   head: string[]
   rows: { label: string; unit?: string; forecast?: number | null; r?: number | null; digits?: number }[]
 }) {
+  const weak = rows.some((r) => typeof r.r === 'number' && r.r > 0 && r.r < WEAK_RELIABILITY)
+
   return (
-    <table className="metric-table">
-      <thead>
-        <tr>
-          {head.map((h, i) => (
-            <th key={h} className={i === 0 ? '' : 'text-right'} colSpan={i === 0 ? 2 : 1}>
-              {h}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((r) => (
-          <tr key={r.label + (r.unit ?? '')}>
-            <td>{r.label}</td>
-            <td className="w-14 text-ink-500">{r.unit ?? ''}</td>
-            <td className="text-right tabular-nums">{nf(r.forecast, r.digits ?? 2)}</td>
-            <td className="w-20 text-right tabular-nums">{nf(r.r, 1)}</td>
+    <>
+      <table className="metric-table">
+        <thead>
+          <tr>
+            {head.map((h, i) => (
+              <th key={h} className={i === 0 ? '' : 'text-right'} colSpan={i === 0 ? 2 : 1}>
+                {h}
+              </th>
+            ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {rows.map((r) => {
+            const low = typeof r.r === 'number' && r.r > 0 && r.r < WEAK_RELIABILITY
+            return (
+              <tr key={r.label + (r.unit ?? '')}>
+                <td>{r.label}</td>
+                <td className="w-14 text-ink-500">{r.unit ?? ''}</td>
+                <td className={`text-right tabular-nums ${low ? 'text-ink-300' : ''}`}>
+                  {nf(r.forecast, r.digits ?? 2)}
+                </td>
+                <td
+                  className={`w-20 text-right tabular-nums ${low ? 'font-medium text-accent-600' : ''}`}
+                >
+                  {nf(r.r, 1)}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+
+      {/* Пояснение появляется только там, где есть что пояснять: постоянная
+          строка под каждой таблицей превратилась бы в фон и перестала
+          читаться ровно тогда, когда понадобится */}
+      {weak && (
+        <p className="mt-3 max-w-[70ch] text-[13px] leading-relaxed text-ink-500">
+          Бледным показаны прогнозы с надёжностью ниже {nf(WEAK_RELIABILITY, 0)} %: у таких
+          признаков накопленных данных пока меньше половины нужного, и значение может заметно
+          измениться. Это не ошибка в карточке — у признаков с низкой наследуемостью надёжность
+          растёт медленнее, и одного и того же числа дочерей им хватает на меньшее.
+        </p>
+      )}
+    </>
   )
 }
 
@@ -962,6 +1023,32 @@ export default async function AnimalPage({
                 </Collapsible>
 
                 {/*
+                   Здоровье и долголетие идут сразу за продуктивностью,
+                   а отёлы вынесены в самый низ группы — так же, как
+                   в каталогах CDCB и Lactanet.
+
+                   Порядок отвечает вопросам покупателя семени в том
+                   порядке, в каком тот их задаёт: сколько даст молока,
+                   сколько проживёт, придёт ли в охоту, оплодотворит ли
+                   семя, легко ли отелится. Прежний порядок был порядком
+                   полей в коллекции — то есть историей того, как их
+                   заводили, а не смыслом.
+                */}
+                <Collapsible
+                  title={isBull ? 'Здоровье и долголетие дочерей' : 'Здоровье и долголетие'}
+                  aside={<ReliabilityNote value={animal.health?.reliabilityLevel} />}
+                  defaultOpen
+                >
+                  <MetricTable
+                    head={['Индексы', 'Прогноз', 'R, %']}
+                    rows={LONGEVITY_TRAITS.map((t) => {
+                      const v = (animal!.health as Record<string, { forecast?: number | null; r?: number | null }> | undefined)?.[t.key]
+                      return { label: t.label, unit: t.unit, forecast: v?.forecast, r: v?.r, digits: 1 }
+                    })}
+                  />
+                </Collapsible>
+
+                {/*
                    У быка две разные фертильности, и они не связаны:
                    собственная оплодотворяющая способность семени
                    и способность дочерей приходить в охоту. В книге пока
@@ -987,12 +1074,6 @@ export default async function AnimalPage({
                   />
                 </Collapsible>
 
-                {/*
-                   «Признаки здоровья животного» у быка читались как его
-                   собственные — то есть как здоровье вымени, которого
-                   у него нет. Это прогноз по дочерям, и так он теперь
-                   и назван.
-                */}
                 {/*
                    Семя стоит отдельным блоком между дочерними,
                    и это разделение физическое, а не подписью.
@@ -1042,14 +1123,33 @@ export default async function AnimalPage({
                     </Collapsible>
                   )}
 
+                {/*
+                   Отёлы вынесены из «Здоровья» в свою группу.
+
+                   Лёгкость отёла и смертность приплода лежат в тех же
+                   полях коллекции, что и здоровье вымени, — но отвечают
+                   на другой вопрос: не «как дочь проживёт лактацию»,
+                   а «переживёт ли она отёл и выживет ли телёнок».
+                   Так их и разделяют CDCB, Lactanet и европейцы,
+                   и покупатель спрашивает про отёлы отдельно, обычно
+                   раньше вопроса о долголетии.
+
+                   Чего мы за ними не повторяем — разделения лёгкости
+                   отёла на «как отец» и «как дед по матери». Различать
+                   их правильно: это два разных числа, легко ли телятся
+                   осеменённые им коровы и легко ли телятся его дочери.
+                   Но данных у нас нет ни под одно, ни под другое
+                   в отдельности, и две колонки из одного числа были бы
+                   не точностью, а её изображением.
+                */}
                 <Collapsible
-                  title={isBull ? 'Здоровье дочерей' : 'Признаки здоровья животного'}
-                  aside={<ReliabilityNote value={animal.health?.reliabilityLevel} />}
+                  title={isBull ? 'Отёлы у дочерей' : 'Отёлы'}
+                  note="Лёгкость отёла и судьба телёнка — отдельная группа, а не часть здоровья"
                   defaultOpen
                 >
                   <MetricTable
                     head={['Индексы', 'Прогноз', 'R, %']}
-                    rows={HEALTH_TRAITS.map((t) => {
+                    rows={CALVING_TRAITS.map((t) => {
                       const v = (animal!.health as Record<string, { forecast?: number | null; r?: number | null }> | undefined)?.[t.key]
                       return { label: t.label, unit: t.unit, forecast: v?.forecast, r: v?.r, digits: 1 }
                     })}
