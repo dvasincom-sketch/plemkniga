@@ -50,6 +50,8 @@
     "check:xlsx": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-xlsx.ts",
     "check:csv": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-csv.ts",
     "check:time": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-time.ts",
+    "check:searches": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-searches.ts",
+    "bench": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/bench.ts",
     "seed:checks": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/seed-checks.ts",
     "seed:afc": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/seed-afc.ts",
     "smoke": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/smoke.ts"

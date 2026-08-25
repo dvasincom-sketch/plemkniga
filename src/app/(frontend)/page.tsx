@@ -5,10 +5,12 @@ import { WhyJoin } from '@/components/WhyJoin'
 import { ImageSlot } from '@/components/ImageSlot'
 import { SearchPanel } from '@/components/SearchPanel'
 import { ResultsBar } from '@/components/ResultsBar'
+import { SavedSearches } from '@/components/SavedSearches'
 import { EmptyResults } from '@/components/EmptyResults'
 import { AnimalTable } from '@/components/AnimalTable'
 import { AnimalCards } from '@/components/AnimalCards'
 import { getClient, getCurrentUser } from '@/lib/payload'
+import { filterQueryOf, loadSavedSearches } from '@/lib/saved-searches'
 import { viewerOf } from '@/lib/visibility'
 import {
   NOT_ARCHIVED,
@@ -50,6 +52,13 @@ export default async function HerdbookPage({
 
   const where = buildAnimalWhere(sp)
   const hasActive = hasActiveFilters(sp)
+
+  /*
+   * Отборы читаются правилами доступа от имени читателя, а не отдельным
+   * условием: правило видимости одно, и лежит оно в `savedSearchRead`.
+   * Гостю список приходит пустым, и ряд не рисуется.
+   */
+  const savedSearches = await loadSavedSearches(payload, user, 'book')
 
   /*
    * Профиль расчёта: явный выбор в адресе, иначе основной профиль хозяйства.
@@ -369,6 +378,21 @@ export default async function HerdbookPage({
               )
             })}
           </div>
+
+          {/*
+             Свои отборы стоят сразу под быстрыми, потому что это одно
+             и то же действие — готовый отбор в одно нажатие; разница
+             лишь в том, кто его придумал. Гостю ряд не показывается
+             вовсе: сохранять некуда, и предложение завело бы разговор
+             о регистрации там, где человек ищет корову.
+          */}
+          <SavedSearches
+            items={savedSearches}
+            place="book"
+            currentQuery={filterQueryOf(sp)}
+            hasActive={hasActive}
+            basePath="/"
+          />
 
           <div className="mt-7">
             <ResultsBar

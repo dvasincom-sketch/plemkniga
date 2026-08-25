@@ -5,7 +5,9 @@ import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { AccountNav, ACCOUNT_TABS, type AccountTabKey } from '@/components/AccountNav'
 import { SearchPanel } from '@/components/SearchPanel'
+import { filterQueryOf, loadSavedSearches } from '@/lib/saved-searches'
 import { ResultsBar } from '@/components/ResultsBar'
+import { SavedSearches } from '@/components/SavedSearches'
 import { HerdSelection } from '@/components/HerdSelection'
 import { farmTodo } from '@/lib/todo'
 import { AnimalTable } from '@/components/AnimalTable'
@@ -48,7 +50,7 @@ import { indexValuesLag } from '@/lib/index-values'
 import { ASSOCIATION_PROFILE } from '@/lib/breeding-index'
 import { loadOwnProfiles, selectProfile } from '@/lib/index-profiles'
 import type { Where } from 'payload'
-import type { Animal, Organization } from '@/payload-types'
+import type { Animal, Organization, User } from '@/payload-types'
 
 export const metadata: Metadata = { title: 'Личный кабинет' }
 export const dynamic = 'force-dynamic'
@@ -267,7 +269,7 @@ export default async function AccountPage({
             {tab === 'herd' && (
               <>
                 {herdSubResolved === 'list' && (
-                  <AnimalsTab sp={sp} orgId={orgId} userId={user.id} viewer={viewer} />
+                  <AnimalsTab sp={sp} orgId={orgId} user={user} viewer={viewer} />
                 )}
                 {herdSubResolved === 'reports' && <HerdReports />}
                 {herdSubResolved === 'documents' && <DocumentsTab orgId={orgId} />}
@@ -553,14 +555,22 @@ function HerdReports() {
 async function AnimalsTab({
   sp,
   orgId,
-  userId,
+  user,
   viewer,
 }: {
   sp: SearchParams
   orgId?: number
-  userId: number | string
+  /*
+   * Раньше сюда приходил только `userId`. Список сохранённых отборов
+   * читается правилами доступа от имени читателя, а правилу нужен
+   * пользователь целиком — с ролью в хозяйстве и с организацией.
+   * Собирать его здесь заново из одного идентификатора значило бы
+   * сходить в базу за тем, что вызывающий уже держит в руках.
+   */
+  user: User
   viewer: Viewer
 }) {
+  const userId = user.id
   const payload = await getClient()
   const page = currentPage(sp)
   const perPage = resolvePageSize(sp)
@@ -589,6 +599,14 @@ async function AnimalsTab({
    * тем самым, который хозяйство себе назначило.
    */
   const profile = await selectProfile(one(sp.profile), orgId)
+
+  /*
+   * Отборы читаются правилами доступа от имени читателя: правило
+   * видимости записано один раз, в `savedSearchRead`, и повторять его
+   * здесь своим условием значило бы завести вторую копию, которая
+   * разойдётся с первой при первой же правке.
+   */
+  const savedSearches = await loadSavedSearches(payload, user, 'herd')
 
   const [result, herdsResult, total, archivedTotal] = await Promise.all([
     profile
@@ -720,6 +738,21 @@ async function AnimalsTab({
            видел таблицу и не знал, сколько в ней записей и почему именно
            эти. Условия отбора приходилось искать в свёрнутой форме.
         */}
+        {/*
+           Отборы кабинета отделены от отборов книги признаком места.
+           Условия у них общие, а смысл разный: в книге отбор идёт по всем
+           хозяйствам, здесь — по своему стаду, и часть полей («Автор
+           записи») в книге не существует вовсе. Показать «свой» набор
+           в книге технически можно, и он дал бы не то, чего от него ждут.
+        */}
+        <SavedSearches
+          items={savedSearches}
+          place="herd"
+          currentQuery={filterQueryOf(sp)}
+          hasActive={filtered}
+          basePath="/account?tab=herd"
+        />
+
         <ResultsBar
           sp={sp}
           total={result.totalDocs ?? 0}

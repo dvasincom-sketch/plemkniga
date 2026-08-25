@@ -478,3 +478,63 @@ export const ownOrganization: Access = ({ req: { user } }) => {
   if (!org) return false
   return { id: { equals: org } }
 }
+
+/* ------------------------------------------------------------------ */
+/*  Сохранённые отборы                                                 */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Свой отбор виден всегда, чужой — только если открыт хозяйству.
+ *
+ * Ассоциация сюда не допущена, и это осознанно. Отбор — рабочий черновик
+ * зоотехника: «коровы, которых я подозреваю», «то, что надо перемерить».
+ * Ничего секретного в нём нет, и всё же это чужая кухня, а видимость
+ * без надобности — это видимость, которую однажды используют не по делу.
+ * Администратору доступ оставлен: без него не разобрать поломку.
+ */
+export const savedSearchRead: Access = ({ req: { user } }) => {
+  const u = user as U | null
+  if (!u) return false
+  if (u.role === 'admin') return true
+
+  const or: Where[] = [{ author: { equals: u.id } }]
+  const org = orgId(u)
+  if (org) or.push({ and: [{ organization: { equals: org } }, { scope: { equals: 'organization' } }] })
+  return { or }
+}
+
+/**
+ * Править отбор может только автор.
+ *
+ * Соблазн был разрешить руководителю править общие: он за хозяйство
+ * отвечает. Но правка отбора — это изменение его смысла: сдвинутый порог
+ * удоя превращает «кандидатов на выбраковку» в другой список под тем же
+ * названием, и тот, кто на него опирался, узнает об этом последним.
+ * Удалить общий отбор руководитель может (`savedSearchDelete`) — исчезнувший
+ * набор виден сразу, подменённый не виден никогда.
+ */
+export const savedSearchWrite: Access = ({ req: { user } }) => {
+  const u = user as U | null
+  if (!u) return false
+  if (u.role === 'admin') return true
+  return { author: { equals: u.id } }
+}
+
+/**
+ * Удалять — автор, а общие отборы хозяйства ещё и руководитель.
+ *
+ * Иначе набор, оставшийся от уволившегося зоотехника, не убрать никем:
+ * человека у нас блокируют, а не удаляют (решение №109), значит автор
+ * формально жив и правило «только автор» держало бы мусор вечно.
+ */
+export const savedSearchDelete: Access = ({ req: { user } }) => {
+  const u = user as U | null
+  if (!u) return false
+  if (u.role === 'admin') return true
+
+  const or: Where[] = [{ author: { equals: u.id } }]
+  const org = orgId(u)
+  if (org && u.orgRole === 'head')
+    or.push({ and: [{ organization: { equals: org } }, { scope: { equals: 'organization' } }] })
+  return { or }
+}

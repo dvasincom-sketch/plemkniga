@@ -281,6 +281,11 @@ const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
     probe: { kind: 'table', name: 'operations' },
     note: 'сводный журнал операций',
   },
+  {
+    name: '20260826_140000_saved_searches',
+    probe: { kind: 'table', name: 'saved_searches' },
+    note: 'именованные отборы животных',
+  },
 ]
 
 const { driverUri, uri, source, sslConfig } = resolveDatabase()

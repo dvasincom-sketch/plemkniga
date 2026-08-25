@@ -13,6 +13,7 @@ import { Animals } from '@/collections/Animals'
 import { Events } from '@/collections/Events'
 import { Movements } from '@/collections/Movements'
 import { Documents } from '@/collections/Documents'
+import { SavedSearches } from '@/collections/SavedSearches'
 import { Media } from '@/collections/Media'
 import { Inseminations } from '@/collections/Inseminations'
 import { MilkTests } from '@/collections/MilkTests'
@@ -94,6 +95,7 @@ export default buildConfig({
     Events,
     Documents,
     Media,
+    SavedSearches,
     ...DICTIONARY_COLLECTIONS,
   ],
   editor: lexicalEditor(),

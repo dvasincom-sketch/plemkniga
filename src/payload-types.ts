@@ -96,6 +96,7 @@ export interface Config {
     events: Event;
     documents: Document;
     media: Media;
+    'saved-searches': SavedSearch;
     breeds: Breed;
     lines: Line;
     'breeding-categories': BreedingCategory;
@@ -147,6 +148,7 @@ export interface Config {
     events: EventsSelect<false> | EventsSelect<true>;
     documents: DocumentsSelect<false> | DocumentsSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
+    'saved-searches': SavedSearchesSelect<false> | SavedSearchesSelect<true>;
     breeds: BreedsSelect<false> | BreedsSelect<true>;
     lines: LinesSelect<false> | LinesSelect<true>;
     'breeding-categories': BreedingCategoriesSelect<false> | BreedingCategoriesSelect<true>;
@@ -1798,6 +1800,30 @@ export interface Document {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "saved-searches".
+ */
+export interface SavedSearch {
+  id: number;
+  /**
+   * Как отбор назовут в списке: «Коровы на выбраковку»
+   */
+  name: string;
+  place: 'book' | 'herd';
+  /**
+   * Строка запроса — то же, что стоит в адресе страницы после «?»
+   */
+  query: string;
+  scope: 'private' | 'organization';
+  author: number | User;
+  /**
+   * Чьё это хозяйство — от него зависит, кому виден общий отбор
+   */
+  organization?: (number | null) | Organization;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -1935,6 +1961,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'media';
         value: number | Media;
+      } | null)
+    | ({
+        relationTo: 'saved-searches';
+        value: number | SavedSearch;
       } | null)
     | ({
         relationTo: 'breeds';
@@ -2995,6 +3025,20 @@ export interface MediaSelect<T extends boolean = true> {
               filename?: T;
             };
       };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "saved-searches_select".
+ */
+export interface SavedSearchesSelect<T extends boolean = true> {
+  name?: T;
+  place?: T;
+  query?: T;
+  scope?: T;
+  author?: T;
+  organization?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
