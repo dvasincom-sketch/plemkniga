@@ -38,10 +38,17 @@ import { TRAIT_BASE } from '@/lib/breeding-index'
  *   npm run seed:bull-card -- --daughters 60  — сколько дочерей ему приписать
  *   npm run seed:bull-card -- --undo          — убрать дописанное
  *
- * Скрипт **не заводит животных**: он заполняет поля уже существующего
- * быка и, при необходимости, приписывает ему уже существующих коров
- * в дочери. Заводить синтетических животных умеет `seed:bulk`, и делать
- * это дважды разными способами незачем.
+ * ## Про заведение дочерей
+ *
+ * Первая редакция обещала животных не заводить: плодить синтетику двумя
+ * способами незачем, для этого есть `seed:bulk`. Обещание оказалось
+ * недостижимым — свободных коров без отца на заполненной базе четыре,
+ * а эталонной карточке нужно полсотни. Выбор был между «завести»
+ * и «не показать образец вовсе».
+ *
+ * Поэтому порядок такой: сначала берутся коровы без отца, и только
+ * недостающих скрипт заводит сам. Приписанную дочь откат отпускает
+ * (она существовала до нас), заведённую — удаляет.
  */
 
 const TAG = 'SEED-BULL-CARD'
@@ -94,12 +101,30 @@ const shifted = (min: number, max: number, i: number): number => {
 async function main() {
   const payload = await getPayload({ config })
 
+  /*
+   * Бык по умолчанию выбирается не «первый попавшийся».
+   *
+   * Первый прогон взял «Молодого быка» — запись из `seed:checks`,
+   * заведённую ровно для случая «дочерей слишком мало, оценку показывать
+   * рано». Делать эталон из неё — всё равно что учить на исключении.
+   *
+   * Поэтому требуется заполненная оценка: у служебных записей её нет,
+   * а у настоящего быка она есть по определению. И берётся лучший
+   * по индексу: образец должен показывать полную карточку, а полная
+   * она у того, о ком книга знает больше.
+   */
   const ident = arg('ident')
   const found = await payload.find({
     collection: 'animals',
     where: ident
       ? { identNumber: { equals: ident } }
-      : { and: [{ kind: { equals: 'bull' } }, { archived: { not_equals: true } }] },
+      : {
+          and: [
+            { kind: { equals: 'bull' } },
+            { archived: { not_equals: true } },
+            { ipc: { exists: true } },
+          ],
+        },
     limit: 1,
     depth: 0,
     sort: '-ipc',
@@ -134,15 +159,45 @@ async function main() {
       overrideAccess: true,
     })
 
-    console.log(`Отпускаем дочерей: ${daughters.docs.length}`)
-    if (!DRY)
-      for (const d of daughters.docs)
+    /*
+     * Откат различает две судьбы, и это важнее краткости.
+     *
+     * Приписанную дочь мы только пометили — она существовала до нас,
+     * и удалить её значило бы унести чужую запись. Заведённую дочь мы
+     * создали сами, и оставить её после отката значит оставить в книге
+     * животное, которого не было и не будет.
+     *
+     * Различаются они по тексту отметки: «отец приписан» против «дочь
+     * заведена». Отметка в самой записи здесь работает как единственный
+     * достоверный след — списка рядом со скриптом мы намеренно не ведём.
+     */
+    const created = daughters.docs.filter((d) => String(d.notes ?? '').includes('дочь заведена'))
+    const linked = daughters.docs.filter((d) => !String(d.notes ?? '').includes('дочь заведена'))
+
+    console.log(`Отпускаем приписанных: ${linked.length}, удаляем заведённых: ${created.length}`)
+
+    if (!DRY) {
+      for (const d of linked)
         await payload.update({
           collection: 'animals',
           id: d.id,
           data: { father: null, notes: String(d.notes ?? '').replace(new RegExp(`\\s*${TAG}[^\\n]*`), '') },
           overrideAccess: true,
         })
+
+      for (const d of created)
+        await payload
+          .delete({ collection: 'animals', id: d.id, overrideAccess: true })
+          /*
+           * Отказ удаления не роняет откат: на дочь могли успеть
+           * сослаться — выдать свидетельство, записать отёл. Такая
+           * запись остаётся, и об этом сказано вслух: молчаливый пропуск
+           * означал бы «убрано всё», что неправда.
+           */
+          .catch((e: unknown) => {
+            console.error(`  ! ${d.identNumber} не удалена: ${e instanceof Error ? e.message : e}`)
+          })
+    }
 
     if (!DRY)
       await payload.update({
@@ -174,63 +229,175 @@ async function main() {
   const need = Math.max(0, DAUGHTERS - already.totalDocs)
   console.log(`  дочерей сейчас: ${already.totalDocs}, нужно ${DAUGHTERS}, добираем ${need}`)
 
-  if (need > 0) {
+  /*
+   * Сначала берутся коровы без отца, и только потом заводятся новые.
+   *
+   * Приписать себе чужую дочь значит испортить чужую карточку заодно
+   * со своей, поэтому кандидаты — только записи без отца. Их на живой
+   * базе почти нет: массовый сид всем дочерям отца проставляет.
+   *
+   * Первая редакция на этом и останавливалась — брала сколько нашлось
+   * и печатала, что набрала пятьдесят пять. Это ровно та ошибка,
+   * за которую в этом проекте ругают чужой код: показывать намерение
+   * вместо факта. Теперь недостающих заводим, а печатаем то, что вышло.
+   */
+  const free = need
+    ? await payload.find({
+        collection: 'animals',
+        where: {
+          and: [
+            { sex: { equals: 'female' } },
+            { father: { exists: false } },
+            { archived: { not_equals: true } },
+            { 'summary.milkYield': { exists: true } },
+          ],
+        },
+        limit: need,
+        depth: 0,
+        overrideAccess: true,
+      })
+    : { docs: [] as { id: number | string; notes?: unknown }[] }
+
+  console.log(`  свободных коров нашлось: ${free.docs.length}`)
+
+  if (!DRY)
+    for (const cow of free.docs)
+      await payload.update({
+        collection: 'animals',
+        id: cow.id,
+        data: {
+          father: bull.id,
+          /*
+           * Отметка в самой записи, а не список рядом со скриптом:
+           * запись, которая помнит, откуда взялась, не разъедется
+           * с базой при первом же ручном удалении. Тот же приём,
+           * что в `seed:afc` (решение №126).
+           */
+          notes: `${String(cow.notes ?? '')}\n${TAG}: отец приписан для эталонной карточки`.trim(),
+        },
+        overrideAccess: true,
+      })
+
+  /* ---------------------------------------------------------------- */
+  const toCreate = Math.max(0, need - free.docs.length)
+
+  if (toCreate > 0) {
     /*
-     * В дочери берутся коровы без отца: приписать себе чужую дочь значит
-     * испортить чужую карточку заодно со своей. Ищутся они по всей книге,
-     * а не в одном хозяйстве, — эффект стада неотделим от эффекта быка,
-     * если все дочери в одном месте, и карточка с одним хозяйством
-     * никогда не покажет официальную оценку.
+     * Заводить животных пришлось, хотя первая редакция скрипта обещала
+     * этого не делать.
+     *
+     * Обещание было разумным — плодить синтетику двумя способами незачем,
+     * — и недостижимым: свободных коров на заполненной базе четыре,
+     * а эталонной карточке нужно полсотни. Выбор был между «завести»
+     * и «не показать образец вовсе».
+     *
+     * Заведённые дочери помечены и убираются откатом целиком, в отличие
+     * от приписанных — тем откат только возвращает отца в пустое.
      */
-    const free = await payload.find({
-      collection: 'animals',
-      where: {
-        and: [
-          { sex: { equals: 'female' } },
-          { father: { exists: false } },
-          { archived: { not_equals: true } },
-          { 'summary.milkYield': { exists: true } },
-        ],
-      },
-      limit: need,
-      depth: 0,
+    const herdsRes = await payload.find({
+      collection: 'herds',
+      limit: 12,
+      depth: 1,
       overrideAccess: true,
     })
 
-    console.log(`  нашлось свободных коров: ${free.docs.length}`)
+    if (!herdsRes.docs.length) {
+      console.log('  ! стад в книге нет — завести дочерей некуда. Сначала npm run seed')
+    } else {
+      console.log(`  заводим новых: ${toCreate} в ${herdsRes.docs.length} стадах`)
 
-    if (!DRY)
-      for (const cow of free.docs)
-        await payload.update({
+      const stamp = String(Date.now()).slice(-7)
+
+      let made = 0
+      for (let i = 0; i < toCreate * 2 && made < toCreate && !DRY; i++) {
+        /*
+         * Дочери раскладываются по стадам по кругу, а не сваливаются
+         * в одно. При одном хозяйстве эффект стада неотделим от эффекта
+         * быка, и карточка никогда не покажет официальную оценку —
+         * то есть образец учил бы неверному.
+         */
+        const herd = herdsRes.docs[i % herdsRes.docs.length]!
+        const owner =
+          typeof herd.organization === 'object' && herd.organization
+            ? (herd.organization as { id: number }).id
+            : (herd.organization as number | undefined)
+
+        /*
+         * Стадо без организации пропускается, а не заводится с пустым
+         * владельцем: владелец у животного обязателен, и запись без него
+         * не примет ни база, ни правила видимости — она была бы невидима
+         * всем, включая того, кто её завёл.
+         */
+        if (typeof owner !== 'number') continue
+
+        const milk = Math.round(shifted(6800, 11200, i + 100))
+        const fat = round(shifted(3.5, 4.3, i + 200), 2)
+        const protein = round(shifted(3.0, 3.5, i + 300), 2)
+
+        await payload.create({
           collection: 'animals',
-          id: cow.id,
-          data: {
-            father: bull.id,
-            /*
-             * Отметка в самой записи, а не список рядом со скриптом:
-             * запись, которая помнит, откуда взялась, не разъедется
-             * с базой при первом же ручном удалении. Тот же приём,
-             * что в `seed:afc` (решение №126).
-             */
-            notes: `${String(cow.notes ?? '')}\n${TAG}: отец приписан для эталонной карточки`.trim(),
-          },
           overrideAccess: true,
+          data: {
+            identNumber: `98${stamp}${String(i).padStart(3, '0')}`,
+            idFormat: 'internal',
+            name: `Дочь ${i + 1}`,
+            sex: 'female',
+            kind: 'cow',
+            ageGroup: i % 3 === 0 ? 'firstCalf' : 'cow2',
+            state: 'alive',
+            owner,
+            herd: herd.id,
+            /*
+             * Дата рождения разложена по годам: карточка показывает
+             * дочерей по годам рождения, и все ровесницы превратили бы
+             * этот разбор в одну строку.
+             */
+            birthDate: new Date(
+              Date.UTC(2019 + (i % 5), (i * 3) % 12, 1 + (i % 27)),
+            ).toISOString(),
+            summary: {
+              milkYield: milk,
+              fatPercent: fat,
+              proteinPercent: protein,
+              fatKg: round((milk * fat) / 100, 1),
+              proteinKg: round((milk * protein) / 100, 1),
+              fatProteinSum: round((milk * (fat + protein)) / 100, 1),
+            },
+            father: bull.id,
+            notes: `${TAG}: дочь заведена для эталонной карточки`,
+          },
         })
+        made += 1
+      }
+    }
   }
 
-  const daughters = Math.max(already.totalDocs, DAUGHTERS)
-
-  const herdsRes = await payload.find({
+  /* ---------------------------------------------------------------- */
+  /*
+   * Факт, а не намерение: считаем то, что получилось, и печатаем это.
+   * При пробном прогоне цифры остаются прежними — и сказано, почему.
+   */
+  const after = await payload.find({
     collection: 'animals',
     where: { father: { equals: bull.id } },
     limit: 1000,
     depth: 0,
     overrideAccess: true,
   })
-  const herds = new Set(herdsRes.docs.map((d) => String(d.herd ?? ''))).size
+
+  const daughters = after.docs.length
+  const herds = new Set(
+    after.docs
+      .map((d) => (typeof d.herd === 'object' && d.herd ? (d.herd as { id: number }).id : d.herd))
+      .filter((v) => v !== null && v !== undefined),
+  ).size
 
   const status = bullStatus(daughters, herds)
-  console.log(`  стало: ${daughters} дочерей в ${herds} стадах → ${status.label.toLowerCase()}`)
+  console.log(
+    DRY
+      ? `  сейчас: ${daughters} дочерей в ${herds} стадах (пробный прогон — ничего не менялось)`
+      : `  стало: ${daughters} дочерей в ${herds} стадах → ${status.label.toLowerCase()}`,
+  )
   if (status.missing) console.log(`  ! до следующей ступени: ${status.missing}`)
 
   /* ---------------------------------------------------------------- */
