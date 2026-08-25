@@ -11,20 +11,10 @@ import { getClient, getCurrentUser } from '@/lib/payload'
 import { denyAssociation } from '@/lib/association'
 import { SUBMISSION_KINDS, SUBMISSION_STATUSES } from '@/collections/DataSubmissions'
 import { labelOf } from '@/lib/dictionaries'
+import { Moment } from '@/components/Moment'
 
 export const metadata: Metadata = { title: 'Пакет загрузки данных' }
 export const dynamic = 'force-dynamic'
-
-const dateTimeRu = (v?: string | null) => {
-  if (!v) return '—'
-  const d = new Date(v)
-  if (Number.isNaN(d.getTime())) return '—'
-  return `${d.toLocaleDateString('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  })} в ${d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`
-}
 
 const fileSize = (bytes?: number | null) => {
   if (!bytes) return ''
@@ -146,7 +136,7 @@ export default async function SubmissionPage({
             <div className="flex flex-wrap items-start justify-between gap-4">
               <p className="text-[15px]">{labelOf(SUBMISSION_STATUSES, submission.status)}</p>
               <p className="text-[15px] text-ink-500">
-                {dateTimeRu(submission.review?.checkedAt ?? submission.submittedAt)}
+                <Moment iso={submission.review?.checkedAt ?? submission.submittedAt} />
               </p>
             </div>
 
@@ -345,7 +335,7 @@ export default async function SubmissionPage({
                         )}
                         {h.note && <span className="text-ink-500"> · {h.note}</span>}
                       </span>
-                      <span className="text-ink-500">{dateTimeRu(h.at)}</span>
+                      <Moment iso={h.at} className="text-ink-500" />
                     </li>
                   ))}
                 </ul>

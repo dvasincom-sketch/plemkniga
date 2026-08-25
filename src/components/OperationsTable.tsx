@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Moment } from '@/components/Moment'
 import { operationGroup, operationLabel, OPERATION_GROUPS } from '@/lib/operations'
 import type { Operation } from '@/payload-types'
 
@@ -20,15 +21,6 @@ import type { Operation } from '@/payload-types'
  * Поэтому ссылками сделаны только животные, и то по идентификатору,
  * который переживает переименование.
  */
-
-const dt = (iso: string): string =>
-  new Date(iso).toLocaleString('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
 
 const GROUP_TONE: Record<string, string> = {
   accounts: 'text-ink-700',
@@ -80,7 +72,9 @@ export function OperationsTable({
 
             return (
               <tr key={r.id}>
-                <td className="whitespace-nowrap text-ink-500 tabular-nums">{dt(r.at)}</td>
+                <td className="whitespace-nowrap text-ink-500 tabular-nums">
+                  <Moment iso={r.at} />
+                </td>
                 <td className={group ? GROUP_TONE[group] : ''}>{operationLabel(r.action)}</td>
                 <td>{r.actorName || '—'}</td>
                 {showOrganization && <td className="text-ink-500">{org ?? '—'}</td>}

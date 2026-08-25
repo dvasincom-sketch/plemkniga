@@ -11,7 +11,7 @@ import { AccessDecision } from '@/components/AccessDecision'
 import { MarkNotificationsSeen } from '@/components/MarkNotificationsSeen'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { loadNotifications, type Notification, type NotificationKind } from '@/lib/notifications'
-import { dateTimeRu } from '@/lib/format'
+import { Moment } from '@/components/Moment'
 
 export const metadata: Metadata = { title: 'Уведомления' }
 export const dynamic = 'force-dynamic'
@@ -182,7 +182,7 @@ export default async function NotificationsPage({
                   {n.unread && (
                     <span className="rounded-md bg-brand-50 px-2 py-0.5 text-forest-600">Новое</span>
                   )}
-                  <span className="text-ink-500">{dateTimeRu(n.at)}</span>
+                  <Moment iso={n.at} className="text-ink-500" />
                 </div>
 
                 <p className="mt-2.5 text-[17px] font-medium leading-snug">{n.title}</p>
