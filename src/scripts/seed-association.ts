@@ -51,54 +51,67 @@ const UNDO = process.argv.includes('--undo')
 
 const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString()
 
-async function main() {
-  const payload = await getPayload({ config })
+/**
+ * Убрать всё, что этот сид когда-либо создавал.
+ *
+ * Зовётся и откатом, и началом обычного прогона. Второе важнее первого:
+ * номера пакетов уникальны, и повтор без уборки падал бы на дубликате
+ * — причём падал бы на середине, оставив кабинет наполовину заполненным.
+ * Сид, который нельзя запустить дважды, на деле нельзя запустить и один
+ * раз: первый же прогон обрывается на незнакомом значении справочника,
+ * и дальше нужен именно повтор.
+ *
+ * Ищем по номеру, а не по метке в тексте. Комментарий у пакета лежит
+ * внутри группы разбора, а не в корне записи, и отбор по нему ничего
+ * не находил бы молча — уборка сообщала бы «удалено ноль» на полном
+ * кабинете. Номер же виден и человеку: ПД-2026-9xx и ЗВ-2026-9xx
+ * заведомо наши, настоящие нумеруются с единицы.
+ */
+async function removeSeeded(payload: Awaited<ReturnType<typeof getPayload>>): Promise<number> {
+  let removed = 0
 
-  /* ------------------------------ Откат ------------------------------ */
-  if (UNDO) {
-    let removed = 0
-
-    /*
-     * Ищем по номеру, а не по комментарию.
-     *
-     * Комментарий у пакета лежит внутри группы разбора, а не в корне
-     * записи, и отбор по нему просто ничего не находил бы — молча,
-     * что хуже ошибки: откат сообщал бы «удалено ноль» на полном кабинете.
-     * Номер же виден и человеку: ПД-2026-9xx и ЗВ-2026-9xx — заведомо
-     * наши, настоящие пакеты нумеруются с единицы.
-     */
-    for (const [collection, prefix] of [
-      ['data-submissions', 'ПД-'],
-      ['verification-requests', 'ЗВ-'],
-    ] as const) {
-      const { docs } = await payload.find({
-        collection,
-        where: { number: { like: prefix } },
-        limit: 200,
-        depth: 0,
-        overrideAccess: true,
-      })
-      for (const d of docs) {
-        await payload.delete({ collection, id: d.id, overrideAccess: true })
-        removed += 1
-      }
-    }
-
-    const cols = await payload.find({
-      collection: 'pending-columns',
-      where: { dataset: { like: TAG } },
+  for (const [collection, prefix] of [
+    ['data-submissions', 'ПД-'],
+    ['verification-requests', 'ЗВ-'],
+  ] as const) {
+    const { docs } = await payload.find({
+      collection,
+      where: { number: { like: prefix } },
       limit: 200,
       depth: 0,
       overrideAccess: true,
     })
-    for (const d of cols.docs) {
-      await payload.delete({ collection: 'pending-columns', id: d.id, overrideAccess: true })
+    for (const d of docs) {
+      await payload.delete({ collection, id: d.id, overrideAccess: true })
       removed += 1
     }
+  }
 
-    console.log(`\nУдалено записей: ${removed}\n`)
+  const cols = await payload.find({
+    collection: 'pending-columns',
+    where: { dataset: { like: TAG } },
+    limit: 200,
+    depth: 0,
+    overrideAccess: true,
+  })
+  for (const d of cols.docs) {
+    await payload.delete({ collection: 'pending-columns', id: d.id, overrideAccess: true })
+    removed += 1
+  }
+
+  return removed
+}
+
+async function main() {
+  const payload = await getPayload({ config })
+
+  if (UNDO) {
+    console.log(`\nУдалено записей: ${await removeSeeded(payload)}\n`)
     process.exit(0)
   }
+
+  const cleared = await removeSeeded(payload)
+  if (cleared > 0) console.log(`\nУбрано с прошлого прогона: ${cleared}`)
 
   /* --------------------------- Что уже есть --------------------------- */
   const orgs = await payload.find({
@@ -274,7 +287,14 @@ async function main() {
       },
     },
     {
-      status: 'withdrawn' as const,
+      /*
+       * Отзыв называется `cancelled`, а не `withdrawn`: первый прогон
+       * упал на «Следующее поле недействительно: Состояние», потому что
+       * значение я написал по смыслу, а не по справочнику. Ошибка полезная
+       * — она показывает, что перечисление проверяется, а не принимает
+       * любую строку.
+       */
+      status: 'cancelled' as const,
       purpose: 'trust' as const,
       org: 0,
       days: 30,
