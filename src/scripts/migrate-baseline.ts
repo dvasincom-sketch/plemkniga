@@ -301,6 +301,11 @@ const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
     probe: { kind: 'column', table: 'animals', column: 'ipc_details_center' },
     note: 'кто считал привезённую оценку и по какой базе',
   },
+  {
+    name: '20260828_140000_linear_score',
+    probe: { kind: 'column', table: 'animals', column: 'linear_score_height' },
+    note: 'собственный промер коровы по шкале 1–9 отдельно от передачи потомству',
+  },
 ]
 
 const { driverUri, uri, source, sslConfig } = resolveDatabase()

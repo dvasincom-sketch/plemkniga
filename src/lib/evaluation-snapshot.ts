@@ -59,15 +59,32 @@ export const snapshotOfEvaluation = (e: AnimalEvaluation) => {
   }
 }
 
-/** Плоские поля карточки, собранные из строки истории экстерьера. */
+/**
+ * Плоские поля карточки, собранные из строки истории экстерьера.
+ *
+ * Снимок ложится в `linearScore`, а не в `exterior`, и это не переименование.
+ * `animal-exteriors` — история осмотров: у каждой строки есть бонитёр,
+ * дата и лактация. То, что он намерил, — собственный промер животного
+ * по девятибалльной шкале. Группа `exterior` в карточке означает другое:
+ * что животное передаёт потомству, и заполняется она расчётом, а не
+ * осмотром.
+ *
+ * Пока снимок ложился в `exterior`, у коровы приезд бонитёра переписывал
+ * её оценку по потомству. Числа выглядели одинаково, поэтому подмена
+ * не замечалась.
+ *
+ * Композиты в снимок не идут: их бонитёр не ставит, они считаются
+ * из линейных признаков и живут на стороне оценки.
+ */
 export const snapshotOfExterior = (x: AnimalExterior) => {
   const rec = x as unknown as Record<string, unknown>
   const num = (v: unknown) => (typeof v === 'number' ? v : null)
 
   return {
-    exterior: Object.fromEntries(
-      [...EXTERIOR_TRAITS, ...EXTERIOR_COMPOSITES].map((t) => [t.key, num(rec[t.key])]),
-    ),
+    linearScore: {
+      ...Object.fromEntries(EXTERIOR_TRAITS.map((t) => [t.key, num(rec[t.key])])),
+      assessedAt: (rec.assessedAt as string | null | undefined) ?? null,
+    },
   }
 }
 

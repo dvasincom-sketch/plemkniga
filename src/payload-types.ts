@@ -466,6 +466,27 @@ export interface Animal {
       r?: number | null;
     };
   };
+  linearScore?: {
+    assessedAt?: string | null;
+    height?: number | null;
+    chestWidth?: number | null;
+    bodyDepth?: number | null;
+    bodyType?: number | null;
+    rumpAngle?: number | null;
+    rumpWidth?: number | null;
+    rearLegsRear?: number | null;
+    rearLegsSide?: number | null;
+    hoofAngle?: number | null;
+    frontLegs?: number | null;
+    movement?: number | null;
+    foreUdder?: number | null;
+    frontTeatPlacement?: number | null;
+    teatLength?: number | null;
+    udderDepth?: number | null;
+    rearUdder?: number | null;
+    centralLigament?: number | null;
+    rearTeatPlacement?: number | null;
+  };
   exterior?: {
     height?: number | null;
     chestWidth?: number | null;
@@ -2387,6 +2408,29 @@ export interface AnimalsSelect<T extends boolean = true> {
               forecast?: T;
               r?: T;
             };
+      };
+  linearScore?:
+    | T
+    | {
+        assessedAt?: T;
+        height?: T;
+        chestWidth?: T;
+        bodyDepth?: T;
+        bodyType?: T;
+        rumpAngle?: T;
+        rumpWidth?: T;
+        rearLegsRear?: T;
+        rearLegsSide?: T;
+        hoofAngle?: T;
+        frontLegs?: T;
+        movement?: T;
+        foreUdder?: T;
+        frontTeatPlacement?: T;
+        teatLength?: T;
+        udderDepth?: T;
+        rearUdder?: T;
+        centralLigament?: T;
+        rearTeatPlacement?: T;
       };
   exterior?:
     | T

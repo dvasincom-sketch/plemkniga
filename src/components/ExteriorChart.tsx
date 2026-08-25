@@ -1,5 +1,5 @@
 import { signed } from '@/lib/format'
-import { exteriorDirection, type ExteriorTrait } from '@/lib/dictionaries'
+import { exteriorDirection, linearDirection, type ExteriorTrait } from '@/lib/dictionaries'
 
 /**
  * Линейные признаки экстерьера — двумя блоками, а не одним.
@@ -195,6 +195,115 @@ function TraitRows({ rows, middle }: { rows: (ExteriorRow & { trait: ExteriorTra
         </tr>
       ))}
     </tbody>
+  )
+}
+
+/**
+ * Собственный промер животного по девятибалльной шкале.
+ *
+ * Отдельная таблица, а не режим `ExteriorChart`, и это важнее, чем кажется.
+ * Там показывается отклонение — что животное передаёт потомству; здесь балл
+ * — что бонитёр увидел у этой коровы. Свести их в один компонент значило бы
+ * сказать разметкой, что это одно и то же с разными подписями.
+ *
+ * Отсчёт ведётся от пятёрки: полоса растёт от середины шкалы в ту сторону,
+ * в какую отклонился признак. Ноль здесь не бывает — шкала начинается
+ * с единицы, — поэтому середина обозначена явной риской, а не подразумевается.
+ */
+const L_MIN = 1
+const L_MAX = 9
+const lpct = (v: number) => ((v - L_MIN) / (L_MAX - L_MIN)) * 100
+
+function ScoreBar({ score }: { score?: number | null }) {
+  if (score === null || score === undefined) return <div className="relative h-6" />
+
+  const clamped = Math.max(L_MIN, Math.min(L_MAX, score))
+  const mid = lpct(5)
+  const here = lpct(clamped)
+  const left = Math.min(mid, here)
+  const width = Math.abs(here - mid)
+
+  return (
+    <div className="relative h-6">
+      {[1, 3, 5, 7, 9].map((t) => (
+        <span
+          key={t}
+          className={`absolute top-0 h-full w-px ${t === 5 ? 'bg-ink-300' : 'bg-ink-100'}`}
+          style={{ left: `${lpct(t)}%` }}
+          aria-hidden="true"
+        />
+      ))}
+      <span
+        className="absolute top-1 h-4 rounded-[2px] bg-forest-400"
+        style={{ left: `${left}%`, width: `${Math.max(width, 0.4)}%` }}
+      />
+    </div>
+  )
+}
+
+export function LinearScoreChart({
+  traits,
+}: {
+  traits: (ExteriorRow & { trait: ExteriorTrait })[]
+}) {
+  return (
+    <table className="w-full text-sm">
+      <thead className="max-sm:hidden">
+        <tr className="bg-[#f0f0f0] text-ink-700">
+          <th className="w-[40%] rounded-tl-lg px-3.5 pb-1.5 pt-2.5 text-left font-normal">
+            Признак
+          </th>
+          <th className="px-3.5 pb-1.5 pt-2.5 text-center font-normal">Балл 1–9</th>
+          <th className="w-[22%] px-3.5 pb-1.5 pt-2.5 text-right font-normal">Что это значит</th>
+          <th className="w-[12%] rounded-tr-lg px-3.5 pb-1.5 pt-2.5 text-right font-normal">
+            Оценка
+          </th>
+        </tr>
+        <tr className="bg-[#f0f0f0] text-ink-500">
+          <th className="rounded-bl-lg" />
+          <th className="px-3.5 pb-2 font-normal">
+            <span className="relative flex h-4 w-full items-center">
+              {[1, 3, 5, 7, 9].map((t) => (
+                <span
+                  key={t}
+                  className="absolute -translate-x-1/2 text-xs tabular-nums"
+                  style={{ left: `${lpct(t)}%` }}
+                >
+                  {t}
+                </span>
+              ))}
+            </span>
+          </th>
+          <th />
+          <th className="rounded-br-lg" />
+        </tr>
+      </thead>
+
+      <tbody>
+        {traits.map((t) => (
+          <tr
+            key={t.key}
+            className="border-b border-[#ededed] last:border-0 max-sm:flex max-sm:flex-wrap max-sm:items-baseline max-sm:py-3"
+          >
+            <td className="py-2.5 pr-3 align-middle leading-snug max-sm:order-1 max-sm:w-[70%] max-sm:py-0">
+              {t.label}
+              <span className="block text-[12px] leading-snug text-ink-400">
+                {t.trait.minus} ← → {t.trait.plus}
+              </span>
+            </td>
+            <td className="px-3 align-middle max-sm:order-3 max-sm:w-full max-sm:px-0 max-sm:pt-1">
+              <ScoreBar score={t.value} />
+            </td>
+            <td className="py-2.5 pl-3 text-right align-middle text-[13px] leading-snug text-ink-700 max-sm:order-4 max-sm:w-full max-sm:py-0 max-sm:pl-0 max-sm:text-left">
+              {linearDirection(t.trait, t.value) ?? '—'}
+            </td>
+            <td className="py-2.5 pl-3 text-right align-middle tabular-nums max-sm:order-2 max-sm:w-[30%] max-sm:py-0">
+              {t.value ?? '—'}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   )
 }
 

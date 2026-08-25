@@ -5,7 +5,7 @@ import { BullProofBlock, BullStatusNote } from '@/components/BullProof'
 import { bullProof } from '@/lib/bull-proof'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
-import { ExteriorChart } from '@/components/ExteriorChart'
+import { ExteriorChart, LinearScoreChart } from '@/components/ExteriorChart'
 import { AnimalEventsTab } from '@/components/AnimalEventsTab'
 import { AnimalOriginTab } from '@/components/AnimalOriginTab'
 import { TrustBadge } from '@/components/TrustBadge'
@@ -327,6 +327,15 @@ export default async function AnimalPage({
 
   const kindLabel = labelOf(ANIMAL_KINDS, animal.kind)
   const exteriorRaw = (animal.exterior ?? {}) as Record<string, number | null | undefined>
+
+  /*
+   * Собственный промер животного — из своей группы, а не из `exterior`.
+   * Блок показывается, только если промер есть: у быка его не бывает,
+   * у коровы бывает не всегда, и пустая таблица на восемнадцать строк
+   * читается как потеря данных.
+   */
+  const linearRaw = (animal.linearScore ?? {}) as Record<string, number | null | undefined>
+  const hasLinearScore = EXTERIOR_TRAITS.some((t) => typeof linearRaw[t.key] === 'number')
 
   // Животное «своё», если принадлежит организации пользователя. От этого
   // зависит, показывать ли навигацию кабинета и куда ведёт цепочка возврата.
@@ -1452,12 +1461,50 @@ export default async function AnimalPage({
                  и Holstein USA; ошибкой была подпись, из которой
                  выходило, что у быка есть глубина вымени.
               */}
+              {/*
+                 Собственный промер — отдельным блоком и выше передачи
+                 потомству.
+
+                 Это два разных измерения, а не два взгляда на одно.
+                 Балл — что бонитёр увидел у этой коровы; отклонение —
+                 что она передаёт дочерям. Раньше они лежали в одном
+                 месте и показывались одной таблицей, так что приезд
+                 бонитёра переписывал оценку по потомству, и заметить
+                 это было нельзя: числа выглядели одинаково.
+
+                 Выше — потому что это факт, а ниже вывод. У быка блока
+                 нет вовсе: его никто не осматривал по вымени, и пустая
+                 таблица здесь означала бы недостачу данных вместо
+                 свойства животного.
+              */}
+              {hasLinearScore && (
+                <Collapsible
+                  title="Линейная оценка"
+                  note={
+                    (animal.linearScore?.assessedAt
+                      ? `Осмотр от ${dateRu(animal.linearScore.assessedAt)}. `
+                      : '') +
+                    'Собственный промер животного по девятибалльной шкале: пятёрка — среднее по породе'
+                  }
+                  defaultOpen
+                >
+                  <LinearScoreChart
+                    traits={EXTERIOR_TRAITS.map((t) => ({
+                      key: t.key,
+                      label: t.label,
+                      value: linearRaw[t.key],
+                      trait: t,
+                    }))}
+                  />
+                </Collapsible>
+              )}
+
               <Collapsible
-                title={isBull ? 'Экстерьер дочерей' : 'Экстерьер'}
+                title={isBull ? 'Экстерьер дочерей' : 'Экстерьер: передача потомству'}
                 note={
                   isBull
                     ? 'Восемнадцать линейных признаков и три композита — прогноз того, какими будут дочери'
-                    : 'Восемнадцать линейных признаков и три композита'
+                    : 'Не промер этой коровы, а то, что она передаёт дочерям: отклонение от среднего по породе'
                 }
                 defaultOpen
               >

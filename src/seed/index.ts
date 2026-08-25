@@ -17,6 +17,7 @@ import { fileURLToPath } from 'url'
 import { getPayload } from 'payload'
 import config from '../payload.config'
 import { maskUri, resolveDatabase } from '../lib/db-url'
+import { expectedFatKg, expectedProteinKg } from '../lib/pta-consistency'
 import {
   EXTERIOR_COMPOSITES,
   EXTERIOR_TRAITS,
@@ -62,6 +63,8 @@ const gauss = (mean = 0, sd = 1): number => {
  * по индексу, поэтому их оценки смещены вверх примерно на сигму; коровы
  * товарного стада держатся около базы.
  */
+const round1 = (v: number) => Math.round(v * 10) / 10
+
 const ebv = (sd: number, shift = 0, digits = 1, limit?: [number, number]) => {
   let v = gauss(shift * sd, sd)
   // У признаков экстерьера в схеме заданы границы шкалы: нормальное
@@ -391,6 +394,15 @@ const run = async () => {
   const bulls: { id: number; identNumber: string; name: string }[] = []
   for (let i = 0; i < 12; i++) {
     const orgIndex = i % orgs.length
+
+    /*
+     * Удой и проценты разыгрываются, килограммы считаются. Разбор —
+     * у самих полей ниже и в `src/lib/pta-consistency.ts`.
+     */
+    const bullMilk = ebv(257.1, 1, 0)
+    const bullFatPct = ebv(0.09, 0.6, 2)
+    const bullProteinPct = ebv(0.05, 0.5, 2)
+
     bulls.push(
       (await payload.create({
         collection: 'animals',
@@ -446,11 +458,25 @@ const run = async () => {
             reliabilityLevel: 4,
             // Оценки в долях генетического σ из TRAIT_BASE: быки отобраны
             // по индексу, поэтому распределение смещено вверх на сигму
-            milk: { forecast: ebv(257.1, 1, 0), r: between(80, 95, 1) },
-            fatPercent: { forecast: ebv(0.09, 0.6, 2), r: between(40, 70, 1) },
-            proteinPercent: { forecast: ebv(0.05, 0.5, 2), r: between(45, 75, 1) },
-            fatKg: { forecast: ebv(11.29, 1, 1), r: between(78, 92, 1) },
-            proteinKg: { forecast: ebv(6.93, 1, 1), r: between(80, 94, 1) },
+            /*
+             * Килограммы выводятся из удоя и процентов, а не разыгрываются
+             * отдельно.
+             *
+             * Прежде все пять признаков брались независимо, и получались
+             * записи, которых не бывает: удой минус триста при белке ноль
+             * процентов и плюс тридцать килограммов белка. Проверка
+             * `eval-protein-kg-mismatch` ловит теперь именно это — и первым
+             * поймала бы наш собственный сид, то есть учила бы Ассоциацию
+             * на неправдоподобном образце.
+             */
+            milk: { forecast: bullMilk, r: between(80, 95, 1) },
+            fatPercent: { forecast: bullFatPct, r: between(40, 70, 1) },
+            proteinPercent: { forecast: bullProteinPct, r: between(45, 75, 1) },
+            fatKg: { forecast: round1(expectedFatKg(bullMilk, bullFatPct)), r: between(78, 92, 1) },
+            proteinKg: {
+              forecast: round1(expectedProteinKg(bullMilk, bullProteinPct)),
+              r: between(80, 94, 1),
+            },
             productionIndex: { forecast: between(90, 130, 1), r: between(70, 90, 1) },
           },
           reproduction: { fertility: { forecast: ebv(1.37, 0.4, 1), r: between(50, 80, 1) } },
@@ -511,6 +537,11 @@ const run = async () => {
     })
 
     const father = bulls[int(0, bulls.length - 1)]
+
+    // Килограммы считаются из удоя и процентов — как у быков выше
+    const cowMilk = ebv(257.1, 0.15, 0)
+    const cowFatPct = ebv(0.09, 0.1, 2)
+    const cowProteinPct = ebv(0.05, 0.1, 2)
 
     await payload.create({
       collection: 'animals',
@@ -608,11 +639,15 @@ const run = async () => {
         production: {
           reliabilityLevel: int(2, 4),
           // Товарное стадо держится около базы породы: сдвиг близок к нулю
-          milk: { forecast: ebv(257.1, 0.15, 0), r: between(55, 92, 1) },
-          fatPercent: { forecast: ebv(0.09, 0.1, 2), r: between(30, 60, 1) },
-          proteinPercent: { forecast: ebv(0.05, 0.1, 2), r: between(38, 68, 1) },
-          fatKg: { forecast: ebv(11.29, 0.15, 1), r: between(60, 88, 1) },
-          proteinKg: { forecast: ebv(6.93, 0.15, 1), r: between(65, 94, 1) },
+          // Килограммы — из удоя и процентов, см. пояснение у быков
+          milk: { forecast: cowMilk, r: between(55, 92, 1) },
+          fatPercent: { forecast: cowFatPct, r: between(30, 60, 1) },
+          proteinPercent: { forecast: cowProteinPct, r: between(38, 68, 1) },
+          fatKg: { forecast: round1(expectedFatKg(cowMilk, cowFatPct)), r: between(60, 88, 1) },
+          proteinKg: {
+            forecast: round1(expectedProteinKg(cowMilk, cowProteinPct)),
+            r: between(65, 94, 1),
+          },
           productionIndex: { forecast: between(85, 122, 1), r: between(50, 84, 1) },
         },
         reproduction: { fertility: { forecast: ebv(1.37, 0, 1), r: between(30, 65, 1) } },
@@ -627,6 +662,28 @@ const run = async () => {
           ...EXTERIOR_TRAITS.map((t) => [t.key, ebv(1.0, 0, 2, [-3, 3])]),
           ...EXTERIOR_COMPOSITES.map((t) => [t.key, ebv(0.65, 0, 2, [-3, 3])]),
         ]),
+        /*
+         * Собственный промер коровы — своя группа и своя шкала.
+         *
+         * Числа независимы от группы выше намеренно: это два разных
+         * измерения. Балл говорит, какое у этой коровы вымя; отклонение
+         * рядом — какое вымя будет у её дочерей. Совпадать они не обязаны,
+         * и синтетика, где балл выводился бы из отклонения, учила бы
+         * обратному.
+         *
+         * Распределение около пятёрки с разбросом в полтора балла: так
+         * выглядит настоящее стадо, где крайние единицы и девятки —
+         * редкость, а не половина списка.
+         */
+        linearScore: {
+          assessedAt: new Date(2025, i % 12, 1 + (i % 27)).toISOString(),
+          ...Object.fromEntries(
+            EXTERIOR_TRAITS.map((t) => [
+              t.key,
+              Math.max(1, Math.min(9, Math.round(5 + ebv(1.5, 0, 1)))),
+            ]),
+          ),
+        },
         summary: {
           milkYield: milk,
           fatPercent: fatP,

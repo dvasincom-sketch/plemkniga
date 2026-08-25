@@ -337,6 +337,24 @@ export const exteriorDirection = (
   return value > 0 ? trait.plus : trait.minus
 }
 
+/**
+ * Словесное значение балла линейной оценки.
+ *
+ * Та же логика, что у `exteriorDirection`, но вход другой: там отклонение
+ * с нулём посередине, здесь балл от единицы до девяти со средним в пятёрке.
+ * Переводить балл в отклонение ради переиспользования нельзя — получилось бы
+ * число, которого никто не измерял, и оно немедленно попало бы куда-нибудь
+ * ещё. Здесь переводится только для выбора слова и наружу не выходит.
+ *
+ * Полшага допуска, а не четверть, как у отклонений: шкала целочисленная,
+ * и «пять с половиной» на ней не бывает.
+ */
+export const linearDirection = (trait: ExteriorTrait, score?: number | null): string | null => {
+  if (score === null || score === undefined) return null
+  if (Math.abs(score - 5) < 0.5) return 'средний по породе'
+  return score > 5 ? trait.plus : trait.minus
+}
+
 export const EXTERIOR_COMPOSITES = [
   { key: 'bodyComposite', label: 'Композит тела' },
   { key: 'udderComposite', label: 'Композит вымени' },

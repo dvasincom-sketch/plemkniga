@@ -44,6 +44,7 @@ import * as migration_20260826_140000_saved_searches from './20260826_140000_sav
 import * as migration_20260826_180000_bench_runs from './20260826_180000_bench_runs'
 import * as migration_20260827_090000_semen_and_grade from './20260827_090000_semen_and_grade'
 import * as migration_20260828_090000_evaluation_source from './20260828_090000_evaluation_source'
+import * as migration_20260828_140000_linear_score from './20260828_140000_linear_score'
 
 export const migrations = [
   {
@@ -275,5 +276,10 @@ export const migrations = [
     up: migration_20260828_090000_evaluation_source.up,
     down: migration_20260828_090000_evaluation_source.down,
     name: '20260828_090000_evaluation_source',
+  },
+  {
+    up: migration_20260828_140000_linear_score.up,
+    down: migration_20260828_140000_linear_score.down,
+    name: '20260828_140000_linear_score',
   },
 ];
