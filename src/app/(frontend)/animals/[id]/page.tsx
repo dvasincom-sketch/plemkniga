@@ -421,6 +421,41 @@ export default async function AnimalPage({
    */
   const isForeign = !isMine
 
+  /**
+   * Цвет шапки карточки: тёмно-серый у быка, зелёный у чужой записи.
+   *
+   * ## Зачем быку своя окраска
+   *
+   * Книга уже размечает карточки цветом: чужая запись идёт под зелёной
+   * плашкой, своя — без плашки вовсе. Бык из этого ряда выпадал, хотя
+   * отличается от коровы сильнее, чем чужая корова от своей: у него нет
+   * ни удоя, ни вымени, ни лактаций, и каждое число в его карточке —
+   * прогноз по дочерям, а не измерение. Подписями это сказано в трёх
+   * местах, но подпись читают после того, как решили читать; цвет
+   * работает раньше.
+   *
+   * ## Почему серый, а не ещё один зелёный
+   *
+   * Зелёный в книге занят — им отмечено «чужое». Второй зелёный означал бы
+   * «то же самое, но другое», и различать их пришлось бы по оттенку.
+   * Тёмно-серый в палитре уже есть (`basement`, подложка подвала) и ничем
+   * не занят.
+   *
+   * ## Что происходит с чужим быком
+   *
+   * Побеждает бычья окраска, и это осознанный размен. Принадлежность
+   * сказана словами прямо над шапкой — «Это животное принадлежит…», —
+   * а вид животного словами не сказан нигде до самой шапки. Терять цветом
+   * то, что уже сказано текстом, дешевле, чем то, что не сказано.
+   */
+  const isBullHeader = animal.kind === 'bull'
+  const headerTone = isBullHeader
+    ? 'rounded-card bg-basement p-7 text-white sm:p-8'
+    : isForeign
+      ? 'rounded-card bg-forest-500 p-7 text-white sm:p-8'
+      : ''
+  const onDark = isBullHeader || isForeign
+
   /*
    * Формулировка зависит от того, знаем ли мы, кто смотрит.
    *
@@ -802,15 +837,13 @@ export default async function AnimalPage({
 
         {/* ------------------------------ Шапка ------------------------------ */}
         <section
-          className={`flex flex-wrap items-start justify-between gap-x-10 gap-y-6 ${
-            isForeign ? 'rounded-card bg-forest-500 p-7 text-white sm:p-8' : ''
-          }`}
+          className={`flex flex-wrap items-start justify-between gap-x-10 gap-y-6 ${headerTone}`}
         >
           <div className="min-w-0">
             <div className="min-w-0">
               <p
                 className={`text-[12px] uppercase tracking-[0.09em] ${
-                  isForeign ? 'text-white/70' : 'text-ink-500'
+                  onDark ? 'text-white/70' : 'text-ink-500'
                 }`}
               >
                 Кличка
@@ -820,7 +853,7 @@ export default async function AnimalPage({
                 <span className="break-words">{animal.name ?? '—'}</span>
                 <span
                   className={`rounded-md px-2.5 py-1 text-[13px] font-normal leading-none ${
-                    isForeign ? 'bg-white/20 text-white' : 'bg-[#eeeeee] text-ink-700'
+                    onDark ? 'bg-white/20 text-white' : 'bg-[#eeeeee] text-ink-700'
                   }`}
                 >
                   {kindLabel}
@@ -828,16 +861,16 @@ export default async function AnimalPage({
               </h1>
 
               <p className="mt-3 text-[17px] leading-none">
-                <span className={isForeign ? 'text-white/70' : 'text-ink-500'}>Инд. №</span>{' '}
+                <span className={onDark ? 'text-white/70' : 'text-ink-500'}>Инд. №</span>{' '}
                 <span className="font-medium tabular-nums">{animal.identNumber}</span>
               </p>
 
               <p
                 className={`mt-2 text-[15px] leading-snug ${
-                  isForeign ? 'text-white/90' : 'text-ink-700'
+                  onDark ? 'text-white/90' : 'text-ink-700'
                 }`}
               >
-                <span className={isForeign ? 'text-white/70' : 'text-ink-500'}>Владелец:</span>{' '}
+                <span className={onDark ? 'text-white/70' : 'text-ink-500'}>Владелец:</span>{' '}
                 {/* Ссылка ведёт в книгу с отбором по этому хозяйству —
                     «а что ещё у них есть» самый частый следующий вопрос */}
                 {owner === '—' ? (
@@ -846,7 +879,7 @@ export default async function AnimalPage({
                   <Link
                     href={`/?owner=${encodeURIComponent(owner)}#results`}
                     className={`underline underline-offset-4 ${
-                      isForeign ? 'hover:text-white' : 'hover:text-forest-500'
+                      onDark ? 'hover:text-white' : 'hover:text-forest-500'
                     }`}
                     title={`Показать животных хозяйства «${owner}»`}
                   >
@@ -858,7 +891,7 @@ export default async function AnimalPage({
           </div>
 
           <div className="flex flex-col items-start gap-2.5 lg:items-end">
-            <p className={`text-[13px] ${isForeign ? 'text-white/70' : 'text-ink-500'}`}>
+            <p className={`text-[13px] ${onDark ? 'text-white/70' : 'text-ink-500'}`}>
               Обновлено {dateRu(animal.updatedAt)}
             </p>
 
@@ -882,7 +915,7 @@ export default async function AnimalPage({
             {views !== null && (
               <p
                 className={`max-w-[36ch] text-[13px] leading-snug lg:text-right ${
-                  isForeign ? 'text-white/70' : 'text-ink-500'
+                  onDark ? 'text-white/70' : 'text-ink-500'
                 }`}
               >
                 {views === 0
@@ -897,7 +930,7 @@ export default async function AnimalPage({
               </p>
             )}
 
-            <TrustBadge level={animal.trustLevel} onDark={isForeign} />
+            <TrustBadge level={animal.trustLevel} onDark={onDark} />
           </div>
         </section>
 
