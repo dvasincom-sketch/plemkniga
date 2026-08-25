@@ -95,23 +95,83 @@ export function BullStatusNote({ daughters, herds }: { daughters: number; herds:
 
   return (
     <div className="card">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-        <h2 className="panel-heading mb-0 flex items-center gap-2">
-          <span className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${dot}`} />
-          {status.label}
-        </h2>
-        <p className="text-[13px] text-ink-500">
-          надёжность по удою {status.reliability} % · дочерей {daughters} в {herds}{' '}
-          {herds === 1 ? 'хозяйстве' : 'хозяйствах'}
-        </p>
+      <h2 className="panel-heading mb-0 flex items-center gap-2">
+        <span className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${dot}`} />
+        {status.label}
+      </h2>
+
+      {/*
+         Надёжность, дочери и хозяйства показаны как результат, а не мелкой
+         строкой сбоку.
+
+         Раньше они стояли примечанием справа от заголовка — тем же кеглем,
+         что подпись под таблицей. Но это и есть ответ на главный вопрос
+         покупателя: сколько дочерей, в скольких хозяйствах и насколько
+         этому можно верить. Примечанием набирают оговорку, а не ответ,
+         и набор решает за читателя, что здесь важно.
+
+         Плитки те же, что в «Оценке по дочерям» ниже, и повтор намеренный:
+         блоки читают по отдельности, и в каждом должно хватать своего.
+      */}
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {[
+          { label: 'Надёжность по удою', value: `${status.reliability} %` },
+          { label: 'Дочерей в книге', value: nf(daughters) },
+          { label: herds === 1 ? 'Хозяйство' : 'Хозяйств', value: nf(herds) },
+        ].map((s) => (
+          <div key={s.label} className="rounded-xl bg-canvas px-4 py-3.5">
+            <p className="text-[13px] leading-snug text-ink-500">{s.label}</p>
+            <p className="mt-1 text-[24px] font-medium leading-none tabular-nums">{s.value}</p>
+          </div>
+        ))}
       </div>
 
-      <p className="mt-2 max-w-[80ch] text-[15px] leading-relaxed text-ink-700">{status.what}</p>
+      <p className="mt-4 max-w-[80ch] text-[15px] leading-relaxed text-ink-700">{status.what}</p>
 
-      {status.missing && (
-        <p className="mt-1 text-[13px] leading-snug text-ink-500">
-          До следующей ступени: {status.missing}.
-        </p>
+      {/*
+         Путь до следующей ступени показан полосами, а не строкой
+         «дочерей 11 из 13».
+
+         Числа отвечают на вопрос точно, но требуют вычитания: сколько
+         это — одиннадцать из тринадцати, почти дошли или ещё далеко?
+         Полоса отвечает на тот же вопрос до чтения, а числа остаются
+         рядом для тех, кому нужна точность. Ни то ни другое по отдельности
+         не годится: одна полоса — впечатление без величины, одни числа —
+         величина без впечатления.
+
+         Полоса не уходит за сто процентов: перевыполненное условие
+         (дочерей хватает, а хозяйств нет) должно выглядеть выполненным,
+         а не выпирающим.
+      */}
+      {status.next && (
+        <div className="mt-5 rounded-xl border border-ink-100 px-4 py-3.5">
+          <p className="text-[13px] text-ink-500">
+            До ступени «{status.next.label}»
+          </p>
+
+          <div className="mt-3 space-y-3">
+            {status.next.steps.map((s) => {
+              const done = s.have >= s.need
+              const share = Math.min(100, Math.round((s.have / s.need) * 100))
+              return (
+                <div key={s.what}>
+                  <div className="flex items-baseline justify-between gap-4 text-[13px]">
+                    <span className={done ? 'text-ink-500' : 'text-ink-900'}>{s.what}</span>
+                    <span className="tabular-nums text-ink-500">
+                      {done ? `${nf(s.have)} — хватает` : `${nf(s.have)} из ${nf(s.need)}`}
+                    </span>
+                  </div>
+                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-ink-100">
+                    <div
+                      className={`h-full rounded-full ${done ? 'bg-brand-300' : 'bg-accent-500'}`}
+                      style={{ width: `${share}%` }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
       )}
 
       {/*

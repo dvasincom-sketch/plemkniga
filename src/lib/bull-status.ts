@@ -65,6 +65,17 @@ export type BullStatus = {
   what: string
   /** Чего не хватает до следующей ступени. Пусто у официальной. */
   missing: string | null
+  /**
+   * То же самое числами, а не строкой.
+   *
+   * Строка `missing` отвечает на вопрос словами и годится для журнала
+   * и для проверок. Карточке нужен другой ответ на тот же вопрос:
+   * «одиннадцать из тринадцати» человек читает как две цифры, а полосу
+   * — как расстояние, и расстояние до цели понятно раньше, чем прочитано.
+   * Собирать числа обратно разбором строки было бы способом сломать
+   * показ ближайшей правкой формулировки.
+   */
+  next: { label: string; steps: { what: string; have: number; need: number }[] } | null
   /** Надёжность по удою на этом числе дочерей, проценты. */
   reliability: number
 }
@@ -104,6 +115,13 @@ export function bullStatus(daughters: number, herds: number): BullStatus {
         'Надёжность ниже половины: прогноз ошибается чаще, чем угадывает. ' +
         'Числа ниже показаны как есть, но опираться на них при выборе быка рано.',
       missing: gaps.join(', '),
+      next: {
+        label: 'Предварительная оценка',
+        steps: [
+          { what: 'Дочерей', have: daughters, need: needDaughters },
+          { what: 'Хозяйств', have: herds, need: THRESHOLDS.preliminary.herds },
+        ],
+      },
       reliability,
     }
   }
@@ -126,6 +144,13 @@ export function bullStatus(daughters: number, herds: number): BullStatus {
         'Оценка есть, но будет заметно меняться с новыми дочерями: ' +
         'по мере их появления число сдвигается, иногда на заметную величину.',
       missing: gaps.join(', '),
+      next: {
+        label: 'Официальная оценка',
+        steps: [
+          { what: 'Дочерей', have: daughters, need: THRESHOLDS.official.daughters },
+          { what: 'Хозяйств', have: herds, need: THRESHOLDS.official.herds },
+        ],
+      },
       reliability,
     }
   }
@@ -135,6 +160,7 @@ export function bullStatus(daughters: number, herds: number): BullStatus {
     label: 'Официальная оценка',
     what: 'Оценка устоялась: новые дочери сдвигают её незначительно.',
     missing: null,
+    next: null,
     reliability,
   }
 }
