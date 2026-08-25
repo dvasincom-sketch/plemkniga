@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { BULL_COMPARISON_MIN, type BullProof as Proof } from '@/lib/bull-proof'
+import { bullStatus } from '@/lib/bull-status'
 
 /**
  * Оценка быка по дочерям — блок карточки вместо собственной продуктивности.
@@ -50,6 +51,65 @@ const plural = (n: number, one: string, few: string, many: string) => {
  * меню в этот момент искать не будут, а найдя — начнут с пустой таблицы
  * вместо той, где первый бык уже стоит.
  */
+/**
+ * Статус оценки: можно ли верить числам ниже.
+ *
+ * Три ступени, и у каждой сказано не только название, но и что оно
+ * означает для того, кто собирается покупать семя. «Предварительная»
+ * без пояснения — ярлык; «будет заметно меняться с новыми дочерями» —
+ * предупреждение, по которому можно принять решение.
+ *
+ * Чего не хватает до следующей ступени, названо числом. Человек,
+ * смотрящий на молодого быка, должен понимать, сколько ещё ждать;
+ * «данных недостаточно» на этот вопрос не отвечает и читается как отказ
+ * системы работать.
+ */
+function StatusNote({ daughters, herds }: { daughters: number; herds: number }) {
+  const status = bullStatus(daughters, herds)
+
+  const tone =
+    status.key === 'official'
+      ? 'border-forest-500/40 bg-brand-50'
+      : status.key === 'preliminary'
+        ? 'border-amber-300 bg-[#fff6e5]'
+        : 'border-ink-200 bg-canvas'
+
+  return (
+    <div className={`mb-6 rounded-xl border px-4 py-3 ${tone}`}>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+        <p className="text-[15px] font-medium">{status.label}</p>
+        <p className="text-[13px] text-ink-500">
+          надёжность по удою {status.reliability} % · дочерей {daughters} в {herds}{' '}
+          {herds === 1 ? 'хозяйстве' : 'хозяйствах'}
+        </p>
+      </div>
+
+      <p className="mt-1.5 max-w-[80ch] text-[14px] leading-relaxed text-ink-700">
+        {status.what}
+      </p>
+
+      {status.missing && (
+        <p className="mt-1 text-[13px] leading-snug text-ink-500">
+          До следующей ступени: {status.missing}.
+        </p>
+      )}
+
+      {/*
+         Ссылка на практику CDCB — не украшение и не ссылка на авторитет.
+         Она отвечает на вопрос, который возникает первым: «а почему
+         именно столько». Их 60–75 дочерей — это надёжность 83–86 %
+         по той же формуле, и совпадение стоит показать: оно означает,
+         что порог не выдуман нами.
+      */}
+      <p className="mt-2 text-[13px] leading-relaxed text-ink-400">
+        Пороги выведены из формулы надёжности оценки по потомству. Для сравнения: расчётный
+        центр CDCB (США) считает достаточными 60–75 дочерей в 40–50 стадах — это те же
+        83–86 % надёжности.
+      </p>
+    </div>
+  )
+}
+
 export function BullProofBlock({ data, bullId }: { data: Proof; bullId?: number }) {
   if (data.daughters === 0) {
     return (
@@ -84,6 +144,22 @@ export function BullProofBlock({ data, bullId }: { data: Proof; bullId?: number 
         по всей популяции сразу, с учётом происхождения самих дочерей и года отёла, а не
         запросом по одному быку.
       </p>
+
+      {/* ------------------------- Статус оценки ---------------------------- */}
+
+      {/*
+         Статус стоит выше чисел, а не под ними.
+
+         Оценка на десяти дочерях выглядит ровно так же, как оценка
+         на трёхстах: те же знаки после запятой, та же уверенность.
+         Разница видна только тому, кто помнит формулу надёжности,
+         — и читать её надо до чисел, а не после, иначе решение уже
+         принято.
+
+         Пороги выведены из формулы, а не назначены: разбор
+         в `src/lib/bull-status.ts` и в `docs/karta-byka.md`.
+      */}
+      <StatusNote daughters={data.daughters} herds={data.farms} />
 
       {/* --------------------------- Сколько и где --------------------------- */}
 

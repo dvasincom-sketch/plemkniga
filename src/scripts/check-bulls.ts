@@ -3,6 +3,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { compareBulls, MAX_BULLS } from '@/lib/bull-compare'
 import { EXTERIOR_TRAITS, exteriorDirection } from '@/lib/dictionaries'
+import { bullStatus, daughtersFor, reliabilityOf } from '@/lib/bull-status'
 
 /**
  * Проверка сравнения быков на живой базе.
@@ -245,6 +246,49 @@ async function main() {
     orphan.length === 0,
     `все ${EXTERIOR_TRAITS.length} признака есть в коллекции экстерьера`,
     orphan.map((t) => t.key).join(', '),
+  )
+
+  /* ---------------------------------------------------------------- */
+  console.log('\nСтатус оценки: пороги выведены из формулы\n')
+
+  /*
+   * Проверяются не «какие-то» числа, а согласие формулы с практикой.
+   * Если правило CDCB и наша арифметика разойдутся, ссылка на них
+   * в интерфейсе станет неправдой — а она там стоит.
+   */
+  check(
+    Math.round(reliabilityOf(60) * 100) === 83,
+    `шестьдесят дочерей дают 83 % (у CDCB это порог)`,
+    `${Math.round(reliabilityOf(60) * 100)} %`,
+  )
+  check(
+    Math.round(reliabilityOf(75) * 100) === 86,
+    'семьдесят пять дочерей дают 86 %',
+    `${Math.round(reliabilityOf(75) * 100)} %`,
+  )
+  check(daughtersFor(0.5) === 13, 'для половинной надёжности нужно 13 дочерей', String(daughtersFor(0.5)))
+
+  /*
+   * Наследуемость меняет всё: у фертильности она в семь раз ниже,
+   * и то же число дочерей даёт вчетверо меньшую надёжность. Проверка
+   * стоит здесь, чтобы порог не «упростили» до одного числа на карточку.
+   */
+  const milk20 = Math.round(reliabilityOf(20, 0.3) * 100)
+  const fert20 = Math.round(reliabilityOf(20, 0.04) * 100)
+  check(milk20 > 60 && fert20 < 20, `двадцать дочерей: удой ${milk20} %, фертильность ${fert20} %`)
+
+  check(bullStatus(10, 4).key === 'insufficient', 'десять дочерей в четырёх хозяйствах — данных мало')
+  check(bullStatus(20, 5).key === 'preliminary', 'двадцать в пяти — предварительная')
+  check(bullStatus(60, 12).key === 'official', 'шестьдесят в двенадцати — официальная')
+  check(
+    bullStatus(200, 2).key === 'insufficient',
+    'двести дочерей в двух хозяйствах — всё равно мало',
+    'эффект стада неотделим от эффекта быка, и числом дочерей это не лечится',
+  )
+  check(
+    bullStatus(10, 4).missing?.includes('13') === true,
+    'сказано, сколько дочерей не хватает',
+    String(bullStatus(10, 4).missing),
   )
 
   console.log(failures === 0 ? '\nВсё сошлось.' : `\nНе сошлось: ${failures}`)
