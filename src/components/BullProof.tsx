@@ -64,7 +64,17 @@ const plural = (n: number, one: string, few: string, many: string) => {
  * «данных недостаточно» на этот вопрос не отвечает и читается как отказ
  * системы работать.
  */
-function StatusNote({ daughters, herds }: { daughters: number; herds: number }) {
+/*
+ * Блок вынесен из «Оценки по дочерям» и показывается прямо под индексом.
+ *
+ * Стоял он внутри — после заголовка блока и абзаца пояснений, то есть
+ * через экран от числа, к которому относится. А относится он именно
+ * к индексу: индекс на десяти дочерях выглядит ровно так же, как индекс
+ * на трёхстах, теми же знаками после запятой и с той же уверенностью.
+ * Ответ «этому числу можно верить» обязан стоять там же, где число,
+ * а не в блоке ниже — иначе решение уже принято, когда до него доходят.
+ */
+export function BullStatusNote({ daughters, herds }: { daughters: number; herds: number }) {
   const status = bullStatus(daughters, herds)
 
   const tone =
@@ -75,7 +85,7 @@ function StatusNote({ daughters, herds }: { daughters: number; herds: number }) 
         : 'border-ink-200 bg-canvas'
 
   return (
-    <div className={`mb-6 rounded-xl border px-4 py-3 ${tone}`}>
+    <div className={`rounded-xl border px-4 py-3 ${tone}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
         <p className="text-[15px] font-medium">{status.label}</p>
         <p className="text-[13px] text-ink-500">
@@ -144,22 +154,6 @@ export function BullProofBlock({ data, bullId }: { data: Proof; bullId?: number 
         по всей популяции сразу, с учётом происхождения самих дочерей и года отёла, а не
         запросом по одному быку.
       </p>
-
-      {/* ------------------------- Статус оценки ---------------------------- */}
-
-      {/*
-         Статус стоит выше чисел, а не под ними.
-
-         Оценка на десяти дочерях выглядит ровно так же, как оценка
-         на трёхстах: те же знаки после запятой, та же уверенность.
-         Разница видна только тому, кто помнит формулу надёжности,
-         — и читать её надо до чисел, а не после, иначе решение уже
-         принято.
-
-         Пороги выведены из формулы, а не назначены: разбор
-         в `src/lib/bull-status.ts` и в `docs/karta-byka.md`.
-      */}
-      <StatusNote daughters={data.daughters} herds={data.farms} />
 
       {/* --------------------------- Сколько и где --------------------------- */}
 

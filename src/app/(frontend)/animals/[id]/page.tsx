@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { BullProofBlock } from '@/components/BullProof'
+import { BullProofBlock, BullStatusNote } from '@/components/BullProof'
 import { bullProof } from '@/lib/bull-proof'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
@@ -912,6 +912,24 @@ export default async function AnimalPage({
                   percentile={indexBlock.percentile}
                   href={isMine ? '/account/indices' : undefined}
                 />
+              </section>
+            )}
+
+            {/*
+               Статус оценки прижат к индексу, а не спрятан в блоке ниже.
+
+               Это первый блок макета — «индекс и статус», — и порядок
+               в нём такой: сначала число, сразу за ним ответ на вопрос,
+               можно ли этому числу верить. Разъединять их нельзя: оценка
+               на десяти дочерях выглядит так же уверенно, как на трёхстах,
+               и разницу видит только тот, кто помнит формулу надёжности.
+
+               Пороги выведены из формулы, а не назначены: разбор
+               в `src/lib/bull-status.ts` и в `docs/karta-byka.md`.
+            */}
+            {proof && proof.daughters > 0 && (
+              <section className="mt-6">
+                <BullStatusNote daughters={proof.daughters} herds={proof.farms} />
               </section>
             )}
 
