@@ -919,6 +919,7 @@ async function AnimalsTab({
             indexLabel={profile?.name}
             indexValues={'values' in result ? result.values : undefined}
             selectable={!archiveMode}
+            ownHerd
           />
         </HerdSelection>
         {/*
