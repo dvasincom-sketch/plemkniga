@@ -76,6 +76,20 @@ const formHref = (d: BookDocument): string | null => {
   return `/animals/${animalId}/certificate/${kind}?document=${d.id}`
 }
 
+/**
+ * Поле формы: подпись сверху, управление под ней.
+ *
+ * Обёртка нужна не ради экономии букв, а ради ровной сетки: у ввода,
+ * выбора и даты разная высота собственных подписей, и без общей обёртки
+ * ряд перестаёт быть рядом при первой же длинной подписи.
+ */
+const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
+  <label className="block min-w-0">
+    <span className="mb-1.5 block text-[13px] leading-snug text-ink-500">{label}</span>
+    {children}
+  </label>
+)
+
 /** Ссылка на сам файл — у загруженных хозяйством. */
 const fileHref = (d: BookDocument): string | null => {
   const f = d.file
@@ -139,68 +153,106 @@ export function DocumentsPanel({
           </InfoTip>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <input
-            className="field"
-            name="dnum"
-            placeholder="Номер документа"
-            defaultValue={one(sp.dnum)}
-          />
-          <input
-            className="field"
-            name="danimal"
-            placeholder="Номер животного"
-            defaultValue={one(sp.danimal)}
-          />
+        {/*
+           Каждое поле подписано сверху, и подпись — не украшение.
+
+           Первая редакция обходилась подсказкой внутри поля: у ввода
+           это работает, пока поле пустое, а у выбора даты не работает
+           никогда — подсказки там нет вовсе, и два одинаковых календаря
+           подряд различить было нечем. Подпись сверху одинаково годится
+           для всех четырёх видов управления и держит сетку ровной.
+        */}
+        <div className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Field label="Номер документа">
+            <input
+              className="field field-on-light"
+              name="dnum"
+              placeholder="ПС-2026-0001"
+              defaultValue={one(sp.dnum)}
+            />
+          </Field>
+          <Field label="Номер животного">
+            <input
+              className="field field-on-light"
+              name="danimal"
+              placeholder="3662217000196"
+              defaultValue={one(sp.danimal)}
+            />
+          </Field>
           {/*
              Своя пустая строка вместо стандартной подсказки списка:
              у «типа» это «любой», у происхождения и состояния —
              осмысленные значения по умолчанию, и лишняя пустая строка
              читалась бы как «не выбрано», хотя выбор уже сделан.
           */}
-          <Select
-            name="dtype"
-            placeholder=""
-            onLight
-            ariaLabel="Тип документа"
-            defaultValue={one(sp.dtype)}
-            options={[
-              { value: '', label: 'Любой тип' },
-              ...DOCUMENT_TYPES.map((t) => ({ value: t.value, label: t.label })),
-            ]}
-          />
-          <Select
-            name="dorigin"
-            placeholder=""
-            onLight
-            ariaLabel="Кем выдан"
-            defaultValue={one(sp.dorigin) || 'all'}
-            options={DOC_ORIGINS.map((o) => ({ value: o.value, label: o.label }))}
-          />
-          <Select
-            name="dstate"
-            placeholder=""
-            onLight
-            ariaLabel="Состояние"
-            defaultValue={one(sp.dstate) || 'active'}
-            options={DOC_STATES.map((o) => ({ value: o.value, label: o.label }))}
-          />
-          {/*
-             Даты подписаны, а не спрятаны в placeholder: у поля с датой
-             его не видно, пока поле пустое, и два одинаковых календаря
-             подряд невозможно различить.
-          */}
-          <label className="flex items-center gap-2 text-[14px] text-ink-500">
-            <span className="whitespace-nowrap">Выдан с</span>
-            <input className="field" type="date" name="dfrom" defaultValue={one(sp.dfrom)} />
-          </label>
-          <label className="flex items-center gap-2 text-[14px] text-ink-500">
-            <span className="whitespace-nowrap">по</span>
-            <input className="field" type="date" name="dto" defaultValue={one(sp.dto)} />
-          </label>
+          <Field label="Тип документа">
+            <Select
+              name="dtype"
+              placeholder=""
+              onLight
+              ariaLabel="Тип документа"
+              defaultValue={one(sp.dtype)}
+              options={[
+                { value: '', label: 'Любой тип' },
+                ...DOCUMENT_TYPES.map((t) => ({ value: t.value, label: t.label })),
+              ]}
+            />
+          </Field>
+          <Field label="Кем выдан">
+            <Select
+              name="dorigin"
+              placeholder=""
+              onLight
+              ariaLabel="Кем выдан"
+              defaultValue={one(sp.dorigin) || 'all'}
+              options={DOC_ORIGINS.map((o) => ({ value: o.value, label: o.label }))}
+            />
+          </Field>
+          <Field label="Состояние">
+            <Select
+              name="dstate"
+              placeholder=""
+              onLight
+              ariaLabel="Состояние"
+              defaultValue={one(sp.dstate) || 'active'}
+              options={DOC_STATES.map((o) => ({ value: o.value, label: o.label }))}
+            />
+          </Field>
+          <Field label="Выдан с">
+            <input
+              className="field field-on-light"
+              type="date"
+              name="dfrom"
+              defaultValue={one(sp.dfrom)}
+            />
+          </Field>
+          <Field label="Выдан по">
+            <input
+              className="field field-on-light"
+              type="date"
+              name="dto"
+              defaultValue={one(sp.dto)}
+            />
+          </Field>
+        </div>
+
+        {/*
+           Кнопка отдельной строкой, а не восьмой ячейкой сетки.
+
+           В сетке она вставала под последним полем и читалась как его
+           часть — «найти по дате», — а при другой ширине экрана переезжала
+           под другое поле и меняла смысл. Действие относится ко всей форме
+           и стоит под всей формой.
+        */}
+        <div className="mt-5 flex flex-wrap items-center gap-3">
           <button type="submit" className="btn btn-accent">
             Найти
           </button>
+          {hasFilters && (
+            <Link href={documentsHrefWithout({})} className="btn">
+              Сбросить
+            </Link>
+          )}
         </div>
       </form>
 

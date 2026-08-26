@@ -4,6 +4,7 @@ import { SiteFooter } from '@/components/SiteFooter'
 import { AssociationNav } from '@/components/AssociationNav'
 import { CabinetPage } from '@/components/CabinetPage'
 import { ColumnDecision } from '@/components/ColumnDecision'
+import { ColumnReopen } from '@/components/ColumnReopen'
 import { Moment } from '@/components/Moment'
 import { getClient } from '@/lib/payload'
 import { requireAssociation } from '@/lib/association'
@@ -48,6 +49,28 @@ const STATUS_TONE: Record<string, string> = {
   duplicate: 'bg-forest-400',
 }
 
+/**
+ * Цвет плашки закрытого решения — по исходу, а не по «разобрано».
+ *
+ * «Завели признак» и «отклонили» это противоположные ответы, и красить их
+ * одинаково значило бы прятать главное за фактом разбора. Зелёное —
+ * книга приняла; серое — отказала; тёмно-зелёное — узнала своё под чужим
+ * именем.
+ */
+const DECISION_CHIP: Record<string, string> = {
+  accepted: 'bg-brand-100 text-forest-700',
+  declined: 'bg-ink-100 text-ink-700',
+  duplicate: 'bg-[#e3f0ea] text-forest-700',
+}
+
+/** Имя решившего — фамилия и имя, иначе почта. Так же в журнале операций. */
+const personName = (u: unknown): string | null => {
+  if (!u || typeof u !== 'object') return null
+  const user = u as { lastName?: string; firstName?: string; email?: string; position?: string }
+  const fio = [user.lastName, user.firstName].filter(Boolean).join(' ')
+  return fio || user.email || null
+}
+
 export default async function ColumnsPage() {
   await requireAssociation()
   const payload = await getClient()
@@ -68,6 +91,102 @@ export default async function ColumnsPage() {
 
   const fresh = docs.filter((d) => (d.status ?? 'new') === 'new')
   const decided = docs.filter((d) => (d.status ?? 'new') !== 'new')
+
+  /**
+   * Закрытое решение — другая сущность, и выглядит иначе.
+   *
+   * ## Что здесь главное
+   *
+   * У неразобранной колонки главное — примеры значений: по ним принимают
+   * решение. У разобранной решение уже принято, и главными становятся три
+   * других вещи: **какое** решение, **кто** его принял и **когда**. Раньше
+   * первого не было видно за общим видом карточки, а второго и третьего
+   * не было вовсе — поля «кто решил» и «когда» заполнялись и нигде
+   * не показывались.
+   *
+   * Спросят об этом рано или поздно обязательно: колонка приезжает снова
+   * через полгода, и первый вопрос будет не «что решили», а «кто решил
+   * и не пора ли пересмотреть».
+   *
+   * ## Почему не карточка
+   *
+   * Белая карточка на сером фоне означает «здесь работают». Закрытое
+   * решение — запись, а не работа: рамка на фоне страницы, без заливки
+   * и без тени. Отличие видно раньше, чем прочитан заголовок, — а именно
+   * это и требовалось: два раздела списка перестали выглядеть одинаково.
+   *
+   * ## Почему числа ужаты в строку
+   *
+   * Три крупные плитки нужны, когда по ним решают. Здесь они справка:
+   * «приходила трижды, 240 строк, два хозяйства» — одна строка мелким.
+   */
+  const closedCard = (d: (typeof docs)[number]) => {
+    const status = d.status ?? 'new'
+    const samples = ((d.samples as string[] | null | undefined) ?? []).filter(Boolean)
+    const orgs = ((d.organizations ?? []) as ({ name?: string } | number)[])
+      .map((o) => (typeof o === 'number' ? null : o.name))
+      .filter(Boolean)
+    const who = personName(d.decision?.decidedBy)
+
+    return (
+      <article key={d.id} className="rounded-card border border-ink-100 px-6 py-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+          <h3 className="text-[19px] font-medium leading-snug">«{d.title}»</h3>
+          <span
+            className={`inline-block whitespace-nowrap rounded-md px-2.5 py-1 text-[13px] leading-snug ${
+              DECISION_CHIP[status] ?? 'bg-ink-100 text-ink-700'
+            }`}
+          >
+            {STATUS_LABEL[status] ?? status}
+          </span>
+        </div>
+
+        {/*
+           Кто и когда — строкой сразу под решением, а не в подвале.
+           Это подпись под выводом; подпись стоит рядом с выводом.
+        */}
+        <p className="mt-2 text-[14px] leading-snug text-ink-700">
+          {who ? <>Решил {who}</> : <span className="cell-flag">Кто решил — не записано</span>}
+          {d.decision?.decidedAt && (
+            <>
+              {' · '}
+              <Moment iso={d.decision.decidedAt} />
+            </>
+          )}
+        </p>
+
+        {d.decision?.comment && (
+          <p className="mt-3 max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
+            {d.decision.comment}
+          </p>
+        )}
+
+        {d.mapsTo && (
+          <p className="mt-2 text-[14px] text-ink-500">
+            Ключ известного признака: <span className="font-mono text-[13px]">{d.mapsTo}</span>
+          </p>
+        )}
+
+        <p className="mt-3 text-[13px] leading-snug text-ink-500">
+          Приходила {d.seenTimes ?? 0} раз · строк со значением {d.rowsWithValue ?? 0}
+          {orgs.length > 0 && <> · {orgs.join(', ')}</>}
+          {d.lastSeenAt && (
+            <>
+              {' · '}в последний раз <Moment iso={d.lastSeenAt} />
+            </>
+          )}
+        </p>
+
+        {samples.length > 0 && (
+          <p className="mt-3 overflow-x-auto font-mono text-[13px] leading-relaxed text-ink-500">
+            {samples.join(' · ')}
+          </p>
+        )}
+
+        <ColumnReopen id={d.id as number} />
+      </article>
+    )
+  }
 
   const card = (d: (typeof docs)[number]) => {
     const samples = ((d.samples as string[] | null | undefined) ?? []).filter(Boolean)
@@ -192,7 +311,13 @@ export default async function ColumnsPage() {
                    увидеть. Спрятав их, мы заставили бы разбирать заново.
                 */}
                 <h2 className="section-title">Решения приняты — {decided.length}</h2>
-                {decided.map(card)}
+                <p className="-mt-3 max-w-[80ch] text-[14px] leading-relaxed text-ink-500">
+                  Записи, а не работа. Каждая закрыта для правки и подписана тем, кто её
+                  принял: когда та же колонка приедет снова, спросят не только «что решили»,
+                  но и «кто решил и не пора ли пересмотреть». Чтобы изменить решение,
+                  его нужно сперва вернуть в разбор.
+                </p>
+                {decided.map(closedCard)}
               </section>
             )}
           </>
