@@ -656,6 +656,18 @@ async function HerdReports({ orgId }: { orgId?: number }) {
         <h2 className="section-title mb-5">Отдельные разборы</h2>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <div className="card">
+            <h3 className="panel-heading">Календарь стада</h3>
+            <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
+              Кого запускать, кто телится в ближайший месяц, кого проверять на стельность.
+              Три списка на неделю вперёд, посчитанные из отёлов и осеменений, которые
+              вы и так записываете. Единственный отчёт здесь, который смотрят каждое утро.
+            </p>
+            <Link href="/account/reports/calendar" className="btn btn-accent mt-5">
+              Открыть календарь
+            </Link>
+          </div>
+
+          <div className="card">
             <h3 className="panel-heading">Кандидаты на выбраковку</h3>
             <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
               Коровы, к которым есть претензии: не стельная после двухсот дней, много
