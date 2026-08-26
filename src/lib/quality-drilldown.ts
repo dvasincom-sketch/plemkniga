@@ -158,7 +158,16 @@ export async function drilldown(
   const [count, rows] = await Promise.all([
     pool.query(`select count(*) as total ${from}`),
     pool.query(`
-      select a.id, a.ident_number, a.name, a.birth_date, o.name as owner,
+      select a.id, a.ident_number, a.name,
+             /*
+              * Дата рождения — строкой, без перевода в пояс: колонку
+              * типа date драйвер разбирает в полночь местного пояса,
+              * toISOString переводит её в UTC и восточнее Гринвича
+              * отнимает сутки. Ошибка найдена на календаре стада,
+              * где та же дата в двух ячейках расходилась на день.
+              */
+             to_char(a.birth_date, 'YYYY-MM-DD') as birth_date,
+             o.name as owner,
              ${rule.detail ?? 'null'} as detail
       ${from}
        order by a.ident_number
@@ -175,7 +184,7 @@ export async function drilldown(
       id: Number(r.id),
       identNumber: String(r.ident_number),
       name: r.name ? String(r.name) : null,
-      birthDate: r.birth_date ? new Date(String(r.birth_date)).toISOString() : null,
+      birthDate: r.birth_date ? String(r.birth_date) : null,
       owner: r.owner ? String(r.owner) : null,
       detail: r.detail ? String(r.detail) : null,
     })),

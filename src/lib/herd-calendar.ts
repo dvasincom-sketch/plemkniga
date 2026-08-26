@@ -79,13 +79,26 @@ export const PREG_CHECK_FROM = 30
  */
 export const PREG_CHECK_TO = 120
 
+/**
+ * Длина полового цикла коровы, дней.
+ *
+ * Двадцать один день — стандарт для крупного рогатого скота, разброс
+ * 18–24. Через столько яловая корова снова придёт в охоту; звать
+ * осеменять раньше значит звать впустую.
+ */
+export const CYCLE_DAYS = 21
+
 export type CalendarRow = {
   id: number
   identNumber: string
   name: string | null
   /** Отёлов в книге: тёлка перед первым отёлом — это 0. */
   lactation: number
-  /** Дата события: ожидаемый отёл либо день осеменения. */
+  /**
+   * Дата события — ожидаемый отёл либо день осеменения, строкой
+   * `YYYY-MM-DD`. Не момент времени: у неё нет часов, и переводить
+   * её в пояс читателя нечего.
+   */
   at: string
   /** Дней до события; отрицательное — срок прошёл. */
   days: number
@@ -98,8 +111,10 @@ export type HerdCalendar = {
   dryOff: CalendarRow[]
   /** Кто телится в ближайший месяц. */
   calving: CalendarRow[]
-  /** Кого проверять на стельность после осеменения. */
+  /** Кого проверять на стельность: результат осеменения неизвестен. */
   pregCheck: CalendarRow[]
+  /** Кого осеменять заново: яловая, цикл прошёл. */
+  rebreed: CalendarRow[]
 }
 
 type SqlPool = {
@@ -165,13 +180,27 @@ const BASE = `
   )
 `
 
+/**
+ * Дата не проходит через `Date` по дороге из базы.
+ *
+ * Первая редакция делала `new Date(значение).toISOString()`, и на экране
+ * получалось «25.09.2026» там, где в пояснении из того же поля стояло
+ * «26.09.2026». Причина известная: колонку типа `date` драйвер разбирает
+ * в полночь **местного** пояса, `toISOString` переводит её в UTC
+ * и в поясе восточнее Гринвича отнимает сутки, а показ идёт в UTC.
+ *
+ * Дата отёла — не момент времени, у неё нет часов, и пропускать её через
+ * пояс нельзя вовсе. Поэтому запрос отдаёт её строкой `YYYY-MM-DD`,
+ * и дальше она идёт как есть. Та же ловушка разобрана над `dateRu`
+ * и в разборе книг Excel.
+ */
 const rowsOf = (rows: Record<string, unknown>[] | undefined): CalendarRow[] =>
   (rows ?? []).map((r) => ({
     id: Number(r.id),
     identNumber: String(r.ident_number ?? ''),
     name: r.name ? String(r.name) : null,
     lactation: Number(r.lactation ?? 0),
-    at: new Date(String(r.at)).toISOString(),
+    at: String(r.at ?? ''),
     days: Number(r.days ?? 0),
     detail: String(r.detail ?? ''),
   }))
@@ -185,7 +214,7 @@ export async function herdCalendar(
 
   const p = [organizationId, GESTATION_DAYS]
 
-  const [dry, calving, check] = await Promise.all([
+  const [dry, calving, check, rebreed] = await Promise.all([
     /*
      * Запуск. Сюда попадает только корова с отёлом: у нетели запускать
      * нечего. Просроченные больше чем на месяц отсекаются — это уже
@@ -194,7 +223,7 @@ export async function herdCalendar(
     pool.query(
       `${BASE}
        select b.id, m.ident_number, m.name, b.lactation,
-              b.due                                            as at,
+              to_char(b.due, 'YYYY-MM-DD')                     as at,
               (b.due - now()::date)                            as days,
               'осеменение ' || to_char(b.at, 'DD.MM.YYYY')
                 || ', отёл ожидается ' || to_char(b.due, 'DD.MM.YYYY') as detail
@@ -220,7 +249,7 @@ export async function herdCalendar(
     pool.query(
       `${BASE}
        select b.id, m.ident_number, m.name, b.lactation,
-              b.due                                            as at,
+              to_char(b.due, 'YYYY-MM-DD')                     as at,
               (b.due - now()::date)                            as days,
               case when b.lactation = 0 then 'первый отёл' else 'отёл № ' || (b.lactation + 1)::text end
                 || ', по осеменению ' || to_char(b.at, 'DD.MM.YYYY') as detail
@@ -233,15 +262,21 @@ export async function herdCalendar(
     ),
 
     /*
-     * Проверка стельности. Условие «результат не 1» включает и пустой
-     * результат, и «яловая»: последняя тоже требует решения — осеменять
-     * заново. Проверенные вручную (дата проверки заполнена) уходят:
-     * работа сделана, даже если результат ещё не проставлен.
+     * Проверка стельности. Только те, у кого результат неизвестен вовсе.
+     *
+     * Первая редакция брала «результат не стельная», то есть заодно всех
+     * яловых, — и список смешивал две разные работы. Проверять стельность
+     * у коровы, про которую уже известно, что она яловая, незачем: ей
+     * нужно новое осеменение, а это другой день, другой человек и другой
+     * список. Он идёт следующим.
+     *
+     * Проверенные вручную (дата проверки заполнена) уходят: работа
+     * сделана, даже если результат ещё вносят.
      */
     pool.query(
       `${BASE}
        select b.id, m.ident_number, m.name, b.lactation,
-              b.at                                             as at,
+              to_char(b.at, 'YYYY-MM-DD')                      as at,
               (now()::date - b.at::date)                       as days,
               'осеменено ' || to_char(b.at, 'DD.MM.YYYY')
                 || ', прошло ' || (now()::date - b.at::date)::text || ' дн.' as detail
@@ -249,10 +284,34 @@ export async function herdCalendar(
          join mine m on m.id = b.id
         where b.at is not null
           and b.checked is not true
-          and coalesce(b.result_code, '') <> '1'
+          and b.result_code is null
           and (now()::date - b.at::date) between $3::int and $4::int
         order by b.at`,
       [...p, PREG_CHECK_FROM, PREG_CHECK_TO],
+    ),
+
+    /*
+     * Осеменить заново: последняя попытка окончилась яловостью, и с тех
+     * пор прошёл хотя бы один половой цикл.
+     *
+     * Двадцать один день — длина цикла коровы. Раньше охоты не будет,
+     * а список, зовущий осеменять сегодня ту, что пришла в охоту через
+     * неделю, приучает себе не верить.
+     */
+    pool.query(
+      `${BASE}
+       select b.id, m.ident_number, m.name, b.lactation,
+              to_char(b.at, 'YYYY-MM-DD')                      as at,
+              (now()::date - b.at::date)                       as days,
+              'яловая по осеменению ' || to_char(b.at, 'DD.MM.YYYY')
+                || ', прошло ' || (now()::date - b.at::date)::text || ' дн.' as detail
+         from bred b
+         join mine m on m.id = b.id
+        where b.at is not null
+          and b.result_code = '2'
+          and (now()::date - b.at::date) >= $3::int
+        order by b.at`,
+      [...p, CYCLE_DAYS],
     ),
   ])
 
@@ -265,5 +324,6 @@ export async function herdCalendar(
     dryOff: rowsOf(dry.rows),
     calving: rowsOf(calving.rows),
     pregCheck: rowsOf(check.rows),
+    rebreed: rowsOf(rebreed.rows),
   }
 }

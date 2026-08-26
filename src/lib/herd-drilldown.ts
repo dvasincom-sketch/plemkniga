@@ -46,6 +46,14 @@ export type HerdRow = {
   id: number
   identNumber: string
   name: string | null
+  /**
+   * Дата рождения строкой `YYYY-MM-DD`, без перевода в пояс.
+   *
+   * Через `Date` её пропускать нельзя: колонку типа `date` драйвер
+   * разбирает в полночь местного пояса, `toISOString` переводит в UTC
+   * и восточнее Гринвича отнимает сутки. На календаре стада это дало
+   * «25.09» там, где в соседней ячейке из того же поля стояло «26.09».
+   */
   birthDate: string | null
   /** Пояснение, относящееся именно к этой строке: почему она здесь. */
   detail: string | null
@@ -321,7 +329,9 @@ export async function herdDrilldown(
   const [count, rows] = await Promise.all([
     pool.query(`select count(*) as total ${rule.body}`, params),
     pool.query(
-      `select a.id, a.ident_number, a.name, a.birth_date, ${rule.detail} as detail
+      `select a.id, a.ident_number, a.name,
+              to_char(a.birth_date, 'YYYY-MM-DD') as birth_date,
+              ${rule.detail} as detail
        ${rule.body}
        order by ${rule.order}
        limit ${Number(limit)}`,
@@ -339,7 +349,7 @@ export async function herdDrilldown(
       id: Number(r.id),
       identNumber: String(r.ident_number ?? ''),
       name: r.name ? String(r.name) : null,
-      birthDate: r.birth_date ? new Date(String(r.birth_date)).toISOString() : null,
+      birthDate: r.birth_date ? String(r.birth_date) : null,
       detail: r.detail ? String(r.detail) : null,
     })),
   }
