@@ -515,12 +515,27 @@ export async function reproduction(
         from calvings k
         join mine m on m.id = k.animal_id
     ),
-    /* Осеменения за год: всего и результативных */
+    /*
+     * Осеменения за год: всего и плодотворных.
+     *
+     * Результат — не строка в самой записи, а ссылка на справочник:
+     * «Стельная», «Яловая», «Выкидыш», «Ожидает проверки». Ведёт его
+     * Ассоциация, и названия она вправе поменять — поэтому сверяемся
+     * с кодом, а не с текстом. Первая редакция сравнивала с несуществующим
+     * полем i.result и падала на живой базе: колонка называется result_id,
+     * а значения «pregnant» не бывает вовсе — там ссылка на справочник.
+     *
+     * Обратные кавычки в этом пояснении стоять не могут: комментарий
+     * лежит внутри шаблонной строки, и первая же из них закрыла бы её
+     * посреди SQL. Ловушка известная и записана в правилах проекта —
+     * и всё равно сработала.
+     */
     ins as (
-      select count(*)::int                                        as total,
-             count(*) filter (where i.result = 'pregnant')::int    as ok
+      select count(*)::int                             as total,
+             count(*) filter (where r.code = '1')::int  as ok
         from inseminations i
         join mine m on m.id = i.animal_id
+        left join insemination_results r on r.id = i.result_id
        where i."date" > now() - interval '12 months'
     ),
     /*
