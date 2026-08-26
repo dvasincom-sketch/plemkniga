@@ -46,6 +46,7 @@ import {
   reproduction,
   udderHealth,
 } from '@/lib/herd-analytics'
+import { herdSignals } from '@/lib/herd-signals'
 import { HerdAnalytics } from '@/components/HerdAnalytics'
 import {
   FileUploadIcon,
@@ -281,7 +282,7 @@ export default async function AccountPage({
                 {herdSubResolved === 'list' && (
                   <AnimalsTab sp={sp} orgId={orgId} user={user} viewer={viewer} />
                 )}
-                {herdSubResolved === 'reports' && <HerdReports />}
+                {herdSubResolved === 'reports' && <HerdReports orgId={orgId} />}
                 {herdSubResolved === 'documents' && <DocumentsTab orgId={orgId} />}
               </>
             )}
@@ -383,27 +384,25 @@ async function OverviewTab({ orgId }: { orgId?: number }) {
   }
 
   /*
-   * Семь отчётов запрашиваются одним заходом рядом со сводкой.
+   * Всё, что нужно «Обзору», запрашивается одним заходом.
    *
-   * Последовательно это было бы семь ожиданий базы подряд — на глаз
-   * заметно, при том что запросы друг от друга не зависят. Каждый
-   * возвращает `null`, если считать не по чему, и блок сам себя прячет:
-   * ноль вместо «нет данных» читается как утверждение, которого никто
-   * не проверял.
+   * Четыре отчёта из семи нужны здесь ради полосы сигналов. Считать их
+   * своим, более узким запросом было бы дешевле, но однажды два запроса
+   * разошлись бы, и «Обзор» тревожил бы о том, чего в отчёте нет: ровно
+   * так уже расходились числа стада. Три остальных отчёта сюда
+   * не запрашиваются — сигналов по ним нет.
    */
-  const [todo, summary, profiles, structure, heifers, trend, cull, repro, udder, milk] =
-    await Promise.all([
-      farmTodo(payload, orgId),
-      herdSummary(payload, orgId),
-      loadOwnProfiles(orgId),
-      lactationStructure(payload, orgId),
-      heiferAges(payload, orgId),
-      geneticTrend(payload, orgId),
-      culling(payload, orgId),
-      reproduction(payload, orgId),
-      udderHealth(payload, orgId),
-      milkByLactation(payload, orgId),
-    ])
+  const [todo, summary, profiles, heifers, trend, cull, udder] = await Promise.all([
+    farmTodo(payload, orgId),
+    herdSummary(payload, orgId),
+    loadOwnProfiles(orgId),
+    heiferAges(payload, orgId),
+    geneticTrend(payload, orgId),
+    culling(payload, orgId),
+    udderHealth(payload, orgId),
+  ])
+
+  const signals = herdSignals({ heifers, trend, udder, cull })
 
   const activeProfile = profiles.defaultDoc ? profiles.defaultDoc.name : ASSOCIATION_PROFILE.name
 
@@ -530,21 +529,50 @@ async function OverviewTab({ orgId }: { orgId?: number }) {
       )}
 
       {/*
-         Отчёты по стаду: какое оно, почему теряется, двигается ли вперёд.
-         Стоят после чисел, а дела — выше их обоих: за делами приходят
-         каждый день, отчёты читают, когда есть время. Разбор каждого —
-         в самих компонентах и в `herd-analytics`.
-      */}
-      <HerdAnalytics
-        structure={structure}
-        heifers={heifers}
-        trend={trend}
-        cull={cull}
-        repro={repro}
-        udder={udder}
-        milk={milk}
-      />
+         Сигналы: не состояние стада, а то, с чем нужно что-то делать.
 
+         Сами отчёты переехали в «Стадо → Отчёты» — там их и ищут, судя
+         по названию раздела. Но терять ежедневность было нельзя:
+         передержанная тёлка стоит корма каждый день, а раздел, куда надо
+         зайти, открывают раз в квартал. Поэтому здесь остались те же
+         числа, но только тревожные, и каждое ведёт прямо в список
+         животных. Разбор — в `herd-signals.ts`.
+      */}
+      {signals.length > 0 && (
+        <section className="mt-9">
+          <h2 className="section-title mb-5">Требует решения</h2>
+          <div className="flex flex-wrap gap-3">
+            {signals.map((s) => (
+              <Link
+                key={s.key}
+                href={s.href}
+                className={`min-w-[220px] flex-1 rounded-xl px-4 py-3 transition-colors ${
+                  s.urgent
+                    ? 'bg-[#fdecea] hover:bg-[#fbe0dc]'
+                    : 'bg-white shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] hover:bg-[#f6f6f6]'
+                }`}
+              >
+                <span className="block text-[15px] font-medium">
+                  <span className="tabular-nums">{s.count} </span>
+                  {s.label}
+                </span>
+                <span className="mt-0.5 block text-[12px] leading-snug text-ink-500">{s.hint}</span>
+              </Link>
+            ))}
+          </div>
+
+          <p className="mt-3 text-[13px] text-ink-500">
+            Полностью —{' '}
+            <Link
+              href="/account?tab=herd&sub=reports"
+              className="underline underline-offset-2 hover:text-forest-500"
+            >
+              отчёты по стаду
+            </Link>
+            : структура, воспроизводство, выбытие, генетический тренд.
+          </p>
+        </section>
+      )}
     </>
   )
 }
@@ -556,44 +584,104 @@ async function OverviewTab({ orgId }: { orgId?: number }) {
 /**
  * Подраздел «Стадо → Отчёты».
  *
- * Отчёт был один и стоял карточкой под таблицей животных — то есть ниже
- * семидесяти строк и трёх экранов прокрутки, и ссылка на него была
- * единственной во всей системе. Отчёты — не хвост списка, а свой ответ
- * по стаду, и место им рядом со списком, а не под ним.
+ * ## Что здесь изменилось и почему
  *
- * Сравнение быков стоит здесь же, хотя быки — не только свои. Причина
- * в том, зачем на него смотрят: колонка «родство с вашим стадом» считается
- * из родословной покупателя, то есть отвечает на вопрос про стадо,
- * а не про каталог.
+ * Отчётов было два, а семь отчётов по стаду стояли на «Обзоре». Раздел,
+ * названный «Отчёты», отчётов не содержал, и это дороже, чем кажется:
+ * человек, которому нужен отчёт, ищет его там, где написано «Отчёты»,
+ * не находит и заключает, что отчёта нет.
+ *
+ * Довод, по которому семь отчётов стояли на «Обзоре», был верным: отчёт,
+ * за которым надо идти в отдельный раздел, смотрят раз в квартал, то есть
+ * когда решать уже поздно. Он не отброшен, а решён иначе — полосой
+ * сигналов на «Обзоре»: тревожные числа остались на виду и ведут прямо
+ * в список животных.
+ *
+ * ## Число и животные за ним
+ *
+ * Каждое число, за которым стоят конкретные животные, стало дверью
+ * в их список (`/account/reports/[code]`, разбор — `herd-drilldown.ts`).
+ * До этого кабинет умел сказать «инбридинг выше порога у двенадцати»
+ * и не умел показать, у каких, — а сделать что-то можно только
+ * с двенадцатью коровами, не с числом.
+ *
+ * Не у всякого числа дверь есть. У среднего инбридинга её нет и быть
+ * не может: среднее не относится ни к одному животному, и список
+ * «по среднему» означал бы всё стадо, притворяясь разбором.
+ *
+ * ## Почему сравнение быков стоит здесь
+ *
+ * Быки — не только свои, но смотрят на них ради колонки «родство
+ * с вашим стадом», а она считается из родословной покупателя. То есть
+ * это ответ про стадо, а не про каталог.
  */
-function HerdReports() {
-  return (
-    <section className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-      <div className="card">
-        <h3 className="panel-heading">Возраст первого отёла</h3>
-        <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
-          Считается по датам, которые вы уже внесли, — рождение и первый отёл.
-          Показывает, как телились ваши коровы, что с ними было дальше и дочери
-          каких быков телятся раньше. Вводить для этого ничего не нужно.
-        </p>
-        <Link href="/account/afc" className="btn btn-accent mt-5">
-          Посмотреть отчёт
-        </Link>
-      </div>
+async function HerdReports({ orgId }: { orgId?: number }) {
+  const payload = await getClient()
 
-      <div className="card">
-        <h3 className="panel-heading">Сравнение быков</h3>
-        <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
-          До шести производителей рядом: разница со сверстницами, число дочерей,
-          на которых она посчитана, и родство с вашим стадом. Последнее не даст
-          ни один каталог — для него нужны разом родословная быка и родословная
-          вашего хозяйства.
-        </p>
-        <Link href="/bulls/compare" className="btn btn-accent mt-5">
-          Открыть сравнение
-        </Link>
-      </div>
-    </section>
+  /*
+   * Те же семь запросов одним заходом. На «Обзоре» из них берутся
+   * четыре — ради сигналов, — а здесь нужны все: раздел про стадо
+   * целиком, а не только про его беды.
+   */
+  const [structure, heifers, trend, cull, repro, udder, milk] = orgId
+    ? await Promise.all([
+        lactationStructure(payload, orgId),
+        heiferAges(payload, orgId),
+        geneticTrend(payload, orgId),
+        culling(payload, orgId),
+        reproduction(payload, orgId),
+        udderHealth(payload, orgId),
+        milkByLactation(payload, orgId),
+      ])
+    : [null, null, null, null, null, null, null]
+
+  return (
+    <>
+      <HerdAnalytics
+        structure={structure}
+        heifers={heifers}
+        trend={trend}
+        cull={cull}
+        repro={repro}
+        udder={udder}
+        milk={milk}
+      />
+
+      {/*
+         Две отдельные страницы — ниже отчётов, считающихся здесь же.
+         Дверь в другую страницу и отчёт на этой выглядят по-разному
+         намеренно: первая уводит, второй уже показан.
+      */}
+      <section className="mt-9">
+        <h2 className="section-title mb-5">Отдельные разборы</h2>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className="card">
+            <h3 className="panel-heading">Возраст первого отёла</h3>
+            <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
+              Считается по датам, которые вы уже внесли, — рождение и первый отёл.
+              Показывает, как телились ваши коровы, что с ними было дальше и дочери
+              каких быков телятся раньше. Вводить для этого ничего не нужно.
+            </p>
+            <Link href="/account/afc" className="btn btn-accent mt-5">
+              Посмотреть отчёт
+            </Link>
+          </div>
+
+          <div className="card">
+            <h3 className="panel-heading">Сравнение быков</h3>
+            <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
+              До шести производителей рядом: разница со сверстницами, число дочерей,
+              на которых она посчитана, и родство с вашим стадом. Последнее не даст
+              ни один каталог — для него нужны разом родословная быка и родословная
+              вашего хозяйства.
+            </p>
+            <Link href="/bulls/compare" className="btn btn-accent mt-5">
+              Открыть сравнение
+            </Link>
+          </div>
+        </div>
+      </section>
+    </>
   )
 }
 

@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { nf } from '@/lib/format'
 import { Moment } from '@/components/Moment'
 import { InfoTip } from '@/components/InfoTip'
@@ -13,14 +14,22 @@ import type {
 } from '@/lib/herd-analytics'
 
 /**
- * Отчёты по стаду на «Обзоре».
+ * Отчёты по стаду в разделе «Стадо → Отчёты».
  *
- * ## Почему они здесь, а не на отдельной странице
+ * ## Почему они переехали с «Обзора»
  *
- * Все семь отвечают на вопросы, которые зоотехник задаёт себе утром:
- * какое у меня стадо, почему я его теряю, двигаюсь ли вперёд, здорово ли
- * вымя, хватит ли замены. Отчёт, за которым надо идти в отдельный раздел,
- * смотрят раз в квартал — то есть тогда, когда решать уже поздно.
+ * Стояли на «Обзоре» — по доводу, что отчёт, за которым надо идти
+ * в отдельный раздел, смотрят раз в квартал, то есть когда решать уже
+ * поздно. Довод верный, но из него вышло другое: раздел «Отчёты» с двумя
+ * дверями и «Обзор» с семью отчётами. Название перестало отвечать
+ * содержимому, а это дороже одного лишнего нажатия: человек, которому
+ * нужен отчёт, ищет его там, где написано «Отчёты», не находит и решает,
+ * что отчёта нет.
+ *
+ * Ежедневность спасена иначе — полосой сигналов на «Обзоре»: там остались
+ * те же числа, но только тревожные, и каждое ведёт прямо в список
+ * животных. «Обзор» отвечает «что случилось», «Отчёты» — «почему
+ * и с кем».
  *
  * ## Почему сеткой карточек, а не колонкой разделов
  *
@@ -44,29 +53,60 @@ import type {
  * не заполняют».
  */
 
+/**
+ * Плитка с числом. С адресом — становится дверью в список животных.
+ *
+ * ## Почему дверь именно на плитке, а не отдельной ссылкой под карточкой
+ *
+ * Ссылка «показать животных» внизу карточки относилась бы ко всей карточке,
+ * а числа в ней разные: «пора осеменять 12» и «передержка 4» — два разных
+ * списка. Человек нажимает на то число, которое его встревожило, и должен
+ * получить именно его.
+ *
+ * Плитка без адреса остаётся неподвижной. Это не недоделка: у «среднего
+ * инбридинга» списка нет и быть не может — среднее не относится ни к одному
+ * животному, а показать по нему всё стадо значило бы притвориться, что
+ * относится.
+ */
 const Tile = ({
   label,
   value,
   note,
   tone,
+  href,
 }: {
   label: string
   value: string
   note?: string
   tone?: 'good' | 'warn' | 'plain'
-}) => (
-  <div className="rounded-xl bg-canvas px-3.5 py-3">
-    <p className="text-[12px] leading-snug text-ink-500">{label}</p>
-    <p
-      className={`mt-1 text-[21px] font-medium leading-none tabular-nums ${
-        tone === 'warn' ? 'text-[#c0392b]' : tone === 'good' ? 'text-forest-600' : ''
-      }`}
+  href?: string
+}) => {
+  const body = (
+    <>
+      <p className="text-[12px] leading-snug text-ink-500">{label}</p>
+      <p
+        className={`mt-1 text-[21px] font-medium leading-none tabular-nums ${
+          tone === 'warn' ? 'text-[#c0392b]' : tone === 'good' ? 'text-forest-600' : ''
+        }`}
+      >
+        {value}
+        {href && <span className="ml-1.5 align-middle text-[13px] text-ink-400">→</span>}
+      </p>
+      {note && <p className="mt-1 text-[11px] leading-snug text-ink-500">{note}</p>}
+    </>
+  )
+
+  if (!href) return <div className="rounded-xl bg-canvas px-3.5 py-3">{body}</div>
+
+  return (
+    <Link
+      href={href}
+      className="block rounded-xl bg-canvas px-3.5 py-3 transition-colors hover:bg-ink-100"
     >
-      {value}
-    </p>
-    {note && <p className="mt-1 text-[11px] leading-snug text-ink-500">{note}</p>}
-  </div>
-)
+      {body}
+    </Link>
+  )
+}
 
 /** Карточка отчёта: заголовок, короткая строка, подсказка «почему так». */
 const Report = ({
@@ -249,11 +289,16 @@ export function HerdAnalytics({
               </>
             }
           >
+            {/*
+               Полоса группы — дверь в список её коров. Строка без коров
+               ссылкой не становится: приглашение открыть пустое —
+               обещание, которое страница не выполнит.
+            */}
             <div className="space-y-2.5">
               {structure.byLactation.map((r) => {
                 const share = structure.cows > 0 ? (r.cows / structure.cows) * 100 : 0
-                return (
-                  <div key={r.lactation}>
+                const bar = (
+                  <>
                     <div className="flex items-baseline justify-between gap-4 text-[13px]">
                       <span>{r.label}</span>
                       <span className="tabular-nums text-ink-500">
@@ -266,6 +311,20 @@ export function HerdAnalytics({
                         style={{ width: `${Math.max(share, 0.5)}%` }}
                       />
                     </div>
+                  </>
+                )
+
+                return r.cows > 0 ? (
+                  <Link
+                    key={r.lactation}
+                    href={`/account/reports/lactation-${r.lactation}`}
+                    className="block rounded-lg px-1 py-0.5 transition-colors hover:bg-canvas"
+                  >
+                    {bar}
+                  </Link>
+                ) : (
+                  <div key={r.lactation} className="px-1 py-0.5">
+                    {bar}
                   </div>
                 )
               })}
@@ -273,8 +332,15 @@ export function HerdAnalytics({
 
             {structure.withoutCalvings > 0 && (
               <p className="mt-3 text-[12px] leading-snug text-ink-500">
-                Ещё {nf(structure.withoutCalvings, 0)} коров без отёлов в книге — в среднюю
-                лактацию не входят: это пробел в данных, а не молодость стада.
+                Ещё{' '}
+                <Link
+                  href="/account/reports/no-calvings"
+                  className="underline underline-offset-2 hover:text-forest-500"
+                >
+                  {nf(structure.withoutCalvings, 0)} коров без отёлов
+                </Link>{' '}
+                в книге — в среднюю лактацию не входят: это пробел в данных, а не молодость
+                стада.
               </p>
             )}
           </Report>
@@ -298,11 +364,16 @@ export function HerdAnalytics({
             }
           >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <Tile label="Растут, до 13 мес." value={nf(heifers.young, 0)} />
+              <Tile
+                label="Растут, до 13 мес."
+                value={nf(heifers.young, 0)}
+                href={heifers.young > 0 ? '/account/reports/heifers-young' : undefined}
+              />
               <Tile
                 label="Пора осеменять"
                 value={nf(heifers.ready, 0)}
                 tone="good"
+                href={heifers.ready > 0 ? '/account/reports/heifers-ready' : undefined}
                 note={
                   heifers.meanReadyAge === null
                     ? '13–15 мес.'
@@ -313,6 +384,7 @@ export function HerdAnalytics({
                 label="Передержка, 15+ мес."
                 value={nf(heifers.overdue, 0)}
                 tone={heifers.overdue > 0 ? 'warn' : 'plain'}
+                href={heifers.overdue > 0 ? '/account/reports/heifers-overdue' : undefined}
               />
             </div>
           </Report>
@@ -378,8 +450,14 @@ export function HerdAnalytics({
 
             {milk.inProgress > 0 && (
               <p className="mt-3 text-[12px] leading-snug text-ink-500">
-                Ещё {nf(milk.inProgress, 0)} лактаций в ходу — в средние не входят: «ещё доит»
-                не то же, что «мало надоила».
+                Ещё{' '}
+                <Link
+                  href="/account/reports/milk-in-progress"
+                  className="underline underline-offset-2 hover:text-forest-500"
+                >
+                  {nf(milk.inProgress, 0)} лактаций в ходу
+                </Link>{' '}
+                — в средние не входят: «ещё доит» не то же, что «мало надоила».
               </p>
             )}
           </Report>
@@ -416,6 +494,7 @@ export function HerdAnalytics({
                 label={`Выше ${SCC_THRESHOLD} тыс.`}
                 value={nf(udder.above, 0)}
                 tone={udder.above > 0 ? 'warn' : 'good'}
+                href={udder.above > 0 ? '/account/reports/scc-above' : undefined}
                 note={udder.share === null ? undefined : `${nf(udder.share, 0)} % от измеренных`}
               />
             </div>
@@ -499,10 +578,19 @@ export function HerdAnalytics({
             }
           >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {/*
+                 Дверь стоит на числе первотёлок, а не на общем итоге:
+                 итог уже назван в строке под заголовком, а список открывают
+                 ради того, чтобы посмотреть на самые дорогие потери.
+                 Список при этом общий — за год, отсортированный по дате:
+                 отдельный список «только первотёлки» разошёлся бы
+                 с числом выбытия, стоящим рядом.
+              */}
               <Tile
                 label="Из них первотёлок"
                 value={nf(cull.firstLactation, 0)}
                 tone={cull.firstLactation > 0 ? 'warn' : 'plain'}
+                href="/account/reports/culled-year"
                 note="самая дорогая потеря"
               />
               <Tile
@@ -573,6 +661,9 @@ export function HerdAnalytics({
                 label={`Животных выше ${INBREEDING_THRESHOLD} %`}
                 value={nf(trend.aboveThreshold, 0)}
                 tone={trend.aboveThreshold > 0 ? 'warn' : 'good'}
+                href={
+                  trend.aboveThreshold > 0 ? '/account/reports/inbreeding-above' : undefined
+                }
                 note={
                   trend.withInbreeding > 0
                     ? `${nf((trend.aboveThreshold / trend.withInbreeding) * 100, 0)} % от посчитанных`

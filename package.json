@@ -47,6 +47,7 @@
     "check:movements": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-movements.ts",
     "check:pool": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-pool.ts",
     "check:herd": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-herd-analytics.ts",
+    "check:drilldown": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-drilldown.ts",
     "check:nav": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-nav.ts",
     "check:layout": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-layout.ts",
     "check:api-docs": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-api-docs.ts",
