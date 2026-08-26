@@ -656,6 +656,18 @@ async function HerdReports({ orgId }: { orgId?: number }) {
         <h2 className="section-title mb-5">Отдельные разборы</h2>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <div className="card">
+            <h3 className="panel-heading">Подбор быков</h3>
+            <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
+              Инбридинг будущего потомка для каждой пары «корова × бык». Посчитать его
+              может только тот, у кого есть обе родословные разом: у системы управления
+              стадом есть ваша, у каталога быков — его, и ни у кого нет обеих.
+            </p>
+            <Link href="/account/reports/mating" className="btn btn-accent mt-5">
+              Подобрать
+            </Link>
+          </div>
+
+          <div className="card">
             <h3 className="panel-heading">Быки в моём стаде</h3>
             <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
               Что каждый бык дал именно у вас: дочери против ровесниц того же стада,
