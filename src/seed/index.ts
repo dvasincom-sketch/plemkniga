@@ -316,7 +316,7 @@ const run = async () => {
   log('Создание пользователей…')
   const PASSWORD = 'plemkniga123'
 
-  await payload.create({
+  const associationUser = await payload.create({
     collection: 'users',
     overrideAccess: true,
     data: {
@@ -1406,6 +1406,17 @@ const run = async () => {
       issuedAt: new Date(2025, 2, 12).toISOString(),
       animal: polyana.id,
       organization: orgs[0].id,
+      /*
+       * Кто выдал — обязательно для свидетельства.
+       *
+       * Поле оставалось пустым, и до появления колонки «кем выдан»
+       * это было незаметно. Как только колонка появилась, кабинет
+       * стал показывать племенное свидетельство как загруженное самим
+       * хозяйством — то есть бумагу, за которую Ассоциация не отвечает.
+       * Свидетельство без выдавшего есть противоречие: подписывать
+       * его больше некому.
+       */
+      issuedBy: associationUser.id,
     },
   })
 

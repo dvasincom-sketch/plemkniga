@@ -30,7 +30,14 @@ import {
   resolveSort,
   type SearchParams,
 } from '@/lib/animal-query'
-import { DOCUMENT_TYPES, eventTypeLabel, labelOf } from '@/lib/dictionaries'
+import { eventTypeLabel, labelOf } from '@/lib/dictionaries'
+import { DocumentsPanel } from '@/components/DocumentsPanel'
+import {
+  buildDocumentWhere,
+  hasDocumentFilters,
+  one as oneDoc,
+  type SearchParams as DocSearchParams,
+} from '@/lib/document-query'
 import { SubmissionHistory } from '@/components/SubmissionHistory'
 import { DATA_SUBTABS, DataNav, type DataSub } from '@/components/DataNav'
 import { HERD_SUBTABS, HerdNav, type HerdSub } from '@/components/HerdNav'
@@ -283,7 +290,7 @@ export default async function AccountPage({
                   <AnimalsTab sp={sp} orgId={orgId} user={user} viewer={viewer} />
                 )}
                 {herdSubResolved === 'reports' && <HerdReports orgId={orgId} />}
-                {herdSubResolved === 'documents' && <DocumentsTab orgId={orgId} />}
+                {herdSubResolved === 'documents' && <DocumentsTab orgId={orgId} sp={sp} />}
               </>
             )}
 
@@ -1516,78 +1523,47 @@ async function DataFeed({ orgId }: { orgId?: number }) {
 /*                             Вкладка «Документы»                      */
 /* ------------------------------------------------------------------ */
 
-async function DocumentsTab({ orgId }: { orgId?: number }) {
+/**
+ * Подраздел «Стадо → Документы».
+ *
+ * Отбор, разбивка и разметка — в `DocumentsPanel`; здесь только запрос.
+ * Разделение не ради красоты: раздел вырос из таблицы на сорок строк
+ * без условий в архив с семью условиями и постраничной навигацией,
+ * а страница кабинета и без него полторы тысячи строк.
+ */
+async function DocumentsTab({ orgId, sp }: { orgId?: number; sp: DocSearchParams }) {
   const payload = await getClient()
+
+  const page = Math.max(1, Number(oneDoc(sp.page)) || 1)
+  const perPage = 25
+
+  const where = buildDocumentWhere(sp, orgId)
+
+  /*
+   * Общий счёт берётся из выдачи (`totalDocs`), а не отдельным запросом:
+   * условие у них одно и то же, и разойтись они не могут. Это не тот
+   * случай, что со списками отчётов, — там число и список считались
+   * разными запросами по разным условиям.
+   */
   const docs = await payload.find({
     collection: 'documents',
     depth: 1,
-    limit: 40,
+    page,
+    limit: perPage,
     sort: '-issuedAt',
     overrideAccess: true,
-    where: orgId ? { organization: { equals: orgId } } : {},
+    where,
   })
 
   return (
-    <section className="mt-8">
-      <div className="card overflow-x-auto">
-        <table className="metric-table min-w-[720px]">
-          <thead>
-            <tr>
-              <th>Дата</th>
-              <th>Тип</th>
-              <th>Номер</th>
-              <th>Название</th>
-              <th>Животное</th>
-              <th>Состояние</th>
-            </tr>
-          </thead>
-          <tbody>
-            {docs.docs.length === 0 && (
-              <tr>
-                <td colSpan={6} className="py-8 text-center text-ink-500">
-                  Документов пока нет
-                </td>
-              </tr>
-            )}
-            {docs.docs.map((d) => (
-              <tr key={d.id}>
-                <td>{dateRu(d.issuedAt)}</td>
-                <td>{labelOf(DOCUMENT_TYPES, d.type)}</td>
-                <td>{d.number || '—'}</td>
-                <td>{d.title}</td>
-                <td>
-                  {typeof d.animal === 'object' && d.animal ? (
-                    <Link href={`/animals/${d.animal.id}`} className="underline underline-offset-2">
-                      {d.animal.identNumber}
-                    </Link>
-                  ) : (
-                    '—'
-                  )}
-                </td>
-                <td>
-                  {/*
-                    Отзыв показывается хозяйству, а не только Ассоциации.
-                    Отозванное свидетельство внешне ничем не отличалось
-                    от действующего — а сослаться на недействующую бумагу
-                    в сделке хуже, чем не иметь её вовсе.
-                  */}
-                  {d.revoked?.at ? (
-                    <span
-                      className="rounded-md bg-[#fdecea] px-2 py-0.5 text-[13px]"
-                      title={d.revoked.reason ?? undefined}
-                    >
-                      отозван {dateRu(d.revoked.at)}
-                    </span>
-                  ) : (
-                    <span className="text-ink-500">действует</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
+    <DocumentsPanel
+      docs={docs.docs}
+      total={docs.totalDocs ?? 0}
+      page={page}
+      totalPages={docs.totalPages ?? 1}
+      sp={sp}
+      hasFilters={hasDocumentFilters(sp)}
+    />
   )
 }
 
