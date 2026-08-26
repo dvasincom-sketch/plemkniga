@@ -192,15 +192,18 @@ export function WhyJoin() {
           </div>
 
           <div className="flex flex-wrap gap-3 lg:justify-end">
-            <Link
-              href="/register"
-              className="btn bg-white text-ink-900 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] hover:bg-[#f6f6f6]"
-            >
+            <Link href="/register" className="btn">
               Зарегистрироваться бесплатно
             </Link>
+            {/*
+               Прозрачная кнопка на тёмном блоке — единственное место, где
+               базовый белый фон гасится нарочно: рядом с белой кнопкой она
+               должна читаться как второе действие, а две белые подряд
+               спорили бы друг с другом.
+            */}
             <Link
               href="/login"
-              className="btn border border-white/35 bg-transparent text-white hover:bg-white/10"
+              className="btn border-white/35 bg-transparent text-white hover:bg-white/10"
             >
               У меня есть учётная запись
             </Link>

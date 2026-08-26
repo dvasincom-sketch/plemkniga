@@ -75,7 +75,7 @@ export function ColumnDecision({
           name="status"
           value="duplicate"
           disabled={pending}
-          className="btn btn-ghost text-[14px]"
+          className="btn text-[14px]"
         >
           Уже есть под другим названием
         </button>
@@ -84,7 +84,7 @@ export function ColumnDecision({
           name="status"
           value="declined"
           disabled={pending}
-          className="btn btn-ghost text-[14px]"
+          className="btn text-[14px]"
         >
           Отклонить
         </button>
@@ -94,7 +94,7 @@ export function ColumnDecision({
             name="status"
             value="new"
             disabled={pending}
-            className="btn btn-ghost text-[14px]"
+            className="btn text-[14px]"
           >
             Вернуть в разбор
           </button>

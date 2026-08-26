@@ -531,10 +531,8 @@ export default async function HerdbookPage({
                         <Link href="/register" className="btn btn-brand">
                           Зарегистрироваться бесплатно
                         </Link>
-                        <Link
-                          href="/login"
-                          className="btn bg-white text-ink-900 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] hover:bg-[#f6f6f6]"
-                        >
+                        {/* Белая кнопка — теперь просто `btn`: цвет в базе */}
+                        <Link href="/login" className="btn">
                           У меня уже есть учётная запись
                         </Link>
                       </div>

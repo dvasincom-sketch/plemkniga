@@ -280,7 +280,32 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* ---------- Кнопки ---------- */
+  /* ---------- Кнопки ----------
+   *
+   * Голая `.btn` — белая кнопка, а не бесцветная.
+   *
+   * Раньше базовый класс задавал только форму: размер, скругление, шрифт.
+   * Цвет приходил модификатором, и кнопка без модификатора оставалась
+   * прозрачной — Tailwind в своём сбросе явно гасит фон у `button`, а `a`
+   * прозрачен и так. На сером фоне кабинета получалась не кнопка, а надпись
+   * в воздухе: «Загрузить файл» рядом с оранжевым «Записать событие»
+   * читалось как подпись к нему, а не как второе действие того же ряда.
+   *
+   * Так стояло в пятнадцати местах, и это не было решением: никто не выбирал
+   * «пусть будет прозрачная». Просто вторичной кнопки в наборе не завели,
+   * а `btn-ghost` — белую с рамкой — вспоминали редко, и дважды белую кнопку
+   * набрали утилитами прямо в разметке.
+   *
+   * Поэтому вторичная кнопка стала базовой: белая, с волосяной рамкой.
+   * Кому нужен цвет, тот дописывает модификатор — так и было. Отдельный
+   * `btn-ghost` убран: два почти одинаковых белых стиля разъезжаются при
+   * первой же правке отступа, а выбирать между ними приходится каждый раз
+   * заново.
+   *
+   * Рамка, а не тень: белая кнопка с тенью видна на сером фоне и пропадает
+   * на белой карточке, а вторичные кнопки стоят и там, и там — в формах
+   * события и экстерьера они лежат на белом.
+   */
   .btn {
     display: inline-flex;
     align-items: center;
@@ -292,18 +317,31 @@
     font-size: 0.9375rem;
     font-weight: 500;
     cursor: pointer;
+    background: #fff;
+    color: var(--color-ink-900);
+    border: 1px solid var(--color-ink-100);
     transition:
       background-color 0.15s ease,
       opacity 0.15s ease;
     white-space: nowrap;
   }
+  .btn:hover:not(:disabled) {
+    background: var(--color-canvas);
+  }
   .btn:disabled {
     opacity: 0.55;
     cursor: not-allowed;
   }
+
+  /*
+   * Цветные варианты гасят рамку, а не убирают её: ширина остаётся в габарите,
+   * и цветная кнопка стоит вровень с белой в одном ряду. Уберёшь `border`
+   * совсем — цветная станет на два пиксела ниже соседней белой.
+   */
   .btn-accent {
     background: var(--color-accent-500);
     color: #fff;
+    border-color: transparent;
   }
   .btn-accent:hover:not(:disabled) {
     background: var(--color-accent-600);
@@ -311,6 +349,7 @@
   .btn-brand {
     background: var(--color-brand-500);
     color: #fff;
+    border-color: transparent;
   }
   .btn-brand:hover:not(:disabled) {
     background: var(--color-brand-600);
@@ -318,17 +357,10 @@
   .btn-forest {
     background: var(--color-forest-500);
     color: #fff;
+    border-color: transparent;
   }
   .btn-forest:hover:not(:disabled) {
     background: var(--color-forest-600);
-  }
-  .btn-ghost {
-    background: #fff;
-    color: var(--color-ink-900);
-    border: 1px solid var(--color-ink-100);
-  }
-  .btn-ghost:hover:not(:disabled) {
-    background: var(--color-canvas);
   }
 
   /* ---------- Карточки ---------- */

@@ -47,7 +47,7 @@ export default function FrontendError({
           <button type="button" onClick={reset} className="btn btn-accent">
             Попробовать снова
           </button>
-          <Link href="/" className="btn btn-ghost">
+          <Link href="/" className="btn">
             На главную
           </Link>
         </div>

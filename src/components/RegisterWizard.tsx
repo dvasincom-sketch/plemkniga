@@ -251,7 +251,7 @@ export function RegisterWizard({ next }: { next?: string }) {
 
         <div className="mt-8 flex items-center gap-3">
           {step > 0 && (
-            <button type="button" className="btn btn-ghost" onClick={() => setStep((s) => s - 1)}>
+            <button type="button" className="btn" onClick={() => setStep((s) => s - 1)}>
               Назад
             </button>
           )}
