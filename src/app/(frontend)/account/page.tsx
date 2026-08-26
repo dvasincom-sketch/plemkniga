@@ -38,6 +38,16 @@ import { FarmNav } from '@/components/FarmNav'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { herdSummary } from '@/lib/herd-summary'
 import {
+  culling,
+  geneticTrend,
+  heiferAges,
+  lactationStructure,
+  milkByLactation,
+  reproduction,
+  udderHealth,
+} from '@/lib/herd-analytics'
+import { HerdAnalytics } from '@/components/HerdAnalytics'
+import {
   FileUploadIcon,
   HerdScanIcon,
   RulesIcon,
@@ -372,11 +382,28 @@ async function OverviewTab({ orgId }: { orgId?: number }) {
     )
   }
 
-  const [todo, summary, profiles] = await Promise.all([
-    farmTodo(payload, orgId),
-    herdSummary(payload, orgId),
-    loadOwnProfiles(orgId),
-  ])
+  /*
+   * Семь отчётов запрашиваются одним заходом рядом со сводкой.
+   *
+   * Последовательно это было бы семь ожиданий базы подряд — на глаз
+   * заметно, при том что запросы друг от друга не зависят. Каждый
+   * возвращает `null`, если считать не по чему, и блок сам себя прячет:
+   * ноль вместо «нет данных» читается как утверждение, которого никто
+   * не проверял.
+   */
+  const [todo, summary, profiles, structure, heifers, trend, cull, repro, udder, milk] =
+    await Promise.all([
+      farmTodo(payload, orgId),
+      herdSummary(payload, orgId),
+      loadOwnProfiles(orgId),
+      lactationStructure(payload, orgId),
+      heiferAges(payload, orgId),
+      geneticTrend(payload, orgId),
+      culling(payload, orgId),
+      reproduction(payload, orgId),
+      udderHealth(payload, orgId),
+      milkByLactation(payload, orgId),
+    ])
 
   const activeProfile = profiles.defaultDoc ? profiles.defaultDoc.name : ASSOCIATION_PROFILE.name
 
@@ -472,6 +499,21 @@ async function OverviewTab({ orgId }: { orgId?: number }) {
           </div>
         </section>
       )}
+
+      {/*
+         Отчёты по стаду: какое оно, почему теряется, двигается ли вперёд.
+         Стоят после чисел и до частых дел — сначала обстановка, потом
+         действия. Разбор каждого — в самих компонентах и в `herd-analytics`.
+      */}
+      <HerdAnalytics
+        structure={structure}
+        heifers={heifers}
+        trend={trend}
+        cull={cull}
+        repro={repro}
+        udder={udder}
+        milk={milk}
+      />
 
       {/*
          Три частых действия ссылками — не дубль разделов, а короткий путь
