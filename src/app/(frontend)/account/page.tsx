@@ -478,9 +478,38 @@ async function OverviewTab({ orgId }: { orgId?: number }) {
         </section>
       )}
 
+      {/*
+         Частые дела подняты наверх, к делам и числам.
+
+         Стояли последними — за семью отчётами, то есть за пятью экранами
+         прокрутки. А в кабинет заходят чаще всего именно за ними: записать
+         отёл, залить файл, отправить на верификацию. Отчёты читают, дела
+         делают, и делать не должно требовать доскроллить.
+
+         Ряд кнопок, а не карточек: полными карточками с описаниями они
+         стоят в «Данных», там человек выбирает способ. Здесь он уже знает,
+         чего хочет.
+      */}
+      <section className="mt-8">
+        <div className="flex flex-wrap gap-3">
+          <Link href="/account/events/new" className="btn btn-accent">
+            Записать событие
+          </Link>
+          <Link href="/account/import" className="btn">
+            Загрузить файл
+          </Link>
+          <Link href="/account/verification" className="btn">
+            Подать на верификацию
+          </Link>
+          <Link href="/account/checks/herd" className="btn">
+            Проверить моё стадо
+          </Link>
+        </div>
+      </section>
+
       {stats.length > 0 && (
         <section className="mt-9">
-          <h2 className="section-title mb-6">Стадо в числах</h2>
+          <h2 className="section-title mb-5">Стадо в числах</h2>
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {stats.map((s) => (
               <div key={s.label} className="card">
@@ -502,8 +531,9 @@ async function OverviewTab({ orgId }: { orgId?: number }) {
 
       {/*
          Отчёты по стаду: какое оно, почему теряется, двигается ли вперёд.
-         Стоят после чисел и до частых дел — сначала обстановка, потом
-         действия. Разбор каждого — в самих компонентах и в `herd-analytics`.
+         Стоят после чисел, а дела — выше их обоих: за делами приходят
+         каждый день, отчёты читают, когда есть время. Разбор каждого —
+         в самих компонентах и в `herd-analytics`.
       */}
       <HerdAnalytics
         structure={structure}
@@ -515,29 +545,6 @@ async function OverviewTab({ orgId }: { orgId?: number }) {
         milk={milk}
       />
 
-      {/*
-         Три частых действия ссылками — не дубль разделов, а короткий путь
-         к тому, зачем в кабинет заходят чаще всего. Полными карточками
-         с описаниями они стоят в «Данных»: там человек выбирает способ,
-         здесь — уже знает, чего хочет.
-      */}
-      <section className="mt-10">
-        <h2 className="section-title mb-6">Частые дела</h2>
-        <div className="flex flex-wrap gap-3">
-          <Link href="/account/events/new" className="btn btn-accent">
-            Записать событие
-          </Link>
-          <Link href="/account/import" className="btn">
-            Загрузить файл
-          </Link>
-          <Link href="/account/verification" className="btn">
-            Подать на верификацию
-          </Link>
-          <Link href="/account/checks/herd" className="btn">
-            Проверить моё стадо
-          </Link>
-        </div>
-      </section>
     </>
   )
 }

@@ -511,7 +511,8 @@ export async function reproduction(
       select k.animal_id,
              k."date"::date - lag(k."date"::date) over (
                partition by k.animal_id order by k."date"
-             ) as days
+             ) as days,
+             k."date" as at
         from calvings k
         join mine m on m.id = k.animal_id
     ),
@@ -555,7 +556,17 @@ export async function reproduction(
     )
     select
       (select round(avg(days), 0) from service where days between 20 and 250) as service_period,
-      (select round(avg(days), 0) from intervals where days between 300 and 600) as calving_interval,
+      /*
+       * Только промежутки, закрывшиеся за последний год.
+       *
+       * Считалось по всем отёлам за всю историю, а подпись под числом
+       * обещала «за последний год» — то есть страница утверждала одно,
+       * а показывала другое. Средний межотельный за всю жизнь стада
+       * к тому же прячет ухудшение: он тем инертнее, чем дольше стадо
+       * ведётся.
+       */
+      (select round(avg(days), 0) from intervals
+        where days between 300 and 600 and at > now() - interval '12 months') as calving_interval,
       (select total from ins)                                    as ins_total,
       (select ok from ins)                                       as ins_ok,
       (select count(*)::int from calvings k join mine m on m.id = k.animal_id
