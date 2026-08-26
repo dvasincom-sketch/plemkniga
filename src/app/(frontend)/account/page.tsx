@@ -656,6 +656,19 @@ async function HerdReports({ orgId }: { orgId?: number }) {
         <h2 className="section-title mb-5">Отдельные разборы</h2>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <div className="card">
+            <h3 className="panel-heading">Кандидаты на выбраковку</h3>
+            <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
+              Коровы, к которым есть претензии: не стельная после двухсот дней, много
+              осеменений, высокая соматика, нижняя четверть стада по индексу или по удою.
+              Рейтинга нет намеренно — у каждой перечислено, чем именно она сюда попала,
+              а решает зоотехник.
+            </p>
+            <Link href="/account/reports/cull" className="btn btn-accent mt-5">
+              Открыть список
+            </Link>
+          </div>
+
+          <div className="card">
             <h3 className="panel-heading">Возраст первого отёла</h3>
             <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
               Считается по датам, которые вы уже внесли, — рождение и первый отёл.
