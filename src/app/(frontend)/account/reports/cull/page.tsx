@@ -39,11 +39,19 @@ export const dynamic = 'force-dynamic'
  * стадом, отсортированным по колонке, — а это уже есть в «Списке».
  */
 
+/**
+ * Плашка претензии.
+ *
+ * `whitespace-nowrap` не косметика: «Не стельная» переносилась на две
+ * строки, плашка становилась вдвое выше соседних, и ряд начинал прыгать.
+ * Название претензии — это ярлык, а ярлык не переносят: он либо помещается,
+ * либо его надо переименовать.
+ */
 const Chip = ({ reason }: { reason: CullReason }) => {
   const r = CULL_REASONS[reason]
   return (
     <span
-      className="inline-block rounded-md bg-[#fdecea] px-2 py-0.5 text-[12px] leading-snug text-[#8a2d22]"
+      className="inline-block whitespace-nowrap rounded-md bg-[#fdecea] px-2 py-0.5 text-[12px] leading-snug text-[#8a2d22]"
       title={r.hint}
     >
       {r.label}
@@ -140,10 +148,24 @@ export default async function CullPage() {
                 </InfoTip>
               </div>
 
-              <ul className="grid grid-cols-1 gap-2 text-[14px] leading-snug text-ink-700 sm:grid-cols-2">
+              {/*
+                 Пояснения выровнены по левому краю в своей колонке,
+                 а не начинаются сразу за плашкой.
+
+                 Плашки разной длины, и текст, приклеенный к каждой,
+                 начинался в пяти разных местах: глаз возвращается
+                 к началу строки заново на каждой строке, и список
+                 из пяти пунктов читается дольше таблицы из двадцати.
+                 Столбец фиксированной ширины стоит того — это тот же
+                 приём, что в любой таблице: колонка задаёт край,
+                 а не содержимое ячейки.
+              */}
+              <ul className="grid grid-cols-1 gap-x-6 gap-y-2.5 text-[14px] leading-snug text-ink-700 sm:grid-cols-2">
                 {(Object.keys(CULL_REASONS) as CullReason[]).map((k) => (
-                  <li key={k} className="flex items-baseline gap-2">
-                    <Chip reason={k} />
+                  <li key={k} className="grid grid-cols-[10rem_1fr] items-baseline gap-3">
+                    <span>
+                      <Chip reason={k} />
+                    </span>
                     <span className="text-ink-500">{CULL_REASONS[k].hint}</span>
                   </li>
                 ))}
@@ -197,12 +219,25 @@ export default async function CullPage() {
                         </td>
                         <td className="font-medium">{r.name || '—'}</td>
                         <td className="text-right tabular-nums">{r.lactation}</td>
+                        {/*
+                           Число всегда у правого края, подпись — слева от него.
+
+                           Стояло наоборот, и «стельная» отодвигала число
+                           влево: колонка переставала быть колонкой,
+                           а сравнить дни у соседних строк можно было
+                           только по одной. Число в числовой колонке
+                           держит край, что бы рядом ни стояло.
+
+                           Сама подпись нужна: 250 дней после отёла
+                           у стельной коровы — норма, у нестельной — повод.
+                        */}
                         <td className="text-right tabular-nums">
-                          {r.dim === null ? '—' : nf(r.dim, 0)}
-                          {/* Стельность важнее числа дней: 250 дней у стельной — норма */}
-                          {r.pregnant && (
-                            <span className="ml-1 text-[12px] text-forest-600">стельная</span>
-                          )}
+                          <span className="inline-flex items-baseline justify-end gap-2">
+                            {r.pregnant && (
+                              <span className="text-[12px] text-forest-600">стельная</span>
+                            )}
+                            <span>{r.dim === null ? '—' : nf(r.dim, 0)}</span>
+                          </span>
                         </td>
                         <td className="text-right tabular-nums">{r.services}</td>
                         <td className="text-right tabular-nums">

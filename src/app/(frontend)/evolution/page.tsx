@@ -7,6 +7,7 @@ import { EvolutionStages } from '@/components/EvolutionStages'
 import { EvolutionDocs } from '@/components/EvolutionDocs'
 import { EvolutionRoadmap } from '@/components/EvolutionRoadmap'
 import { EvolutionBench } from '@/components/EvolutionBench'
+import { EvolutionVisualCode } from '@/components/EvolutionVisualCode'
 import { loadBenchReports } from '@/lib/bench-report'
 import { getClient } from '@/lib/payload'
 import { CURRENT_VERSION } from '@/lib/product-versions'
@@ -43,6 +44,13 @@ const TABS = [
      и на приёмке спрашивают в том же порядке.
   */
   { key: 'bench', label: 'Замер' },
+  /*
+     «Визуальный код» стоит перед документацией и после замера.
+     Документация отвечает инженеру, которому строить интеграцию;
+     визуальный код — тому, кто будет книгу развивать. Второй приходит
+     раньше первого и чаще.
+  */
+  { key: 'visual', label: 'Визуальный код' },
   { key: 'docs', label: 'Документация' },
 ] as const
 
@@ -64,6 +72,10 @@ const LEAD: Record<TabKey, string> = {
     'Критерии приёмки требуют поиска быстрее секунды на пятидесяти тысячах записей ' +
     'и свидетельства не дольше пяти секунд. Здесь — что получилось на самом деле, ' +
     'на каком железе и чего эти цифры не говорят.',
+  visual:
+    'Правила оформления, по которым книга собрана, и случаи, из которых каждое выросло. ' +
+    'Не каталог отступов: отступы можно скопировать из соседнего файла, а понять, ' +
+    'какое решение принимать, когда правила молчат, — нельзя.',
   docs:
     'Техническое описание системы для тех, кому предстоит с ней работать: модель данных, ' +
     'процессы, архитектура, контракты обмена, развёртывание и — отдельно — ограничения.',
@@ -129,6 +141,7 @@ export default async function EvolutionPage({
           {tab === 'stages' && <EvolutionStages />}
           {tab === 'roadmap' && <EvolutionRoadmap />}
           {tab === 'bench' && <EvolutionBench reports={benchReports} />}
+          {tab === 'visual' && <EvolutionVisualCode />}
           {tab === 'docs' && <EvolutionDocs />}
         </div>
       </main>
