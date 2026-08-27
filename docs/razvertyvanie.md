@@ -69,6 +69,8 @@ npm run payload migrate:create
 npm run payload migrate
 
 npm run backfill:sort-ranks  # пересчитать служебные ранги сортировки
+npm run backfill:trust -- --dry  # посчитать вторую ступень без протокола лаборатории
+npm run backfill:trust           # опустить такие записи до «Заявлено хозяйством»
 npm run repair:uuid          # починить animals.uuid, если push падает на уникальном индексе
 
 npm run pedigree:deep -- <инд-номер> [глубина]  # достроить родословную вглубь
