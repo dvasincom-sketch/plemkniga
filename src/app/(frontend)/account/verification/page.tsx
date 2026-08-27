@@ -16,6 +16,7 @@ import {
 } from '@/collections/VerificationRequests'
 import { labelOf } from '@/lib/dictionaries'
 import { dateRu } from '@/lib/format'
+import { GAP_LABEL, GAP_ORDER, GAP_WHY, completenessGaps } from '@/lib/completeness'
 
 export const metadata: Metadata = { title: 'Верификация записей' }
 export const dynamic = 'force-dynamic'
@@ -28,22 +29,17 @@ export const dynamic = 'force-dynamic'
  * а не мимоходом между двумя фильтрами.
  */
 
-/** Чего не хватает записи, чтобы её подтвердили. */
-const missingOf = (a: {
-  birthDate?: string | null
-  breed?: unknown
-  father?: unknown
-  mother?: unknown
-  pedigreeText?: { fatherId?: string | null; motherId?: string | null } | null
-}): string[] => {
-  const out: string[] = []
-  if (!a.birthDate) out.push('дата рождения')
-  if (!a.breed) out.push('порода')
-  const hasParents =
-    a.father || a.mother || a.pedigreeText?.fatherId || a.pedigreeText?.motherId
-  if (!hasParents) out.push('происхождение')
-  return out
-}
+/*
+ * Чего не хватает записи, считает `completeness.ts` — то же правило,
+ * что заслон применяет при подтверждении.
+ *
+ * Здесь стоял свой список из трёх условий, и он расходился с заслоном:
+ * происхождением считался любой из родителей, а отёлы и дойки
+ * не проверялись вовсе. Хозяйство видело «готово», подавало заявку
+ * и получало отказ по причинам, о которых страница молчала. Требование,
+ * объявленное в одном месте и применяемое в другом, — это способ
+ * потратить чужое время.
+ */
 
 export default async function VerificationPage() {
   const user = await getCurrentUser()
@@ -104,8 +100,15 @@ export default async function VerificationPage() {
     }
   }
 
+  const gapsBy = new Map(
+    (await completenessGaps(payload, docs.map((a) => a.id as number))).map((g) => [
+      g.animalId,
+      g.missing.map((c) => GAP_LABEL[c]),
+    ]),
+  )
+
   const rows = docs.map((a) => {
-    const missing = missingOf(a)
+    const missing = gapsBy.get(a.id as number) ?? []
     return {
       id: a.id as number,
       identNumber: a.identNumber,
@@ -170,7 +173,35 @@ export default async function VerificationPage() {
             покажет, что именно найдётся в ваших записях.
           </p>
 
-          <div className="mt-8 space-y-6">
+          {/*
+             Состав необходимого назван до подачи, а не в тексте отказа.
+             Требование, о котором узнают из отказа, читается как придирка;
+             названное заранее — как условие. Список берётся из того же
+             правила, которым потом проверяют, поэтому разойтись они
+             не могут.
+          */}
+          <details className="card mt-8">
+            <summary className="cursor-pointer list-none text-[15px] font-medium">
+              Что должно быть в записи, чтобы её подтвердили
+              <span className="ml-2 text-[14px] font-normal text-ink-500">
+                — {GAP_ORDER.length} требования, разверните
+              </span>
+            </summary>
+            <p className="mt-4 max-w-[70ch] text-[15px] leading-relaxed text-ink-700">
+              Подтверждение Ассоциации означает две вещи сразу: расхождений в данных нет
+              и передано всё необходимое. Второе — вот это.
+            </p>
+            <dl className="mt-4 max-w-[70ch] space-y-3 text-[15px] leading-relaxed">
+              {GAP_ORDER.map((code) => (
+                <div key={code}>
+                  <dt className="font-medium">{GAP_LABEL[code]}</dt>
+                  <dd className="text-ink-700">{GAP_WHY[code]}</dd>
+                </div>
+              ))}
+            </dl>
+          </details>
+
+          <div className="mt-6 space-y-6">
             <VerificationForm rows={rows} />
 
             {requests.docs.length > 0 && (

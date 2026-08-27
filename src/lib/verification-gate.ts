@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 import { relId } from '@/lib/visibility'
+import { completenessGaps, gapsMessage, type Gap } from '@/lib/completeness'
 
 /**
  * Заслон подтверждения: можно ли поставить знак Ассоциации.
@@ -38,6 +39,14 @@ import { relId } from '@/lib/visibility'
  * в каталоге проверок как обещание хозяйству. Запрещено не возражение,
  * а молчание.
  *
+ * ## Вторая половина обещания
+ *
+ * «Расхождений нет» — половина того, что означает знак Ассоциации.
+ * Вторая половина — «передано всё необходимое», и она не проверялась
+ * ничем: запись без единого отёла и без единой дойки не противоречит
+ * ничему, потому что противоречить нечему. Полнота считается отдельным
+ * правилом (`completeness.ts`) и возвращается отдельным списком.
+ *
  * ## Почему проверки гоняются заново
  *
  * Не берутся с экрана разбора. Между открытием страницы и нажатием
@@ -64,6 +73,16 @@ export type Blocker = {
 
 export type GateResult = {
   blockers: Blocker[]
+  /**
+   * Записи, где данных не хватает.
+   *
+   * Отдельным списком, а не вперемешку с находками: это разные вопросы
+   * и разные способы закрыть их. Находку можно снять с объяснением —
+   * эксперт вправе счесть её несущественной. Нехватку снять нельзя:
+   * объяснением дойки не появятся. Свалив их в один список, мы бы
+   * предложили эксперту кнопку «снять», которая тут ничего не значит.
+   */
+  gaps: Gap[]
   /** Сколько записей заявки разобрано проверками. */
   checked: number
   /** Оговорки проверок: где сработал потолок и что осталось несверенным. */
@@ -111,7 +130,7 @@ export async function approvalBlockers(
 ): Promise<GateResult> {
   const all = (req.animals ?? []).map(plainId).filter((n) => Number.isFinite(n) && n > 0)
 
-  if (!all.length) return { blockers: [], checked: 0, limits: [] }
+  if (!all.length) return { blockers: [], gaps: [], checked: 0, limits: [] }
 
   const held = heldAnimals(req)
   const dismissed = dismissedKeys(req)
@@ -142,12 +161,23 @@ export async function approvalBlockers(
     ])
   }
 
+  /*
+   * Полнота считается только по записям, которые эксперт не вывел
+   * из заявки. Выведенная замечанием запись не подтверждается — требовать
+   * от неё полноты значит держать заявку из-за того, что и так решено.
+   */
+  const gaps = (await completenessGaps(payload, all.filter((id) => !held.has(id)))).map((g) => ({
+    ...g,
+    ident: identOf.get(g.animalId) ?? g.ident,
+  }))
+
   return {
     blockers: [...byAnimal.entries()].map(([animalId, labels]) => ({
       animalId,
       ident: identOf.get(animalId) ?? String(animalId),
       labels,
     })),
+    gaps,
     checked: docs.length,
     limits,
   }
@@ -160,6 +190,8 @@ export async function approvalBlockers(
  * начнёт срабатывать в одном месте, а объясняться в другом: сообщение
  * переживёт правку правила и станет неправдой раньше, чем это заметят.
  */
+export { gapsMessage }
+
 export const blockersMessage = (blockers: Blocker[]): string => {
   const uniq = [...new Set(blockers.flatMap((b) => b.labels))]
   return (

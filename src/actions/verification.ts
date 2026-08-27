@@ -476,6 +476,11 @@ export async function removeVerificationFindingAction(
  * и исключением: список причин и список исключений — это один список,
  * а не два, которые однажды разойдутся.
  *
+ * Перед решением заявка проходит два заслона: противоречия
+ * (`verification-gate.ts`) и полнота (`completeness.ts`). Знак Ассоциации
+ * означает и «расхождений нет», и «передано всё необходимое», и второе
+ * до сих пор не проверялось ничем.
+ *
  * В отличие от пакета загрузки, здесь уровень достоверности поднимается
  * сразу, без отдельного согласия хозяйства. Разница по существу: пакет —
  * это данные, которые хозяйство прислало и ещё не решило показывать;
@@ -525,9 +530,18 @@ export async function decideVerificationAction(
    * действия, единственным способом его проверить был человек с мышью.
    */
   if (decision === 'approved') {
-    const { approvalBlockers, blockersMessage } = await import('@/lib/verification-gate')
-    const { blockers } = await approvalBlockers(payload, request as never)
+    const { approvalBlockers, blockersMessage, gapsMessage } = await import(
+      '@/lib/verification-gate'
+    )
+    const { blockers, gaps } = await approvalBlockers(payload, request as never)
     if (blockers.length) return { error: blockersMessage(blockers) }
+    /*
+     * Нехватка данных проверяется после противоречий, а не вместе с ними.
+     * Два отказа сразу человек читает как один и исправляет половину;
+     * к тому же противоречие в данных весомее пробела в них, и начинать
+     * разбор нужно с него.
+     */
+    if (gaps.length) return { error: gapsMessage(gaps) }
   }
 
   const approved = decision === 'approved' ? all.filter((id) => !held.has(id)) : []

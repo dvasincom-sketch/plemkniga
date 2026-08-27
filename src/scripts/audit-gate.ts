@@ -1,7 +1,8 @@
 import 'dotenv/config'
 import { getPayload, type Payload } from 'payload'
 import config from '@payload-config'
-import { approvalBlockers, blockersMessage } from '@/lib/verification-gate'
+import { approvalBlockers, blockersMessage, gapsMessage } from '@/lib/verification-gate'
+import { GAP_LABEL } from '@/lib/completeness'
 
 /**
  * Ревизия заслона подтверждения — на настоящей базе и без единого нажатия.
@@ -98,6 +99,19 @@ async function probe(payload: Payload, idents: string[]) {
     console.log(`    ${blockersMessage(result.blockers)}`)
   }
 
+  console.log('')
+  if (!result.gaps.length) {
+    console.log('  Полнота: у всех записей есть всё необходимое.')
+  } else {
+    console.log(`  Неполных записей: ${result.gaps.length}`)
+    for (const g of result.gaps) {
+      console.log(`    ${pad(g.ident, 24)} нет: ${g.missing.map((c) => GAP_LABEL[c]).join('; ')}`)
+    }
+    console.log('')
+    console.log('  Текст, который увидит эксперт:')
+    console.log(`    ${gapsMessage(result.gaps)}`)
+  }
+
   for (const l of result.limits) console.log(`  · ${l}`)
   console.log('')
 }
@@ -132,7 +146,10 @@ async function queue(payload: Payload) {
     const count = (r.animals ?? []).length
 
     if (!result.blockers.length) {
-      console.log(`  ${pad(number, 14)} записей ${pad(String(count), 5)} заслон молчит — подтвердить можно`)
+      const tail = result.gaps.length
+        ? `заслон молчит, но неполных записей ${result.gaps.length}`
+        : 'заслон молчит — подтвердить можно'
+      console.log(`  ${pad(number, 14)} записей ${pad(String(count), 5)} ${tail}`)
     } else {
       console.log(
         `  ${pad(number, 14)} записей ${pad(String(count), 5)} держит ${result.blockers.length}: ` +
@@ -149,8 +166,8 @@ async function queue(payload: Payload) {
 
   console.log('')
   console.log('  «Заслон молчит» не значит «данные верны»: молчит он только')
-  console.log('  о существенных находках, которые видит система. Соответствие')
-  console.log('  документам проверяет человек.')
+  console.log('  о существенных находках, которые видит система, и о полноте')
+  console.log('  переданного. Соответствие документам проверяет человек.')
   console.log('')
 }
 
