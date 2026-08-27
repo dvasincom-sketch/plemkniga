@@ -108,8 +108,35 @@ export async function GET() {
     })
 
   try {
+    /*
+     * Помимо связи с базой проба отвечает, докуда доехали миграции.
+     *
+     * Повод конкретный: выкладка прошла, страницы отдавали новый код,
+     * а колонки из миграции в базе не было — и выяснить это удалось только
+     * запросом к боевой базе с чужой машины. Миграции на проде прогоняет
+     * сам контейнер при старте; вопрос «прогнал ли» задают каждый раз,
+     * когда что-то идёт не так, и он должен иметь ответ по ссылке.
+     *
+     * Читается прямым запросом, а не через коллекцию: `payload_migrations` —
+     * служебная таблица Payload, коллекции у неё нет.
+     */
+    const payload = await withDeadline(getClient(), PROBE_DEADLINE_MS)
     const { totalDocs } = await withDeadline(
-      getClient().then((payload) => payload.count({ collection: 'animals', overrideAccess: true })),
+      payload.count({ collection: 'animals', overrideAccess: true }),
+      PROBE_DEADLINE_MS,
+    )
+
+    const migrations = await withDeadline(
+      payload.db.pool
+        .query(
+          `select name, count(*) over ()::int as total
+             from payload_migrations order by id desc limit 1`,
+        )
+        .then((r: { rows: { name?: string; total?: number }[] }) => ({
+          applied: Number(r.rows[0]?.total ?? 0),
+          last: r.rows[0]?.name ?? '—',
+        }))
+        .catch((e: unknown) => ({ applied: -1, last: `не прочитаны: ${describeError(e)}` })),
       PROBE_DEADLINE_MS,
     )
 
@@ -117,6 +144,7 @@ export async function GET() {
       status: 'ok',
       service: 'plemkniga',
       database: { connected: true, animals: totalDocs },
+      migrations,
       env,
       visibleEnv,
       tookMs: Date.now() - started,
