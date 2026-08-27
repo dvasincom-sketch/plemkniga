@@ -86,6 +86,31 @@ async function main() {
 
   const where = `a.trust_level = 2 and not ${hasProtocol}`
 
+  /*
+   * Колонка `lab_name` появляется миграцией, а миграции на проде
+   * прогоняет сам контейнер при старте. Запущенная раньше выкладки,
+   * уборка падала стеком pg с текстом `column d.lab_name does not exist` —
+   * верным, но не отвечающим на вопрос «что мне теперь делать».
+   *
+   * Порядок здесь жёсткий и обратный невозможен: сначала выкладка,
+   * потом уборка. Поэтому проверяем и говорим об этом словами.
+   */
+  const { rows: col } = await payload.db.pool.query(
+    `select 1 from information_schema.columns
+      where table_name = 'documents' and column_name = 'lab_name'`,
+  )
+  if (!col.length) {
+    console.log('')
+    console.log('В этой базе ещё нет колонки documents.lab_name.')
+    console.log('Значит миграция 20260830_090000_lab_name не прогонялась:')
+    console.log('на проде её выполняет сам контейнер при старте — сначала выкладка.')
+    console.log('')
+    console.log('Проверить, что миграция прошла:')
+    console.log('  npm run db:psql -- -c "select name from payload_migrations order by id desc limit 3"')
+    console.log('')
+    process.exit(1)
+  }
+
   const { rows: counts } = await payload.db.pool.query(
     `select
        count(*) filter (where not ${hasProtocol})::int as without,
