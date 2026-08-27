@@ -62,6 +62,15 @@ export type CheckSpec = {
   needsServer: boolean
   /** Умеет прогоняться самим приложением — попадает в ночной прогон. */
   probe: boolean
+  /**
+   * Где разбирать находку внутри системы.
+   *
+   * Не у всякой проверки такое место есть, и придумывать его нельзя:
+   * ссылка, ведущая «примерно туда», хуже её отсутствия — по ней идут
+   * и не находят того, о чём была находка. Здесь только те адреса,
+   * которые показывают ровно предмет проверки.
+   */
+  where?: { href: string; label: string }
 }
 
 export const CHECKS: CheckSpec[] = [
@@ -107,6 +116,7 @@ export const CHECKS: CheckSpec[] = [
     writes: false,
     needsServer: false,
     probe: true,
+    where: { href: '/account?tab=herd&sub=reports', label: 'Отчёты по стаду' },
   },
   {
     code: 'check:drilldown',
@@ -118,6 +128,7 @@ export const CHECKS: CheckSpec[] = [
     writes: false,
     needsServer: false,
     probe: true,
+    where: { href: '/account?tab=herd&sub=reports', label: 'Отчёты по стаду' },
   },
   {
     code: 'audit:checks',
@@ -127,6 +138,7 @@ export const CHECKS: CheckSpec[] = [
     writes: false,
     needsServer: false,
     probe: false,
+    where: { href: '/association/quality', label: 'Качество книги' },
   },
   {
     code: 'audit:pedigree',
@@ -136,6 +148,7 @@ export const CHECKS: CheckSpec[] = [
     writes: false,
     needsServer: false,
     probe: false,
+    where: { href: '/association/quality', label: 'Качество книги' },
   },
   {
     code: 'check:mating',
@@ -145,6 +158,7 @@ export const CHECKS: CheckSpec[] = [
     writes: true,
     needsServer: false,
     probe: false,
+    where: { href: '/account/reports/mating', label: 'Подбор быков' },
   },
   {
     code: 'check:bulls',
@@ -248,6 +262,7 @@ export const CHECKS: CheckSpec[] = [
     writes: false,
     needsServer: false,
     probe: false,
+    where: { href: '/api-docs', label: 'Описание API' },
   },
 
   /* -------------------------- Страницы и ссылки -------------------------- */

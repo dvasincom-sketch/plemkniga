@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { Moment } from '@/components/Moment'
 import { InfoTip } from '@/components/InfoTip'
 import { AREA_LABEL, AREA_ORDER, CHECKS, PROBE_COUNT, checkSpec } from '@/lib/check-registry'
@@ -24,11 +25,19 @@ import { FRESH_HOURS, type CheckRunView } from '@/lib/check-report'
  * Находки при этом важнее возраста: старый прогон с расхождением
  * остаётся красным. Расхождение не рассасывается само.
  *
- * ## Чего здесь нет
+ * ## Почему подробности видит не всякий
  *
- * Номеров животных и названий хозяйств. Страница открыта, и находка
- * формулируется как «отчёт 12, список 11», а не «у коровы такой-то».
- * За этим следят сами пробы.
+ * Страница открыта, и это решено сознательно: зрелость системы — довод
+ * в её пользу, а не тайна. Но исход и подробность — разные вещи.
+ *
+ * Ночные пробы номеров животных не печатают: находка формулируется как
+ * «отчёт 12, список 11». А полный прогон зовёт двадцать пять проверок,
+ * и ревизия родословной честно называет, у каких животных цикл. Открытая
+ * страница со списком номеров — это выгрузка книги в обход всех правил
+ * видимости, сделанная из лучших побуждений.
+ *
+ * Поэтому счёт находок виден всем, а сами строки — вошедшим. Постороннему
+ * при этом не врут: сказано, что находки есть и сколько их.
  */
 
 /**
@@ -40,6 +49,49 @@ import { FRESH_HOURS, type CheckRunView } from '@/lib/check-report'
  */
 const isSkipped = (p: { findings: string[] }): boolean =>
   p.findings.length > 0 && p.findings.every((f) => f.startsWith('пропущена'))
+
+/**
+ * Номер животного внутри находки — ссылкой на поиск по книге.
+ *
+ * Находка приходит строкой: «CHK-016 → CHK-015 → CHK-016», «отчёт 12,
+ * список 11». Разобрать её нельзя, не найдя животное, а найти его
+ * значило скопировать номер и вставить в поиск. Три движения там, где
+ * хватает одного.
+ *
+ * Ссылка ведёт в общий поиск книги, а не в карточку: идентификатора
+ * записи в строке нет, есть только номер. Поиск по номеру — то же самое
+ * действие, что человек сделал бы руками, и он честно ответит «не
+ * найдено», если животное уже удалено.
+ *
+ * Что считается номером: цифры (национальный), латиница с цифрами
+ * (HOUSA, RUS) и приставки контрольных стад (CHK-, TEST-). Русские
+ * слова под это не попадают, и обычный текст находки остаётся текстом.
+ */
+const IDENT = /\b((?:CHK|TEST)-[A-ZА-Я0-9-]+|[A-Z]{2,5}\d{6,14}|\d{6,15}(?:\.\d{2})?)\b/g
+
+function withLinks(text: string): React.ReactNode[] {
+  const out: React.ReactNode[] = []
+  let last = 0
+
+  for (const m of text.matchAll(IDENT)) {
+    const at = m.index ?? 0
+    if (at > last) out.push(text.slice(last, at))
+    out.push(
+      <Link
+        key={`${at}-${m[0]}`}
+        href={`/?id=${encodeURIComponent(m[0])}`}
+        className="underline underline-offset-2 hover:text-forest-500"
+        title={`Найти ${m[0]} в книге`}
+      >
+        {m[0]}
+      </Link>,
+    )
+    last = at + m[0].length
+  }
+
+  if (last < text.length) out.push(text.slice(last))
+  return out
+}
 
 const TONE: Record<string, { dot: string; text: string; label: string }> = {
   ok: { dot: 'bg-forest-500', text: 'text-forest-600', label: 'сошлось' },
@@ -106,7 +158,16 @@ const COMMAND_PROD = [
   '  --data-urlencode "label=Прод"',
 ].join('\n')
 
-export function EvolutionChecks({ runs, error }: { runs: CheckRunView[]; error: string | null }) {
+export function EvolutionChecks({
+  runs,
+  error,
+  detailed,
+}: {
+  runs: CheckRunView[]
+  error: string | null
+  /** Показывать сами находки, а не только их число. Только вошедшим. */
+  detailed: boolean
+}) {
   /* Пробы, прогнанные хоть где-то, по коду проверки → результат по средам. */
   const byCode = new Map<
     string,
@@ -330,20 +391,60 @@ export function EvolutionChecks({ runs, error }: { runs: CheckRunView[]; error: 
                 .filter((p) => !p.ok && !isSkipped(p))
                 .map((p) => (
                   <article key={`${run.label}-${p.code}`} className="card">
-                    <h3 className="panel-heading mb-0">
-                      {checkSpec(p.code)?.title ?? p.code}
-                      <span className="ml-2 text-[14px] font-normal text-ink-500">{run.label}</span>
-                    </h3>
-                    <ul className="mt-3 space-y-1.5 text-[15px] leading-relaxed text-ink-700">
-                      {p.findings.map((f, i) => (
-                        <li key={i} className="flex gap-2">
-                          <span aria-hidden="true" className="text-[#c0392b]">
-                            ·
-                          </span>
-                          <span>{f}</span>
-                        </li>
-                      ))}
-                    </ul>
+                    <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+                      <h3 className="panel-heading mb-0">
+                        {checkSpec(p.code)?.title ?? p.code}
+                        <span className="ml-2 text-[14px] font-normal text-ink-500">
+                          {run.label}
+                        </span>
+                      </h3>
+                      {/*
+                         Ссылка «где разбирать» — только у тех проверок,
+                         у которых такое место в системе есть. Придумывать
+                         его нельзя: ссылка, ведущая примерно туда, хуже
+                         её отсутствия.
+                      */}
+                      {checkSpec(p.code)?.where && (
+                        <Link
+                          href={checkSpec(p.code)!.where!.href}
+                          className="text-[14px] underline underline-offset-4 hover:text-forest-500"
+                        >
+                          {checkSpec(p.code)!.where!.label} →
+                        </Link>
+                      )}
+                    </div>
+                    {/*
+                       Постороннему — счёт, вошедшему — строки. Ревизия
+                       родословной называет номера животных, и открытый
+                       список таких номеров есть выгрузка книги в обход
+                       правил видимости.
+                    */}
+                    {detailed ? (
+                      <ul className="space-y-1.5 text-[15px] leading-relaxed text-ink-700">
+                        {p.findings.map((f, i) => (
+                          <li key={i} className="flex gap-2">
+                            <span aria-hidden="true" className="text-[#c0392b]">
+                              ·
+                            </span>
+                            <span>{withLinks(f)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-[15px] leading-relaxed text-ink-700">
+                        Находок: <b className="tabular-nums">{p.findings.length}</b>. Что именно
+                        не сошлось, видно вошедшим: разбор называет номера животных, а это
+                        уже данные книги, а не сведения о системе.
+                      </p>
+                    )}
+                    {/*
+                       Команда напечатана рядом с находкой: разбор почти
+                       всегда начинается с повторного прогона той же
+                       проверки — с подробностями и на свежих данных.
+                    */}
+                    <p className="mt-3 font-mono text-[13px] text-ink-500">
+                      npm run {p.code}
+                    </p>
                   </article>
                 )),
             )}

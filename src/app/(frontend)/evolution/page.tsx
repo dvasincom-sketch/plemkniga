@@ -11,7 +11,7 @@ import { EvolutionChecks } from '@/components/EvolutionChecks'
 import { EvolutionVisualCode } from '@/components/EvolutionVisualCode'
 import { loadBenchReports } from '@/lib/bench-report'
 import { loadCheckRuns } from '@/lib/check-report'
-import { getClient } from '@/lib/payload'
+import { getClient, getCurrentUser } from '@/lib/payload'
 import { CURRENT_VERSION } from '@/lib/product-versions'
 
 export const metadata: Metadata = {
@@ -110,6 +110,13 @@ export default async function EvolutionPage({
   const checkRuns =
     tab === 'status' ? await loadCheckRuns(await getClient()) : { runs: [], error: null }
 
+  /*
+   * Кто смотрит — нужно только «Статусу»: посторонний видит счёт находок,
+   * вошедший — сами строки. Спрашиваем на его вкладке, чтобы не ходить
+   * за пользователем на каждый просмотр «Версий».
+   */
+  const viewer = tab === 'status' ? await getCurrentUser() : null
+
   return (
     <>
       <SiteHeader />
@@ -156,7 +163,11 @@ export default async function EvolutionPage({
           {tab === 'roadmap' && <EvolutionRoadmap />}
           {tab === 'bench' && <EvolutionBench reports={benchReports} />}
           {tab === 'status' && (
-            <EvolutionChecks runs={checkRuns.runs} error={checkRuns.error} />
+            <EvolutionChecks
+              runs={checkRuns.runs}
+              error={checkRuns.error}
+              detailed={Boolean(viewer)}
+            />
           )}
           {tab === 'visual' && <EvolutionVisualCode />}
           {tab === 'docs' && <EvolutionDocs />}
