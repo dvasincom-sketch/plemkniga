@@ -3,10 +3,12 @@
 import { useActionState, useState } from 'react'
 import {
   issueDocumentAction,
+  registerLabProtocolAction,
   revokeDocumentAction,
   type DocumentState,
 } from '@/actions/documents'
 import { Select } from '@/components/Select'
+import { DateField } from '@/components/DateField'
 
 /**
  * Выпуск документа — по индивидуальному номеру, а не выбором из списка.
@@ -67,6 +69,97 @@ export function IssueDocument() {
       )}
       {state.message && (
         <p className="mt-4 rounded-xl bg-brand-50 px-4 py-3 text-[14px] text-forest-600">
+          {state.message}
+        </p>
+      )}
+    </form>
+  )
+}
+
+/**
+ * Регистрация протокола лаборатории.
+ *
+ * Стоит рядом с выпуском документов и намеренно похожа на него: это
+ * то же действие Ассоциации над той же коллекцией, и разводить их
+ * по разным страницам значило бы прятать половину того, что здесь можно.
+ *
+ * Форма честно говорит, чего протокол не даёт. Соблазн подписать
+ * «подтверждено лабораторией» как «данные проверены» велик, а это
+ * две разные вещи, и вторая — третья ступень.
+ */
+export function RegisterLabProtocol() {
+  const [state, formAction, pending] = useActionState<DocumentState, FormData>(
+    registerLabProtocolAction,
+    {},
+  )
+  const [fileName, setFileName] = useState('')
+
+  return (
+    <form action={formAction} className="card">
+      <h2 className="panel-heading">Зарегистрировать протокол лаборатории</h2>
+
+      <p className="mb-5 max-w-[70ch] text-[15px] leading-relaxed text-ink-700">
+        Запись животного получит уровень «Подтверждено лабораторией» — второй из четырёх.
+        Он означает ровно одно: в книге лежит протокол, приложенный файлом и с названной
+        лабораторией. Проверкой данных животного это не является: её удостоверяет заявка
+        на верификацию. Отзовёте протокол — уровень снимется сам.
+      </p>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="block text-[14px]">
+          <span className="mb-1.5 block text-ink-700">Индивидуальный № животного</span>
+          <input
+            name="identNumber"
+            required
+            className="field field-on-light"
+            placeholder="112233445566778"
+          />
+        </label>
+
+        <label className="block text-[14px]">
+          <span className="mb-1.5 block text-ink-700">Лаборатория</span>
+          <input
+            name="labName"
+            required
+            className="field field-on-light"
+            placeholder="ВНИИплем, лаборатория молекулярной генетики"
+          />
+        </label>
+
+        <label className="block text-[14px]">
+          <span className="mb-1.5 block text-ink-700">№ протокола у лаборатории</span>
+          <input name="labNumber" className="field field-on-light" placeholder="необязательно" />
+        </label>
+
+        <div className="block text-[14px]">
+          <span className="mb-1.5 block text-ink-700">Дата протокола</span>
+          {/* Своё поле даты, а не нативное: см. ревизию управляющих элементов */}
+          <DateField name="issuedAt" ariaLabel="Дата протокола" max={new Date().toISOString().slice(0, 10)} />
+        </div>
+      </div>
+
+      <label className="mt-4 flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-ink-300 px-4 py-3 text-sm text-ink-700 hover:border-brand-400">
+        {/* Файл обязателен: протокол без файла — это отметка о том, что бумага
+            где-то есть, и проверить её нечем. */}
+        <input
+          type="file"
+          name="file"
+          accept=".pdf,application/pdf,image/*"
+          className="sr-only"
+          onChange={(e) => setFileName(e.target.files?.[0]?.name ?? '')}
+        />
+        <span className="truncate">{fileName || 'Приложите файл протокола — PDF или скан…'}</span>
+      </label>
+
+      <button type="submit" className="btn btn-accent mt-5" disabled={pending}>
+        {pending ? 'Регистрируем…' : 'Зарегистрировать протокол'}
+      </button>
+
+      {state.error && (
+        <p className="mt-4 max-w-[80ch] text-[14px] leading-relaxed text-red-700">{state.error}</p>
+      )}
+      {state.message && (
+        <p className="mt-4 max-w-[80ch] rounded-xl bg-brand-50 px-4 py-3 text-[14px] leading-relaxed text-forest-600">
           {state.message}
         </p>
       )}

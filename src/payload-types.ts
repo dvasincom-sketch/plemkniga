@@ -374,7 +374,7 @@ export interface Animal {
    */
   pastOwners?: (number | Organization)[] | null;
   /**
-   * ТЗ, Таблица №4: −1 отклонено, 0 черновик, 1 проверено собственником, 2 подтверждено лабораторией, 3 верифицировано ассоциацией
+   * Меняется только решением Ассоциации по заявке. Снаружи не пишется: −1 отклонено, 0 черновик, 1 проверено собственником, 2 подтверждено лабораторией, 3 верифицировано ассоциацией
    */
   trustLevel?: number | null;
   trustCheckedAt?: string | null;
@@ -1875,6 +1875,10 @@ export interface Document {
     | boolean
     | null;
   issuedBy?: (number | null) | User;
+  /**
+   * Заполняется у протоколов лаборатории — они дают второй уровень достоверности
+   */
+  labName?: string | null;
   revoked?: {
     at?: string | null;
     by?: (number | null) | User;
@@ -3266,6 +3270,7 @@ export interface DocumentsSelect<T extends boolean = true> {
   file?: T;
   snapshot?: T;
   issuedBy?: T;
+  labName?: T;
   revoked?:
     | T
     | {

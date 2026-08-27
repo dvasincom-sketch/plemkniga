@@ -2,6 +2,7 @@ import type { CollectionConfig } from 'payload'
 import { DOCUMENT_TYPES, toOptions } from '@/lib/dictionaries'
 import { documentMutate, documentRead, isAdmin, isAuthenticated } from '@/access'
 import { associationIssuesOnly, requireOwnOrganization } from '@/access/guards'
+import { LAB_PROTOCOL_TYPE, animalIdOf, syncTrustFromLab } from '@/lib/trust'
 
 export const Documents: CollectionConfig = {
   slug: 'documents',
@@ -18,7 +19,39 @@ export const Documents: CollectionConfig = {
     update: documentMutate,
     delete: isAdmin,
   },
-  hooks: { beforeChange: [requireOwnOrganization, associationIssuesOnly] },
+  hooks: {
+    beforeChange: [requireOwnOrganization, associationIssuesOnly],
+    /*
+     * Вторая ступень достоверности выводится из протокола лаборатории,
+     * и выводится здесь — в хуке коллекции, а не в действии, которое
+     * протокол регистрирует.
+     *
+     * Разница видна на отзыве: отзыв документа идёт другим действием,
+     * а через админку — вообще мимо действий. Правило, живущее в одном
+     * из путей, оставило бы животное «подтверждённым лабораторией»
+     * после того, как протокол отозвали. Правило, живущее у документа,
+     * срабатывает на любую его судьбу.
+     */
+    afterChange: [
+      async ({ doc, previousDoc, req }) => {
+        if (doc?.type !== LAB_PROTOCOL_TYPE && previousDoc?.type !== LAB_PROTOCOL_TYPE) return
+        const ids = new Set<number>()
+        for (const v of [doc?.animal, previousDoc?.animal]) {
+          const id = animalIdOf(v)
+          if (id !== null) ids.add(id)
+        }
+        // Прежнее животное тоже пересчитывается: протокол могли перепривязать
+        for (const id of ids) await syncTrustFromLab(req.payload, id, req)
+      },
+    ],
+    afterDelete: [
+      async ({ doc, req }) => {
+        if (doc?.type !== LAB_PROTOCOL_TYPE) return
+        const id = animalIdOf(doc?.animal)
+        if (id !== null) await syncTrustFromLab(req.payload, id, req)
+      },
+    ],
+  },
   fields: [
     { name: 'title', type: 'text', label: 'Название', required: true },
     {
@@ -118,6 +151,28 @@ export const Documents: CollectionConfig = {
       relationTo: 'users',
       label: 'Кто выдал',
       index: true,
+    },
+    {
+      /*
+       * Лаборатория, выдавшая протокол.
+       *
+       * Текстом, а не связью: у лабораторий в системе нет учётных записей,
+       * и справочник из них пришлось бы вести вручную ради поля, которое
+       * читают глазами. Заводить справочник стоит тогда, когда по нему
+       * начнут отбирать или сверять, — сейчас имя нужно, чтобы человек
+       * знал, кого спрашивать про бумагу.
+       *
+       * Заполненность — одно из условий второй ступени достоверности
+       * (`src/lib/trust.ts`): протокол без имени лаборатории ничем
+       * не отличается от файла, положенного кем угодно.
+       */
+      name: 'labName',
+      type: 'text',
+      label: 'Лаборатория',
+      index: true,
+      admin: {
+        description: 'Заполняется у протоколов лаборатории — они дают второй уровень достоверности',
+      },
     },
     {
       /*

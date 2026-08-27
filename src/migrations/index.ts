@@ -48,6 +48,7 @@ import * as migration_20260828_140000_linear_score from './20260828_140000_linea
 import * as migration_20260828_180000_calving_roles from './20260828_180000_calving_roles'
 import * as migration_20260829_090000_pending_columns from './20260829_090000_pending_columns'
 import * as migration_20260827_120000_check_runs from './20260827_120000_check_runs';
+import * as migration_20260830_090000_lab_name from './20260830_090000_lab_name';
 
 export const migrations = [
   {
@@ -299,5 +300,10 @@ export const migrations = [
     up: migration_20260827_120000_check_runs.up,
     down: migration_20260827_120000_check_runs.down,
     name: '20260827_120000_check_runs',
+  },
+  {
+    up: migration_20260830_090000_lab_name.up,
+    down: migration_20260830_090000_lab_name.down,
+    name: '20260830_090000_lab_name',
   },
 ];

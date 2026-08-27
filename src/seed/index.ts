@@ -698,6 +698,64 @@ const run = async () => {
     created++
   }
 
+  /* --------------------- Протоколы лабораторий ---------------------------- */
+  /*
+   * Вторая ступень достоверности выводится из протокола (`src/lib/trust.ts`),
+   * а не проставляется. Значит синтетика, где ступень стоит, а протокола нет,
+   * показывает состояние, которого система больше не создаёт, — и первый же,
+   * кто откроет такую карточку, увидит плашку без документа за ней.
+   *
+   * Поэтому протоколы заводятся по-настоящему: файлом, с лабораторией
+   * и с «кем выдан». Файл один на всех — это демо-данные, и полсотни
+   * одинаковых PDF в хранилище ничего не добавили бы.
+   */
+  log('Создание протоколов лаборатории…')
+
+  const labFile = await payload.create({
+    collection: 'media',
+    overrideAccess: true,
+    data: { alt: 'Протокол лаборатории (демонстрационный)', visibility: 'private' },
+    file: {
+      data: Buffer.from(
+        '%PDF-1.4\n% Демонстрационный протокол генотипирования\n%%EOF\n',
+        'utf8',
+      ),
+      name: 'protokol-laboratorii.pdf',
+      mimetype: 'application/pdf',
+      size: 60,
+    },
+  })
+
+  const labAnimals = await payload.find({
+    collection: 'animals',
+    where: { trustLevel: { equals: 2 } },
+    limit: 500,
+    depth: 0,
+    overrideAccess: true,
+  })
+
+  let protocols = 0
+  for (const a of labAnimals.docs) {
+    protocols += 1
+    await payload.create({
+      collection: 'documents',
+      overrideAccess: true,
+      user: associationUser,
+      data: {
+        title: `Протокол генотипирования № ГТ-${String(protocols).padStart(4, '0')} — ${a.identNumber}`,
+        type: 'genotypeReport',
+        number: `ЛП-2025-${String(protocols).padStart(4, '0')}`,
+        issuedAt: new Date(2025, protocols % 12, 1 + (protocols % 27)).toISOString(),
+        animal: a.id,
+        organization: typeof a.owner === 'object' && a.owner ? a.owner.id : a.owner,
+        issuedBy: associationUser.id,
+        labName: `${serviceOrg.name}`,
+        file: labFile.id,
+      } as never,
+    })
+  }
+  log(`  протоколов: ${protocols}`)
+
   /* ------------- Родословная эталонной карточки: девять колен ------------- */
   log('Создание предков для генеалогического древа…')
 
@@ -834,7 +892,12 @@ const run = async () => {
           // а строительный материал родословных
           publicVisible: false,
           publicDetails: false,
-          trustLevel: generation <= 5 ? 2 : 1,
+          /*
+           * Предкам — первая ступень. Вторая теперь означает «есть протокол
+           * лаборатории», а протоколов на архивные записи родословной никто
+           * не носит: это строительный материал дерева, а не поголовье.
+           */
+          trustLevel: 1,
           archived: true,
           archiveReason: 'Запись предка для построения родословной',
         },

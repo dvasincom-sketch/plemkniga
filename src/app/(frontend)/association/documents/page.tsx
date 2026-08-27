@@ -4,7 +4,7 @@ import type { Where } from 'payload'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { AssociationNav } from '@/components/AssociationNav'
-import { IssueDocument, RevokeDocument } from '@/components/DocumentIssue'
+import { IssueDocument, RegisterLabProtocol, RevokeDocument } from '@/components/DocumentIssue'
 import { StaleSchemaNotice } from '@/components/StaleSchemaNotice'
 import { getClient } from '@/lib/payload'
 import { relId } from '@/lib/visibility'
@@ -119,6 +119,8 @@ export default async function AssociationDocumentsPage({
           ) : (
             <div className="mt-8 space-y-6">
               <IssueDocument />
+
+              <RegisterLabProtocol />
 
               <div className="card">
                 <div className="mb-5 flex flex-wrap items-center justify-between gap-4">

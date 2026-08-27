@@ -245,3 +245,160 @@ export async function revokeDocumentAction(
   revalidatePath('/association/documents')
   return { message: 'Документ отозван' }
 }
+
+/**
+ * Зарегистрировать протокол лаборатории.
+ *
+ * ## Зачем отдельное действие
+ *
+ * Второй уровень достоверности — «Подтверждено лабораторией» — в шкале
+ * был, а дойти до него было нельзя: ни формы, ни правила. Ступень
+ * существовала только в подписи и объясняла покупателю то, чего система
+ * не знала.
+ *
+ * Обсуждали галочку «есть протокол ДНК» в карточке животного и отказались:
+ * галочка — это утверждение, а не доказательство, и ставило бы её то же
+ * хозяйство, чьи данные подтверждаются. Протокол лежит документом:
+ * файлом, с номером, датой и названной лабораторией. Ступень из него
+ * выводится (`src/lib/trust.ts`), а не проставляется здесь, — поэтому
+ * отзыв протокола её опускает сам.
+ *
+ * ## Почему регистрирует Ассоциация
+ *
+ * У хозяйства нет права заполнить «кто выдал», а без этого поля протокол
+ * для правила не существует. Пустить сюда хозяйство значило бы вернуть
+ * закрытую дыру: завёл документ через API — подписал себя сам.
+ *
+ * Ассоциация ручается ровно за одно: бумагу принесли и она её приняла.
+ * Что лаборатория настоящая, система не знает и не обещает — у лабораторий
+ * здесь нет учётных записей.
+ *
+ * ## Почему свой номер, а не номер лаборатории
+ *
+ * Номер документа в книге уникален, а номера протоколов у разных
+ * лабораторий совпадают запросто. Книга нумерует своё («ЛП-2026-0001»),
+ * лабораторный номер идёт в название — там он и нужен человеку, который
+ * сверяет бумагу с записью.
+ */
+export async function registerLabProtocolAction(
+  _prev: DocumentState,
+  formData: FormData,
+): Promise<DocumentState> {
+  const ctx = await guard()
+  if ('error' in ctx) return { error: ctx.error }
+  const { user, payload } = ctx
+
+  const identNumber = String(formData.get('identNumber') || '').trim()
+  if (!identNumber) return { error: 'Укажите индивидуальный номер животного' }
+
+  const labName = String(formData.get('labName') || '').trim()
+  if (!labName) {
+    return { error: 'Назовите лабораторию: протокол без её имени ничего не удостоверяет' }
+  }
+
+  const labNumber = String(formData.get('labNumber') || '').trim()
+  const issuedAtRaw = String(formData.get('issuedAt') || '').trim()
+
+  /*
+   * Файл обязателен. Именно он отличает протокол от галочки: запись
+   * о протоколе без протокола — это утверждение, что бумага где-то есть,
+   * и проверить его нечем.
+   */
+  const file = formData.get('file')
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: 'Приложите файл протокола — без него это отметка, а не документ' }
+  }
+
+  const { docs } = await payload.find({
+    collection: 'animals',
+    where: { identNumber: { equals: identNumber } },
+    limit: 1,
+    depth: 1,
+    overrideAccess: true,
+  })
+  const animal = docs[0] as Animal | undefined
+  if (!animal) return { error: `Животное № ${identNumber} в книге не найдено` }
+
+  const orgId = relId(animal.owner) ?? undefined
+
+  const year = new Date().getFullYear()
+  const { totalDocs } = await payload.count({
+    collection: 'documents',
+    where: { number: { like: `ЛП-${year}-` } },
+    overrideAccess: true,
+  })
+  const number = `ЛП-${year}-${String(totalDocs + 1).padStart(4, '0')}`
+  const issuedAt = issuedAtRaw ? new Date(`${issuedAtRaw}T00:00:00`).toISOString() : new Date().toISOString()
+
+  try {
+    const bytes = await file.arrayBuffer()
+    const media = await payload.create({
+      collection: 'media',
+      overrideAccess: true,
+      /*
+       * Протокол закрыт: это данные о конкретном животном конкретного
+       * хозяйства. Плашка «подтверждено лабораторией» видна всем,
+       * сам файл — владельцу и Ассоциации. Ограничение осознанное:
+       * открывать чужие ДНК-протоколы наружу ради убедительности плашки
+       * — плата не по счёту.
+       */
+      data: { alt: `Протокол лаборатории ${labName} — ${identNumber}`, owner: orgId, visibility: 'private' },
+      file: {
+        data: Buffer.from(bytes),
+        name: file.name,
+        mimetype: file.type || 'application/pdf',
+        size: file.size,
+      },
+    })
+
+    const title =
+      `Протокол лаборатории ${labName}` +
+      (labNumber ? ` № ${labNumber}` : '') +
+      ` — ${animal.identNumber ?? identNumber}`
+
+    const created = await payload.create({
+      collection: 'documents',
+      overrideAccess: true,
+      user,
+      data: {
+        title,
+        type: 'genotypeReport' as never,
+        number,
+        issuedAt,
+        animal: animal.id,
+        organization: orgId,
+        issuedBy: user.id,
+        labName,
+        file: media.id,
+      } as never,
+    })
+
+    revalidatePath('/association/documents')
+    revalidatePath(`/animals/${animal.id}`)
+    revalidatePath('/account')
+
+    await recordOperation(payload, {
+      action: 'document-issued',
+      actor: user,
+      organization: orgId,
+      subjectType: 'document',
+      subjectId: Number(created.id),
+      subject: number,
+      summary: `Протокол лаборатории «${labName}» на животное ${animal.identNumber ?? identNumber}`,
+    })
+
+    /*
+     * В ответе сказано и про ступень: регистратор нажимал «зарегистрировать
+     * протокол», а изменилось при этом ещё и то, что видит покупатель.
+     * Молчаливое побочное действие — худший вид действия.
+     */
+    return {
+      message:
+        `Протокол № ${number} зарегистрирован. Уровень достоверности записи — ` +
+        '«Подтверждено лабораторией»; он снимется сам, если протокол отозвать.',
+      issuedId: created.id,
+    }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Не удалось зарегистрировать протокол' }
+  }
+}

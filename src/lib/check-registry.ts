@@ -191,6 +191,18 @@ export const CHECKS: CheckSpec[] = [
     probe: false,
   },
   {
+    code: 'check:trust',
+    title: 'Уровень достоверности выводится, а не ставится',
+    what:
+      'Протокол лаборатории поднимает вторую ступень, отзыв её снимает, ' +
+      'а подпись Ассоциации ни то ни другое не трогает',
+    area: 'access',
+    writes: true,
+    needsServer: false,
+    probe: false,
+    where: { href: '/association/documents', label: 'Документы Ассоциации' },
+  },
+  {
     code: 'check:team',
     title: 'Роли, приглашения, блокировка',
     what: 'Сотрудник видит своё, приглашение работает один раз, заблокированный не входит',
