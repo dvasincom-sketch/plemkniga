@@ -31,6 +31,16 @@ import { FRESH_HOURS, type CheckRunView } from '@/lib/check-report'
  * За этим следят сами пробы.
  */
 
+/**
+ * Пропущенная проверка — не находка и не удача.
+ *
+ * Пустой список находок сюда не попадает намеренно: `every` по пустому
+ * массиву отвечает «да», и без проверки длины неудача без единой
+ * названной причины считалась бы пропуском и пряталась бы с глаз.
+ */
+const isSkipped = (p: { findings: string[] }): boolean =>
+  p.findings.length > 0 && p.findings.every((f) => f.startsWith('пропущена'))
+
 const TONE: Record<string, { dot: string; text: string; label: string }> = {
   ok: { dot: 'bg-forest-500', text: 'text-forest-600', label: 'сошлось' },
   failed: { dot: 'bg-[#c0392b]', text: 'text-[#c0392b]', label: 'есть находки' },
@@ -98,11 +108,21 @@ const COMMAND_PROD = [
 
 export function EvolutionChecks({ runs, error }: { runs: CheckRunView[]; error: string | null }) {
   /* Пробы, прогнанные хоть где-то, по коду проверки → результат по средам. */
-  const byCode = new Map<string, { label: string; ok: boolean; findings: string[] }[]>()
+  const byCode = new Map<
+    string,
+    { label: string; ok: boolean; skipped: boolean; findings: string[] }[]
+  >()
   for (const run of runs) {
     for (const r of run.results) {
       const list = byCode.get(r.code) ?? []
-      list.push({ label: run.label, ok: r.ok, findings: r.findings })
+      /*
+       * Пропуск — не находка и не удача. Проверка страниц при лежащем
+       * сервере ничего не проверила: красить её красным значило бы
+       * обвинить систему в том, чего никто не смотрел, зелёным —
+       * притвориться, что смотрели.
+       */
+      const skipped = isSkipped(r)
+      list.push({ label: run.label, ok: r.ok, skipped, findings: r.findings })
       byCode.set(r.code, list)
     }
   }
@@ -175,7 +195,7 @@ export function EvolutionChecks({ runs, error }: { runs: CheckRunView[]; error: 
                   </div>
 
                   <p className="mt-3 text-[15px] leading-relaxed text-ink-700">
-                    Проб прогнано {run.total}, с находками {run.failed}. Заняло{' '}
+                    Проверок прогнано {run.total}, с находками {run.failed}. Заняло{' '}
                     {(run.ms / 1000).toFixed(1)} с.
                   </p>
 
@@ -250,14 +270,16 @@ export function EvolutionChecks({ runs, error }: { runs: CheckRunView[]; error: 
                     <tbody>
                       {list.map((spec) => {
                         const seen = byCode.get(spec.code) ?? []
-                        const bad = seen.filter((s) => !s.ok)
-                        const outcome = !spec.probe
-                          ? 'never'
-                          : seen.length === 0
+                        const bad = seen.filter((s) => !s.ok && !s.skipped)
+                        const onlySkipped = seen.length > 0 && seen.every((s) => s.skipped)
+                        const outcome =
+                          seen.length === 0
                             ? 'never'
-                            : bad.length > 0
-                              ? 'failed'
-                              : 'ok'
+                            : onlySkipped
+                              ? 'stale'
+                              : bad.length > 0
+                                ? 'failed'
+                                : 'ok'
                         const tone = TONE[outcome]
 
                         return (
@@ -274,10 +296,12 @@ export function EvolutionChecks({ runs, error }: { runs: CheckRunView[]; error: 
                                   className={`inline-block h-2 w-2 shrink-0 translate-y-[-1px] rounded-full ${tone.dot}`}
                                 />
                                 <span className={tone.text}>
-                                  {outcome === 'never' && spec.probe
-                                    ? 'ещё не гонялась'
-                                    : outcome === 'never'
-                                      ? whyManual(spec.code)
+                                  {outcome === 'never'
+                                    ? spec.probe
+                                      ? 'ещё не гонялась'
+                                      : whyManual(spec.code)
+                                    : outcome === 'stale'
+                                      ? 'пропущена'
                                       : outcome === 'failed'
                                         ? bad.map((b) => b.label).join(', ')
                                         : seen.map((s) => s.label).join(', ')}
@@ -297,13 +321,13 @@ export function EvolutionChecks({ runs, error }: { runs: CheckRunView[]; error: 
       </section>
 
       {/* --------------------------- Находки --------------------------- */}
-      {runs.some((r) => r.results.some((p) => !p.ok)) && (
+      {runs.some((r) => r.results.some((p) => !p.ok && !isSkipped(p))) && (
         <section>
           <h2 className="section-title mb-5">Находки</h2>
           <div className="space-y-5">
             {runs.map((run) =>
               run.results
-                .filter((p) => !p.ok)
+                .filter((p) => !p.ok && !isSkipped(p))
                 .map((p) => (
                   <article key={`${run.label}-${p.code}`} className="card">
                     <h3 className="panel-heading mb-0">
