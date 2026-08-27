@@ -67,12 +67,33 @@ const whyManual = (code: string): string => {
  * работать от начала до конца в чужой оболочке, а не «работать, если
  * до этого сделать ещё кое-что». Иначе подсказка не помогает, а сбивает.
  */
-const COMMAND = [
+const COMMAND_LOCAL = [
   "export CHECKS_TOKEN=$(grep -m1 '^CHECKS_TOKEN=' .env | cut -d= -f2-)",
   '',
   'curl -sS -G -w \'\\n%{http_code}\\n\' "http://localhost:3000/checks" \\',
   '  --data-urlencode "token=$CHECKS_TOKEN" \\',
   '  --data-urlencode "label=Разработка"',
+].join('\n')
+
+/**
+ * На проде ключ берётся не из файла, а из панели — значит его вписывают
+ * руками, и вот здесь особенно важно, чем обозначено место для него.
+ *
+ * `ВПИШИТЕ_КЛЮЧ` заглавными, а не многоточие. Многоточие — один знак
+ * Unicode, оболочка отправляет его как ключ, и ручка отвечает «не
+ * найдено»: в логе тогда стоит «прислано знаков: 1», и понять по такому
+ * ответу, что подставили не то, невозможно. Так и вышло на первом
+ * боевом прогоне.
+ *
+ * Одинарные кавычки тоже не для красоты: в ключе встречаются `+` и `$`,
+ * и в двойных оболочка попробует их истолковать.
+ */
+const COMMAND_PROD = [
+  "export CHECKS_TOKEN='ВПИШИТЕ_КЛЮЧ_ИЗ_ПАНЕЛИ'",
+  '',
+  'curl -sS -G -w \'\\n%{http_code}\\n\' "https://адрес-сервера/checks" \\',
+  '  --data-urlencode "token=$CHECKS_TOKEN" \\',
+  '  --data-urlencode "label=Прод"',
 ].join('\n')
 
 export function EvolutionChecks({ runs, error }: { runs: CheckRunView[]; error: string | null }) {
@@ -119,13 +140,22 @@ export function EvolutionChecks({ runs, error }: { runs: CheckRunView[]; error: 
                Строкой в адресе она уходит сырыми байтами, и разбор HTTP
                отвечает «плохой запрос» до всякого маршрута.
             */}
-            <pre className="mt-4 overflow-x-auto rounded-lg bg-canvas px-4 py-3 font-mono text-[13px] leading-relaxed">
-              {COMMAND}
+            <p className="mt-5 text-[13px] font-medium text-ink-700">На своей машине</p>
+            <pre className="mt-1.5 overflow-x-auto rounded-lg bg-canvas px-4 py-3 font-mono text-[13px] leading-relaxed">
+              {COMMAND_LOCAL}
+            </pre>
+
+            <p className="mt-4 text-[13px] font-medium text-ink-700">
+              На сервере — ключ из панели, файла окружения там нет
+            </p>
+            <pre className="mt-1.5 overflow-x-auto rounded-lg bg-canvas px-4 py-3 font-mono text-[13px] leading-relaxed">
+              {COMMAND_PROD}
             </pre>
             <p className="mt-2 max-w-[80ch] text-[13px] leading-snug text-ink-500">
-              Первая строка достаёт ключ из <code className="text-[12px]">.env</code>: файл
-              окружения читает сервер, но не терминал, и без неё уходит пустой ключ, а ответ
-              выглядит как «неверный токен». Метка передаётся через{' '}
+              Ключ вписывается целиком — многоточие вместо него оболочка отправит как
+              один знак, и ручка ответит «не найдено». На своей машине первая строка
+              достаёт его из <code className="text-[12px]">.env</code>: этот файл читает
+              сервер, но не терминал. Метка передаётся через{' '}
               <code className="text-[12px]">--data-urlencode</code>: кириллица, вписанная прямо
               в адрес, уходит сырыми байтами, и сервер отвечает «плохой запрос» ещё до маршрута.
               Код ответа говорит об исходе прогона: 200 — сошлось, 409 — есть находки, 404 —
