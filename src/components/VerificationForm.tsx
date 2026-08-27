@@ -145,6 +145,7 @@ export function VerificationForm({ rows }: { rows: Row[] }) {
                     checked={picked.has(r.id)}
                     onChange={() => toggle(r.id)}
                     aria-label={`Подать ${r.identNumber}`}
+                    className="checkbox"
                   />
                 </td>
                 <td>
@@ -246,7 +247,7 @@ export function VerificationForm({ rows }: { rows: Row[] }) {
               value="1"
               checked={supersede}
               onChange={(e) => setSupersede(e.target.checked)}
-              className="mt-1"
+              className="checkbox mt-1"
             />
             <span>
               Отозвать {clashNumbers.length === 1 ? 'прежнюю заявку' : 'прежние заявки'} и подать

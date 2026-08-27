@@ -530,7 +530,7 @@ export function VerificationDecision({
 
       <fieldset className="grid gap-3 sm:grid-cols-2">
         <label className="flex items-start gap-3 rounded-xl bg-[#f6f6f6] px-4 py-3 text-[14px]">
-          <input type="radio" name="decision" value="approved" defaultChecked className="mt-1" />
+          <input type="radio" name="decision" value="approved" defaultChecked className="radio mt-1" />
           <span>
             <span className="block font-medium">Подтвердить</span>
             <span className="text-ink-500">
@@ -540,7 +540,7 @@ export function VerificationDecision({
         </label>
 
         <label className="flex items-start gap-3 rounded-xl bg-[#f6f6f6] px-4 py-3 text-[14px]">
-          <input type="radio" name="decision" value="rejected" className="mt-1" />
+          <input type="radio" name="decision" value="rejected" className="radio mt-1" />
           <span>
             <span className="block font-medium">Отклонить</span>
             <span className="text-ink-500">

@@ -262,7 +262,7 @@ export function ImportCard({ datasets }: { datasets: (Choice & { hint: string })
                     type="checkbox"
                     name="updateVerified"
                     value="1"
-                    className="mt-0.5"
+                    className="checkbox mt-0.5"
                   />
                   <span>
                     Обновлять записи со знаком «Верифицировано ассоциацией».

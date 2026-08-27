@@ -81,7 +81,7 @@ export function ThresholdForm({ spec }: { spec: Spec }) {
             max={spec.max}
             step={spec.step}
             required
-            className="w-[160px] rounded-lg border border-ink-200 px-3 py-2 tabular-nums"
+            className="field field-on-light w-[160px] tabular-nums"
           />
         </label>
 

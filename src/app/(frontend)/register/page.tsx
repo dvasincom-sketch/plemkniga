@@ -104,7 +104,7 @@ export default async function RegisterPage({
                 name="contactMessage"
                 placeholder="Вопрос"
                 rows={3}
-                className="w-full rounded-lg border border-ink-100 bg-white px-4 py-3 text-sm outline-none focus:border-brand-400"
+                className="field field-on-light"
               />
               <button type="submit" className="btn btn-brand">
                 Отправить

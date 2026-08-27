@@ -3,6 +3,7 @@ import type { Document as BookDocument } from '@/payload-types'
 import { DOCUMENT_TYPES, labelOf } from '@/lib/dictionaries'
 import { dateRu } from '@/lib/format'
 import { Select } from '@/components/Select'
+import { DateField } from '@/components/DateField'
 import { InfoTip } from '@/components/InfoTip'
 import { Pagination } from '@/components/Pagination'
 import {
@@ -218,21 +219,19 @@ export function DocumentsPanel({
               options={DOC_STATES.map((o) => ({ value: o.value, label: o.label }))}
             />
           </Field>
+          {/*
+             Фирменное поле даты, а не нативное. Нативное каждая система
+             рисует по-своему: на macOS три сегмента с системным календарём,
+             на Windows другой, на телефоне колесо во весь экран, — и рядом
+             с нашими списками оно читается как чужое. Довод записан ещё
+             в самом `DateField`, им пользуются тринадцать мест, и здесь
+             он был нарушен по невнимательности.
+          */}
           <Field label="Выдан с">
-            <input
-              className="field field-on-light"
-              type="date"
-              name="dfrom"
-              defaultValue={one(sp.dfrom)}
-            />
+            <DateField name="dfrom" ariaLabel="Выдан с" defaultValue={one(sp.dfrom)} />
           </Field>
           <Field label="Выдан по">
-            <input
-              className="field field-on-light"
-              type="date"
-              name="dto"
-              defaultValue={one(sp.dto)}
-            />
+            <DateField name="dto" ariaLabel="Выдан по" defaultValue={one(sp.dto)} />
           </Field>
         </div>
 

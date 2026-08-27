@@ -278,14 +278,20 @@ function CounterpartyPicker({ label, hint }: { label: string; hint: string }) {
             inputMode="numeric"
             className="field field-on-light w-[20ch]"
           />
-          <select name="counterpartyRegion" className="field field-on-light w-[26ch]">
-            <option value="">Регион не указан</option>
-            {REGIONS.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
+          {/*
+             Фирменный список, а не нативный. Нативный `select` каждая
+             система рисует по-своему, и рядом с полем даты и вводом,
+             сделанными по-нашему, он читался как чужой — тот же довод,
+             что у `DateField`, которым эта же форма пользуется выше.
+          */}
+          <Select
+            name="counterpartyRegion"
+            onLight
+            ariaLabel="Регион контрагента"
+            placeholder="Регион не указан"
+            className="w-[26ch]"
+            options={REGIONS.map((r) => ({ value: r, label: r }))}
+          />
         </div>
         <p className="mt-2 text-[13px] leading-snug text-ink-500">
           ИНН стоит вписать: по нему Ассоциация отличит новое хозяйство от того,

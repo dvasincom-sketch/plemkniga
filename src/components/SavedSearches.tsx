@@ -160,7 +160,7 @@ export function SavedSearches({
           </label>
 
           <label className="flex items-center gap-2 pb-2.5 text-[13px] text-ink-700">
-            <input type="checkbox" name="scope" value="organization" />
+            <input type="checkbox" name="scope" value="organization" className="checkbox" />
             Виден всему хозяйству
           </label>
 
@@ -231,6 +231,7 @@ function ManageForm({ item, onDone }: { item: SavedSearchItem; onDone: () => voi
             name="scope"
             value="organization"
             defaultChecked={item.scope === 'organization'}
+            className="checkbox"
           />
           Виден всему хозяйству
         </label>

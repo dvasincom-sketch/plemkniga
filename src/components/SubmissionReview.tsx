@@ -319,7 +319,7 @@ export function Decision({
 
       <fieldset className="grid gap-3 sm:grid-cols-2">
         <label className="flex items-start gap-3 rounded-xl bg-[#f6f6f6] px-4 py-3 text-[14px]">
-          <input type="radio" name="decision" value="checked" defaultChecked className="mt-1" />
+          <input type="radio" name="decision" value="checked" defaultChecked className="radio mt-1" />
           <span>
             <span className="block font-medium">Проверено</span>
             <span className="text-ink-500">
@@ -330,7 +330,7 @@ export function Decision({
         </label>
 
         <label className="flex items-start gap-3 rounded-xl bg-[#f6f6f6] px-4 py-3 text-[14px]">
-          <input type="radio" name="decision" value="rejected" className="mt-1" />
+          <input type="radio" name="decision" value="rejected" className="radio mt-1" />
           <span>
             <span className="block font-medium">Отклонено</span>
             <span className="text-ink-500">

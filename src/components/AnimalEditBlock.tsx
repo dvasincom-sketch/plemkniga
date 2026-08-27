@@ -132,7 +132,7 @@ export function AnimalEditBlock({
 
             {v.kind === 'checkbox' ? (
               <span className="flex items-center gap-2 py-2">
-                <input type="checkbox" name={v.path} defaultChecked={v.raw === 'on'} />
+                <input type="checkbox" name={v.path} defaultChecked={v.raw === 'on'} className="checkbox" />
                 <span className="text-ink-700">да</span>
               </span>
             ) : v.choices ? (
