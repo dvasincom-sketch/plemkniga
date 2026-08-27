@@ -5,6 +5,7 @@ import { SiteFooter } from '@/components/SiteFooter'
 import { EvolutionVersions } from '@/components/EvolutionVersions'
 import { EvolutionStages } from '@/components/EvolutionStages'
 import { EvolutionDocs } from '@/components/EvolutionDocs'
+import { EvolutionProcesses } from '@/components/EvolutionProcesses'
 import { EvolutionRoadmap } from '@/components/EvolutionRoadmap'
 import { EvolutionBench } from '@/components/EvolutionBench'
 import { EvolutionChecks } from '@/components/EvolutionChecks'
@@ -59,6 +60,13 @@ const TABS = [
      раньше первого и чаще.
   */
   { key: 'visual', label: 'Визуальный код' },
+  /*
+     «Бизнес-процессы» стоят перед документацией, а не после: у них
+     шире читатель. Документацию открывает тот, кто будет строить
+     интеграцию, — таких единицы; сценарии открывает всякий, кто хочет
+     понять, что система делает и чего не делает.
+  */
+  { key: 'processes', label: 'Бизнес-процессы' },
   { key: 'docs', label: 'Документация' },
 ] as const
 
@@ -88,6 +96,11 @@ const LEAD: Record<TabKey, string> = {
     'Что проверено, когда и с каким исходом. Зелёное здесь означает «проверено недавно ' +
     'и сошлось»: результат старше полутора суток отмечается как неизвестный, потому что ' +
     'доска, показывающая вчерашнее за нынешнее, хуже отсутствующей.',
+  processes:
+    'Что участники — хозяйства, Ассоциация, сервисные организации, государство — могут ' +
+    'сделать в системе и что из этого выйдет. У каждого сценария отдельно названо, чего ' +
+    'он не даст: ограничение, названное заранее, стоит дешевле разочарования, которое ' +
+    'приходит, когда на систему уже положились.',
   docs:
     'Техническое описание системы для тех, кому предстоит с ней работать: модель данных, ' +
     'процессы, архитектура, контракты обмена, развёртывание и — отдельно — ограничения.',
@@ -170,6 +183,7 @@ export default async function EvolutionPage({
             />
           )}
           {tab === 'visual' && <EvolutionVisualCode />}
+          {tab === 'processes' && <EvolutionProcesses />}
           {tab === 'docs' && <EvolutionDocs />}
         </div>
       </main>
