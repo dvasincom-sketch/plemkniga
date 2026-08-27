@@ -129,6 +129,81 @@ async function main() {
   check(relId(after.organization) === other.id, 'участник НЕ переписал себе организацию на чужую')
   check(after.role !== 'admin', 'участник НЕ повысил себе роль')
 
+  /* --------------------- Уровень достоверности ---------------------- */
+
+  /*
+   * Самая дорогая из закрытых дыр: подпись Ассоциации ставилась одним
+   * запросом от руководителя своего же хозяйства. Поле стояло без правил,
+   * серверная форма его выбрасывала — но форма не граница, API работает
+   * мимо неё.
+   *
+   * Проверяется попыткой, а не разбором кода: правило у поля теперь есть,
+   * и вопрос ровно в том, срабатывает ли оно на этом действии. Прошлые
+   * две дыры выглядели защищёнными точно так же.
+   */
+  console.log('\nУровень достоверности\n')
+
+  const own = await payload.create({
+    collection: 'animals',
+    overrideAccess: true,
+    data: {
+      identNumber: `${TAG}-TRUST-${suffix}`,
+      idFormat: 'internal',
+      name: 'Проверка уровня',
+      sex: 'female',
+      state: 'alive',
+      ageGroup: 'cow2',
+      birthDate: new Date('2020-01-01').toISOString(),
+      owner: other.id,
+    } as never,
+  })
+
+  await payload
+    .update({
+      collection: 'animals',
+      id: own.id,
+      user: outsider,
+      overrideAccess: false,
+      data: { trustLevel: 3, trustCheckedAt: new Date().toISOString() } as never,
+    })
+    .catch(() => null)
+
+  const raised = await payload.findByID({
+    collection: 'animals',
+    id: own.id,
+    depth: 0,
+    overrideAccess: true,
+  })
+
+  check(
+    raised.trustLevel !== 3,
+    'хозяйство НЕ поставило себе подпись Ассоциации через API',
+    `уровень стал ${raised.trustLevel}`,
+  )
+  check(!raised.trustCheckedAt, 'дата подтверждения НЕ проставлена снаружи')
+
+  /*
+   * И обратное: законный путь обязан работать. Проверка, закрывшая
+   * поле для всех, была бы такой же поломкой, только незаметной —
+   * заявки перестали бы подтверждаться, и выяснилось бы это у эксперта.
+   */
+  await payload.update({
+    collection: 'animals',
+    id: own.id,
+    overrideAccess: true,
+    data: { trustLevel: 3 } as never,
+  })
+
+  const byAssociation = await payload.findByID({
+    collection: 'animals',
+    id: own.id,
+    depth: 0,
+    overrideAccess: true,
+  })
+  check(byAssociation.trustLevel === 3, 'решение Ассоциации уровень по-прежнему поднимает')
+
+  await payload.delete({ collection: 'animals', id: own.id, overrideAccess: true })
+
   console.log('\nФайлы\n')
 
   const csv = Buffer.from('ident;kg\n123;30\n', 'utf8')
