@@ -54,19 +54,52 @@ type Node = {
 
 const ru = (n: number) => n.toLocaleString('ru-RU')
 
-/** Печать находок: заголовок, счётчик, несколько примеров. */
+/**
+ * Приставка контрольного стада (`seed:checks`).
+ *
+ * В нём противоречия посажены нарочно — по записи на каждое правило,
+ * чтобы `audit:checks` было что находить. Ревизия родословной их видит
+ * и обязана видеть: она смотрит на данные, а не на замысел.
+ *
+ * Но считать их находками нельзя. Проверка, красная всегда, перестаёт
+ * быть проверкой: к семи знакомым крестикам привыкают за неделю, и восьмой,
+ * настоящий, теряется среди них. Поэтому контрольное стадо считается
+ * отдельно и на исход прогона не влияет.
+ *
+ * Отбор по приставке номера, а не по хозяйству: хозяйство можно
+ * переименовать и переназначить, номер живёт с записью. Приставка
+ * зарезервирована сидом и в настоящих данных не встречается —
+ * национальный номер состоит из цифр.
+ */
+const FIXTURE = 'CHK-'
+const isFixture = (line: string) => line.trimStart().startsWith(FIXTURE)
+
+/**
+ * Печать находок: заголовок, счётчик, несколько примеров.
+ *
+ * Возвращает только настоящие находки. Контрольные названы отдельной
+ * строкой — прятать их нельзя: молчание о том, что часть противоречий
+ * отброшена, превращает честный счёт в подогнанный.
+ */
 const report = (title: string, lines: string[]) => {
-  if (!lines.length) {
-    console.log(`  ✓  ${title} — нет`)
+  const real = lines.filter((l) => !isFixture(l))
+  const fixture = lines.length - real.length
+
+  if (!real.length) {
+    console.log(
+      `  ✓  ${title} — нет` + (fixture ? ` (в контрольном стаде: ${ru(fixture)})` : ''),
+    )
     return 0
   }
-  console.log(`\n  ✗  ${title}: ${ru(lines.length)}`)
-  for (const line of showAll ? lines : lines.slice(0, SAMPLE)) console.log(`     ${line}`)
-  if (!showAll && lines.length > SAMPLE) {
-    console.log(`     … и ещё ${ru(lines.length - SAMPLE)} (запустите с --all)`)
+
+  console.log(`\n  ✗  ${title}: ${ru(real.length)}`)
+  for (const line of showAll ? real : real.slice(0, SAMPLE)) console.log(`     ${line}`)
+  if (!showAll && real.length > SAMPLE) {
+    console.log(`     … и ещё ${ru(real.length - SAMPLE)} (запустите с --all)`)
   }
+  if (fixture) console.log(`     плюс ${ru(fixture)} в контрольном стаде — это фикстура`)
   console.log('')
-  return lines.length
+  return real.length
 }
 
 async function main() {
@@ -165,7 +198,8 @@ async function main() {
     }
   }
 
-  problems += report('Циклы в родословной', cycles)
+  const realCycles = report('Циклы в родословной', cycles)
+  problems += realCycles
 
   /* ---------------------------- Пол родителей ----------------------------- */
 
@@ -227,7 +261,16 @@ async function main() {
     return 1 + Math.max(f, m)
   }
 
-  if (cycles.length === 0) {
+  /*
+   * Глубина не считается только при настоящих циклах. Цикл контрольного
+   * стада стоит там всегда, и прежнее условие означало бы «глубина
+   * не измеряется никогда» — то есть отчёт молча лишался бы половины
+   * содержания из-за фикстуры, заведённой ради другого.
+   *
+   * Сам обход цикла не боится: `depthOf` помнит пройденное и на возврате
+   * отвечает нулём. Осторожность в условии была лишней.
+   */
+  if (realCycles === 0) {
     const depths: number[] = []
     const sample = [...nodes.keys()].slice(0, 2000)
     for (const id of sample) depths.push(depthOf(id) - 1)
@@ -252,7 +295,7 @@ async function main() {
     `Всего находок: ${ru(problems)}.\n\n` +
       'Скрипт ничего не исправил — и не должен. У каждой находки два\n' +
       'объяснения: неверна запись или неверна связь, и выбор смысловой.\n' +
-      (cycles.length
+      (realCycles
         ? '\nЦиклы разрывайте в первую очередь: пока они есть, обход предков\n' +
           'на этих животных не завершается, и карточка не открывается.\n'
         : ''),
