@@ -118,11 +118,33 @@ function runOne(code: string): Promise<Outcome> {
        * упала до того, как что-то сказала. Тогда в находку идут
        * последние строки вывода: они и объяснят, обо что.
        */
-      const marked = out
-        .split('\n')
-        .filter((l) => l.includes('✗'))
-        .map((l) => l.replace(/^\s*✗\s*/, '').trim())
-        .filter(Boolean)
+      /*
+       * Вместе со строкой-крестиком берутся и подробности под ней.
+       *
+       * Первый полный прогон вернул «Циклы в родословной: 1» — и на этом
+       * останавливался, хотя сам скрипт печатал под этим заголовком
+       * номера животных. Находка без подробностей заставляет запускать
+       * проверку заново руками, то есть отменяет смысл общего прогона.
+       *
+       * Подробностями считаются отступленные строки до пустой: так
+       * печатают все проверки, и это единственный признак, по которому
+       * их можно отличить от следующего заголовка.
+       */
+      const lines = out.split('\n')
+      const marked: string[] = []
+
+      for (let i = 0; i < lines.length; i += 1) {
+        if (!lines[i].includes('✗')) continue
+
+        marked.push(lines[i].replace(/^\s*✗\s*/, '').trim())
+
+        for (let j = i + 1; j < lines.length && j <= i + 6; j += 1) {
+          const next = lines[j]
+          if (!next.trim() || next.includes('✗') || next.includes('✓')) break
+          if (!/^\s{4,}/.test(next)) break
+          marked.push(`    ${next.trim()}`)
+        }
+      }
 
       const tail = out.split('\n').filter((l) => l.trim()).slice(-3)
 
