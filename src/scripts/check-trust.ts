@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import { getPayload } from 'payload'
 import type { User } from '@/payload-types'
+import { pdfStub } from '@/lib/pdf-stub'
 
 import config from '@payload-config'
 
@@ -91,7 +92,13 @@ async function main() {
       ).trustLevel ?? 0,
     )
 
-  const pdf = Buffer.from('%PDF-1.4 CHK-TRUST\n', 'utf8')
+  /*
+   * Настоящий PDF, а не строка с заголовком: Payload читает буфер
+   * и требует таблицу ссылок с меткой конца файла. Подделка роняла
+   * прогон на создании файла — с сообщением про поле `file`, из которого
+   * причина не читалась вовсе.
+   */
+  const pdf = pdfStub('CHK-TRUST protocol')
   const mkFile = async (mark: string) =>
     payload.create({
       collection: 'media',
@@ -107,7 +114,7 @@ async function main() {
 
   console.log('\nПодъём до второй ступени\n')
 
-  check((await level()) === 1, 'исходно — «Проверено собственником»')
+  check((await level()) === 1, 'исходно — «Заявлено хозяйством»')
 
   /*
    * Первый протокол — неполный: файл есть, лаборатории нет. Так выглядит

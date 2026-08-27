@@ -18,6 +18,7 @@ import { getPayload } from 'payload'
 import config from '../payload.config'
 import { maskUri, resolveDatabase } from '../lib/db-url'
 import { expectedFatKg, expectedProteinKg } from '../lib/pta-consistency'
+import { pdfStub } from '../lib/pdf-stub'
 import {
   EXTERIOR_COMPOSITES,
   EXTERIOR_TRAITS,
@@ -715,15 +716,11 @@ const run = async () => {
     collection: 'media',
     overrideAccess: true,
     data: { alt: 'Протокол лаборатории (демонстрационный)', visibility: 'private' },
-    file: {
-      data: Buffer.from(
-        '%PDF-1.4\n% Демонстрационный протокол генотипирования\n%%EOF\n',
-        'utf8',
-      ),
-      name: 'protokol-laboratorii.pdf',
-      mimetype: 'application/pdf',
-      size: 60,
-    },
+    file: (() => {
+      // Настоящий PDF: файл лежит в карточке животного, и его однажды нажмут
+      const data = pdfStub('Genotype report (demo)')
+      return { data, name: 'protokol-laboratorii.pdf', mimetype: 'application/pdf', size: data.length }
+    })(),
   })
 
   const labAnimals = await payload.find({
