@@ -107,7 +107,8 @@ export default async function EvolutionPage({
    * запрос на каждый просмотр «Версий» и «Дорожной карты».
    */
   const benchReports = tab === 'bench' ? await loadBenchReports(await getClient()) : []
-  const checkRuns = tab === 'status' ? await loadCheckRuns(await getClient()) : []
+  const checkRuns =
+    tab === 'status' ? await loadCheckRuns(await getClient()) : { runs: [], error: null }
 
   return (
     <>
@@ -154,7 +155,9 @@ export default async function EvolutionPage({
           {tab === 'stages' && <EvolutionStages />}
           {tab === 'roadmap' && <EvolutionRoadmap />}
           {tab === 'bench' && <EvolutionBench reports={benchReports} />}
-          {tab === 'status' && <EvolutionChecks runs={checkRuns} />}
+          {tab === 'status' && (
+            <EvolutionChecks runs={checkRuns.runs} error={checkRuns.error} />
+          )}
           {tab === 'visual' && <EvolutionVisualCode />}
           {tab === 'docs' && <EvolutionDocs />}
         </div>

@@ -43,9 +43,31 @@ export type CheckRunView = {
   outcome: Exclude<RunOutcome, 'never'>
 }
 
-export async function loadCheckRuns(payload: Payload): Promise<CheckRunView[]> {
-  const res = await payload
-    .find({
+export type CheckRuns = {
+  runs: CheckRunView[]
+  /**
+   * Почему прогонов нет — если дело не в том, что их не запускали.
+   *
+   * Пустой список и недоступное хранилище выглядят одинаково, а значат
+   * разное: «ещё не проверяли» против «проверяли, но прочитать не могу».
+   * Второе — не то же самое, что первое, и подсовывать вместо него
+   * «прогонов ещё не было» значит соврать ровно на той странице,
+   * которая заведена ради честности.
+   */
+  error: string | null
+}
+
+export async function loadCheckRuns(payload: Payload): Promise<CheckRuns> {
+  let docs: Record<string, unknown>[] = []
+  let error: string | null = null
+
+  /*
+   * Отказ запроса не роняет страницу: она про состояние системы,
+   * и «не смог прочитать прогоны» — тоже состояние, которое надо
+   * показать, а не спрятать.
+   */
+  try {
+    const res = await payload.find({
       collection: 'check-runs',
       limit: 20,
       depth: 0,
@@ -53,19 +75,30 @@ export async function loadCheckRuns(payload: Payload): Promise<CheckRunView[]> {
       overrideAccess: true,
     })
     /*
-     * Отказ запроса не роняет страницу: она про состояние системы,
-     * и «не смог прочитать прогоны» — тоже состояние. Пустой список
-     * покажется как «прогонов не было», и это ближе к правде, чем
-     * страница с ошибкой.
+     * Через `unknown`: у сгенерированного типа записи нет строкового
+     * индекса, и прямое приведение к «мешку полей» типизация не пускает.
+     * Мешок здесь нужен потому, что снимок результатов лежит json —
+     * его форму знает не схема, а `probes.ts`.
      */
-    .catch((e) => {
-      console.error('[checks] прогоны не прочитаны:', e instanceof Error ? e.message : e)
-      return { docs: [] as Record<string, unknown>[] }
-    })
+    docs = res.docs as unknown as Record<string, unknown>[]
+  } catch (e) {
+    const raw = e instanceof Error ? e.message : String(e)
+    /*
+     * Самый частый случай — коллекция ещё не подхвачена: код выложен,
+     * а сервер работает со старой сборкой конфигурации, либо таблицы
+     * нет вовсе. Сообщение Payload про «slug can't be found» человеку
+     * ничего не говорит; здесь оно переводится в то, что надо сделать.
+     */
+    error = /can'?t be found/i.test(raw)
+      ? 'Хранилище прогонов ещё не подхвачено: перезапустите сервер, а на проде — ' +
+        'дождитесь применения миграции при старте контейнера.'
+      : `Прогоны не прочитались: ${raw}`
+    console.error('[checks] прогоны не прочитаны:', raw)
+  }
 
   const now = Date.now()
 
-  return (res.docs as Record<string, unknown>[]).map((d) => {
+  const runs: CheckRunView[] = docs.map((d) => {
     const ranAt = String(d.ranAt ?? '')
     const ageHours = ranAt ? (now - new Date(ranAt).getTime()) / 3_600_000 : Number.POSITIVE_INFINITY
     const ok = Boolean(d.ok)
@@ -89,4 +122,6 @@ export async function loadCheckRuns(payload: Payload): Promise<CheckRunView[]> {
       outcome: !ok ? 'failed' : ageHours > FRESH_HOURS ? 'stale' : 'ok',
     }
   })
+
+  return { runs, error }
 }

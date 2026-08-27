@@ -47,7 +47,23 @@ const whyManual = (code: string): string => {
   return 'гоняется вручную'
 }
 
-export function EvolutionChecks({ runs }: { runs: CheckRunView[] }) {
+/**
+ * Команда прогона — целиком и в рабочем виде.
+ *
+ * Через `-G --data-urlencode`, а не строкой с готовым адресом.
+ * Первая редакция показывала `?token=…&label=Разработка` — и первый же
+ * запуск ответил четырёхсотым: кириллица в строке запроса уходит сырыми
+ * байтами, а разбор HTTP такого не принимает и отвечает «плохой запрос»
+ * ещё до того, как дело дойдёт до маршрута. Снаружи это выглядит как
+ * поломка ручки, хотя ручка её и не видела.
+ */
+const COMMAND = [
+  'curl -sS -G -w \'\\n%{http_code}\\n\' "http://localhost:3000/checks" \\',
+  '  --data-urlencode "token=$CHECKS_TOKEN" \\',
+  '  --data-urlencode "label=Разработка"',
+].join('\n')
+
+export function EvolutionChecks({ runs, error }: { runs: CheckRunView[]; error: string | null }) {
   /* Пробы, прогнанные хоть где-то, по коду проверки → результат по средам. */
   const byCode = new Map<string, { label: string; ok: boolean; findings: string[] }[]>()
   for (const run of runs) {
@@ -66,11 +82,39 @@ export function EvolutionChecks({ runs }: { runs: CheckRunView[] }) {
 
         {runs.length === 0 ? (
           <div className="card">
-            <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
-              Прогонов ещё не было. Проверки запускаются на той машине, где развёрнута
-              система: <code className="text-[13px]">GET /checks?token=…&amp;label=Прод</code>.
-              Ключ задаётся переменной <code className="text-[13px]">CHECKS_TOKEN</code>;
-              без неё маршрут отвечает несуществующей страницей.
+            {/*
+               Недоступное хранилище и «ещё не запускали» — разные вещи,
+               и подменять одно другим нельзя ровно здесь: страница
+               заведена ради честного ответа о состоянии.
+            */}
+            {error ? (
+              <p className="max-w-[80ch] text-[15px] leading-relaxed text-[#8a2d22]">{error}</p>
+            ) : (
+              <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
+                Прогонов ещё не было. Проверки запускаются на той машине, где развёрнута
+                система.
+              </p>
+            )}
+
+            <p className="mt-4 max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
+              Ключ задаётся переменной <code className="text-[13px]">CHECKS_TOKEN</code> —
+              не короче шестнадцати знаков; пока её нет, маршрут отвечает несуществующей
+              страницей. После правки окружения сервер нужно перезапустить.
+            </p>
+
+            {/*
+               Кириллица в метке передаётся через --data-urlencode.
+               Строкой в адресе она уходит сырыми байтами, и разбор HTTP
+               отвечает «плохой запрос» до всякого маршрута.
+            */}
+            <pre className="mt-4 overflow-x-auto rounded-lg bg-canvas px-4 py-3 font-mono text-[13px] leading-relaxed">
+              {COMMAND}
+            </pre>
+            <p className="mt-2 text-[13px] leading-snug text-ink-500">
+              Метка передаётся через <code className="text-[12px]">--data-urlencode</code>:
+              кириллица, вписанная прямо в адрес, уходит сырыми байтами, и сервер отвечает
+              «плохой запрос» ещё до маршрута. Код ответа говорит об исходе прогона:
+              200 — сошлось, 409 — есть находки.
             </p>
           </div>
         ) : (
