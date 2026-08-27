@@ -2,6 +2,7 @@ import 'dotenv/config'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { LAB_PROTOCOL_TYPE } from '@/lib/trust'
+import { maskUri, resolveDatabase } from '@/lib/db-url'
 
 /**
  * Разовая уборка: вторая ступень без протокола.
@@ -26,8 +27,27 @@ import { LAB_PROTOCOL_TYPE } from '@/lib/trust'
  * Записи с подписью Ассоциации (третья ступень) и отклонённые скрипт
  * не трогает — их ступень к протоколу отношения не имеет.
  *
- *   npm run backfill:trust -- --dry     посчитать, ничего не меняя
- *   npm run backfill:trust              выполнить
+ *   npm run backfill:trust -- --dry           посчитать, ничего не меняя
+ *   npm run backfill:trust -- --yes           выполнить
+ *
+ * ## Как запустить это на проде
+ *
+ * Не в контейнере. В нём стоят только рабочие зависимости, а `tsx`
+ * и `cross-env` — из тех, что нужны только разработке: `npm run`
+ * отвечает там «cross-env: not found». Скрипт запускается со своей
+ * машины, а боевая база указывается строкой подключения — тем же
+ * способом, что и перенос данных (`docs/perenos-dannyh.md`):
+ *
+ *   DATABASE_URI="postgresql://…@…:5432/…?sslmode=require" \
+ *     npm run backfill:trust -- --dry
+ *
+ * Поэтому скрипт первым делом печатает, к какой базе подключился.
+ * Запустить уборку не на той базе — ошибка, которую замечают
+ * не в момент запуска, а через неделю, по чужой жалобе.
+ *
+ * И поэтому же настоящий прогон требует `--yes`: команда меняет десятки
+ * тысяч записей, а от пробного отличается одним словом в конце строки,
+ * которое легко потерять при копировании.
  *
  * ## Почему прямым запросом, а не через Payload
  *
@@ -39,8 +59,13 @@ import { LAB_PROTOCOL_TYPE } from '@/lib/trust'
  */
 
 const dry = process.argv.includes('--dry')
+const confirmed = process.argv.includes('--yes')
 
 async function main() {
+  const { uri, source } = resolveDatabase()
+  console.log('')
+  console.log(`База: ${uri ? maskUri(uri) : 'не определена'}${source ? ` (из ${source})` : ''}`)
+
   const payload = await getPayload({ config })
 
   /*
@@ -82,8 +107,13 @@ async function main() {
   }
 
   if (dry) {
-    console.log('Пробный прогон: ничего не изменено. Без --dry ступень опустится до первой.')
+    console.log('Пробный прогон: ничего не изменено. Чтобы выполнить, повторите с --yes.')
     process.exit(0)
+  }
+
+  if (!confirmed) {
+    console.log('Чтобы выполнить, добавьте --yes. Проверьте базу в первой строке.')
+    process.exit(1)
   }
 
   const res = await payload.db.pool.query(
