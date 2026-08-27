@@ -1,57 +1,34 @@
 import 'dotenv/config'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import {
-  culling,
-  geneticTrend,
-  heiferAges,
-  lactationStructure,
-  milkByLactation,
-  udderHealth,
-} from '@/lib/herd-analytics'
+import { lactationStructure, milkByLactation } from '@/lib/herd-analytics'
 import { herdDrilldown } from '@/lib/herd-drilldown'
+import { drilldownConsistency } from '@/lib/probes'
 
 /**
  * Списки животных за числами отчётов — прогон на живой базе.
  *
- * ## Что здесь проверяется на самом деле
+ * ## Что проверяется
  *
- * Не «запрос выполняется» — это заодно, — а **сходимость**: число
- * в отчёте и длина списка за ним должны совпадать. Условия в
- * `herd-drilldown.ts` списаны с `herd-analytics.ts` вручную, и разойтись
- * они могут от одного лишнего `and archived is not true`, добавленного
- * из лучших побуждений.
+ * **Сходимость**: число в отчёте и длина списка за ним должны совпадать.
+ * Условия в `herd-drilldown.ts` списаны с `herd-analytics.ts` вручную,
+ * и разойтись они могут от одного лишнего `and archived is not true`,
+ * добавленного из лучших побуждений.
  *
  * Расхождение здесь дороже обычной ошибки. Ошибку видно: страница падает
  * или показывает чушь. Несходящееся число выглядит правдоподобно с обеих
  * сторон — «двенадцать» в отчёте, одиннадцать строк в списке, — и человек
- * перестаёт верить не одному из них, а обоим сразу, вместе со всем
- * остальным, что книга насчитала.
+ * перестаёт верить не одному из них, а обоим сразу.
  *
- * Исключение одно и оговорено ниже: «лактаций в ходу» отчёт считает
- * строками лактаций, а список — коровами. Одна корова может иметь две
- * незакрытые лактации, и числа законно разные.
+ * ## Почему расчёт не здесь
+ *
+ * Сама сверка живёт в `probes.ts` и оттуда же зовётся ночным прогоном.
+ * Раньше она лежала в этом скрипте, а ручка прогона считала своё —
+ * и это была ровно та беда, которую скрипт ищет: две реализации одной
+ * проверки, расходящиеся молча. Здесь остались печать и код возврата.
  *
  *   npm run check:drilldown
  */
-
-let failures = 0
-
-const ok = (what: string, detail = '') =>
-  console.log(`  ✓ ${what}${detail ? ` — ${detail}` : ''}`)
-
-const bad = (what: string, detail = '') => {
-  failures += 1
-  console.log(`  ✗ ${what}${detail ? ` — ${detail}` : ''}`)
-}
-
-/** Число из отчёта против итога списка. `null` в отчёте — проверять нечего. */
-const agree = (name: string, reported: number | null, drilled: number | null) => {
-  if (reported === null) return console.log(`  · ${name} — отчёт не посчитан, пропуск`)
-  if (drilled === null) return bad(name, 'список не собрался (нет пула соединений?)')
-  if (reported === drilled) return ok(name, `${reported}`)
-  bad(name, `отчёт ${reported}, список ${drilled}`)
-}
 
 async function main() {
   const payload = await getPayload({ config })
@@ -65,8 +42,8 @@ async function main() {
     overrideAccess: true,
   })
 
-  const orgId =
-    typeof docs[0]?.owner === 'number' ? docs[0].owner : (docs[0]?.owner as { id?: number })?.id
+  const owner = docs[0]?.owner
+  const orgId = typeof owner === 'number' ? owner : (owner as { id?: number } | undefined)?.id
 
   if (!orgId) {
     console.log('  ✗ в книге нет животных с хозяйством — проверять нечего')
@@ -75,82 +52,44 @@ async function main() {
 
   console.log(`\nСходимость списков с числами, хозяйство #${orgId}\n`)
 
-  const total = async (code: string): Promise<number | null> => {
-    const d = await herdDrilldown(payload, orgId, code)
-    return d ? d.total : null
-  }
+  const { findings, notes } = await drilldownConsistency(payload, orgId)
 
-  /* ------------------------- Ремонтный молодняк ------------------------ */
-  const heifers = await heiferAges(payload, orgId)
-  if (heifers) {
-    await agree('Тёлки до 13 мес.', heifers.young, await total('heifers-young'))
-    await agree('Тёлки 13–15 мес.', heifers.ready, await total('heifers-ready'))
-    await agree('Тёлки в передержке', heifers.overdue, await total('heifers-overdue'))
-  }
+  for (const n of notes) console.log(`  ✓ ${n}`)
+  for (const f of findings) console.log(`  ✗ ${f}`)
 
-  /* ---------------------------- Инбридинг ------------------------------ */
-  const trend = await geneticTrend(payload, orgId)
-  if (trend) {
-    await agree('Инбридинг выше порога', trend.aboveThreshold, await total('inbreeding-above'))
-  }
-
-  /* ------------------------- Здоровье вымени --------------------------- */
-  const udder = await udderHealth(payload, orgId)
-  if (udder) {
-    await agree('Соматика выше порога', udder.above, await total('scc-above'))
-  }
-
-  /* ----------------------------- Выбытие ------------------------------- */
-  const cull = await culling(payload, orgId)
-  if (cull) {
-    await agree('Выбыло за год', cull.total, await total('culled-year'))
-  }
-
-  /* ------------------------ Структура стада ---------------------------- */
+  /*
+   * Два случая расходятся законно и потому печатаются, а не считаются
+   * находками: «коров без отёлов» отчёт считает по всем самкам, список —
+   * по числящимся коровами; «лактаций в ходу» отчёт считает строками
+   * лактаций, список — коровами, а у коровы их может быть несколько.
+   *
+   * Молча уравнивать их было бы хуже расхождения: смысл у чисел разный,
+   * и одинаковыми они станут только по недоразумению.
+   */
   const structure = await lactationStructure(payload, orgId)
   if (structure) {
-    for (const row of structure.byLactation) {
-      await agree(row.label, row.cows, await total(`lactation-${row.lactation}`))
-    }
-
-    /*
-     * «Коров без отёлов» в отчёте и в списке считаются по-разному
-     * намеренно: отчёт берёт всех самок без отёлов (включая тёлок),
-     * список — только тех, кто числится коровой. Сравнивать их нельзя,
-     * поэтому здесь только вывод числа: расхождение осмысленное,
-     * и молча уравнивать его было бы хуже.
-     */
-    const noCalvings = await total('no-calvings')
+    const noCalvings = await herdDrilldown(payload, orgId, 'no-calvings')
     console.log(
       `  · Коров без отёлов — в отчёте ${structure.withoutCalvings} (все самки без отёлов), ` +
-        `в списке ${noCalvings} (только числящиеся коровами)`,
+        `в списке ${noCalvings?.total ?? '—'} (только числящиеся коровами)`,
     )
   }
 
-  /* ------------------------ Лактации в ходу ---------------------------- */
   const milk = await milkByLactation(payload, orgId)
   if (milk) {
-    const inProgress = await total('milk-in-progress')
+    const inProgress = await herdDrilldown(payload, orgId, 'milk-in-progress')
     console.log(
       `  · Лактации в ходу — в отчёте ${milk.inProgress} (строк лактаций), ` +
-        `в списке ${inProgress} (коров): у коровы их может быть несколько`,
+        `в списке ${inProgress?.total ?? '—'} (коров): у коровы их может быть несколько`,
     )
-    if (inProgress !== null && inProgress > milk.inProgress) {
-      bad('Лактации в ходу', `коров ${inProgress} больше, чем самих лактаций ${milk.inProgress}`)
-    }
   }
 
-  /* ------------------ Неизвестный код не должен молчать ---------------- */
-  const nonsense = await herdDrilldown(payload, orgId, 'нет-такого-кода')
-  if (nonsense === null) ok('Неизвестный код отклонён')
-  else bad('Неизвестный код', 'вернулся список вместо отказа')
-
   console.log(
-    failures === 0
+    findings.length === 0
       ? '\nВсе списки сходятся с числами.\n'
-      : `\nРасхождений: ${failures}. Список и число говорят разное — чинить до показа.\n`,
+      : `\nРасхождений: ${findings.length}. Список и число говорят разное — чинить до показа.\n`,
   )
-  process.exit(failures === 0 ? 0 : 1)
+  process.exit(findings.length === 0 ? 0 : 1)
 }
 
 main().catch((e) => {

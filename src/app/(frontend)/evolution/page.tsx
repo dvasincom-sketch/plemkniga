@@ -7,8 +7,10 @@ import { EvolutionStages } from '@/components/EvolutionStages'
 import { EvolutionDocs } from '@/components/EvolutionDocs'
 import { EvolutionRoadmap } from '@/components/EvolutionRoadmap'
 import { EvolutionBench } from '@/components/EvolutionBench'
+import { EvolutionChecks } from '@/components/EvolutionChecks'
 import { EvolutionVisualCode } from '@/components/EvolutionVisualCode'
 import { loadBenchReports } from '@/lib/bench-report'
+import { loadCheckRuns } from '@/lib/check-report'
 import { getClient } from '@/lib/payload'
 import { CURRENT_VERSION } from '@/lib/product-versions'
 
@@ -45,6 +47,12 @@ const TABS = [
   */
   { key: 'bench', label: 'Замер' },
   /*
+     «Статус» рядом с «Замером» и по той же причине: оба про факты,
+     а не про рассказ. Замер отвечает «насколько быстро», статус —
+     «сходится ли», и спрашивают их обычно подряд.
+  */
+  { key: 'status', label: 'Статус' },
+  /*
      «Визуальный код» стоит перед документацией и после замера.
      Документация отвечает инженеру, которому строить интеграцию;
      визуальный код — тому, кто будет книгу развивать. Второй приходит
@@ -76,6 +84,10 @@ const LEAD: Record<TabKey, string> = {
     'Правила оформления, по которым книга собрана, и случаи, из которых каждое выросло. ' +
     'Не каталог отступов: отступы можно скопировать из соседнего файла, а понять, ' +
     'какое решение принимать, когда правила молчат, — нельзя.',
+  status:
+    'Что проверено, когда и с каким исходом. Зелёное здесь означает «проверено недавно ' +
+    'и сошлось»: результат старше полутора суток отмечается как неизвестный, потому что ' +
+    'доска, показывающая вчерашнее за нынешнее, хуже отсутствующей.',
   docs:
     'Техническое описание системы для тех, кому предстоит с ней работать: модель данных, ' +
     'процессы, архитектура, контракты обмена, развёртывание и — отдельно — ограничения.',
@@ -95,6 +107,7 @@ export default async function EvolutionPage({
    * запрос на каждый просмотр «Версий» и «Дорожной карты».
    */
   const benchReports = tab === 'bench' ? await loadBenchReports(await getClient()) : []
+  const checkRuns = tab === 'status' ? await loadCheckRuns(await getClient()) : []
 
   return (
     <>
@@ -141,6 +154,7 @@ export default async function EvolutionPage({
           {tab === 'stages' && <EvolutionStages />}
           {tab === 'roadmap' && <EvolutionRoadmap />}
           {tab === 'bench' && <EvolutionBench reports={benchReports} />}
+          {tab === 'status' && <EvolutionChecks runs={checkRuns} />}
           {tab === 'visual' && <EvolutionVisualCode />}
           {tab === 'docs' && <EvolutionDocs />}
         </div>

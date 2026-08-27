@@ -15,6 +15,7 @@ import { Movements } from '@/collections/Movements'
 import { Documents } from '@/collections/Documents'
 import { SavedSearches } from '@/collections/SavedSearches'
 import { BenchRuns } from '@/collections/BenchRuns'
+import { CheckRuns } from '@/collections/CheckRuns'
 import { PendingColumns } from '@/collections/PendingColumns'
 import { Media } from '@/collections/Media'
 import { Inseminations } from '@/collections/Inseminations'
@@ -99,6 +100,7 @@ export default buildConfig({
     Media,
     SavedSearches,
     BenchRuns,
+    CheckRuns,
     PendingColumns,
     ...DICTIONARY_COLLECTIONS,
   ],

@@ -98,6 +98,7 @@ export interface Config {
     media: Media;
     'saved-searches': SavedSearch;
     'bench-runs': BenchRun;
+    'check-runs': CheckRun;
     'pending-columns': PendingColumn;
     breeds: Breed;
     lines: Line;
@@ -152,6 +153,7 @@ export interface Config {
     media: MediaSelect<false> | MediaSelect<true>;
     'saved-searches': SavedSearchesSelect<false> | SavedSearchesSelect<true>;
     'bench-runs': BenchRunsSelect<false> | BenchRunsSelect<true>;
+    'check-runs': CheckRunsSelect<false> | CheckRunsSelect<true>;
     'pending-columns': PendingColumnsSelect<false> | PendingColumnsSelect<true>;
     breeds: BreedsSelect<false> | BreedsSelect<true>;
     lines: LinesSelect<false> | LinesSelect<true>;
@@ -1956,6 +1958,40 @@ export interface BenchRun {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "check-runs".
+ */
+export interface CheckRun {
+  id: number;
+  /**
+   * Имя среды: «Прод», «Разработка». Повторный прогон заменяет прежний — смотрят сюда за нынешним состоянием, а не за лентой одинаковых ночей
+   */
+  label: string;
+  ranAt: string;
+  /**
+   * Ни одна проба не нашла расхождений
+   */
+  ok?: boolean | null;
+  failed?: number | null;
+  total?: number | null;
+  ms?: number | null;
+  version?: string | null;
+  /**
+   * Массив: код пробы, исход, находки, длительность
+   */
+  results:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "pending-columns".
  */
 export interface PendingColumn {
@@ -2150,6 +2186,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'bench-runs';
         value: number | BenchRun;
+      } | null)
+    | ({
+        relationTo: 'check-runs';
+        value: number | CheckRun;
       } | null)
     | ({
         relationTo: 'pending-columns';
@@ -3306,6 +3346,22 @@ export interface BenchRunsSelect<T extends boolean = true> {
   server?: T;
   rows?: T;
   notes?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "check-runs_select".
+ */
+export interface CheckRunsSelect<T extends boolean = true> {
+  label?: T;
+  ranAt?: T;
+  ok?: T;
+  failed?: T;
+  total?: T;
+  ms?: T;
+  version?: T;
+  results?: T;
   updatedAt?: T;
   createdAt?: T;
 }
