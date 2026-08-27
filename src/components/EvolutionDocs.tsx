@@ -41,7 +41,20 @@ function L({ children }: { children: ReactNode }) {
   )
 }
 
-function Code({ children }: { children: string }) {
+/**
+ * Блок кода — отдельным абзацем, не внутри текста.
+ *
+ * Назывался `Code`, и это имя само приглашало поставить его в строку:
+ * «Так устроено <Code>scopedRead</Code>». Внутри абзаца получался
+ * `<pre>` внутри `<p>` — недопустимое вложение, от которого браузер
+ * закрывает абзац раньше времени, а React ругается на несовпадение
+ * разметки. Ошибка тихая при написании и шумная при открытии страницы.
+ *
+ * Теперь имя говорит, что это: `Pre` ставят между абзацами, `K` — внутрь.
+ * Переименование дешевле любого правила в гайде: правило надо помнить,
+ * а имя видно в месте использования.
+ */
+function Pre({ children }: { children: string }) {
   return (
     <pre className="mt-4 overflow-x-auto rounded-xl bg-basement px-4 py-3 text-[13px] leading-relaxed text-white/90">
       <code>{children}</code>
@@ -257,11 +270,11 @@ const DOC: Part[] = [
             title: '2.2. Запуск',
             body: (
               <>
-                <Code>{`npm install
+                <Pre>{`npm install
 cp .env.example .env          # DATABASE_URI и PAYLOAD_SECRET
 npm run db:sync               # схема и миграции в согласованное состояние
 SEED_CONFIRM=1 npm run seed   # демонстрационные данные
-npm run dev                   # http://localhost:3000`}</Code>
+npm run dev                   # http://localhost:3000`}</Pre>
                 <P>
                   Переменная <K>SEED_CONFIRM</K> — предохранитель, а не формальность.
                   Наполнение базы удаляет существующие записи, и защита от запуска этой команды
@@ -629,8 +642,8 @@ npm run dev                   # http://localhost:3000`}</Code>
                   Область гранта уважают не только карточка, но и все связанные коллекции:
                   открыв «только происхождение», доступа к контрольным дойкам не получают
                   ни через страницу, ни через API. Это одно правило —{' '}
-                  <Code>scopedRead</Code> в <Code>src/access/index.ts</Code>, — и за ним следит
-                  ревизия <Code>npm run audit:grants</Code>.
+                  <K>scopedRead</K> в <K>src/access/index.ts</K>, — и за ним следит
+                  ревизия <K>npm run audit:grants</K>.
                 </P>
                 <P>
                   Тому, у кого нет учётной записи, выдаётся ссылка на просмотр
@@ -1134,9 +1147,9 @@ npm run dev                   # http://localhost:3000`}</Code>
                   <K>POST /api/users/login</K>, дальше cookie или заголовок{' '}
                   <K>Authorization: JWT …</K>.
                 </P>
-                <Code>{`GET /api/animals?where[kind][equals]=bull
+                <Pre>{`GET /api/animals?where[kind][equals]=bull
                    &where[ipc][greater_than]=1000
-                   &sort=-ipcRank&limit=25&page=1&depth=1`}</Code>
+                   &sort=-ipcRank&limit=25&page=1&depth=1`}</Pre>
                 <P>
                   Поддерживаются операторы <K>equals</K>, <K>not_equals</K>,{' '}
                   <K>greater_than</K>, <K>less_than</K>, <K>in</K>, <K>contains</K>,{' '}
@@ -1155,8 +1168,8 @@ npm run dev                   # http://localhost:3000`}</Code>
                 <P>
                   Правило одно и то же на всех уровнях: видно то, что видно у животного.
                   Запись фенотипа или события не имеет собственной видимости — она наследует
-                  её у карточки, к которой относится. Так устроено <Code>scopedRead</Code>{' '}
-                  в <Code>src/access/index.ts</Code>: правило повторяет условие животного
+                  её у карточки, к которой относится. Так устроено <K>scopedRead</K>{' '}
+                  в <K>src/access/index.ts</K>: правило повторяет условие животного
                   через связь и заодно учитывает области выданных доступов.
                 </P>
                 <Table
@@ -1203,7 +1216,7 @@ npm run dev                   # http://localhost:3000`}</Code>
                   <K>/api/milk-tests</K> авторизованный получал первичные данные чужого
                   хозяйства. Предупреждение снято не потому, что стало неудобным, а потому
                   что дыра закрыта: правила переписаны, и за ними следят ревизии{' '}
-                  <Code>npm run check:security</Code> и <Code>npm run audit:tenancy</Code> —
+                  <K>npm run check:security</K> и <K>npm run audit:tenancy</K> —
                   обе ходят от лица настоящего пользователя и пробуют достать чужое.
                 </P>
               </>
@@ -1244,10 +1257,10 @@ npm run dev                   # http://localhost:3000`}</Code>
                   и Section 15 Guidelines прямо отсылает к нему; собственный формат пришлось бы
                   объяснять каждому партнёру отдельно.
                 </P>
-                <Code>{`POST /api/ade/milk-recording   результаты контрольной дойки
+                <Pre>{`POST /api/ade/milk-recording   результаты контрольной дойки
 POST /api/ade/reproduction     осеменения, стельности, отёлы
 POST /api/ade/animal-events    перемещения, выбытия
-GET  /api/ade/animals          выдача животных наружу`}</Code>
+GET  /api/ade/animals          выдача животных наружу`}</Pre>
                 <L>
                   <li>
                     <B>идемпотентность</B> — повторная отправка того же события не создаёт
@@ -1276,8 +1289,8 @@ GET  /api/ade/animals          выдача животных наружу`}</Cod
                   сборка генома и конвенция кодирования аллелей: без них смешивание конвенций
                   даёт тихую порчу данных, которая проявится только падением точности оценки.
                 </P>
-                <Code>{`POST /api/genotypes/upload      file, chip, assembly, alleleCoding, laboratory
-GET  /api/genotypes/jobs/:id    статус, принято/отклонено, причины, протокол`}</Code>
+                <Pre>{`POST /api/genotypes/upload      file, chip, assembly, alleleCoding, laboratory
+GET  /api/genotypes/jobs/:id    статус, принято/отклонено, причины, протокол`}</Pre>
               </>
             ),
           },
@@ -1406,9 +1419,9 @@ GET  /api/genotypes/jobs/:id    статус, принято/отклонено,
                   существует». Причина — служебная запись, которую push оставляет
                   в <K>payload_migrations</K>. Данные при этом целы.
                 </P>
-                <Code>{`npm run db:sync      # снимает служебную отметку, доводит журнал, применяет миграции
+                <Pre>{`npm run db:sync      # снимает служебную отметку, доводит журнал, применяет миграции
 npm run doctor       # семь проверок окружения и базы, только чтение
-npm run db:precheck  # что произойдёт до того, как оно произойдёт`}</Code>
+npm run db:precheck  # что произойдёт до того, как оно произойдёт`}</Pre>
                 <P>
                   Одна команда вместо трёх появилась не для удобства: последовательность
                   из трёх шагов, выполняемая руками под сбоем, рано или поздно выполняется
@@ -1465,7 +1478,7 @@ npm run db:precheck  # что произойдёт до того, как оно 
                   ]}
                 />
                 <P>
-                  Полный перечень проверок с признаками — <Code>src/lib/check-registry.ts</Code>.
+                  Полный перечень проверок с признаками — <K>src/lib/check-registry.ts</K>.
                   Три признака решают всё: <B>пишет ли она в базу</B> (десять из двадцати пяти
                   заводят записи и потом удаляют — на боевой книге такое гонять нельзя),{' '}
                   <B>нужен ли ей живой сервер</B> (три ходят по страницам снаружи) и{' '}
@@ -1483,7 +1496,7 @@ npm run db:precheck  # что произойдёт до того, как оно 
                 </P>
                 <P>
                   <B>Прогон по боевой базе.</B> Пятнадцать читающих проверок:{' '}
-                  <Code>DATABASE_URI=… BASE=… npm run check:all -- --readonly --label Прод</Code>.
+                  <K>DATABASE_URI=… BASE=… npm run check:all -- --readonly --label Прод</K>.
                   Десять пишущих туда не попадают и не попадут: обрыв посреди прогона оставил
                   бы в книге записи, неотличимые от настоящих.
                 </P>
