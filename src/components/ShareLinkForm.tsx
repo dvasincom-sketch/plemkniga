@@ -3,7 +3,7 @@
 import { useActionState } from 'react'
 import { createShareLinkAction, revokeShareLinkAction, type ShareFormState } from '@/actions/share'
 import { SHARE_ANIMALS_CAP, SHARE_MAX_DAYS } from '@/lib/share-links'
-import { ACCESS_SCOPES } from '@/lib/dictionaries'
+import { ScopeChecklist } from '@/components/ScopeChecklist'
 import { DateField } from '@/components/DateField'
 
 /**
@@ -83,16 +83,8 @@ export function ShareLinkForm({ defaultNumber }: { defaultNumber?: string }) {
 
       <fieldset className="mt-5">
         <legend className="text-[14px]">Что открывает ссылка</legend>
-        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {ACCESS_SCOPES.map((s) => (
-            <label key={s.value} className="flex items-start gap-3 text-[14px]">
-              <input type="checkbox" name="scopes" value={s.value} className="checkbox mt-0.5" />
-              <span>
-                {s.label}
-                <span className="block text-[13px] leading-snug text-ink-500">{s.hint}</span>
-              </span>
-            </label>
-          ))}
+        <div className="mt-2">
+          <ScopeChecklist />
         </div>
       </fieldset>
 

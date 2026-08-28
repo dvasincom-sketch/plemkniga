@@ -3,8 +3,9 @@
 import { useActionState, useState } from 'react'
 import { requestAccessAction, type AccessFormState } from '@/actions/access'
 import { ACCESS_REQUEST_PURPOSES } from '@/collections/AccessRequests'
-import { ACCESS_SCOPES, SCOPES_BY_PURPOSE } from '@/lib/dictionaries'
+import { SCOPES_BY_PURPOSE } from '@/lib/dictionaries'
 import { Select } from '@/components/Select'
+import { ScopeChecklist } from '@/components/ScopeChecklist'
 
 /**
  * Запрос доступа к закрытой карточке.
@@ -76,35 +77,7 @@ export function AccessRequestForm({
 
       <fieldset className="mt-4">
         <legend className="mb-2 text-[14px] text-ink-700">Что нужно посмотреть</legend>
-        <div className="flex flex-wrap gap-2">
-          {ACCESS_SCOPES.map((s) => {
-            const on = scopes.includes(s.value)
-            return (
-              <label
-                key={s.value}
-                title={s.hint}
-                className={`rounded-lg px-3 py-2 text-[14px] transition-colors ${
-                  sent ? 'cursor-default opacity-60' : 'cursor-pointer'
-                } ${
-                  on
-                    ? 'bg-forest-500 text-white'
-                    : 'bg-white text-ink-700 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] hover:bg-[#f6f6f6]'
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  name="scopes"
-                  value={s.value}
-                  checked={on}
-                  onChange={() => toggle(s.value)}
-                  disabled={sent}
-                  className="sr-only"
-                />
-                {s.label}
-              </label>
-            )
-          })}
-        </div>
+        <ScopeChecklist selected={scopes} onToggle={toggle} disabled={sent} />
         <p className="mt-2 text-[13px] leading-snug text-ink-500">
           Отмечено то, что обычно нужно для выбранной цели. Просите столько, сколько
           действительно посмотрите: соразмерную просьбу открывают охотнее.

@@ -3,6 +3,7 @@
 import { useActionState, useState } from 'react'
 import { decideAccessAction, type AccessFormState } from '@/actions/access'
 import { ACCESS_SCOPES, GRANT_TERMS, SCOPES_BY_PURPOSE } from '@/lib/dictionaries'
+import { ScopeChecklist } from '@/components/ScopeChecklist'
 
 /**
  * Решение хозяйства по запросу доступа.
@@ -102,32 +103,7 @@ export function AccessDecision({
             {requestedScopes.length ? '— отмечено то, что просили' : '— отмечено по цели запроса'}
           </span>
         </legend>
-        <div className="flex flex-wrap gap-2">
-          {ACCESS_SCOPES.map((s) => {
-            const on = scopes.includes(s.value)
-            return (
-              <label
-                key={s.value}
-                title={s.hint}
-                className={`cursor-pointer rounded-lg px-3 py-2 text-[14px] transition-colors ${
-                  on
-                    ? 'bg-forest-500 text-white'
-                    : 'bg-white text-ink-700 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] hover:bg-[#f6f6f6]'
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  name="scopes"
-                  value={s.value}
-                  checked={on}
-                  onChange={() => toggle(s.value)}
-                  className="sr-only"
-                />
-                {s.label}
-              </label>
-            )
-          })}
-        </div>
+        <ScopeChecklist selected={scopes} onToggle={toggle} />
       </fieldset>
 
       <fieldset className="mb-4">
