@@ -533,7 +533,7 @@ async function relationalIssues(
       if (parent.sex && parent.sex !== expectedSex) {
         push(
           'parent-wrong-sex',
-          `${label} — животное № ${parent.identNumber} — записан(а) с полом «${parent.sex === 'male' ? 'мужской' : 'женский'}»`,
+          `${label} — животное № ${parent.identNumber} — это ${parent.sex === 'male' ? 'самец' : 'самка'}`,
           side,
         )
       }

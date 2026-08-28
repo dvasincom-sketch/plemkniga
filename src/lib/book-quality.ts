@@ -226,8 +226,8 @@ export async function bookQuality(payload: Payload): Promise<BookQuality | null>
     row('self-parent', 'Животное записано собственным родителем', r.self_parent, 'fix'),
     row('father-younger', 'Отец родился позже потомка или в тот же день', r.father_younger, 'fix'),
     row('mother-younger', 'Мать родилась позже потомка или в тот же день', r.mother_younger, 'fix'),
-    row('father-wrong-sex', 'Отцом записано животное женского пола', r.father_wrong_sex, 'fix'),
-    row('mother-wrong-sex', 'Матерью записано животное мужского пола', r.mother_wrong_sex, 'fix'),
+    row('father-wrong-sex', 'Отцом записана самка', r.father_wrong_sex, 'fix'),
+    row('mother-wrong-sex', 'Матерью записан самец', r.mother_wrong_sex, 'fix'),
     row('birth-in-future', 'Дата рождения в будущем', r.birth_in_future, 'fix'),
     row('no-birth-date', 'Нет даты рождения', r.no_birth_date, 'fix'),
     row(

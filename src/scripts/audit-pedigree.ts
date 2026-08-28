@@ -216,10 +216,10 @@ async function main() {
     const mother = n.mother !== null ? nodes.get(n.mother) : undefined
 
     if (father && father.sex !== null && father.sex !== 'male') {
-      wrongFather.push(`${n.ident}: отцом записана ${father.ident} (пол — женский)`)
+      wrongFather.push(`${n.ident}: отцом записана ${father.ident} — это самка`)
     }
     if (mother && mother.sex !== null && mother.sex !== 'female') {
-      wrongMother.push(`${n.ident}: матерью записан ${mother.ident} (пол — мужской)`)
+      wrongMother.push(`${n.ident}: матерью записан ${mother.ident} — это самец`)
     }
 
     for (const [parent, role] of [
@@ -239,8 +239,8 @@ async function main() {
     }
   }
 
-  problems += report('Отцом записано животное женского пола', wrongFather)
-  problems += report('Матерью записано животное мужского пола', wrongMother)
+  problems += report('Отцом записана самка', wrongFather)
+  problems += report('Матерью записан самец', wrongMother)
   problems += report('Потомок родился раньше родителя', bornBeforeParent)
   problems += report('Мать моложе 18 месяцев на момент отёла', youngDam)
 

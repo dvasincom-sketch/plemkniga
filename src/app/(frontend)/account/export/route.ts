@@ -64,6 +64,14 @@ const label = (arr: readonly { value: string; label: string }[], v?: string | nu
 const COLUMNS: { key: string; title: string; numeric?: boolean; width?: number }[] = [
   { key: 'identNumber', title: 'Инд.№', width: 18 },
   { key: 'name', title: 'Кличка', width: 22 },
+  /*
+   * В выгрузке пол остаётся буквой, хотя на экране он теперь «самец»
+   * и «самка» (решение №201). Две причины: в хозяйственных таблицах
+   * «М/Ж» — привычная запись, а файл этой выгрузки читают чужие
+   * программы, и смена значений в колонке сломала бы их разбор ради
+   * подписи. Обратно буква читается: `sexOf` в `actions/data.ts`
+   * принимает и её, и оба слова.
+   */
   { key: 'sex', title: 'Пол', width: 6 },
   { key: 'state', title: 'Состояние', width: 16 },
   { key: 'ageGroup', title: 'Возраст', width: 18 },
