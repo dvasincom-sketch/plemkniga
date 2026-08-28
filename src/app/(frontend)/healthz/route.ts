@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs'
+import path from 'path'
 import { NextResponse } from 'next/server'
 import { getClient } from '@/lib/payload'
 import { databaseEnvKeys, maskUri, resolveDatabase } from '@/lib/db-url'
@@ -80,6 +82,48 @@ function withDeadline<T>(work: Promise<T>, ms: number): Promise<T> {
   return Promise.race([work, deadline]).finally(() => clearTimeout(timer)) as Promise<T>
 }
 
+/**
+ * Отпечаток сборки: какой код сейчас работает и с каких пор.
+ *
+ * ## Зачем
+ *
+ * Дважды подряд выкладка оказывалась не той, что мы думали: сперва
+ * контейнер не прогнал миграцию, потом до него не доехал последний
+ * коммит. Оба раза выяснять приходилось косвенно — искать на странице
+ * слово из свежей правки. Это гадание, и оно даёт неверный ответ ровно
+ * тогда, когда правка невидима снаружи.
+ *
+ * `BUILD_ID` Next генерирует заново при каждой сборке. Он не называет
+ * коммита, но отвечает на главный вопрос: пересобирали или нет. Время
+ * старта отвечает на второй: подняли ли контейнер после сборки.
+ *
+ * Если платформа кладёт хеш коммита в переменную окружения, показываем
+ * и его — тогда ответ становится точным.
+ */
+const buildInfo = () => {
+  let id = 'не прочитан'
+  try {
+    // В standalone-образе файл лежит рядом с приложением
+    id = readFileSync(path.join(process.cwd(), '.next', 'BUILD_ID'), 'utf8').trim()
+  } catch {
+    /* в разработке файла может не быть — это не повод падать пробе */
+  }
+
+  const commit =
+    process.env.GIT_COMMIT ??
+    process.env.SOURCE_COMMIT ??
+    process.env.COMMIT_SHA ??
+    process.env.VERCEL_GIT_COMMIT_SHA ??
+    'не передан платформой'
+
+  return {
+    id,
+    commit,
+    startedAt: new Date(Date.now() - process.uptime() * 1000).toISOString(),
+    uptimeHours: Math.round((process.uptime() / 3600) * 10) / 10,
+  }
+}
+
 export async function GET() {
   const started = Date.now()
   const db = resolveDatabase()
@@ -144,6 +188,7 @@ export async function GET() {
       status: 'ok',
       service: 'plemkniga',
       database: { connected: true, animals: totalDocs },
+      build: buildInfo(),
       migrations,
       env,
       visibleEnv,
@@ -230,6 +275,9 @@ export async function GET() {
       status: 'error',
       service: 'plemkniga',
       database: { connected: false, error: message },
+      // Отпечаток сборки нужен и при отказе: «база не отвечает» и «на проде
+      // не тот код» — разные беды, и различать их надо в одном ответе
+      build: buildInfo(),
       hints,
       env,
       visibleEnv,
