@@ -118,13 +118,28 @@ async function main() {
       `update animals set father_id = null, mother_id = null where owner_id = $1`,
       [orgId],
     )
+
+    /*
+     * Список обязан быть полным, и забытая таблица сообщает об этом
+     * сообщением не про себя.
+     *
+     * `index_values` в первой редакции забыли. Внешний ключ на животное
+     * объявлен как `on delete set null`, а колонка `animal_id` при этом
+     * `not null` — и удаление животного падало с текстом «null value
+     * in column "animal_id" of relation "index_values" violates not-null
+     * constraint». Читается это как ошибка вставки в `index_values`,
+     * которой в тот момент не происходило вовсе: падал `delete
+     * from animals`, а обнуление сделал за него внешний ключ.
+     */
     for (const t of [
       'calvings_rels',
       'calvings',
       'milk_tests',
       'inseminations',
+      'index_values',
       'animals_dna_tests',
       'animal_evaluations',
+      'animal_exteriors',
       'animals_lactations',
     ]) {
       const key =
