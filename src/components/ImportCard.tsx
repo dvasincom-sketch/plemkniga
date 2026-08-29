@@ -345,6 +345,60 @@ export function ImportCard({ datasets }: { datasets: (Choice & { hint: string })
                   )}
 
                   {/*
+                     Ячейки, которые не разобрались, — отдельным блоком
+                     от непринятых строк, и это не оформление.
+
+                     Там строка не попала в книгу целиком, и человек ищет
+                     её в файле. Здесь строка попала, а пустой осталась одна
+                     колонка — искать надо не строку, а написание значения,
+                     и почти всегда одно и то же во всём столбце. Свалить
+                     их в один список значило бы отправить человека
+                     не туда: «пропущено 0» и при этом двести потерянных
+                     ячеек — сочетание, которого он не ждёт.
+
+                     Названы колонка и само написание, а не только номер
+                     строки: «„3,85 %“ в колонке „Жир, %“» человек чинит
+                     заменой по всему столбцу за минуту, а «строка 148»
+                     заставляет открывать файл и искать.
+                  */}
+                  {!!state.valueIssues?.length && (
+                    <div className="mt-2 rounded-lg border border-ink-200 bg-ink-50 px-3 py-2 text-ink-700">
+                      <p className="font-medium">
+                        Значения, которые не разобрались: {state.valueProblems ?? state.valueIssues.length}
+                      </p>
+                      <ul className="mt-1 space-y-0.5">
+                        {state.valueIssues.slice(0, 5).map((v, i) => (
+                          <li key={`${v.row}-${v.column}-${i}`} className="leading-snug">
+                            строка {v.row}
+                            {v.ident ? ` (${v.ident})` : ''}, «{v.column}» — {v.reason}
+                          </li>
+                        ))}
+                      </ul>
+                      {(state.valueProblems ?? state.valueIssues.length) > 5 && (
+                        <p className="mt-1 text-ink-500">
+                          и ещё {(state.valueProblems ?? state.valueIssues.length) - 5}
+                          {state.submissionId && (
+                            <>
+                              {' — '}
+                              <Link
+                                href={`/account/submissions/${state.submissionId}`}
+                                className="underline underline-offset-4"
+                              >
+                                весь список в пакете
+                              </Link>
+                            </>
+                          )}
+                        </p>
+                      )}
+                      <p className="mt-1 text-ink-500">
+                        Сами строки приняты — пустыми остались только эти поля. Исправьте
+                        написание в файле и загрузите его ещё раз: повторная загрузка обновит
+                        те же записи, а не заведёт вторые.
+                      </p>
+                    </div>
+                  )}
+
+                  {/*
                      Неизвестные колонки — не придирка, а потеря данных.
                      Файл принят, строки записаны, но содержимое этих колонок
                      не попало никуда.

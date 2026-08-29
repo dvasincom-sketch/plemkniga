@@ -1372,6 +1372,18 @@ export interface DataSubmission {
           id?: string | null;
         }[]
       | null;
+    /**
+     * Заполняется импортом, до 50 первых. Строка при этом принята
+     */
+    valueIssues?:
+      | {
+          row?: number | null;
+          ident?: string | null;
+          column?: string | null;
+          reason?: string | null;
+          id?: string | null;
+        }[]
+      | null;
   };
   review?: {
     checkedBy?: (number | null) | User;
@@ -2940,6 +2952,15 @@ export interface DataSubmissionsSelect<T extends boolean = true> {
           | {
               row?: T;
               ident?: T;
+              reason?: T;
+              id?: T;
+            };
+        valueIssues?:
+          | T
+          | {
+              row?: T;
+              ident?: T;
+              column?: T;
               reason?: T;
               id?: T;
             };

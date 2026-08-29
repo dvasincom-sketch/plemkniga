@@ -5,6 +5,7 @@ import { getClient, getCurrentUser } from '@/lib/payload'
 import { decodeText, parseCsv, type TextEncodingName } from '@/lib/csv'
 import { detectTableKind, readSpreadsheet } from '@/lib/xlsx'
 import { columnsOf, datasetByKey, headerMapOf, type Dataset } from '@/lib/import-format'
+import { parseDate, parseNumber } from '@/lib/import-values'
 import { IDENT_FIELD_LABEL, IDENT_VALUES_SQL, identCore } from '@/lib/animal-id'
 import { DOMAIN_RULES } from '@/lib/db-constraints'
 import { quarantineColumns } from '@/lib/pending-columns'
@@ -52,6 +53,18 @@ export type ImportState = {
    */
   unverified?: { ident: string; fields: string[] }[]
   /**
+   * Ячейки, которые не разобрались: строка принята, поле осталось пустым.
+   *
+   * До этого списка такие ячейки исчезали бесследно — «3,85 %» в колонке
+   * жира, «10 458 кг» в колонке удоя, «март 2026» в колонке даты. Файл
+   * принимался, в сводке стояло «обновлено 500», и потеря обнаруживалась
+   * через месяц по пустой колонке в карточках. Отвергнутый файл человек
+   * перезальёт; про молча потерянную ячейку он не узнает вовсе.
+   */
+  valueIssues?: { row: number; ident?: string; column: string; reason: string }[]
+  /** Сколько таких ячеек всего: список показывает первые пятьдесят. */
+  valueProblems?: number
+  /**
    * Что именно прочитали из книги Excel.
    *
    * Только для книг: у CSV листа нет, и поле остаётся пустым. Сказано
@@ -84,11 +97,15 @@ export type IdentMatch = { core: string; text: string; row?: number }
 /*  Разбор значений                                                    */
 /* ------------------------------------------------------------------ */
 
-const numOrUndef = (v?: string) => {
-  if (!v) return undefined
-  const n = Number(v.replace(/\s/g, '').replace(',', '.'))
-  return Number.isFinite(n) ? n : undefined
-}
+/*
+ * Разбор чисел и дат уехал в `lib/import-values`, и это не перекладывание
+ * кода из файла в файл. Здешние две функции возвращали `undefined` и на
+ * пустой ячейке, и на непонятой, — то есть отвечали одним и тем же
+ * на «не заполнено» и на «не смог прочитать». Из-за этого «3,85 %»
+ * пропадало без единой строки в протоколе, а `00.00.0000` роняло разбор
+ * файла целиком. Теперь разбор отвечает парой «значение или причина»,
+ * и причина обязана дойти до человека — за это отвечает `note` ниже.
+ */
 
 /*
  * Разбор пола из файла хозяйства.
@@ -104,25 +121,6 @@ const sexOf = (v?: string) => {
   if (['ж', 'f', 'female', 'женский', 'самка'].includes(s)) return 'female'
   if (['м', 'm', 'male', 'мужской', 'самец'].includes(s)) return 'male'
   return undefined
-}
-
-/**
- * Дата в двух видах: 2023-04-17 и 17.04.2023.
- *
- * `Date.parse` разбирает первый и врёт на втором: 17.04.2023 он либо
- * не поймёт, либо поймёт по американскому порядку. Русское написание
- * в выгрузках из «Селэкса» — обычное дело, и молча принять его неверно
- * хуже, чем не принять вовсе.
- */
-const dateOrUndef = (v?: string): string | undefined => {
-  const s = (v || '').trim()
-  if (!s) return undefined
-
-  const ru = /^(\d{2})[.](\d{2})[.](\d{4})$/.exec(s)
-  if (ru) return new Date(`${ru[3]}-${ru[2]}-${ru[1]}T00:00:00.000Z`).toISOString()
-
-  const t = Date.parse(s)
-  return Number.isNaN(t) ? undefined : new Date(t).toISOString()
 }
 
 /** Значение по пути вида `summary.milkYield` — с созданием вложенных объектов. */
@@ -627,6 +625,25 @@ async function importAnimals(
     if (issues.length < 50) issues.push({ row: line, ident, reason })
   }
 
+  /*
+   * Ячейки, которые не разобрались, — отдельным списком от непринятых строк.
+   *
+   * Свалить их в `issues` было бы проще и неверно по смыслу: там строки,
+   * которых в книге **нет**, а здесь строки, которые есть, но приехали
+   * неполными. Сказать «пропущено 4», когда пропущено ноль, а испорчено
+   * четыре ячейки, значит послать человека искать не то.
+   *
+   * Счётчик считает всё, список хранит первые пятьдесят: файл, у которого
+   * вся колонка написана не так, даст пять тысяч одинаковых заметок,
+   * и протокол из пяти тысяч строк не читает никто.
+   */
+  const valueIssues: { row: number; ident?: string; column: string; reason: string }[] = []
+  let valueProblems = 0
+  const note = (line: number, column: string, reason: string, ident?: string) => {
+    valueProblems++
+    if (valueIssues.length < 50) valueIssues.push({ row: line, ident, column, reason })
+  }
+
   for (const [i, row] of rows.slice(1).entries()) {
     const line = i + 2
     const get = readerFor(header, row)
@@ -656,12 +673,18 @@ async function importAnimals(
       if (raw === undefined || raw === '') continue
 
       switch (col.kind) {
-        case 'number':
-          assign(data, col.key, numOrUndef(raw))
+        case 'number': {
+          const n = parseNumber(raw)
+          if (n.problem) note(line, col.title, n.problem, identNumber)
+          assign(data, col.key, n.value)
           break
-        case 'date':
-          assign(data, col.key, dateOrUndef(raw))
+        }
+        case 'date': {
+          const dt = parseDate(raw)
+          if (dt.problem) note(line, col.title, dt.problem, identNumber)
+          assign(data, col.key, dt.value)
           break
+        }
         case 'breed': {
           const id = breeds.get(norm(raw))
           if (id) assign(data, col.key, id)
@@ -821,6 +844,8 @@ async function importAnimals(
     unresolved: [...unresolved].slice(0, 20),
     identMatches,
     unverified,
+    valueIssues,
+    valueProblems,
   }
 }
 
@@ -981,6 +1006,21 @@ async function importEvents(
     if (issues.length < 50) issues.push({ row: line, ident, reason })
   }
 
+  /*
+   * Заголовок колонки даты берётся из набора, а не пишется словом:
+   * у отёлов это «Дата отёла», у доек «Дата замера», и сообщение,
+   * называющее чужую колонку, отправляет человека править не то место.
+   */
+  const dateTitle = cols.find((c) => c.key === 'date')?.title ?? 'Дата'
+
+  /* То же, что у животных: непонятая ячейка — не непринятая строка. */
+  const valueIssues: { row: number; ident?: string; column: string; reason: string }[] = []
+  let valueProblems = 0
+  const note = (line: number, column: string, reason: string, ident?: string) => {
+    valueProblems++
+    if (valueIssues.length < 50) valueIssues.push({ row: line, ident, column, reason })
+  }
+
   for (const [i, row] of body.entries()) {
     const line = i + 2
     const get = readerFor(header, row)
@@ -997,11 +1037,23 @@ async function importEvents(
       continue
     }
 
-    const date = dateOrUndef(get('date'))
-    if (!date) {
-      skip(line, 'Дата не заполнена или не разобрана', rawIdent)
+    /*
+     * Дата события обязательна, поэтому её причина уходит в `issues`,
+     * а не в заметки: строка без даты не принимается, и человек должен
+     * увидеть её среди непринятых. Прежнее «дата не заполнена или
+     * не разобрана» соединяло два разных случая в один и не говорило,
+     * какой из них случился, — а починить их надо по-разному.
+     */
+    const parsedDate = parseDate(get('date'))
+    if (!parsedDate.value) {
+      skip(
+        line,
+        parsedDate.problem ? `${dateTitle}: ${parsedDate.problem}` : `${dateTitle} не заполнена`,
+        rawIdent,
+      )
       continue
     }
+    const date = parsedDate.value
     if (new Date(date).getTime() > Date.now()) {
       skip(line, 'Дата в будущем', rawIdent)
       continue
@@ -1024,7 +1076,14 @@ async function importEvents(
         continue
       }
 
-      assign(data, col.key, col.kind === 'number' ? numOrUndef(raw) : col.kind === 'date' ? dateOrUndef(raw) : raw)
+      if (col.kind === 'number' || col.kind === 'date') {
+        const p = col.kind === 'number' ? parseNumber(raw) : parseDate(raw)
+        if (p.problem) note(line, col.title, p.problem, rawIdent)
+        assign(data, col.key, p.value)
+        continue
+      }
+
+      assign(data, col.key, raw)
     }
 
     if (ds.key === 'calvings') {
@@ -1105,6 +1164,8 @@ async function importEvents(
     unresolved: [...unresolved].slice(0, 20),
     identMatches: [] as IdentMatch[],
     unverified: [] as { ident: string; fields: string[] }[],
+    valueIssues,
+    valueProblems,
   }
 }
 
@@ -1305,6 +1366,7 @@ export async function importDataAction(
           updated: res.updated,
           skipped: res.skipped,
           issues: res.issues,
+          valueIssues: res.valueIssues,
         },
         consent: { agreed: false },
       },
@@ -1330,6 +1392,8 @@ export async function importDataAction(
     unresolved: res.unresolved,
     identMatches: res.identMatches,
     unverified: res.unverified,
+    valueIssues: res.valueIssues,
+    valueProblems: res.valueProblems,
     sheet,
     encoding,
   }
