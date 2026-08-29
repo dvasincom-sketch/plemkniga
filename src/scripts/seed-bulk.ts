@@ -912,6 +912,7 @@ async function generate(client: PoolClient) {
       bullIds,
       ctx,
     )
+    await syncSummaries(client)
   }
 
   console.log(`\nВсего животных добавлено: ${all.length.toLocaleString('ru-RU')} за ${elapsed()} с`)
@@ -1090,6 +1091,85 @@ async function fillEvaluations(client: PoolClient, ids: { id: number; birth: Dat
 }
 
 /**
+ * Продуктивность в карточке — из лучшей лактации, а не из своего розыгрыша.
+ *
+ * ## Зачем
+ *
+ * `summary_milk_yield` разыгрывался `gauss(8500, 1400)` независимо
+ * от событий животного. То есть в книге жили три удоя сразу: замеры
+ * контрольных доек, строка лактации и число в карточке — и ни одно
+ * не следовало из другого. Расхождение такого рода не ловится ни одной
+ * проверкой: каждое число по отдельности правдоподобно.
+ *
+ * Теперь карточка берёт наивысшую законченную лактацию — ту, что
+ * показывают в свидетельстве, — и всё, что в ней стоит, посчитано
+ * из тех же доек.
+ *
+ * ## Почему отдельным проходом, а не в самой карточке
+ *
+ * Карточка заводится до событий: на момент вставки лактаций ещё нет.
+ * Считать их вперёд значило бы держать в памяти три миллиона замеров
+ * ради одного числа на животное. Один `update` после — дешевле и точнее.
+ *
+ * ## Почему только синтетика
+ *
+ * `ident_number like '99%'` — граница, а не оптимизация. У настоящей
+ * записи расхождение карточки с лактациями это находка для эксперта,
+ * и переписать её «как правильно» значило бы стереть след ошибки
+ * вместе с ошибкой.
+ */
+async function syncSummaries(client: PoolClient) {
+  const best = await client.query(`
+    update animals a
+       set summary_milk_yield = b.milk305,
+           summary_milk_rank = b.milk305,
+           summary_fat_percent = b.fat305,
+           summary_protein_percent = b.protein305,
+           summary_fat_kg = b.fat_kg,
+           summary_protein_kg = b.protein_kg,
+           summary_fat_protein_sum = b.fat_kg + b.protein_kg
+      from (
+        select distinct on (l._parent_id)
+               l._parent_id as id, l.milk305, l.fat305, l.protein305, l.fat_kg, l.protein_kg
+          from animals_lactations l
+         where l.milk305 is not null and l.milk305 > 0
+         order by l._parent_id, l.milk305 desc
+      ) b
+     where a.id = b.id
+       and a.ident_number like '${PREFIX}%'`)
+
+  /*
+   * Отелившиеся без единого замера остаются без продуктивности.
+   *
+   * Это корова, отелившаяся на днях: дойка ещё не приезжала, лактации
+   * нет. Оставь ей разыгранное число — и в карточке стоял бы удой
+   * за 305 дней у лактации, которой ещё нет.
+   *
+   * Условие «есть отёлы» здесь не для красоты: без него под уборку
+   * попала бы намеренная посадка — тёлка с удоем, ради которой написана
+   * проверка `production-before-calving`.
+   */
+  const cleared = await client.query(`
+    update animals a
+       set summary_milk_yield = null,
+           summary_milk_rank = -1000000,
+           summary_fat_percent = null,
+           summary_protein_percent = null,
+           summary_fat_kg = null,
+           summary_protein_kg = null,
+           summary_fat_protein_sum = null
+     where a.ident_number like '${PREFIX}%'
+       and a.summary_milk_yield is not null
+       and exists (select 1 from calvings c where c.animal_id = a.id)
+       and not exists (select 1 from animals_lactations l where l._parent_id = a.id)`)
+
+  done(
+    `Продуктивность карточек из лактаций: ${(best.rowCount ?? 0).toLocaleString('ru-RU')}, ` +
+      `снято у отелившихся без замеров: ${(cleared.rowCount ?? 0).toLocaleString('ru-RU')} (${elapsed()} с)`,
+  )
+}
+
+/**
  * События по лактациям: отёл, за ним дойки раз в месяц, осеменения, болезни.
  * Здесь основной объём строк — на каждую корову приходится до сорока записей,
  * и именно они делают карточку животного тяжёлой.
@@ -1104,12 +1184,18 @@ async function fillEvents(
   const milkCols = ['animal_id', 'date', 'lactation_number', 'daily_yield', 'fat_percent', 'protein_percent', 'somatic_cells', 'updated_at', 'created_at']
   const insCols = ['animal_id', 'bull_id', 'date', 'attempt_number', 'doses', 'lactation_number', 'updated_at', 'created_at']
   const healthCols = ['animal_id', 'type_id', 'date', 'severity', 'updated_at', 'created_at']
+  const lactCols = [
+    '_order', '_parent_id', 'id', 'number', 'calving_date', 'insemination_date',
+    'dd', 'milk_yield', 'milk305', 'fat305', 'protein305', 'scc',
+    'dry_off_date', 'fat_kg', 'protein_kg', 'end_date',
+  ]
 
   let calvings: unknown[][] = []
   let milk: unknown[][] = []
   let ins: unknown[][] = []
   let health: unknown[][] = []
-  const counts = { calvings: 0, milk: 0, ins: 0, health: 0 }
+  let lacts: unknown[][] = []
+  const counts = { calvings: 0, milk: 0, ins: 0, health: 0, lacts: 0 }
   const now = new Date()
 
   const flush = async () => {
@@ -1117,14 +1203,17 @@ async function fillEvents(
     await insertMany(client, 'milk_tests', milkCols, milk)
     await insertMany(client, 'inseminations', insCols, ins)
     await insertMany(client, 'health_events', healthCols, health)
+    await insertMany(client, 'animals_lactations', lactCols, lacts)
     counts.calvings += calvings.length
     counts.milk += milk.length
     counts.ins += ins.length
     counts.health += health.length
+    counts.lacts += lacts.length
     calvings = []
     milk = []
     ins = []
     health = []
+    lacts = []
   }
 
   for (const [i, cow] of cows.entries()) {
@@ -1153,18 +1242,99 @@ async function fillEvents(
 
       // Контрольные дойки раз в месяц: кривая лактации с пиком на 60-й день
       const peak = gauss(32, 6, 12, 60)
+      const tests: { day: number; yield: number; fat: number; protein: number; scc: number }[] = []
       for (let m = 1; m <= 10; m++) {
         const at = new Date(calvingDate.getTime() + m * 30 * 86_400_000)
         if (at > now) break
         const t = m * 30
         const yield_ = peak * Math.pow(t / 60, 0.25) * Math.exp((1 - t / 60) * 0.32)
+        const row = {
+          day: t,
+          yield: round(Math.max(2, yield_ + gauss(0, 1.5)), 1),
+          fat: round(gauss(3.9, 0.35, 2.6, 5.8), 2),
+          protein: round(gauss(3.2, 0.22, 2.4, 4.3), 2),
+          scc: int(60, 900),
+        }
+        tests.push(row)
         milk.push([
-          id, at, l,
-          round(Math.max(2, yield_ + gauss(0, 1.5)), 1),
-          round(gauss(3.9, 0.35, 2.6, 5.8), 2),
-          round(gauss(3.2, 0.22, 2.4, 4.3), 2),
-          int(60, 900),
-          now, now,
+          id, at, l, row.yield, row.fat, row.protein, row.scc, now, now,
+        ])
+      }
+
+      /*
+       * Строка лактации в карточке — из тех же доек, а не отдельным числом.
+       *
+       * До этого `animals_lactations` не заполнялась вовсе: сид писал
+       * отёлы и контрольные дойки, а строку лактации — нет. Пять модулей
+       * читают именно её, и все пять молчали на всей книге: удой
+       * по группам лактаций, коровы с незакрытой лактацией, сравнение
+       * дочерей быка, список на выбраковку и заслон полноты перед
+       * верификацией. Отчёты были написаны, ни один не работал ни разу,
+       * и молчали они правдоподобно.
+       *
+       * Удой за 305 дней считается методом контрольных доек (ICAR):
+       * надой каждого замера умножается на длину отрезка до предыдущего.
+       * Это ровно тот способ, который описан в `completeness.ts` и ради
+       * которого там требуется шесть замеров, — и он же связывает строку
+       * лактации с дойками намертво. Возьми мы сюда своё случайное число,
+       * в книге появилось бы третье значение удоя, не сходящееся ни с
+       * замерами, ни с карточкой.
+       */
+      if (tests.length) {
+        const sinceCalving = (now.getTime() - calvingDate.getTime()) / 86_400_000
+        const isLast = k === cow.calvings.length - 1
+        /*
+         * Лактация закончена, если за ней последовал отёл или прошло
+         * заведомо больше 305 дней. Незакрытой остаётся только последняя
+         * и только пока корова в ней, — иначе «коров с незакрытой
+         * лактацией» стало бы всё стадо.
+         */
+        const finished = !isLast || sinceCalving >= 340
+        const dd = finished ? 305 : Math.floor(Math.min(sinceCalving, 304))
+
+        let prev = 0
+        let milkKg = 0
+        let fatKg = 0
+        let proteinKg = 0
+        let sccSum = 0
+        for (const t of tests) {
+          const upto = Math.min(t.day, dd)
+          const span = upto - prev
+          if (span > 0) {
+            milkKg += t.yield * span
+            fatKg += (t.yield * span * t.fat) / 100
+            proteinKg += (t.yield * span * t.protein) / 100
+            prev = upto
+          }
+          sccSum += t.scc
+        }
+        // Хвост от последнего замера до конца лактации — тем же надоем
+        const tail = tests[tests.length - 1]!
+        if (dd > prev) {
+          const span = dd - prev
+          milkKg += tail.yield * span
+          fatKg += (tail.yield * span * tail.fat) / 100
+          proteinKg += (tail.yield * span * tail.protein) / 100
+        }
+
+        const end = finished ? new Date(calvingDate.getTime() + 305 * 86_400_000) : null
+        lacts.push([
+          l,
+          id,
+          randomUUID(),
+          l,
+          calvingDate,
+          new Date(calvingDate.getTime() + 81 * 86_400_000),
+          dd,
+          Math.round(milkKg),
+          Math.round(milkKg),
+          milkKg > 0 ? round((fatKg / milkKg) * 100, 2) : null,
+          milkKg > 0 ? round((proteinKg / milkKg) * 100, 2) : null,
+          Math.round(sccSum / tests.length),
+          end,
+          Math.round(fatKg),
+          Math.round(proteinKg),
+          end,
         ])
       }
 
@@ -1189,6 +1359,7 @@ async function fillEvents(
       progress(
         `События: отёлов ${counts.calvings.toLocaleString('ru-RU')}, ` +
           `доек ${counts.milk.toLocaleString('ru-RU')}, ` +
+          `лактаций ${counts.lacts.toLocaleString('ru-RU')}, ` +
           `осеменений ${counts.ins.toLocaleString('ru-RU')} (${elapsed()} с)`,
       )
     }
@@ -1197,6 +1368,7 @@ async function fillEvents(
   done(
     `События: отёлов ${counts.calvings.toLocaleString('ru-RU')}, ` +
       `доек ${counts.milk.toLocaleString('ru-RU')}, ` +
+      `лактаций ${counts.lacts.toLocaleString('ru-RU')}, ` +
       `осеменений ${counts.ins.toLocaleString('ru-RU')}, ` +
       `болезней ${counts.health.toLocaleString('ru-RU')} (${elapsed()} с)`,
   )
