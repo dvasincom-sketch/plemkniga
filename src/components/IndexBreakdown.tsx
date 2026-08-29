@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import type { ReactNode } from 'react'
 import { InfoTip } from './InfoTip'
 import { Computed } from './Computed'
 import { nf, plural, signed } from '@/lib/format'
@@ -52,6 +53,7 @@ export function IndexBreakdown({
   computedAt,
   href,
   evidence,
+  facts,
 }: {
   result: IndexResult
   /** Место в группе сравнения; считается по хранимым значениям. */
@@ -61,6 +63,13 @@ export function IndexBreakdown({
   href?: string
   /** На чём стоит надёжность: собственные наблюдения и родители в книге. */
   evidence?: CowEvidence | null
+  /**
+   * Числа того же разговора, которые считает не эта панель: инбридинг,
+   * возраст первого отёла. Панель отдаёт им место в подвале, а что
+   * именно там стоит, решает страница — величины эти к индексу
+   * не относятся, но читаются вместе с ним.
+   */
+  facts?: ReactNode
 }) {
   const { profile, contributions, value, reliability, used, total, baseVersion } = result
   const economic = profile.kind === 'economic'
@@ -313,6 +322,20 @@ export function IndexBreakdown({
       )}
 
       {!nothingToCount && basis}
+
+      {/*
+         Инбридинг и возраст первого отёла стояли двумя плашками под
+         панелью — между ней и следующим блоком, ничьи. Читаются они
+         вместе с индексом: высокий индекс при F = 12 % означает не то же,
+         что при нуле, и решение о подборе принимают по обоим числам
+         сразу. Место им — в подвале той же рамки, а не в промежутке
+         между рамками.
+      */}
+      {facts && (
+        <div className="mt-4 flex flex-wrap gap-x-10 gap-y-3 border-t border-ink-100 pt-4">
+          {facts}
+        </div>
+      )}
     </div>
   )
 }

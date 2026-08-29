@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { BullProofBlock, BullStatusNote } from '@/components/BullProof'
@@ -708,6 +709,54 @@ export default async function AnimalPage({
       : null
 
   /*
+   * Инбридинг и возраст первого отёла — числа не из индекса, но того же
+   * разговора: ценность и родственное спаривание читают вместе, а возраст
+   * первого отёла это признак того же ряда, что удой и долголетие.
+   *
+   * Собраны здесь, а рисуются в подвале панели индекса. Каждое — один факт
+   * и ссылка туда, где он разбирается: разбор родословной и список отёлов
+   * остаются на своих вкладках, сюда вынесено только число. Дублирование
+   * дешевле, чем переход туда и обратно посреди чтения оценки.
+   */
+  const fact = (label: string, value: ReactNode, href: string, linkText: string) => (
+    <div key={label}>
+      <p className="text-[12px] leading-snug text-ink-500">{label}</p>
+      <p className="mt-0.5 flex items-baseline gap-2.5">
+        <span className="text-[18px] font-medium leading-none tabular-nums">{value}</span>
+        <Link
+          href={href}
+          className="text-[13px] underline underline-offset-4 hover:text-forest-500"
+        >
+          {linkText}
+        </Link>
+      </p>
+    </div>
+  )
+
+  const ownFacts =
+    typeof animal.inbreeding === 'number' || afcOwn !== null ? (
+      <>
+        {typeof animal.inbreeding === 'number' &&
+          fact(
+            'Коэффициент инбридинга',
+            <Computed formula="inbreeding">{nf(animal.inbreeding, 2)} %</Computed>,
+            `/animals/${id}?tab=origin`,
+            'разбор родословной',
+          )}
+        {afcOwn !== null &&
+          fact(
+            'Возраст первого отёла',
+            <>
+              <Computed formula="afc">{afcOwn}</Computed>
+              <span className="ml-1.5 text-[13px] font-normal text-ink-500">мес.</span>
+            </>,
+            `/animals/${id}?tab=events`,
+            'отёлы',
+          )}
+      </>
+    ) : null
+
+  /*
    * Индекс считается по профилю смотрящего: хозяйство со своим набором весов
    * должно видеть карточку своими глазами. У гостя и у хозяйства без своего
    * профиля это стандартный профиль Ассоциации.
@@ -1043,6 +1092,12 @@ export default async function AnimalPage({
           <ScopeLocked scope="documents" ownerName={owner} canAsk={Boolean(user)} />
         )}
 
+        {/*
+           Инбридинг и возраст первого отёла — одной строкой, а не плашками.
+           Каждое число — один факт со ссылкой туда, где он разбирается;
+           плашка в четверть ширины под такой факт это место, потраченное
+           не на сведения.
+        */}
         {tab === 'evaluation' && maySee('evaluation') && (
           <>
             {indexBlock && (
@@ -1052,6 +1107,7 @@ export default async function AnimalPage({
                   percentile={indexBlock.percentile}
                   href={isMine ? '/account/indices' : undefined}
                   evidence={evidence}
+                  facts={ownFacts}
                 />
               </section>
             )}
@@ -1097,61 +1153,18 @@ export default async function AnimalPage({
             )}
 
             {/*
-               Инбридинг и возраст первого отёла — рядом с племенной ценностью.
+               Инбридинг и возраст первого отёла переехали в подвал панели
+               индекса. Стояли они двумя плашками между панелью и следующим
+               блоком — ничьи: к индексу формально не относятся, а читаются
+               вместе с ним. Высокий индекс при F = 12 % означает не то же,
+               что при нуле, и решение о подборе принимают по обоим числам
+               сразу.
 
-               Оба живут на других вкладках и оба нужны здесь. Инбридинг —
-               потому что ценность и родственное спаривание читают вместе:
-               высокий индекс при F = 12 % означает не то же, что при нуле,
-               и решение о подборе принимают по обоим числам сразу.
-               Возраст первого отёла — потому что это признак того же ряда,
-               что удой и долголетие.
-
-               Показаны, а не перенесены: разбор родословной остаётся
-               на своей вкладке, сюда вынесено одно число со ссылкой.
-               Дублирование здесь дешевле, чем переход туда и обратно
-               посреди чтения оценки.
+               Здесь остался только случай без панели: индекс не построен,
+               а числа всё равно есть и нужны.
             */}
-            {(typeof animal.inbreeding === 'number' || afcOwn !== null) && (
-              <section className="mt-6 flex flex-wrap gap-4">
-                {typeof animal.inbreeding === 'number' && (
-                  <div className="min-w-[220px] flex-1 rounded-xl bg-canvas px-4 py-3.5">
-                    <p className="text-[13px] leading-snug text-ink-500">
-                      Коэффициент инбридинга
-                    </p>
-                    <p className="mt-1 flex items-baseline gap-3">
-                      <span className="text-[24px] font-medium leading-none tabular-nums">
-                        <Computed formula="inbreeding">{nf(animal.inbreeding, 2)} %</Computed>
-                      </span>
-                      <Link
-                        href={`/animals/${id}?tab=origin`}
-                        className="text-[13px] underline underline-offset-4 hover:text-forest-500"
-                      >
-                        разбор родословной
-                      </Link>
-                    </p>
-                  </div>
-                )}
-
-                {afcOwn !== null && (
-                  <div className="min-w-[220px] flex-1 rounded-xl bg-canvas px-4 py-3.5">
-                    <p className="text-[13px] leading-snug text-ink-500">
-                      Возраст первого отёла
-                    </p>
-                    <p className="mt-1 flex items-baseline gap-3">
-                      <span className="text-[24px] font-medium leading-none tabular-nums">
-                        <Computed formula="afc">{afcOwn}</Computed>
-                      </span>
-                      <span className="text-[13px] text-ink-500">мес.</span>
-                      <Link
-                        href={`/animals/${id}?tab=events`}
-                        className="text-[13px] underline underline-offset-4 hover:text-forest-500"
-                      >
-                        отёлы
-                      </Link>
-                    </p>
-                  </div>
-                )}
-              </section>
+            {!indexBlock && ownFacts && (
+              <section className="card mt-8 flex flex-wrap gap-x-10 gap-y-3">{ownFacts}</section>
             )}
 
             {/*
