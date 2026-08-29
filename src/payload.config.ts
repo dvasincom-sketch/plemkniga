@@ -41,7 +41,7 @@ import { IndexValues } from '@/collections/IndexValues'
 import { IndexBases } from '@/collections/IndexBases'
 import { DICTIONARY_COLLECTIONS } from '@/collections/dictionaries'
 import { addDomainConstraints } from '@/lib/db-constraints'
-import { databaseEnvKeys, isLocalDatabase, maskUri, resolveDatabase } from '@/lib/db-url'
+import { databaseEnvKeys, maskUri, resolveDatabase, shouldPushSchema } from '@/lib/db-url'
 import { migrations } from '@/migrations'
 
 const filename = fileURLToPath(import.meta.url)
@@ -211,7 +211,7 @@ export default buildConfig({
      * Признак грубый — петлевой адрес или сокет, — и ошибиться он может
      * только в безопасную сторону: не сделать push там, где было можно.
      */
-    push: process.env.PAYLOAD_DB_PUSH !== 'false' && isLocalDatabase(driverUri),
+    push: shouldPushSchema(driverUri),
     migrationDir: path.resolve(dirname, 'migrations'),
     /*
      * Правила предметной области дописываются к схеме, которую Payload

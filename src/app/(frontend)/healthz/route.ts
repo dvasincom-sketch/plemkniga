@@ -2,7 +2,7 @@ import { readFileSync } from 'fs'
 import path from 'path'
 import { NextResponse } from 'next/server'
 import { getClient } from '@/lib/payload'
-import { databaseEnvKeys, maskUri, resolveDatabase } from '@/lib/db-url'
+import { databaseEnvKeys, maskUri, resolveDatabase, shouldPushSchema } from '@/lib/db-url'
 
 export const dynamic = 'force-dynamic'
 
@@ -136,7 +136,14 @@ export async function GET() {
     caCertificate: process.env.DATABASE_CA_CERT ? 'задан' : 'не задан',
     payloadSecret: process.env.PAYLOAD_SECRET ? 'задан' : 'НЕ ЗАДАН',
     serverUrl: process.env.NEXT_PUBLIC_SERVER_URL ?? 'не задана',
-    dbPush: process.env.PAYLOAD_DB_PUSH ?? 'true (по умолчанию)',
+    /*
+     * Показывается принятое решение, а не переменная окружения:
+     * переменная — половина условия, вторая половина в том, местная ли
+     * база. Разбор — `shouldPushSchema`.
+     */
+    dbPush: shouldPushSchema(db.driverUri)
+      ? 'включён — схема приводится к конфигу на лету'
+      : 'выключен — схему меняют миграции',
     nodeEnv: process.env.NODE_ENV,
   }
 

@@ -61,6 +61,7 @@
     "check:xlsx": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-xlsx.ts",
     "check:csv": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-csv.ts",
     "check:import-values": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-import-values.ts",
+    "check:fgias-readiness": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-fgias-readiness.ts",
     "check:time": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-time.ts",
     "check:searches": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-searches.ts",
     "bench": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/bench.ts",
