@@ -315,6 +315,21 @@ async function main() {
    * Не проблема, а мера: сколько колен реально прослеживается. Число говорит,
    * можно ли выпускать документы с родословной в два ряда и имеет ли смысл
    * считать инбридинг — на глубине в одно колено он всегда нулевой.
+   *
+   * ## Почему мера считалась неверно
+   *
+   * Выборка бралась как «первые две тысячи ключей», то есть первые
+   * две тысячи записей по порядку появления в базе. А первыми в книгу
+   * попали записи предков и наполнение пачкой — у них родителей нет
+   * вовсе. Отчёт честно печатал «в среднем 1,0 колена» для книги,
+   * где у эталонной карточки девять, и число это означало не глубину
+   * родословной, а порядок вставки.
+   *
+   * Теперь считается два числа вместо одного. Первое — доля записей
+   * без единого родителя: это не глубина, а её отсутствие, и мешать
+   * их в среднее нельзя. Второе — глубина среди тех, у кого родословная
+   * есть, по выборке, растянутой на всю книгу шагом, а не срезанной
+   * с начала.
    */
   const depthOf = (id: number, seen = new Set<number>()): number => {
     if (seen.has(id)) return 0
@@ -336,14 +351,45 @@ async function main() {
    * отвечает нулём. Осторожность в условии была лишней.
    */
   if (realCycles === 0) {
-    const depths: number[] = []
-    const sample = [...nodes.keys()].slice(0, 2000)
-    for (const id of sample) depths.push(depthOf(id) - 1)
-    const avg = depths.reduce((a, b) => a + b, 0) / (depths.length || 1)
+    const all = [...nodes.keys()]
+    const withParents = all.filter((id) => {
+      const n = nodes.get(id)!
+      return n.father !== null || n.mother !== null
+    })
+
+    const orphanShare = all.length ? ((all.length - withParents.length) / all.length) * 100 : 0
     console.log(
-      `\nГлубина родословной по ${ru(sample.length)} записям: ` +
-        `в среднем ${avg.toFixed(1)} колена, максимум ${Math.max(0, ...depths)}`,
+      `\nБез единого родителя: ${ru(all.length - withParents.length)} записей ` +
+        `(${orphanShare.toFixed(0)} % книги) — родословной у них нет, ` +
+        'и в среднюю глубину они не идут',
     )
+
+    if (!withParents.length) {
+      console.log('Глубину считать не по чему: родители не проставлены ни у одной записи.')
+    } else {
+      /*
+       * Шаг вместо среза: выборка растягивается на всю книгу, а не берёт
+       * её начало. Иначе меру определяет порядок вставки — ровно та
+       * ошибка, из-за которой отчёт годами показывал «1,0 колена».
+       */
+      const WANT = 2000
+      const step = Math.max(1, Math.floor(withParents.length / WANT))
+      const sample: number[] = []
+      for (let i = 0; i < withParents.length && sample.length < WANT; i += step) {
+        sample.push(withParents[i]!)
+      }
+
+      const depths = sample.map((id) => depthOf(id) - 1)
+      const avg = depths.reduce((a, b) => a + b, 0) / depths.length
+      const sorted = [...depths].sort((a, b) => a - b)
+      const median = sorted[Math.floor(sorted.length / 2)] ?? 0
+
+      console.log(
+        `Глубина родословной у тех, у кого она есть — выборка ${ru(sample.length)} ` +
+          `из ${ru(withParents.length)} записей, шаг ${ru(step)}: ` +
+          `в среднем ${avg.toFixed(1)}, медиана ${median}, максимум ${Math.max(...depths)} колен`,
+      )
+    }
   } else {
     console.log('\nГлубина не измерялась: при циклах обход предков не завершается.')
   }
