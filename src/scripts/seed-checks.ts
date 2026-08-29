@@ -430,6 +430,7 @@ async function main() {
      * пол на мужской, группа остаётся коровьей.
      */
     base(ctx, 66, { ...parents, sex: 'male', age_group: 'cow2' }),                     // age-group-vs-sex
+    base(ctx, 67, { ...parents }),                                                    // duplicate-calving-number
 
     base(ctx, 63, { ...parents, ident_number: 'CHK-771122334455' }),                  // ident-core-shared
     base(ctx, 64, {
@@ -556,6 +557,15 @@ async function main() {
   await calving(at(26), 2, ymd(2022, 8, 20))
   await calving(at(27), 1, ymd(2022, 5, 1))                         // calving-number-gap
   await calving(at(27), 3, ymd(2024, 5, 1))
+  /*
+   * Два третьих отёла при целом ряде. Ни `duplicate-first-calving`
+   * (смотрит только на единицу), ни `calving-number-gap` (ищет дыры)
+   * такого не видят — ради этого случая правило и заведено.
+   */
+  await calving(at(67), 1, ymd(2021, 4, 1))                         // duplicate-calving-number
+  await calving(at(67), 2, ymd(2022, 5, 1))
+  await calving(at(67), 3, ymd(2023, 6, 1))
+  await calving(at(67), 3, ymd(2024, 7, 1))
   await calving(at(29), 1, ymd(2023, 5, 1))                         // опора для insemination-too-soon
   await calving(at(32), 1, ymd(2023, 5, 1), { calves: [at(18)] })   // calf-birth-vs-calving
   await calving(at(33), 1, ymd(2023, 5, 1), { result: 'twins', calves: [at(19)] }) // twins-mismatch
