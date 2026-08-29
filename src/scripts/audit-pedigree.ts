@@ -328,17 +328,40 @@ async function main() {
    * Теперь считается два числа вместо одного. Первое — доля записей
    * без единого родителя: это не глубина, а её отсутствие, и мешать
    * их в среднее нельзя. Второе — глубина среди тех, у кого родословная
-   * есть, по выборке, растянутой на всю книгу шагом, а не срезанной
-   * с начала.
+   * есть, и по всей книге целиком, без выборки.
+   *
+   * ## Почему без выборки
+   *
+   * Выборка шагом честнее среза, но максимум по ней остаётся максимумом
+   * по выборке. Глубокие родословные редки — их достраивают поштучно, —
+   * и в две тысячи записей из полумиллиона девятиколенная не попадает.
+   * Отчёт печатал «максимум 2», когда в книге есть 9: та же ложь, только
+   * аккуратнее посчитанная.
+   *
+   * Считать всё стало можно потому, что обход запоминает пройденное.
+   * Родословные пересекаются: у полумиллиона записей общих предков
+   * несколько тысяч, и без памяти каждый из них обходился бы заново
+   * по разу на потомка.
    */
-  const depthOf = (id: number, seen = new Set<number>()): number => {
-    if (seen.has(id)) return 0
-    seen.add(id)
+
+  /*
+   * Глубина с памятью. Циклов здесь уже нет — проверка выше отработала
+   * и при находке до этого места не доходит, — поэтому рекурсия конечна,
+   * а её глубина равна глубине родословной, то есть единицам колен.
+   */
+  const depthCache = new Map<number, number>()
+  const depthOf = (id: number): number => {
+    const known = depthCache.get(id)
+    if (known !== undefined) return known
     const n = nodes.get(id)
     if (!n) return 0
-    const f = n.father !== null ? depthOf(n.father, new Set(seen)) : 0
-    const m = n.mother !== null ? depthOf(n.mother, new Set(seen)) : 0
-    return 1 + Math.max(f, m)
+    // Предварительная отметка: страхует от цикла, если он всё-таки просочился
+    depthCache.set(id, 1)
+    const f = n.father !== null ? depthOf(n.father) : 0
+    const m = n.mother !== null ? depthOf(n.mother) : 0
+    const d = 1 + Math.max(f, m)
+    depthCache.set(id, d)
+    return d
   }
 
   /*
@@ -376,29 +399,38 @@ async function main() {
     if (!withParents.length) {
       console.log('Глубину считать не по чему: родители не проставлены ни у одной записи.')
     } else {
-      /*
-       * Шаг вместо среза: выборка растягивается на всю книгу, а не берёт
-       * её начало. Иначе меру определяет порядок вставки — ровно та
-       * ошибка, из-за которой отчёт годами показывал «1,0 колена».
-       */
-      const WANT = 2000
-      const step = Math.max(1, Math.floor(withParents.length / WANT))
-      const sample: number[] = []
-      for (let i = 0; i < withParents.length && sample.length < WANT; i += step) {
-        sample.push(withParents[i]!)
+      const byDepth = new Map<number, number>()
+      let sum = 0
+      let deepest = 0
+      let deepestIdent = ''
+
+      for (const id of withParents) {
+        const d = depthOf(id) - 1
+        byDepth.set(d, (byDepth.get(d) ?? 0) + 1)
+        sum += d
+        if (d > deepest) {
+          deepest = d
+          deepestIdent = nodes.get(id)?.ident ?? ''
+        }
       }
 
-      const depths = sample.map((id) => depthOf(id) - 1)
-      const avg = depths.reduce((a, b) => a + b, 0) / depths.length
-      const sorted = [...depths].sort((a, b) => a - b)
-      const median = sorted[Math.floor(sorted.length / 2)] ?? 0
+      const avg = sum / withParents.length
+      const sorted = [...byDepth.entries()].sort((a, b) => a[0] - b[0])
+      let seen = 0
+      let median = 0
+      for (const [d, c] of sorted) {
+        seen += c
+        if (seen >= withParents.length / 2) {
+          median = d
+          break
+        }
+      }
 
-      const deepest = Math.max(...depths)
       console.log(
-        `Глубина родословной у тех, у кого она есть — выборка ${ru(sample.length)} ` +
-          `из ${ru(withParents.length)} записей, шаг ${ru(step)}: ` +
+        `Глубина родословной у тех, у кого она есть (${ru(withParents.length)} записей): ` +
           `в среднем ${avg.toFixed(1).replace('.', ',')}, медиана ${median}, ` +
-          `максимум ${deepest} ${deepest === 1 ? 'колено' : deepest < 5 ? 'колена' : 'колен'}`,
+          `максимум ${deepest} ${deepest === 1 ? 'колено' : deepest < 5 ? 'колена' : 'колен'}` +
+          (deepestIdent ? ` — № ${deepestIdent}` : ''),
       )
 
       /*
@@ -406,12 +438,16 @@ async function main() {
        * одинаково выходит и у книги, где половина записей на одно колено,
        * а половина на девять, и у книги, где все на два. Это разные книги,
        * и для инбридинга разница решающая.
+       *
+       * Редкие колена не прячутся за округлением: доля меньше десятой
+       * процента печатается числом записей. Одна девятиколенная
+       * родословная на полмиллиона — это «0 %», и именно она интересна.
        */
-      const byDepth = new Map<number, number>()
-      for (const d of depths) byDepth.set(d, (byDepth.get(d) ?? 0) + 1)
-      const spread = [...byDepth.entries()]
-        .sort((a, b) => a[0] - b[0])
-        .map(([d, c]) => `${d}: ${Math.round((c / depths.length) * 100)} %`)
+      const spread = sorted
+        .map(([d, c]) => {
+          const share = (c / withParents.length) * 100
+          return share < 0.1 ? `${d}: ${ru(c)} зап.` : `${d}: ${share.toFixed(share < 10 ? 1 : 0).replace('.', ',')} %`
+        })
         .join(', ')
       console.log(`Распределение по коленам — ${spread}`)
 
