@@ -213,6 +213,32 @@ function MetricTable({
   head: string[]
   rows: { label: string; unit?: string; forecast?: number | null; r?: number | null; digits?: number }[]
 }) {
+  /*
+   * Таблица из одних прочерков не рисуется.
+   *
+   * У коровы без привезённой оценки в этих таблицах не бывает ни одного
+   * значения — а рисовались они целиком: тридцать две строки «— —»
+   * с заголовками, единицами и подписями шкал. Прочерк на месте одного
+   * числа сообщает «этого нет»; тридцать два прочерка подряд сообщают
+   * только то, что читателю здесь делать нечего, и занимают под это
+   * пол-экрана.
+   *
+   * Названия признаков при этом теряются, и это осознанная потеря: строка
+   * ниже говорит, чего именно нет, а полный перечень признаков профиля
+   * стоит в разборе индекса, где он к месту.
+   */
+  const anyValue = rows.some(
+    (r) => typeof r.forecast === 'number' || typeof r.r === 'number',
+  )
+
+  if (!anyValue) {
+    return (
+      <p className="text-[14px] leading-relaxed text-ink-500">
+        В документе оценок по этим признакам нет.
+      </p>
+    )
+  }
+
   return (
     <>
       <table className="metric-table">
@@ -337,6 +363,41 @@ export default async function AnimalPage({
    */
   const linearRaw = (animal.linearScore ?? {}) as Record<string, number | null | undefined>
   const hasLinearScore = EXTERIOR_TRAITS.some((t) => typeof linearRaw[t.key] === 'number')
+
+  /*
+   * Экстерьер по потомству показывается, только когда он есть.
+   *
+   * Блок рисует восемнадцать признаков со шкалами, тремя композитами
+   * и двумя абзацами объяснений — половину экрана. У коровы без
+   * привезённой оценки в нём не бывает ни одного значения, и половина
+   * экрана уходит на то, чтобы восемнадцать раз сказать «нет данных».
+   *
+   * Признак тот же, что у собственного промера строкой выше: есть ли
+   * хоть одно число. Разное поведение у двух соседних блоков с одним
+   * содержимым читалось бы как разница в данных, которой нет.
+   */
+  const hasExteriorPta = [...EXTERIOR_TRAITS, ...EXTERIOR_COMPOSITES].some(
+    (t) => typeof exteriorRaw[t.key] === 'number',
+  )
+
+  /*
+   * Достоверность группы показывается только при заполненной группе.
+   *
+   * «По документу: 3 из 5» стояло над блоком, в котором нет ни одного
+   * прогноза, — и это то же самое, что процентиль у неизмеренного
+   * животного: уровень достоверности у данных, которых нет. Тройка
+   * к тому же стоит в базе значением по умолчанию, то есть сообщала
+   * не о документе, а о нашей схеме.
+   */
+  const hasGroupValues = (
+    group: unknown,
+    traits: readonly { key: string }[],
+  ): boolean =>
+    traits.some(
+      (t) =>
+        typeof (group as Record<string, { forecast?: number | null }> | undefined)?.[t.key]
+          ?.forecast === 'number',
+    )
 
   /*
    * Разделение отёлов по роли быка показывается, только когда оно есть
@@ -1304,7 +1365,11 @@ export default async function AnimalPage({
 
                 <Collapsible
                   title={isBull ? 'Продуктивность дочерей' : 'Продуктивные признаки'}
-                  aside={<ReliabilityNote value={animal.production?.reliabilityLevel} />}
+                  aside={
+                    hasGroupValues(animal.production, PRODUCTION_TRAITS) ? (
+                      <ReliabilityNote value={animal.production?.reliabilityLevel} />
+                    ) : undefined
+                  }
                   defaultOpen
                 >
                   <MetricTable
@@ -1336,7 +1401,11 @@ export default async function AnimalPage({
                 */}
                 <Collapsible
                   title={isBull ? 'Здоровье и долголетие дочерей' : 'Здоровье и долголетие'}
-                  aside={<ReliabilityNote value={animal.health?.reliabilityLevel} />}
+                  aside={
+                    hasGroupValues(animal.health, LONGEVITY_TRAITS) ? (
+                      <ReliabilityNote value={animal.health?.reliabilityLevel} />
+                    ) : undefined
+                  }
                   defaultOpen
                 >
                   <MetricTable
@@ -1541,6 +1610,7 @@ export default async function AnimalPage({
                 </Collapsible>
               )}
 
+              {hasExteriorPta && (
               <Collapsible
                 title={isBull ? 'Экстерьер дочерей' : 'Экстерьер: передача потомству'}
                 note={
@@ -1564,6 +1634,7 @@ export default async function AnimalPage({
                   }))}
                 />
               </Collapsible>
+              )}
             </section>
 
             {/* ----------------------------- Фенотип ---------------------------- */}

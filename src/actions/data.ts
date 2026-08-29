@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { decodeText, parseCsv, type TextEncodingName } from '@/lib/csv'
 import { detectTableKind, readSpreadsheet } from '@/lib/xlsx'
-import { columnsOf, datasetByKey, headerMapOf, type Dataset } from '@/lib/import-format'
+import { columnsOf, datasetByKey, matchHeader, normalizeHeader, type Dataset } from '@/lib/import-format'
 import { parseDate, parseNumber } from '@/lib/import-values'
 import { IDENT_FIELD_LABEL, IDENT_VALUES_SQL, identCore } from '@/lib/animal-id'
 import { DOMAIN_RULES } from '@/lib/db-constraints'
@@ -524,10 +524,8 @@ function readTable(rows: string[][], ds: Dataset) {
   if (rows.length < 2)
     return { error: 'В файле нет строк с данными' as const, unknownColumns: [] as string[] }
 
-  const map = headerMapOf(ds)
   const rawHeader = rows[0].map((h) => h.trim())
-  const header = rawHeader.map((h) => map[norm(h)] ?? '')
-  const unknownColumns = rawHeader.filter((h, i) => h !== '' && header[i] === '')
+  const { header, unknown: unknownColumns } = matchHeader(rawHeader, ds)
 
   /*
    * Неопознанные колонки не просто называются, а забираются вместе
@@ -546,7 +544,7 @@ function readTable(rows: string[][], ds: Dataset) {
     .filter(({ title, i }) => title !== '' && header[i] === '')
     .map(({ title, i }) => ({
       title,
-      normalized: norm(title),
+      normalized: normalizeHeader(title),
       values: rows.slice(1).map((r) => (r[i] ?? '').trim()),
     }))
 

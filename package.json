@@ -61,6 +61,8 @@
     "check:api-docs": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-api-docs.ts",
     "check:xlsx": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-xlsx.ts",
     "check:csv": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-csv.ts",
+    "make:proverka-formaty": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/make-proverka-formaty.ts",
+    "check:import-formats": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-import-formats.ts",
     "check:import-values": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-import-values.ts",
     "check:fgias-readiness": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-fgias-readiness.ts",
     "check:cow": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-cow.ts",
