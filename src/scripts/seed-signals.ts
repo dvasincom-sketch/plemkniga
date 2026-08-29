@@ -30,6 +30,11 @@ import { SCC_THRESHOLD, INBREEDING_THRESHOLD } from '@/lib/herd-analytics'
  *   npm run seed:signals -- --clean       убрать заведённое
  *   npm run seed:signals -- --org=12      другое хозяйство
  *
+ * Прогонять можно сколько угодно раз: каждый начинается с уборки
+ * предыдущего. Числа при этом сбрасываются, а не накапливаются —
+ * иначе «шесть тёлок в передержке» превратилось бы в двенадцать
+ * от второго запуска, и полоса врала бы уже про наши же данные.
+ *
  * ## Почему не «покрасивее»
  *
  * Соблазн был сделать стадо образцовым — на демонстрации приятнее
@@ -120,7 +125,18 @@ async function main() {
 
   /* ------------------------------ Уборка ------------------------------ */
 
-  if (clean) {
+  /*
+   * Убрать за собой — и перед тем, как заводить заново.
+   *
+   * Второй прогон падал: номер животного уникален, а скрипт заводил
+   * те же самые. Падал уже после того, как что-то успел записать, —
+   * то есть оставлял стадо в состоянии между двумя прогонами, которого
+   * никто не задумывал.
+   *
+   * Особенно это мешало `--mass`: чтобы увидеть второй вид полосы, надо
+   * прогнать скрипт ещё раз, и именно там он и спотыкался.
+   */
+  const wipe = async () => {
     const mine = await payload.find({
       collection: 'animals',
       where: { identNumber: { like: TAG } },
@@ -171,11 +187,26 @@ async function main() {
       await payload.delete({ collection: 'organizations', id: lab, overrideAccess: true })
     }
 
-    console.log(`  Убрано: животных ${animals}, отёлов ${calvings}, замеров ${tests}`)
+    return { animals, calvings, tests }
+  }
+
+  if (clean) {
+    const done = await wipe()
+    console.log(
+      `  Убрано: животных ${done.animals}, отёлов ${done.calvings}, замеров ${done.tests}`,
+    )
     console.log('  Инбридинг и незакрытые лактации у существующих коров остаются:')
     console.log('  они правились в самих записях, и стереть их безопасно нельзя —')
     console.log('  рядом могут лежать настоящие. Инбридинг пересчитает backfill:index.\n')
     process.exit(0)
+  }
+
+  const before = await wipe()
+  if (before.animals || before.tests) {
+    console.log(
+      `  Прежний прогон убран: животных ${before.animals}, отёлов ${before.calvings}, ` +
+        `замеров ${before.tests}`,
+    )
   }
 
   /* --------------------------- Молодняк ------------------------------- */
@@ -381,6 +412,7 @@ async function main() {
    * отдельно: «ещё доит» не то же, что «мало надоила».
    */
   let inProgress = 0
+  let already = 0
   for (const cow of cows.docs.slice(0, 3)) {
     const full = await payload.findByID({
       collection: 'animals',
@@ -389,6 +421,26 @@ async function main() {
       overrideAccess: true,
     })
     const rows = Array.isArray(full.lactations) ? full.lactations : []
+
+    /*
+     * Незакрытая лактация — единственное, что уборка не забирает
+     * (она лежит в карточке рядом с настоящими). Значит повторный прогон
+     * дописал бы вторую, потом третью, и «коров доят сейчас» росло бы
+     * с каждым запуском, ничего не означая. Есть уже — не трогаем.
+     */
+    const hasOpen = rows.some(
+      (l) =>
+        l &&
+        typeof l === 'object' &&
+        !(l as { endDate?: unknown }).endDate &&
+        Number((l as { milk305?: unknown }).milk305 ?? 0) > 0 &&
+        Number((l as { dd?: unknown }).dd ?? 0) < 305,
+    )
+    if (hasOpen) {
+      already += 1
+      continue
+    }
+
     await payload.update({
       collection: 'animals',
       id: cow.id,
@@ -409,7 +461,10 @@ async function main() {
     })
     inProgress += 1
   }
-  console.log(`  Коров с незакрытой лактацией: ${inProgress}`)
+  console.log(
+    `  Коров с незакрытой лактацией: ${inProgress}` +
+      (already ? ` (у ${already} она уже была — не трогали)` : ''),
+  )
 
   console.log('\nГотово. Откройте /account — полоса «Требует решения» должна показать')
   console.log('передержку, соматику, инбридинг, первотёлок в выбытии и тёлок к осеменению.')
