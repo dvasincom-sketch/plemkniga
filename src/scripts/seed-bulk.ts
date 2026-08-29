@@ -2,6 +2,7 @@ import 'dotenv/config'
 import { randomUUID } from 'node:crypto'
 import { Pool, type PoolClient } from 'pg'
 import { maskUri, resolveDatabase } from '../lib/db-url'
+import { expectedFatKg, expectedProteinKg } from '../lib/pta-consistency'
 
 /**
  * Синтетическое стадо промышленного размера.
@@ -566,6 +567,47 @@ async function ensureScaffolding(client: PoolClient): Promise<Ctx> {
   return { client, orgs, herds, breeds, healthTypes, dnaTypes, disposalReasons, insResults }
 }
 
+/**
+ * Признаки племенной ценности в карточке — те, из которых считается индекс.
+ *
+ * Без них индекс не считался ни у одного животного книги: карточка
+ * показывала «ни один из 11 признаков не оценён», а это главный экран
+ * продукта. Пустым он был не потому, что так бывает, а потому что сид
+ * заполнял сводный ИПЦ и не заполнял то, из чего ИПЦ складывается.
+ *
+ * Имена и порядок — из `TRAIT_BASE` и профиля Ассоциации: восемь признаков
+ * продуктивности, здоровья и воспроизводства плюс три композита экстерьера.
+ */
+const PTA_COLUMNS = [
+  'production_milk_forecast', 'production_milk_r',
+  'production_fat_percent_forecast', 'production_fat_percent_r',
+  'production_protein_percent_forecast', 'production_protein_percent_r',
+  'production_fat_kg_forecast', 'production_fat_kg_r',
+  'production_protein_kg_forecast', 'production_protein_kg_r',
+  'reproduction_fertility_forecast', 'reproduction_fertility_r',
+  'health_productive_longevity_forecast', 'health_productive_longevity_r',
+  'health_udder_health_forecast', 'health_udder_health_r',
+  'health_calf_mortality_forecast', 'health_calf_mortality_r',
+  'health_calving_ease_forecast', 'health_calving_ease_r',
+]
+
+/**
+ * Экстерьер в карточке: восемнадцать линейных признаков и три композита.
+ *
+ * Композиты нужны индексу — они входят в профиль с весами. Линейные
+ * признаки индексу не нужны, но нужны блоку экстерьера: с одними
+ * композитами он показал бы три числа и восемнадцать прочерков.
+ */
+const EXTERIOR_COLUMNS = [
+  'exterior_height', 'exterior_chest_width', 'exterior_body_depth', 'exterior_body_type',
+  'exterior_rump_angle', 'exterior_rump_width', 'exterior_rear_legs_rear',
+  'exterior_rear_legs_side', 'exterior_hoof_angle', 'exterior_front_legs',
+  'exterior_movement', 'exterior_fore_udder', 'exterior_front_teat_placement',
+  'exterior_teat_length', 'exterior_udder_depth', 'exterior_rear_udder',
+  'exterior_central_ligament', 'exterior_rear_teat_placement',
+  'exterior_body_composite', 'exterior_udder_composite', 'exterior_legs_composite',
+]
+
 const ANIMAL_COLUMNS = [
   'ident_number', 'id_format', 'uuid', 'name', 'name_latin', 'sex', 'state',
   'disposal_date', 'disposal_reason_id',
@@ -573,6 +615,8 @@ const ANIMAL_COLUMNS = [
   'father_id', 'mother_id', 'trust_level', 'public_visible', 'public_details',
   'inbreeding', 'inbreeding_needs_approval', 'archived', 'for_sale',
   'ipc', 'ipc_rank', 'evaluation_date',
+  ...PTA_COLUMNS,
+  ...EXTERIOR_COLUMNS,
   'summary_milk_yield', 'summary_milk_rank', 'summary_fat_percent', 'summary_protein_percent',
   'summary_fat_kg', 'summary_protein_kg', 'summary_fat_protein_sum',
   'updated_at', 'created_at',
@@ -736,6 +780,66 @@ function animalRow(opts: {
    * около четверти выбытия — столько, сколько дают в хозяйствах,
    * и ровно тот случай, ради которого сигнал написан.
    */
+  /*
+   * Прогнозы племенной ценности: одиннадцать признаков профиля.
+   *
+   * Отклонения от базы сравнения, а не сами величины: у всех признаков
+   * базы среднее равно нулю, а разброс задан в `TRAIT_BASE`. Числа взяты
+   * оттуда же — иначе индекс считался бы по одной шкале, а рисовался
+   * по другой.
+   *
+   * Килограммы жира и белка не разыгрываются: они следуют из удоя
+   * и процента по той же формуле, которой пользуется проверка
+   * `eval-fat-kg-mismatch` (`pta-consistency.ts`). Разыграй мы их
+   * отдельно — и проверка нашла бы расхождение у всей книги, ровно как
+   * это уже было с инбридингом и кровностью.
+   *
+   * Достоверность растёт с числом собственных наблюдений: у молодой
+   * тёлки она геномная и низкая, у коровы с тремя лактациями выше.
+   * Ниже пятидесяти карточка показывает прогноз бледным — и это должно
+   * встречаться, иначе объяснение под таблицей не проверено ничем.
+   */
+  const ptaMilk = round(gauss(0, 257.1, -900, 900), 0)
+  const ptaFatPercent = round(gauss(0, 0.12, -0.5, 0.5), 2)
+  const ptaProteinPercent = round(gauss(0, 0.08, -0.35, 0.35), 2)
+  const rel = () => Math.round(gauss(55 + calvings.length * 8, 12, 25, 95))
+
+  /*
+   * Оценка есть не у всех, и это не небрежность.
+   *
+   * У части животных её действительно не бывает: не отправляли образец,
+   * не дошли руки, животное молодое. Карточка на такой случай написана
+   * отдельно — «индекс не посчитан», — и без единого примера в книге
+   * этот вид экрана не проверен ничем. Шестая часть без оценки —
+   * достаточно, чтобы он встречался, и мало, чтобы демонстрация об него
+   * спотыкалась.
+   */
+  const pta = chance(0.85)
+    ? [
+        ptaMilk, rel(),
+        ptaFatPercent, rel(),
+        ptaProteinPercent, rel(),
+        round(expectedFatKg(ptaMilk, ptaFatPercent), 1), rel(),
+        round(expectedProteinKg(ptaMilk, ptaProteinPercent), 1), rel(),
+        round(gauss(0, 1.37, -4, 4), 2), rel(),
+        round(gauss(0, 1.7, -5, 5), 2), rel(),
+        round(gauss(0, 1.0, -3, 3), 2), rel(),
+        round(gauss(0, 1.62, -5, 5), 2), rel(),
+        round(gauss(0, 1.3, -4, 4), 2), rel(),
+      ]
+    : PTA_COLUMNS.map(() => null)
+
+  /* Линейные признаки и композиты — в тех же долях сигмы, что в истории */
+  const lin = () => round(gauss(0, 1.1, -3, 3), 1)
+  const exterior = pta[0] === null
+    ? EXTERIOR_COLUMNS.map(() => null)
+    : [
+        ...Array.from({ length: 18 }, lin),
+        round(gauss(0, 0.76, -2.5, 2.5), 2),
+        round(gauss(0, 0.65, -2.5, 2.5), 2),
+        round(gauss(0, 0.53, -2, 2), 2),
+      ]
+
   const CULL_RISK = [0.02, 0.04, 0.1, 0.18, 0.28]
   const risk = CULL_RISK[Math.min(calvings.length, CULL_RISK.length - 1)]!
   const state = chance(risk) ? pick(['sold', 'culled', 'dead']) : 'alive'
@@ -816,6 +920,8 @@ function animalRow(opts: {
       ipc,
       ipc, // ipc_rank: обычно заполняет хук beforeChange
       evaluated > now ? now : evaluated,
+      ...pta,
+      ...exterior,
       producing ? milk : null,
       producing ? milk : -1_000_000, // summary_milk_rank
       producing ? fat : null,
