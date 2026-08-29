@@ -181,6 +181,22 @@ async function main() {
 
   console.log(`Хозяйство-стенд #${orgId}, ферма #${herdId}\n`)
 
+  /*
+   * Общий предок для всех записей стенда, кроме той, что заводится
+   * ради правила «нет родителей».
+   *
+   * Без него `no-parents` срабатывало на 88 % стенда: родителей
+   * по умолчанию не было ни у кого, и посаженная нарочно запись тонула
+   * среди ста двадцати таких же. Стенд, у которого одно правило кричит
+   * на девяти десятых записей, читается не лучше книги, из-за которой
+   * он заведён.
+   *
+   * Именно отец, а не мать: `siblings-too-close` группирует потомков
+   * по матери, и общая мать у всего стенда объявила бы сотню записей
+   * близнецами.
+   */
+  let baseFather = 0
+
   /** Одна карточка со здоровыми значениями по умолчанию. */
   const animal = async (over: Record<string, unknown> = {}): Promise<number> =>
     insert(pool, 'animals', {
@@ -198,6 +214,7 @@ async function main() {
       blood_percent: 93,
       owner_id: orgId,
       herd_id: herdId,
+      father_id: baseFather || null,
       trust_level: 1,
       public_visible: false,
       public_details: false,
@@ -206,6 +223,29 @@ async function main() {
       created_at: now,
       ...over,
     })
+
+  baseFather = await insert(pool, 'animals', {
+    ident_number: identOf(),
+    id_format: 'rf',
+    uuid: randomUUID(),
+    name: 'Стенд-предок',
+    name_latin: 'Stend-predok',
+    kind: 'bull',
+    sex: 'male',
+    state: 'alive',
+    age_group: 'bull',
+    birth_date: yearsAgo(12),
+    breed_id: breedId,
+    blood_percent: 93,
+    owner_id: orgId,
+    herd_id: herdId,
+    trust_level: 1,
+    public_visible: false,
+    public_details: false,
+    archived: false,
+    updated_at: now,
+    created_at: now,
+  })
 
   const plant = async (codes: string[], what: string, fn: () => Promise<void>) => {
     await fn()
@@ -271,6 +311,58 @@ async function main() {
 
   await plant(['no-parents'], 'ни родителей, ни их номеров', async () => {
     await animal({ father_id: null, mother_id: null })
+  })
+
+  /* ------------------------ Оценки и их согласие ------------------------- */
+
+  /*
+   * Оценка племенной ценности по жиру и белку обязана следовать
+   * из оценок удоя и процента: `expectedFatKg` в `pta-consistency.ts`.
+   * Ставим килограммы заведомо мимо — вдесятеро больше ожидаемого.
+   */
+  await plant(['eval-fat-kg-mismatch'], 'оценка по жиру в кг не следует из удоя и процента', async () => {
+    await animal({
+      production_milk_forecast: 800,
+      production_fat_percent_forecast: 0.05,
+      production_fat_kg_forecast: 400,
+    })
+  })
+
+  await plant(['eval-protein-kg-mismatch'], 'то же по белку', async () => {
+    await animal({
+      production_milk_forecast: 800,
+      production_protein_percent_forecast: 0.04,
+      production_protein_kg_forecast: 400,
+    })
+  })
+
+  /*
+   * Расхождение привезённой оценки с расчётом книги сравнивает
+   * процентили, а наш процентиль берётся из `index_values` по
+   * ассоциативному профилю. Значит, посадить надо обе стороны сразу:
+   * без нашей строки правило молчит и честно пишет об этом оговоркой.
+   */
+  await plant(['eval-vs-book-divergence'], 'привезённый процентиль 5, наш 95', async () => {
+    const a = await animal({
+      ipc: 300,
+      ipc_details_forecast: 300,
+      ipc_details_percentile: 5,
+      ipc_details_center: 'CDCB',
+      ipc_details_base: '2026.1',
+    })
+    await insert(pool, 'index_values', {
+      animal_id: a,
+      profile_key: 'association',
+      profile_name: 'ИПЦ Ассоциации',
+      kind: 'selection',
+      base_version: '2026.1',
+      value: 300,
+      percentile: 95,
+      owner_id: orgId,
+      computed_at: now,
+      updated_at: now,
+      created_at: now,
+    })
   })
 
   await plant(['parent-younger'], 'мать младше дочери', async () => {
@@ -642,26 +734,49 @@ async function main() {
     }
   })
 
-  await plant(['index-base-mixed'], 'оценки стада ссылаются на разные базы', async () => {
+  /*
+   * Базы сравнения правило берёт из посчитанных значений индекса
+   * (`index_values`), а не из истории оценок. Первая посадка легла
+   * в `animal_evaluations` и не подняла ничего: правило смотрит туда,
+   * где книга считает сама, а не туда, где сложено привезённое.
+   */
+  await plant(['index-base-mixed'], 'посчитанные индексы стада от разных баз', async () => {
     for (const base of ['2026.1', '2024.2'] as const) {
-      const a = await animal({})
-      await insert(pool, 'animal_evaluations', {
+      const a = await animal({ ipc: 110 })
+      await insert(pool, 'index_values', {
         animal_id: a,
-        evaluated_at: daysAgo(300),
-        source: 'center',
+        profile_key: 'association',
+        profile_name: 'ИПЦ Ассоциации',
+        kind: 'selection',
         base_version: base,
-        is_current: true,
-        ipc: 110,
+        value: 110,
+        percentile: 50,
+        owner_id: orgId,
+        computed_at: now,
         updated_at: now,
         created_at: now,
       })
     }
   })
 
-  await plant(['event-year-gap'], 'в ряду лет отёлов пропущен целый год', async () => {
-    const birth = yearsAgo(9)
-    for (const yearsBack of [5, 4, 2, 1]) {
-      await withCalvings({ birth_date: birth }, [{ number: 1, date: yearsAgo(yearsBack) }])
+  /*
+   * Пропущенный год виден только там, где отёлы идут потоком: правило
+   * требует плотности не ниже `herdMin` в среднем на год, иначе находка
+   * сообщала бы хозяйству, что оно маленькое, а не что оно что-то
+   * потеряло. Четырьмя отёлами, как в первой посадке, дыру не показать —
+   * нужен поток, поэтому здесь тридцать коров по четыре отёла.
+   *
+   * Возраст подобран так, чтобы первый отёл пришёлся на тридцать
+   * месяцев: поставь корову старше — и вместе с пропущенным годом
+   * поднялось бы тридцать находок `afc-too-old`, к делу не относящихся.
+   */
+  await plant(['event-year-gap'], 'поток отёлов с пропущенным годом посередине', async () => {
+    const birth = yearsAgo(7.5)
+    for (let i = 0; i < 30; i++) {
+      await withCalvings(
+        { birth_date: birth },
+        [5, 4, 2, 1].map((yearsBack, k) => ({ number: k + 1, date: yearsAgo(yearsBack) })),
+      )
     }
   })
 
