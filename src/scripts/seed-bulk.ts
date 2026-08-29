@@ -722,7 +722,23 @@ function animalRow(opts: {
    * годовой отчёт снова остался бы пустым, — остальные размазаны на три
    * года назад, но не раньше двух лет от рождения.
    */
-  const state = chance(0.9) ? 'alive' : pick(['sold', 'culled', 'dead'])
+  /*
+   * Выбытие растёт с числом отёлов, а не бьёт всех поровну.
+   *
+   * Стояло `chance(0.9)` на всех подряд — десятая часть книги выбывала
+   * независимо от возраста. В стаде, где молодняка много, это давало
+   * «65 % выбытия — первотёлки», и полоса сигналов честно отвечала:
+   * «беда не в отдельных коровах, а в выращивании или в раздое».
+   * Беда была не в выращивании, а в том, что мы выбраковывали жребием.
+   *
+   * В жизни риск выбытия растёт с лактацией: тёлку выбраковывают редко,
+   * корову четвёртого отёла — часто. При такой шкале первотёлки дают
+   * около четверти выбытия — столько, сколько дают в хозяйствах,
+   * и ровно тот случай, ради которого сигнал написан.
+   */
+  const CULL_RISK = [0.02, 0.04, 0.1, 0.18, 0.28]
+  const risk = CULL_RISK[Math.min(calvings.length, CULL_RISK.length - 1)]!
+  const state = chance(risk) ? pick(['sold', 'culled', 'dead']) : 'alive'
   const gone = state !== 'alive'
   const maxAgo = Math.min(3 * 365, Math.max(1, (now.getTime() - birth.getTime()) / 86_400_000 - 730))
   const disposalDate = gone
@@ -1344,10 +1360,17 @@ async function syncSummaries(client: PoolClient) {
            summary_protein_kg = b.protein_kg,
            summary_fat_protein_sum = b.fat_kg + b.protein_kg
       from (
+        /*
+         * Только законченные лактации. В карточке стоит «удой
+         * за 305 дней», а незакрытая лактация — это удой за столько
+         * дней, сколько прошло: подставь её, и карточка покажет
+         * четыре тысячи там, где корова доится второй месяц.
+         * Средний удой по стаду от этого проседал на восьмую часть.
+         */
         select distinct on (l._parent_id)
                l._parent_id as id, l.milk305, l.fat305, l.protein305, l.fat_kg, l.protein_kg
           from animals_lactations l
-         where l.milk305 is not null and l.milk305 > 0
+         where l.milk305 is not null and l.milk305 > 0 and l.end_date is not null
          order by l._parent_id, l.milk305 desc
       ) b
      where a.id = b.id
@@ -1376,7 +1399,11 @@ async function syncSummaries(client: PoolClient) {
      where a.ident_number like '${PREFIX}%'
        and a.summary_milk_yield is not null
        and exists (select 1 from calvings c where c.animal_id = a.id)
-       and not exists (select 1 from animals_lactations l where l._parent_id = a.id)`)
+       and not exists (
+             select 1 from animals_lactations l
+              where l._parent_id = a.id and l.end_date is not null
+                and l.milk305 is not null and l.milk305 > 0
+           )`)
 
   done(
     `Продуктивность карточек из лактаций: ${(best.rowCount ?? 0).toLocaleString('ru-RU')}, ` +
