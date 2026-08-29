@@ -52,6 +52,12 @@ import { maskUri, resolveDatabase } from '../lib/db-url'
  *   npm run seed:farm                             # 400 голов, одно хозяйство
  *   npm run seed:farm -- --drop                   # убрать только его
  *
+ * И дописать стадо в уже существующее хозяйство — для демонстрации,
+ * которую показывают на настоящем кабинете фермера:
+ *
+ *   npm run seed:demo -- --org 1                  # дописать в хозяйство №1
+ *   npm run seed:demo -- --org 1 --drop           # убрать дописанное
+ *
  * Он собирается за секунды и нужен там, где книга не нужна: проверить
  * правку в отчёте, посмотреть страницу, прогнать проверки. Гонять ради
  * этого триста тысяч записей по двадцать минут — плата ни за что.
@@ -109,6 +115,21 @@ const DROP = process.argv.includes('--drop')
  */
 const PREFIX = text('tag', '99')
 const LABEL = text('name', 'Синтетика')
+
+/**
+ * Дописать в уже существующее хозяйство, а не заводить своё.
+ *
+ * Нужно для демонстрации: показывают её на настоящем хозяйстве книги
+ * («ЗАО Назаровское»), а показывать там нечего, пока в нём полсотни
+ * коров без родословной и без событий. Заводить рядом ещё одно
+ * «Синтетика — хозяйство № 1» бессмысленно: демонстрация идёт от лица
+ * фермера, который входит в свой кабинет и видит своё стадо.
+ *
+ * Приставка номера при этом своя, и это важно: она позволяет убрать
+ * дописанное, не тронув то, что в хозяйстве было. Хозяйство и фермы
+ * в этом режиме не создаются и не удаляются вовсе — они чужие.
+ */
+const ORG = arg('org', 0)
 
 /**
  * Сколько строк накапливать перед записью. Больше — меньше запросов,
@@ -357,6 +378,18 @@ async function drop(client: PoolClient) {
    * Приставка номера защищает животных, но не хозяйство. Поэтому здесь
    * теперь точные имена, а не общее начало.
    */
+  /*
+   * В чужом хозяйстве убираются только животные с нашей приставкой.
+   * Хозяйство и фермы там были до нас и останутся после: снести их
+   * значило бы убрать демонстрационную ферму вместе с дописанным
+   * в неё стадом.
+   */
+  if (ORG) {
+    console.log(`  хозяйство #${ORG} и его фермы не тронуты: они не наши`)
+    console.log(`\nГотово за ${elapsed()} с.`)
+    return
+  }
+
   const herds = await client.query(`delete from herds where name like '${LABEL} — ферма № %'`)
   const orgs = await client.query(
     `delete from organizations o
@@ -420,6 +453,52 @@ async function ensureScaffolding(client: PoolClient): Promise<Ctx> {
       )
     ).rows.map((r) => [String(r.code), r.id]),
   )
+
+  /*
+   * Чужое хозяйство: берём его фермы как есть и ничего не заводим.
+   * Если ферм нет — одна заводится, иначе животным некуда встать.
+   */
+  if (ORG) {
+    const org = await client.query<{ id: number; name: string }>(
+      'select id, name from organizations where id = $1',
+      [ORG],
+    )
+    if (!org.rows.length) {
+      console.error(`\nХозяйства #${ORG} в этой базе нет. Проверьте номер.\n`)
+      process.exit(1)
+    }
+
+    const found = await client.query<{ id: number }>(
+      'select id from herds where organization_id = $1 order by id',
+      [ORG],
+    )
+    let herds = found.rows.map((r) => ({ id: r.id, org: ORG }))
+
+    if (!herds.length) {
+      const made = await insertMany(
+        client,
+        'herds',
+        ['name', 'organization_id', 'updated_at', 'created_at'],
+        [[`${LABEL} — ферма № 1`, ORG, new Date(), new Date()]],
+        'id',
+      )
+      herds = made.map((id) => ({ id, org: ORG }))
+    }
+
+    console.log(
+      `Дописываем в хозяйство #${ORG} «${org.rows[0]!.name}», ферм: ${herds.length}`,
+    )
+    return {
+      client,
+      orgs: [ORG],
+      herds,
+      breeds,
+      healthTypes,
+      dnaTypes,
+      disposalReasons,
+      insResults,
+    }
+  }
 
   const needHerds = Math.ceil(TOTAL / HERD_SIZE)
   const needOrgs = Math.max(1, Math.ceil(needHerds / 4))
@@ -1545,7 +1624,8 @@ async function main() {
      * пересобиравший маленькое хозяйство, скопировал бы команду
      * и снёс всю книгу.
      */
-    const scope = PREFIX === '99' ? '' : ` --tag ${PREFIX} --name ${LABEL}`
+    const scope =
+      (PREFIX === '99' ? '' : ` --tag ${PREFIX} --name ${LABEL}`) + (ORG ? ` --org ${ORG}` : '')
     const command = DROP
       ? `${prefix} npm run seed:bulk -- --drop${scope}`
       : `${prefix} npm run seed:bulk -- --animals ${TOTAL}${LIGHT ? ' --light' : ''}${scope}`
