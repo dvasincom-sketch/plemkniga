@@ -30,6 +30,7 @@ import { biggestHerd } from '@/lib/biggest-herd'
  * сразу, а на странице его пришлось бы искать глазами среди семи блоков.
  *
  *   npm run check:herd
+ *   npm run check:herd -- --org=12     отчёты одного хозяйства
  */
 
 let failures = 0
@@ -56,9 +57,16 @@ async function main() {
    * возвращали пустоту, и проверка была зелёной, ничего не проверив.
    * «Считается» тогда означает «не упало», а не «посчитало».
    */
-  const orgId = await biggestHerd(payload)
+  /*
+   * Хозяйство можно назвать явно. Наибольшее стадо — разумное умолчание
+   * для книги целиком, но проверять правку удобнее на маленьком
+   * хозяйстве, которое пересобирается за секунды: `seed:farm` печатает
+   * его номер, а гонять ради этого триста тысяч записей незачем.
+   */
+  const explicit = process.argv.find((a) => a.startsWith('--org='))?.slice(6)
+  const orgId = explicit ? Number(explicit) : await biggestHerd(payload)
 
-  if (!orgId) {
+  if (!orgId || !Number.isFinite(orgId)) {
     console.log('  ✗ в книге нет животных с хозяйством — проверять нечего')
     process.exit(1)
   }

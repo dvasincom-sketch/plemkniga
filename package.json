@@ -32,6 +32,7 @@
     "db:precheck": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/db-precheck.ts",
     "backfill:evaluations": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/backfill-evaluations.ts",
     "seed:bulk": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/seed-bulk.ts",
+    "seed:farm": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/seed-bulk.ts --animals 400 --herd 400 --tag 97 --name Пример",
     "audit:pedigree": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/audit-pedigree.ts",
     "audit:tenancy": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/audit-tenancy.ts",
     "audit:indexes": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/audit-indexes.ts",

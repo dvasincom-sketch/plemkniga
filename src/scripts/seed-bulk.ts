@@ -46,6 +46,16 @@ import { maskUri, resolveDatabase } from '../lib/db-url'
  *   npm run seed:bulk -- --animals 280000 --light # без событий, только карточки
  *   npm run seed:bulk -- --drop                   # убрать сгенерированное
  *
+ * Отдельный небольшой набор — своей приставкой номера и своей подписью
+ * хозяйств, чтобы убирался порознь от книги:
+ *
+ *   npm run seed:farm                             # 400 голов, одно хозяйство
+ *   npm run seed:farm -- --drop                   # убрать только его
+ *
+ * Он собирается за секунды и нужен там, где книга не нужна: проверить
+ * правку в отчёте, посмотреть страницу, прогнать проверки. Гонять ради
+ * этого триста тысяч записей по двадцать минут — плата ни за что.
+ *
  * Значения признаков берутся из нормального распределения с параметрами,
  * близкими к голштинской популяции: удой 8 500 ± 1 400 кг, жир 3,9 ± 0,3 %,
  * белок 3,2 ± 0,2 %. Это не имитация настоящей генетики — потомки не
@@ -67,10 +77,38 @@ const arg = (name: string, fallback: number) => {
   return Number.isFinite(v) && v > 0 ? Math.floor(v) : fallback
 }
 
+const text = (name: string, fallback: string) => {
+  const i = process.argv.indexOf(`--${name}`)
+  const v = i === -1 ? null : process.argv[i + 1]
+  return v && !v.startsWith('--') ? v : fallback
+}
+
 const TOTAL = arg('animals', 280_000)
 const HERD_SIZE = arg('herd', 2_000)
 const LIGHT = process.argv.includes('--light')
 const DROP = process.argv.includes('--drop')
+
+/**
+ * Приставка номера и подпись хозяйств — доводами, а не константами.
+ *
+ * Книга на триста тысяч записей пересобирается двадцать минут, и гонять
+ * её ради проверки одной правки незачем: то же самое видно на хозяйстве
+ * в четыреста голов, которое собирается за секунды. Но два набора
+ * синтетики должны убираться порознь, иначе маленький уносит большой.
+ *
+ * Разделяет их пара «приставка номера + подпись»: по первой узнаются
+ * животные, по второй — хозяйства и фермы. Нужны обе. Приставка
+ * защищает животных, но не хозяйство: `--drop` уже однажды снёс чужое
+ * хозяйство, чьи животные при этом остались, и удаление упало внешним
+ * ключом с сообщением не про то, что произошло.
+ *
+ * Второй генератор писать для этого не нужно и вредно: он стал бы
+ * вторым определением того же стада — с другой кривой лактации, другими
+ * возрастами и своими расхождениями, которые пришлось бы ловить
+ * ещё одним прогоном.
+ */
+const PREFIX = text('tag', '99')
+const LABEL = text('name', 'Синтетика')
 
 /**
  * Сколько строк накапливать перед записью. Больше — меньше запросов,
@@ -87,9 +125,6 @@ const CHUNK = 2_000
  * причину не угадать.
  */
 const MAX_PARAMS = 60_000
-
-/** Префикс индивидуального номера: по нему синтетика узнаётся и удаляется. */
-const PREFIX = '99'
 
 const pool = new Pool({ connectionString: driverUri, ssl: sslConfig, max: 4 })
 
@@ -277,8 +312,10 @@ async function drop(client: PoolClient) {
    * тут значит «пока схему не тронут», а `--drop` обязан убирать
    * синтетику полностью и сегодня, и после следующей миграции.
    */
-  const dna = await client.query(`delete from animals_dna_tests where _parent_id in (${scope})`)
-  if (dna.rowCount) console.log(`  animals_dna_tests: ${dna.rowCount}`)
+  for (const t of ['animals_dna_tests', 'animals_lactations']) {
+    const r = await client.query(`delete from "${t}" where _parent_id in (${scope})`)
+    if (r.rowCount) console.log(`  ${t}: ${r.rowCount}`)
+  }
 
   // Ссылки на быков-производителей из чужих осеменений
   await client.query(`update inseminations set bull_id = null where bull_id in (${scope})`)
@@ -293,9 +330,43 @@ async function drop(client: PoolClient) {
   const animals = await client.query(`delete from animals where ident_number like '${PREFIX}%'`)
   console.log(`  animals: ${animals.rowCount}`)
 
-  const herds = await client.query(`delete from herds where name like 'Синтетика%'`)
-  const orgs = await client.query(`delete from organizations where name like 'Синтетика%'`)
+  /*
+   * Убираются только те хозяйства, которые завёл этот скрипт.
+   *
+   * Стояло `name like 'Синтетика%'` — и уборка сносила заодно
+   * «Синтетика — стенд проверок», заведённый `seed:flaws`. Его животные
+   * при этом оставались: у них своя приставка номера, под `scope`
+   * они не попадают. Внешний ключ на владельца объявлен
+   * `on delete set null` при `not null`, и удаление падало с текстом
+   * «null value in column "owner_id" of relation "animals"» — сообщением
+   * не про то, что произошло.
+   *
+   * Приставка номера защищает животных, но не хозяйство. Поэтому здесь
+   * теперь точные имена, а не общее начало.
+   */
+  const herds = await client.query(`delete from herds where name like '${LABEL} — ферма № %'`)
+  const orgs = await client.query(
+    `delete from organizations o
+      where o.name like '${LABEL} — хозяйство № %'
+        and not exists (select 1 from animals a where a.owner_id = o.id)`,
+  )
   console.log(`  herds: ${herds.rowCount}, organizations: ${orgs.rowCount}`)
+
+  /*
+   * Если у хозяйства остались животные — сказать об этом, а не падать
+   * внешним ключом. Такое означает, что чьи-то записи завелись в нашем
+   * хозяйстве, и решать это должен человек.
+   */
+  const stuck = await client.query(
+    `select o.name, count(a.id)::int as n
+       from organizations o
+       join animals a on a.owner_id = o.id
+      where o.name like '${LABEL} — хозяйство № %'
+      group by o.name`,
+  )
+  for (const r of stuck.rows ?? []) {
+    console.log(`  ! ${(r as { name?: unknown }).name}: осталось животных ${(r as { n?: unknown }).n} — хозяйство не убрано`)
+  }
 
   console.log(`\nГотово за ${elapsed()} с.`)
 }
@@ -334,8 +405,8 @@ async function ensureScaffolding(client: PoolClient): Promise<Ctx> {
   const orgRows: unknown[][] = []
   for (let i = 0; i < needOrgs; i++) {
     orgRows.push([
-      `Синтетика — хозяйство № ${i + 1}`,
-      `Синт-${i + 1}`,
+      `${LABEL} — хозяйство № ${i + 1}`,
+      `${LABEL.slice(0, 4)}-${i + 1}`,
       'farm',
       'none',
       new Date(),
@@ -353,7 +424,7 @@ async function ensureScaffolding(client: PoolClient): Promise<Ctx> {
   const herdRows: unknown[][] = []
   for (let i = 0; i < needHerds; i++) {
     herdRows.push([
-      `Синтетика — ферма № ${i + 1}`,
+      `${LABEL} — ферма № ${i + 1}`,
       orgs[i % orgs.length],
       new Date(),
       new Date(),
@@ -1399,15 +1470,21 @@ async function main() {
     const prefix = `SEED_CONFIRM=1${
       process.env.DATABASE_URI ? ` DATABASE_URI='${maskUri(uri ?? '')}'` : ''
     }`
+    /*
+     * Подсказка повторяет и приставку с подписью: без них человек,
+     * пересобиравший маленькое хозяйство, скопировал бы команду
+     * и снёс всю книгу.
+     */
+    const scope = PREFIX === '99' ? '' : ` --tag ${PREFIX} --name ${LABEL}`
     const command = DROP
-      ? `${prefix} npm run seed:bulk -- --drop`
-      : `${prefix} npm run seed:bulk -- --animals ${TOTAL}${LIGHT ? ' --light' : ''}`
+      ? `${prefix} npm run seed:bulk -- --drop${scope}`
+      : `${prefix} npm run seed:bulk -- --animals ${TOTAL}${LIGHT ? ' --light' : ''}${scope}`
 
     console.error(
       DROP
         ? '\nУдаление не подтверждено.\n\n' +
             'Скрипт уберёт из этой базы всю синтетику — животных с номерами\n' +
-            `на «${PREFIX}» и хозяйства «Синтетика — …» — вместе с их событиями,\n` +
+            `на «${PREFIX}» и хозяйства «${LABEL} — …» — вместе с их событиями,\n` +
             'оценками и значениями индекса. Настоящие записи не тронет.\n' +
             'Убедитесь, что строка подключения выше — та самая, и повторите:\n\n' +
             `  ${command}\n`
