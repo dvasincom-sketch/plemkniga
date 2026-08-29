@@ -1,4 +1,5 @@
 import type { Payload } from 'payload'
+import { poolOf } from '@/lib/sql'
 
 /**
  * Сводка по хозяйствам для кабинета Ассоциации.
@@ -24,13 +25,6 @@ export type FarmStat = {
   /** Сколько пользователей ждут подтверждения */
   unconfirmedUsers: number
 }
-
-type SqlPool = {
-  query: (q: string, p?: unknown[]) => Promise<{ rows?: Record<string, unknown>[] }>
-}
-
-const poolOf = (payload: Payload): SqlPool | null =>
-  (payload.db as unknown as { pool?: SqlPool }).pool ?? null
 
 export async function farmStats(payload: Payload): Promise<Map<number, FarmStat>> {
   const out = new Map<number, FarmStat>()

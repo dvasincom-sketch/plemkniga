@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 import { BULL_COMPARISON_MIN } from '@/lib/bull-proof'
+import { numOf, poolOf } from '@/lib/sql'
 
 /**
  * Сравнение быков между собой (ТЗ, требование №5).
@@ -43,14 +44,6 @@ import { BULL_COMPARISON_MIN } from '@/lib/bull-proof'
  * дочерей, — это инбридинг, а не улучшение.
  */
 
-type SqlPool = {
-  query: (q: string, p?: unknown[]) => Promise<{ rows?: Record<string, unknown>[] }>
-}
-
-const poolOf = (payload: Payload): SqlPool | null =>
-  (payload.db as unknown as { pool?: SqlPool }).pool ?? null
-
-const num = (v: unknown): number => Number(v ?? 0)
 const maybe = (v: unknown): number | null => (v === null || v === undefined ? null : Number(v))
 
 /**
@@ -255,7 +248,7 @@ export async function compareBulls(
   ])
 
   const by = (rows: Record<string, unknown>[]) =>
-    new Map(rows.map((r) => [num(r.bull), r] as const))
+    new Map(rows.map((r) => [numOf(r.bull), r] as const))
 
   const headBy = by(head)
   const cmpBy = by(comparison)
@@ -268,7 +261,7 @@ export async function compareBulls(
    * порядке; сортировка «по лучшему» здесь была бы подсказкой, а какой
    * признак лучший — решает он.
    */
-  const identityBy = new Map(identity.map((r) => [num(r.id), r] as const))
+  const identityBy = new Map(identity.map((r) => [numOf(r.id), r] as const))
 
   const out: BullRow[] = []
   for (const id of ids) {
@@ -280,7 +273,7 @@ export async function compareBulls(
     const a = afcBy.get(id)
     const k = kinBy.get(id)
 
-    const compared = num(c?.compared)
+    const compared = numOf(c?.compared)
 
     out.push({
       id,
@@ -289,10 +282,10 @@ export async function compareBulls(
       birthDate: (b.birth_date as string) ?? null,
       ipc: maybe(b.ipc),
 
-      daughters: num(h?.daughters),
-      withMilk: num(h?.with_milk),
-      herds: num(h?.herds),
-      farms: num(h?.farms),
+      daughters: numOf(h?.daughters),
+      withMilk: numOf(h?.with_milk),
+      herds: numOf(h?.herds),
+      farms: numOf(h?.farms),
 
       milkMean: h?.milk_mean != null ? Math.round(Number(h.milk_mean)) : null,
       fatMean: h?.fat_mean != null ? Number(Number(h.fat_mean).toFixed(2)) : null,
@@ -311,10 +304,10 @@ export async function compareBulls(
       compared,
 
       afcMean: a?.afc_mean != null ? Number(Number(a.afc_mean).toFixed(1)) : null,
-      afcCows: num(a?.afc_cows),
+      afcCows: numOf(a?.afc_cows),
 
-      kinInHerd: viewerOrg ? num(k?.kin) : null,
-      daughtersInHerd: viewerOrg ? num(k?.daughters) : null,
+      kinInHerd: viewerOrg ? numOf(k?.kin) : null,
+      daughtersInHerd: viewerOrg ? numOf(k?.daughters) : null,
     })
   }
 

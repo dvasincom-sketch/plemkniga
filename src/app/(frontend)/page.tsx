@@ -36,6 +36,7 @@ import { loadProfileChoices, selectProfile } from '@/lib/index-profiles'
 import { RANKING_CAP, indexValues, rankByProfile } from '@/lib/index-column'
 import { indexValuesLag } from '@/lib/index-values'
 import type { Animal, Organization } from '@/payload-types'
+import { plural } from '@/lib/format'
 
 export const dynamic = 'force-dynamic'
 
@@ -580,11 +581,3 @@ export default async function HerdbookPage({
   )
 }
 
-/** Склонение по числу: 1 запись, 2 записи, 5 записей. */
-const plural = (n: number, one_: string, few: string, many: string) => {
-  const n10 = n % 10
-  const n100 = n % 100
-  if (n10 === 1 && n100 !== 11) return one_
-  if (n10 >= 2 && n10 <= 4 && (n100 < 12 || n100 > 14)) return few
-  return many
-}

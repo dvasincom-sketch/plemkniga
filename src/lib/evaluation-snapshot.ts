@@ -1,6 +1,7 @@
 import type { Payload, PayloadRequest } from 'payload'
 import type { AnimalEvaluation, AnimalExterior } from '@/payload-types'
 import { EXTERIOR_COMPOSITES, EXTERIOR_TRAITS, HEALTH_TRAITS, PRODUCTION_TRAITS } from '@/lib/dictionaries'
+import { relId } from '@/lib/visibility'
 
 /**
  * Снимок действующей оценки в карточке животного.
@@ -130,5 +131,3 @@ export const applyExteriorSnapshot = async (
   })
 }
 
-export const idOf = (v: unknown): number | null =>
-  typeof v === 'number' ? v : typeof v === 'object' && v && 'id' in v ? ((v as { id: number }).id ?? null) : null

@@ -204,18 +204,3 @@ export function bullStatus(daughters: number, herds: number): BullStatus {
   }
 }
 
-/**
- * Надёжность по конкретному признаку — она разная и это главное.
- *
- * У быка с двадцатью дочерями удой оценён на 62 %, а фертильность
- * (h² = 0,04) — на 17 %. Показывать оба числа одинаково значит
- * утверждать о втором то, чего данные не говорят.
- *
- * Возвращает `null`, если дочерей нет вовсе: ноль процентов и
- * «не считали» — разные вещи, и рисовать первое вместо второго
- * значит выдавать пропуск за результат.
- */
-export const traitReliabilityByDaughters = (
-  daughters: number,
-  heritability: number,
-): number | null => (daughters > 0 ? Math.round(reliabilityOf(daughters, heritability) * 100) : null)

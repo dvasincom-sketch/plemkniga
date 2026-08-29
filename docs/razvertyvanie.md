@@ -64,7 +64,6 @@ npm run dev                 # разработка
 npm run build && npm start  # прод-сборка
 npm run generate:types      # перегенерировать типы после правки коллекций
 npm run generate:importmap  # после добавления кастомных компонентов в админку
-npm run lint                # next lint
 npm run payload migrate:create
 npm run payload migrate
 

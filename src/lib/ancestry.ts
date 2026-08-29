@@ -63,7 +63,7 @@ export type AncestryReport = {
 type Side = 'father' | 'mother'
 
 /** id связанной записи независимо от глубины выборки. */
-const idOf = (v: unknown): number | null => {
+const relId = (v: unknown): number | null => {
   if (typeof v === 'number') return v
   if (v && typeof v === 'object' && 'id' in v) return (v as { id: number }).id
   return null
@@ -107,7 +107,7 @@ async function walk(
     for (const [id, paths] of frontier) {
       const doc = docs.get(id)
       if (!doc) continue
-      for (const parent of [idOf(doc.father), idOf(doc.mother)]) {
+      for (const parent of [relId(doc.father), relId(doc.mother)]) {
         if (parent === null) continue
         next.set(parent, (next.get(parent) ?? 0) + paths)
       }
@@ -187,8 +187,8 @@ export async function analyzeAncestry(
 ): Promise<AncestryReport> {
   const fetchLevel = createLevelLoader(payload)
 
-  const fatherId = idOf(animal.father)
-  const motherId = idOf(animal.mother)
+  const fatherId = relId(animal.father)
+  const motherId = relId(animal.mother)
 
   const [sire, dam] = await Promise.all([
     walk(fetchLevel, fatherId, depth),
@@ -211,8 +211,8 @@ export async function analyzeAncestry(
     coiCache.set(id, 0) // защита от циклов в испорченных данных
     const docs = await fetchLevel([id])
     const doc = docs.get(id)
-    const f = doc ? idOf(doc.father) : null
-    const m = doc ? idOf(doc.mother) : null
+    const f = doc ? relId(doc.father) : null
+    const m = doc ? relId(doc.mother) : null
 
     let value = 0
     if (f && m) {

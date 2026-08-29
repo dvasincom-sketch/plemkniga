@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 import type { Animal } from '@/payload-types'
+import { relId } from '@/lib/visibility'
 
 /**
  * Построение генеалогического древа для карточки и документов.
@@ -33,12 +34,6 @@ export type PedigreeNode = {
 }
 
 type ParentIds = { father: number | null; mother: number | null }
-
-const idOf = (v: unknown): number | null => {
-  if (typeof v === 'number') return v
-  if (v && typeof v === 'object' && 'id' in v) return (v as { id: number }).id
-  return null
-}
 
 /** Кэширующий загрузчик животных — одно обращение к БД на предка. */
 export function createAnimalLoader(payload: Payload) {
@@ -91,8 +86,8 @@ export async function buildPedigree(
 
     const children: PedigreeNode[] = []
     if (level < depth) {
-      const f = doc ? idOf(doc.father) : null
-      const m = doc ? idOf(doc.mother) : null
+      const f = doc ? relId(doc.father) : null
+      const m = doc ? relId(doc.mother) : null
       const fb = doc?.pedigreeText
 
       children.push(
@@ -120,11 +115,11 @@ export async function buildPedigree(
   const pt = animal.pedigreeText
 
   return [
-    await node(idOf(animal.father), 'О', 1, {
+    await node(relId(animal.father), 'О', 1, {
       identNumber: pt?.fatherId,
       name: pt?.fatherName,
     }),
-    await node(idOf(animal.mother), 'М', 1, {
+    await node(relId(animal.mother), 'М', 1, {
       identNumber: pt?.motherId,
       name: pt?.motherName,
     }),

@@ -1,4 +1,5 @@
 import type { Payload } from 'payload'
+import { numOf, numOrNull, poolOf } from '@/lib/sql'
 
 /**
  * Числа по стаду для «Обзора».
@@ -63,21 +64,7 @@ export type HerdSummary = {
   milkBasis: number
 }
 
-type SqlPool = {
-  query: (q: string, p?: unknown[]) => Promise<{ rows?: Record<string, unknown>[] }>
-}
-
-const poolOf = (payload: Payload): SqlPool | null =>
-  (payload.db as unknown as { pool?: SqlPool }).pool ?? null
-
-const n = (v: unknown): number => Number(v ?? 0)
-
 /** Среднее приходит из базы строкой (numeric) либо null — и null означает null. */
-const f = (v: unknown): number | null => {
-  if (v === null || v === undefined) return null
-  const x = Number(v)
-  return Number.isFinite(x) ? x : null
-}
 
 export async function herdSummary(
   payload: Payload,
@@ -127,14 +114,14 @@ export async function herdSummary(
   if (!r) return null
 
   return {
-    total: n(r.total),
-    cows: n(r.cows),
-    bulls: n(r.bulls),
-    archived: n(r.archived),
-    milkYield: f(r.milk_yield),
-    fatPercent: f(r.fat_percent),
-    proteinPercent: f(r.protein_percent),
-    ipc: f(r.ipc),
-    milkBasis: n(r.milk_basis),
+    total: numOf(r.total),
+    cows: numOf(r.cows),
+    bulls: numOf(r.bulls),
+    archived: numOf(r.archived),
+    milkYield: numOrNull(r.milk_yield),
+    fatPercent: numOrNull(r.fat_percent),
+    proteinPercent: numOrNull(r.protein_percent),
+    ipc: numOrNull(r.ipc),
+    milkBasis: numOf(r.milk_basis),
   }
 }

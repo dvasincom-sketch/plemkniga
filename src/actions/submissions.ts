@@ -4,16 +4,9 @@ import { revalidatePath } from 'next/cache'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { assertCan } from '@/lib/roles'
 import { recordOperation } from '@/lib/operations'
+import { plural } from '@/lib/format'
 
 export type SubmissionState = { error?: string; message?: string }
-
-const plural = (n: number, one: string, few: string, many: string) => {
-  const n10 = n % 10
-  const n100 = n % 100
-  if (n10 === 1 && n100 !== 11) return one
-  if (n10 >= 2 && n10 <= 4 && (n100 < 12 || n100 > 14)) return few
-  return many
-}
 
 const orgOf = (user: { organization?: unknown }) =>
   typeof user.organization === 'object' && user.organization

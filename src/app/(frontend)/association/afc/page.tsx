@@ -7,6 +7,7 @@ import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { getClient } from '@/lib/payload'
 import { requireAssociation } from '@/lib/association'
 import { afcSireBook, AFC_SIRE_MIN_DAUGHTERS } from '@/lib/afc-sires'
+import { nf } from '@/lib/format'
 
 export const metadata: Metadata = { title: 'Возраст первого отёла по быкам' }
 export const dynamic = 'force-dynamic'
@@ -41,11 +42,6 @@ export const dynamic = 'force-dynamic'
  * уже один раз оказались перепутаны с качеством хозяйства, и показывать
  * их как цель мы отказались.
  */
-
-const nf = (v: number | null | undefined, digits = 1): string =>
-  typeof v === 'number' && Number.isFinite(v)
-    ? v.toLocaleString('ru-RU', { minimumFractionDigits: digits, maximumFractionDigits: digits })
-    : '—'
 
 const signed = (v: number | null): string => {
   if (typeof v !== 'number' || !Number.isFinite(v)) return '—'

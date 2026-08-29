@@ -1,4 +1,5 @@
 import type { Payload } from 'payload'
+import { numOrNull, poolOf } from '@/lib/sql'
 
 /**
  * Что каждый бык дал именно в этом стаде.
@@ -67,19 +68,6 @@ export type SireSummary = {
   /** Дочерей, у которых отец в книге не указан вовсе. */
   withoutSire: number
   cows: number
-}
-
-type SqlPool = {
-  query: (q: string, p?: unknown[]) => Promise<{ rows?: Record<string, unknown>[] }>
-}
-
-const poolOf = (payload: Payload): SqlPool | null =>
-  (payload.db as unknown as { pool?: SqlPool }).pool ?? null
-
-const f = (v: unknown): number | null => {
-  if (v === null || v === undefined) return null
-  const x = Number(v)
-  return Number.isFinite(x) ? x : null
 }
 
 export async function sireSummary(
@@ -190,15 +178,15 @@ export async function sireSummary(
       id: Number(r.id),
       identNumber: String(r.ident_number ?? ''),
       name: r.name ? String(r.name) : null,
-      ipc: f(r.ipc),
+      ipc: numOrNull(r.ipc),
       daughters: Number(r.daughters ?? 0),
       withMilk: Number(r.with_milk ?? 0),
-      milk305: f(r.milk305),
-      vsMates: f(r.vs_mates),
-      fatPercent: f(r.fat),
-      proteinPercent: f(r.protein),
-      afc: f(r.afc),
-      scc: f(r.scc),
+      milk305: numOrNull(r.milk305),
+      vsMates: numOrNull(r.vs_mates),
+      fatPercent: numOrNull(r.fat),
+      proteinPercent: numOrNull(r.protein),
+      afc: numOrNull(r.afc),
+      scc: numOrNull(r.scc),
     })),
     withoutSire: Number(t.without_sire ?? 0),
     cows: Number(t.cows ?? 0),

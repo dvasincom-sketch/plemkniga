@@ -3,7 +3,8 @@ import { stampOwnerOrg } from '@/access/guards'
 import { ownerOrgField } from '@/collections/shared'
 import { HEALTH_TRAITS, PRODUCTION_TRAITS } from '@/lib/dictionaries'
 import { animalScopedReadFor, isAdmin } from '@/access'
-import { applyEvaluationSnapshot, idOf } from '@/lib/evaluation-snapshot'
+import { applyEvaluationSnapshot } from '@/lib/evaluation-snapshot'
+import { relId } from '@/lib/visibility'
 
 /**
  * История племенной оценки: строка на каждую переоценку.
@@ -222,7 +223,7 @@ export const AnimalEvaluations: CollectionConfig = {
     afterChange: [
       async ({ doc, req }) => {
         if (!doc.isCurrent) return doc
-        const animal = idOf(doc.animal)
+        const animal = relId(doc.animal)
         if (!animal) return doc
 
         try {
@@ -247,7 +248,7 @@ export const AnimalEvaluations: CollectionConfig = {
     afterDelete: [
       async ({ doc, req }) => {
         if (!doc.isCurrent) return doc
-        const animal = idOf(doc.animal)
+        const animal = relId(doc.animal)
         if (!animal) return doc
 
         const rest = await req.payload.find({

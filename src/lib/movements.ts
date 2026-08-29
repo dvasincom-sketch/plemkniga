@@ -58,8 +58,6 @@ export const MOVEMENT_KINDS = [
   { value: 'death', label: 'Падёж', hint: 'Животное выбыло из книги.' },
 ] as const satisfies readonly { value: MovementKind; label: string; hint: string }[]
 
-export const movementLabel = (kind: string): string =>
-  MOVEMENT_KINDS.find((k) => k.value === kind)?.label ?? kind
 
 /** Виды, после которых у животного меняется владелец. */
 export const CHANGES_OWNER: readonly MovementKind[] = ['sale', 'import']

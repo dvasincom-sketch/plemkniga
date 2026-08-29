@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 import { plural } from '@/lib/format'
+import { numOf, poolOf } from '@/lib/sql'
 
 /**
  * Что хозяйству стоит сделать прямо сейчас.
@@ -41,15 +42,6 @@ export type TodoItem = {
   /** Требует внимания сильнее прочего. */
   urgent?: boolean
 }
-
-type SqlPool = {
-  query: (q: string, p?: unknown[]) => Promise<{ rows?: Record<string, unknown>[] }>
-}
-
-const poolOf = (payload: Payload): SqlPool | null =>
-  (payload.db as unknown as { pool?: SqlPool }).pool ?? null
-
-const n = (v: unknown): number => Number(v ?? 0)
 
 /** Сколько дней прошло — без загрузок вообще возвращает null. */
 const daysSince = (v: unknown): number | null => {
@@ -113,23 +105,23 @@ export async function farmTodo(payload: Payload, organizationId: number): Promis
 
   const out: TodoItem[] = []
 
-  const unverified = n(r.unverified)
+  const unverified = numOf(r.unverified)
   if (unverified > 0) {
     out.push({
       key: 'unverified',
       count: unverified,
-      label: `${plural(unverified, ['запись', 'записи', 'записей'])} ${plural(unverified, ['не подтверждена', 'не подтверждены', 'не подтверждены'])}`,
+      label: `${plural(unverified, 'запись', 'записи', 'записей')} ${plural(unverified, 'не подтверждена', 'не подтверждены', 'не подтверждены')}`,
       hint: 'Подтверждение требуется перед выпуском свидетельства',
       href: '/account/verification',
     })
   }
 
-  const incomplete = n(r.incomplete)
+  const incomplete = numOf(r.incomplete)
   if (incomplete > 0) {
     out.push({
       key: 'incomplete',
       count: incomplete,
-      label: `${plural(incomplete, ['запись', 'записи', 'записей'])} ${plural(incomplete, ['неполна', 'неполны', 'неполны'])}`,
+      label: `${plural(incomplete, 'запись', 'записи', 'записей')} ${plural(incomplete, 'неполна', 'неполны', 'неполны')}`,
       /*
        * Подсказка называет те же три правила, которые ищет разбор стада:
        * `no-birth-date`, `no-breed`, `no-parents`. Числа обязаны сходиться,
@@ -144,12 +136,12 @@ export async function farmTodo(payload: Payload, organizationId: number): Promis
     })
   }
 
-  const noMilk = n(r.no_milk_year)
+  const noMilk = numOf(r.no_milk_year)
   if (noMilk > 0) {
     out.push({
       key: 'no-milk',
       count: noMilk,
-      label: `${plural(noMilk, ['корова', 'коровы', 'коров'])} без ${plural(noMilk, ['дойки', 'доек', 'доек'])} за год`,
+      label: `${plural(noMilk, 'корова', 'коровы', 'коров')} без ${plural(noMilk, 'дойки', 'доек', 'доек')} за год`,
       hint: 'Без контрольных доек продуктивность в книге не считается',
       href: '/account/events/new',
     })
@@ -173,7 +165,7 @@ export async function farmTodo(payload: Payload, organizationId: number): Promis
     out.push({
       key: 'stale',
       count: days,
-      label: `${plural(days, ['день', 'дня', 'дней'])} с последней загрузки`,
+      label: `${plural(days, 'день', 'дня', 'дней')} с последней загрузки`,
       hint: 'Чем свежее данные, тем точнее оценка',
       href: '/account/import',
     })

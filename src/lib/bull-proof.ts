@@ -1,4 +1,5 @@
 import type { Payload } from 'payload'
+import { numOf, poolOf } from '@/lib/sql'
 
 /**
  * Что известно о быке по его дочерям.
@@ -45,14 +46,6 @@ import type { Payload } from 'payload'
  * не сказано вслух, читают без звёздочки.
  */
 
-type SqlPool = {
-  query: (q: string, p?: unknown[]) => Promise<{ rows?: Record<string, unknown>[] }>
-}
-
-const poolOf = (payload: Payload): SqlPool | null =>
-  (payload.db as unknown as { pool?: SqlPool }).pool ?? null
-
-const num = (v: unknown): number => Number(v ?? 0)
 const maybe = (v: unknown): number | null => (v === null || v === undefined ? null : Number(v))
 
 /** Меньше этого числа дочерей со сверстницами сравнение не показываем. */
@@ -178,7 +171,7 @@ export async function bullProof(payload: Payload, bullId: number): Promise<BullP
   const h = head?.[0]
   if (!h) return null
 
-  const daughters = num(h.daughters)
+  const daughters = numOf(h.daughters)
   if (!daughters) {
     return {
       daughters: 0,
@@ -201,15 +194,15 @@ export async function bullProof(payload: Payload, bullId: number): Promise<BullP
     `select count(*)::int as n from animals
       where father_id = $1 and archived is not true and sex = 'male'`,
     [bullId],
-  ).then((r) => num(r?.[0]?.n))
+  ).then((r) => numOf(r?.[0]?.n))
 
-  const compared = num(comparison?.[0]?.compared)
+  const compared = numOf(comparison?.[0]?.compared)
 
   return {
     daughters,
-    withMilk: num(h.with_milk),
-    herds: num(h.herds),
-    farms: num(h.farms),
+    withMilk: numOf(h.with_milk),
+    herds: numOf(h.herds),
+    farms: numOf(h.farms),
     sons,
     milkMean: maybe(h.milk_mean),
     fatMean: maybe(h.fat_mean),
@@ -222,10 +215,10 @@ export async function bullProof(payload: Payload, bullId: number): Promise<BullP
     vsMates: compared >= MIN_FOR_COMPARISON ? maybe(comparison?.[0]?.diff) : null,
     compared,
     afcMean: maybe(afc?.[0]?.months),
-    afcCows: num(afc?.[0]?.cows),
+    afcCows: numOf(afc?.[0]?.cows),
     byYear: (years ?? []).map((r) => ({
-      year: num(r.year),
-      daughters: num(r.daughters),
+      year: numOf(r.year),
+      daughters: numOf(r.daughters),
       milk: maybe(r.milk),
     })),
   }

@@ -4,6 +4,7 @@ import { describeFilter } from '@/lib/filter-labels'
 import { ProfilePicker } from './ProfilePicker'
 import { SortPicker } from './SortPicker'
 import type { ProfileChoice } from '@/lib/index-profiles'
+import { plural } from '@/lib/format'
 
 /**
  * Шапка результатов: сколько найдено, по каким условиям и как показано.
@@ -20,14 +21,6 @@ import type { ProfileChoice } from '@/lib/index-profiles'
  * его в форме. Это же делает состояние поиска очевидным при переходе
  * по ссылке.
  */
-
-const plural = (n: number, one_: string, few: string, many: string) => {
-  const n10 = n % 10
-  const n100 = n % 100
-  if (n10 === 1 && n100 !== 11) return one_
-  if (n10 >= 2 && n10 <= 4 && (n100 < 12 || n100 > 14)) return few
-  return many
-}
 
 const CrossIcon = () => (
   <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">

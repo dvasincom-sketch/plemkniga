@@ -16,6 +16,7 @@ import {
   type CheckSettingsMap,
 } from '@/lib/check-settings'
 import { IDENT_CORE_MIN, IDENT_FIELD_LABEL, IDENT_VALUES_SQL } from '@/lib/animal-id'
+import { numOf, poolOf } from '@/lib/sql'
 
 /**
  * Проверки, у которых предмет — стадо, а не запись.
@@ -53,15 +54,6 @@ import { IDENT_CORE_MIN, IDENT_FIELD_LABEL, IDENT_VALUES_SQL } from '@/lib/anima
  * одинаково, а значат противоположное, и различить их обязана система,
  * а не читатель.
  */
-
-type SqlPool = {
-  query: (q: string, p?: unknown[]) => Promise<{ rows?: Record<string, unknown>[] }>
-}
-
-const poolOf = (payload: Payload): SqlPool | null =>
-  (payload.db as unknown as { pool?: SqlPool }).pool ?? null
-
-const num = (v: unknown): number => Number(v ?? 0)
 
 const pct = (part: number, total: number): string =>
   total ? `${Math.round((part / total) * 100)} %` : '—'
@@ -302,7 +294,7 @@ export async function herdIssues(
   const shape = shapeRows?.[0] ?? null
   const birth = birthRows?.[0] ?? null
 
-  const scanned = num(shape?.n)
+  const scanned = numOf(shape?.n)
 
   /* ---------------------- Разные единицы измерения ---------------------- */
 
@@ -318,7 +310,7 @@ export async function herdIssues(
    * таких записей поймает своя проверка и скажет ровно то, что есть.
    */
   if (magRows && magRows.length > 1) {
-    const buckets = magRows.map((r) => ({ mag: num(r.mag), n: num(r.n) }))
+    const buckets = magRows.map((r) => ({ mag: numOf(r.mag), n: numOf(r.n) }))
     const total = buckets.reduce((s, b) => s + b.n, 0)
     const main = buckets.reduce((a, b) => (b.n > a.n ? b : a))
     const factorMag = Math.log10(t.herdUnitsFactor)
@@ -345,7 +337,7 @@ export async function herdIssues(
   /* ------------------------- Круглые значения ------------------------- */
 
   if (scanned >= t.herdMin) {
-    const r500 = num(shape?.r500)
+    const r500 = numOf(shape?.r500)
     if (r500 / scanned > t.herdRoundedShare / 100) {
       push(
         'values-rounded',
@@ -381,7 +373,7 @@ export async function herdIssues(
     )
 
     if (rows?.length) {
-      const total = num(rows[0]!.total)
+      const total = numOf(rows[0]!.total)
       push(
         'outlier-vs-herd',
         'note',
@@ -390,7 +382,7 @@ export async function herdIssues(
           `за пределами ${kg(Math.round(low))}…${kg(Math.round(high))} кг. ` +
           'Формально такие удои правдоподобны — неправдоподобны они именно в этом стаде',
         rows.map((r) => ({
-          animalId: num(r.id),
+          animalId: numOf(r.id),
           label: `№ ${String(r.ident_number)} — ${kg(Math.round(Number(r.milk)))} кг`,
         })),
       )
@@ -399,11 +391,11 @@ export async function herdIssues(
 
   /* ------------------------- Даты рождения -------------------------- */
 
-  const born = num(birth?.n)
+  const born = numOf(birth?.n)
 
   if (born >= t.herdMin) {
-    const jan1 = num(birth?.jan1)
-    const first = num(birth?.first_of_month)
+    const jan1 = numOf(birth?.jan1)
+    const first = numOf(birth?.first_of_month)
 
     /*
      * Две находки об одном явлении не выводим: первое января входит
@@ -432,10 +424,10 @@ export async function herdIssues(
   /* --------------------- Источники контрольных доек --------------------- */
 
   if (sourceRows && sourceRows.length > 1) {
-    const total = sourceRows.reduce((s, r) => s + num(r.n), 0)
+    const total = sourceRows.reduce((s, r) => s + numOf(r.n), 0)
     const lab = sourceRows.find((r) => String(r.source) === 'lab')
     const others = sourceRows.filter((r) => String(r.source) !== 'lab')
-    const otherRows = others.reduce((s, r) => s + num(r.n), 0)
+    const otherRows = others.reduce((s, r) => s + numOf(r.n), 0)
 
     /*
      * Смешение ловится только тогда, когда лабораторные дойки в стаде
@@ -447,9 +439,9 @@ export async function herdIssues(
       push(
         'milk-test-source-mixed',
         'note',
-        `Дойки стада получены по-разному: ${num(lab.n)} из ${total} — из лаборатории, ` +
+        `Дойки стада получены по-разному: ${numOf(lab.n)} из ${total} — из лаборатории, ` +
           `${otherRows} — ${others
-            .map((r) => `${SOURCE_LABEL[String(r.source)] ?? String(r.source)}: ${num(r.n)}`)
+            .map((r) => `${SOURCE_LABEL[String(r.source)] ?? String(r.source)}: ${numOf(r.n)}`)
             .join(', ')}. ` +
           'Замер лаборатории и число со слов хозяйства складывать в одно среднее нельзя',
       )
@@ -464,7 +456,7 @@ export async function herdIssues(
       const key = String(r.profile_key)
       const version = String(r.base_version)
       const inner = byProfile.get(key) ?? new Map<string, number>()
-      inner.set(version, (inner.get(version) ?? 0) + num(r.n))
+      inner.set(version, (inner.get(version) ?? 0) + numOf(r.n))
       byProfile.set(key, inner)
     }
 
@@ -490,7 +482,7 @@ export async function herdIssues(
   /* -------------------------- Пропущенный год -------------------------- */
 
   if (yearRows && yearRows.length >= 2) {
-    const years = yearRows.map((r) => ({ y: num(r.y), n: num(r.n) })).sort((a, b) => a.y - b.y)
+    const years = yearRows.map((r) => ({ y: numOf(r.y), n: numOf(r.n) })).sort((a, b) => a.y - b.y)
     const first = years[0]!.y
     const last = years[years.length - 1]!.y
     const total = years.reduce((s, y) => s + y.n, 0)
@@ -530,8 +522,8 @@ export async function herdIssues(
    */
   const milkGap = milkGapRows?.[0] ?? null
   if (milkGap) {
-    const cows = num(milkGap.total)
-    const silent = num(milkGap.silent)
+    const cows = numOf(milkGap.total)
+    const silent = numOf(milkGap.silent)
     if (silent > 0 && cows >= t.herdMin) {
       push(
         'no-milk-tests-year',
@@ -566,7 +558,7 @@ export async function herdIssues(
     for (const r of coreRows) {
       const key = String(r.core)
       const row: IdentRow = {
-        id: num(r.id),
+        id: numOf(r.id),
         ident: String(r.ident_number),
         field: String(r.field),
         value: String(r.value),
@@ -608,7 +600,7 @@ export async function herdIssues(
       )
     }
 
-    const total = num(coreRows[0]!.groups)
+    const total = numOf(coreRows[0]!.groups)
     if (total > CAPS.examples) {
       limits.push(
         `Совпадений цифр в идентификаторах найдено ${total}, показаны ${CAPS.examples} ` +

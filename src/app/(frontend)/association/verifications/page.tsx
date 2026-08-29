@@ -165,8 +165,8 @@ export default async function VerificationQueuePage({
           {overlapping > 0 && (
             <div className="mt-6 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-[14px] leading-relaxed text-ink-700">
               <span className="font-medium">
-                {overlapping} {plural(overlapping, ['заявка', 'заявки', 'заявок'])}{' '}
-                {plural(overlapping, ['пересекается', 'пересекаются', 'пересекаются'])} с другими
+                {overlapping} {plural(overlapping, 'заявка', 'заявки', 'заявок')}{' '}
+                {plural(overlapping, 'пересекается', 'пересекаются', 'пересекаются')} с другими
                 по животным.
               </span>{' '}
               Разбирать их по отдельности значит смотреть одни и те же записи дважды и рисковать

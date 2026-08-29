@@ -3,6 +3,7 @@ import type { Animal } from '@/payload-types'
 import { CYCLE_DEPTH, type CheckLimits, type Issue } from '@/lib/checks-registry'
 import { defaultThresholds, type Thresholds } from '@/lib/check-thresholds'
 import { monthsBetween } from '@/lib/afc'
+import { relId } from '@/lib/visibility'
 
 /**
  * Проверки родословной, которым мало прямых родителей.
@@ -35,12 +36,6 @@ const ANCESTOR_CAP = 20_000
 
 /** Сколько потомков одной матери смотрим — больше двадцати у коровы не бывает. */
 const OFFSPRING_CAP = 5_000
-
-const idOf = (v: unknown): number | null => {
-  if (typeof v === 'number') return v
-  if (v && typeof v === 'object' && 'id' in v) return (v as { id: number }).id
-  return null
-}
 
 const time = (d?: string | null): number | null => {
   if (!d) return null
@@ -105,8 +100,8 @@ async function ancestorMap(
 
     for (const a of docs) {
       known.set(a.id as number, {
-        father: idOf(a.father),
-        mother: idOf(a.mother),
+        father: relId(a.father),
+        mother: relId(a.mother),
         identNumber: a.identNumber,
         birthDate: a.birthDate,
         disposalDate: (a as { disposalDate?: string | null }).disposalDate,
@@ -114,7 +109,7 @@ async function ancestorMap(
     }
 
     frontier = docs
-      .flatMap((a) => [idOf(a.father), idOf(a.mother)])
+      .flatMap((a) => [relId(a.father), relId(a.mother)])
       .filter((x): x is number => x !== null)
   }
 
@@ -203,7 +198,7 @@ export async function pedigreeIssues(
       ['father', 'Отец'],
       ['mother', 'Мать'],
     ] as const) {
-      const pid = idOf(a[side])
+      const pid = relId(a[side])
       if (!pid) continue
       const parent = map.get(pid)
       if (!parent?.birthDate) continue
@@ -238,7 +233,7 @@ export async function pedigreeIssues(
 
     /* --------------- Отец выбыл задолго до зачатия --------------- */
 
-    const fid = idOf(a.father)
+    const fid = relId(a.father)
     const father = fid ? map.get(fid) : null
     const gone = time(father?.disposalDate)
     const bornAt = time(born)
@@ -263,7 +258,7 @@ export async function pedigreeIssues(
    * не входить. Поэтому отдельный запрос — по матерям набора.
    */
   const motherIds = [
-    ...new Set(animals.map((a) => idOf(a.mother)).filter((x): x is number => x !== null)),
+    ...new Set(animals.map((a) => relId(a.mother)).filter((x): x is number => x !== null)),
   ]
 
   if (motherIds.length) {
@@ -291,7 +286,7 @@ export async function pedigreeIssues(
 
       const byMother = new Map<number, { id: number; ident: string; born: number }[]>()
       for (const c of res.docs) {
-        const mid = idOf(c.mother)
+        const mid = relId(c.mother)
         const born = time(c.birthDate)
         if (!mid || born === null) continue
         byMother.set(mid, [

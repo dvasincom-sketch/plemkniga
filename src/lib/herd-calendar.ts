@@ -1,4 +1,5 @@
 import type { Payload } from 'payload'
+import { poolOf } from '@/lib/sql'
 
 /**
  * Календарь стада: запуск, отёл, проверка стельности.
@@ -116,13 +117,6 @@ export type HerdCalendar = {
   /** Кого осеменять заново: яловая, цикл прошёл. */
   rebreed: CalendarRow[]
 }
-
-type SqlPool = {
-  query: (q: string, p?: unknown[]) => Promise<{ rows?: Record<string, unknown>[] }>
-}
-
-const poolOf = (payload: Payload): SqlPool | null =>
-  (payload.db as unknown as { pool?: SqlPool }).pool ?? null
 
 /**
  * Общая часть трёх запросов: живые самки хозяйства, их последний отёл

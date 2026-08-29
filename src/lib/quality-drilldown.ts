@@ -1,4 +1,5 @@
 import type { Payload } from 'payload'
+import { poolOf } from '@/lib/sql'
 
 /**
  * Разбор одного противоречия: кто именно.
@@ -30,13 +31,6 @@ export type Drilldown = {
   total: number
   rows: DrilldownRow[]
 }
-
-type SqlPool = {
-  query: (q: string, p?: unknown[]) => Promise<{ rows?: Record<string, unknown>[] }>
-}
-
-const poolOf = (payload: Payload): SqlPool | null =>
-  (payload.db as unknown as { pool?: SqlPool }).pool ?? null
 
 /**
  * Правила разбора.
@@ -131,9 +125,6 @@ const RULES: Record<
     where: 'a.breed_id is null',
   },
 }
-
-export const isKnownRule = (code: string): boolean => code in RULES
-export const ruleLabel = (code: string): string | null => RULES[code]?.label ?? null
 
 /** Список записей по одному правилу. Ограничен: сводка про масштаб, список — про разбор. */
 export async function drilldown(

@@ -2,6 +2,7 @@ import type { Payload } from 'payload'
 import type { Animal } from '@/payload-types'
 import type { CheckLimits, Issue } from '@/lib/checks-registry'
 import { defaultThresholds, type Thresholds } from '@/lib/check-thresholds'
+import { relId } from '@/lib/visibility'
 
 /**
  * Проверки, которые смотрят на события во времени.
@@ -36,12 +37,6 @@ const CALVING_CAP_PER_ANIMAL = 12
 const INSEMINATION_CAP_PER_ANIMAL = 20
 const MILK_TEST_CAP = 20_000
 const DAY = 86_400_000
-
-const idOf = (v: unknown): number | null => {
-  if (typeof v === 'number') return v
-  if (v && typeof v === 'object' && 'id' in v) return (v as { id: number }).id
-  return null
-}
 
 const time = (d?: string | null): number | null => {
   if (!d) return null
@@ -163,10 +158,10 @@ export async function sequenceIssues(
 
   const calvings = new Map<number, CalvingRow[]>()
   for (const c of calvingRes?.docs ?? []) {
-    const aid = idOf(c.animal)
+    const aid = relId(c.animal)
     if (!aid || !c.date) continue
     const calves = Array.isArray(c.calves)
-      ? c.calves.map(idOf).filter((x): x is number => x !== null)
+      ? c.calves.map(relId).filter((x): x is number => x !== null)
       : []
     calvings.set(aid, [
       ...(calvings.get(aid) ?? []),
@@ -183,14 +178,14 @@ export async function sequenceIssues(
 
   const inseminations = new Map<number, InseminationRow[]>()
   for (const i of inseminationRes?.docs ?? []) {
-    const aid = idOf(i.animal)
+    const aid = relId(i.animal)
     if (!aid || !i.date) continue
     inseminations.set(aid, [
       ...(inseminations.get(aid) ?? []),
       {
         animal: aid,
         date: i.date,
-        bull: idOf(i.bull),
+        bull: relId(i.bull),
         pregnancyCheckDate: i.pregnancyCheckDate,
       },
     ])
@@ -198,7 +193,7 @@ export async function sequenceIssues(
 
   const milkDates = new Map<number, string[]>()
   for (const m of milkRes?.docs ?? []) {
-    const aid = idOf(m.animal)
+    const aid = relId(m.animal)
     if (!aid || !m.date) continue
     milkDates.set(aid, [...(milkDates.get(aid) ?? []), m.date])
   }

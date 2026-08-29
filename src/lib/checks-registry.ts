@@ -784,8 +784,6 @@ export const checkSpec = (code: CheckCode): CheckSpec | undefined =>
 export const checkSpecByCode = (code: string): CheckSpec | undefined =>
   ALL_CHECKS.find((c) => c.code === code)
 
-export const checksOfGroup = (group: CheckGroup): readonly CheckSpec[] =>
-  CHECKS.filter((c) => c.group === group)
 
 /**
  * Реестр с расширенным типом — для перебора.

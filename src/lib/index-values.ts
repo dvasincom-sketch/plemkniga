@@ -6,6 +6,7 @@ import {
   type Base,
   type IndexProfile,
 } from '@/lib/breeding-index'
+import { poolOf, type SqlPool } from '@/lib/sql'
 import { loadActiveBase } from '@/lib/index-base'
 import { profileOfDoc } from '@/lib/index-profiles'
 import type { Animal, IndexProfile as IndexProfileDoc } from '@/payload-types'
@@ -74,15 +75,17 @@ const rowOf = (animal: Animal, profile: IndexProfile, base: Base) => {
 
 type Row = ReturnType<typeof rowOf>
 
-type SqlPool = {
-  query: (
-    q: string,
-    p?: unknown[],
-  ) => Promise<{ rowCount: number | null; rows?: Record<string, unknown>[] }>
-}
-
-const poolOf = (payload: Payload): SqlPool => {
-  const pool = (payload.db as unknown as { pool?: SqlPool }).pool
+/*
+ * Здесь свой `poolOf`, и это не забытая копия.
+ *
+ * Общий (`lib/sql.ts`) возвращает `null`, когда пула нет, и вызывающий
+ * решает, отказать или обойтись. Пересчёт индекса обойтись не может:
+ * без прямого запроса он не считается вовсе, а молчаливый пропуск
+ * оставил бы в книге старые значения под видом свежих. Поэтому отказ,
+ * а не пустой результат.
+ */
+const requirePool = (payload: Payload): SqlPool => {
+  const pool = poolOf(payload)
   if (!pool) throw new Error('Пересчёт индекса рассчитан на PostgreSQL-адаптер')
   return pool
 }
@@ -102,7 +105,7 @@ const poolOf = (payload: Payload): SqlPool => {
  */
 async function insertRows(payload: Payload, rows: Row[]): Promise<void> {
   if (!rows.length) return
-  const pool = poolOf(payload)
+  const pool = requirePool(payload)
 
   const CHUNK = 500
   for (let i = 0; i < rows.length; i += CHUNK) {
@@ -298,7 +301,7 @@ async function eachAnimal(
   batchSize: number,
   handle: (batch: Animal[], scanned: number, total: number) => Promise<void>,
 ): Promise<number> {
-  const pool = poolOf(payload)
+  const pool = requirePool(payload)
   const columns = TRAIT_COLUMNS.map(([c]) => `"${c}"`).join(', ')
 
   const totalRow = await pool.query(`select count(*)::int as n from animals`)
@@ -359,7 +362,7 @@ const BATCH = 5_000
  * там, где базе хватает одного.
  */
 export async function dropProfileValues(payload: Payload, profileKey: string): Promise<number> {
-  const r = await poolOf(payload).query(`delete from index_values where profile_key = $1`, [
+  const r = await requirePool(payload).query(`delete from index_values where profile_key = $1`, [
     profileKey,
   ])
   return r.rowCount ?? 0
@@ -414,7 +417,7 @@ export async function recomputeAll(
    * подходящее место, чтобы прибрать.
    */
   const keys = profiles.map((p) => p.key)
-  const cleaned = await poolOf(payload).query(
+  const cleaned = await requirePool(payload).query(
     `delete from index_values where not (profile_key = any($1::text[]))`,
     [keys],
   )
@@ -494,7 +497,7 @@ export async function updatePercentiles(
   const scope = opts.profileKey ? `and profile_key = $1` : ''
   const params = opts.profileKey ? [opts.profileKey] : []
 
-  const res = await poolOf(payload).query(
+  const res = await requirePool(payload).query(
     `
     with ranked as (
       select
@@ -548,7 +551,7 @@ export async function updatePercentiles(
    * — для этого нужен `VACUUM FULL` с блокировкой таблицы, и решение о нём
    * принимает человек в спокойное время, а не скрипт посреди пересчёта.
    */
-  await poolOf(payload).query('vacuum analyze index_values')
+  await requirePool(payload).query('vacuum analyze index_values')
 
   log(
     `процентили${opts.profileKey ? ` (${opts.profileKey})` : ''}: ` +
@@ -616,7 +619,7 @@ export async function percentileFromStored(
    * Заодно три счёта превратились в один запрос: размер группы, сколько ниже
    * и сколько равных считаются одним проходом.
    */
-  const pool = poolOf(payload)
+  const pool = requirePool(payload)
 
   const measure = async (year: number | null) => {
     const params: unknown[] = [profileKey, value]
@@ -744,7 +747,7 @@ export async function indexValuesLag(
      * с полем другой, а обходной путь — вычитать обе таблицы в память —
      * на трёхстах тысячах животных не путь вовсе.
      */
-    poolOf(payload)
+    requirePool(payload)
       .query(
         `select count(*)::int as n
            from index_values v

@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 import { AFC_PLAUSIBLE } from '@/lib/afc'
+import { poolOf } from '@/lib/sql'
 
 /**
  * Возраст первого отёла по быкам — по всей книге, а не по одному стаду.
@@ -49,13 +50,6 @@ import { AFC_PLAUSIBLE } from '@/lib/afc'
  * по стаду целиком и по паре «стадо + бык». Вычитание второй из первой
  * даёт сверстниц без единого лишнего прохода.
  */
-
-type SqlPool = {
-  query: (q: string, p?: unknown[]) => Promise<{ rows?: Record<string, unknown>[] }>
-}
-
-const poolOf = (payload: Payload): SqlPool | null =>
-  (payload.db as unknown as { pool?: SqlPool }).pool ?? null
 
 /** Меньше этого числа дочерей бык в сводку по книге не попадает. */
 export const AFC_SIRE_MIN_DAUGHTERS = 10

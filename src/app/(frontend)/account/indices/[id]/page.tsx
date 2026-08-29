@@ -15,6 +15,7 @@ import { CorrelatedResponse } from '@/components/CorrelatedResponse'
 import { profileOfDoc, sharesOf } from '@/lib/index-profiles'
 import type { Animal, IndexProfile as IndexProfileDoc, Organization } from '@/payload-types'
 import type { TraitKey } from '@/lib/breeding-index'
+import { plural } from '@/lib/format'
 
 export const metadata: Metadata = { title: 'Настройка профиля индекса' }
 export const dynamic = 'force-dynamic'
@@ -215,11 +216,3 @@ export default async function EditIndexProfilePage({
   )
 }
 
-const plural = (n: number, one: string, few: string, many: string) => {
-  const a = Math.abs(n) % 100
-  const b = a % 10
-  if (a > 10 && a < 20) return many
-  if (b > 1 && b < 5) return few
-  if (b === 1) return one
-  return many
-}

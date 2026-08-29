@@ -1,4 +1,5 @@
 import { ROADMAP, STATE_LABEL, STATE_TONE, type RoadmapState } from '@/lib/roadmap'
+import { plural } from '@/lib/format'
 
 /**
  * Вкладка «Дорожная карта».
@@ -70,7 +71,7 @@ export function EvolutionRoadmap() {
               <div className="md:sticky md:top-6 md:self-start">
                 <div className="text-[15px] font-medium text-ink-900">{h.when}</div>
                 <div className="mt-1 text-[12px] text-ink-500">
-                  {h.items.length} {plural(h.items.length)}
+                  {h.items.length} {plural(h.items.length, 'работа', 'работы', 'работ')}
                 </div>
               </div>
 
@@ -118,14 +119,4 @@ const STATE_HINT: Record<RoadmapState, string> = {
   designed: 'решение продумано и записано, кода пока нет',
   planned: 'работа названа, порядок понятен, сроки ориентировочные',
   blocked: 'ждём того, что не в нашей власти, — срок назвать нельзя',
-}
-
-/** Русский счёт: 1 работа, 2 работы, 5 работ */
-function plural(n: number) {
-  const mod100 = n % 100
-  const mod10 = n % 10
-  if (mod100 >= 11 && mod100 <= 14) return 'работ'
-  if (mod10 === 1) return 'работа'
-  if (mod10 >= 2 && mod10 <= 4) return 'работы'
-  return 'работ'
 }

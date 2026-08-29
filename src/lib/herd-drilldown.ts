@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 import { INBREEDING_THRESHOLD, SCC_THRESHOLD } from '@/lib/herd-analytics'
+import { poolOf } from '@/lib/sql'
 
 /**
  * Число отчёта → животные, которые за ним стоят.
@@ -70,13 +71,6 @@ export type HerdDrilldown = {
   total: number
   rows: HerdRow[]
 }
-
-type SqlPool = {
-  query: (q: string, p?: unknown[]) => Promise<{ rows?: Record<string, unknown>[] }>
-}
-
-const poolOf = (payload: Payload): SqlPool | null =>
-  (payload.db as unknown as { pool?: SqlPool }).pool ?? null
 
 /** Возраст в месяцах — тем же выражением, что в `heiferAges`. */
 const MONTHS =
@@ -303,9 +297,6 @@ function lactationRule(k: number, label: string): Rule {
     params: [k],
   }
 }
-
-export const isHerdCode = (code: string): boolean => code in RULES
-export const herdCodeLabel = (code: string): string | null => RULES[code]?.label ?? null
 
 export async function herdDrilldown(
   payload: Payload,

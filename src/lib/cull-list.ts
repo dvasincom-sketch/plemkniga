@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 import { SCC_THRESHOLD } from '@/lib/herd-analytics'
+import { numOrNull, poolOf } from '@/lib/sql'
 
 /**
  * Кандидаты на выбраковку — одной таблицей.
@@ -147,19 +148,6 @@ export type CullList = {
   /** Коров хотя бы с одним поводом. */
   flagged: number
   rows: CullRow[]
-}
-
-type SqlPool = {
-  query: (q: string, p?: unknown[]) => Promise<{ rows?: Record<string, unknown>[] }>
-}
-
-const poolOf = (payload: Payload): SqlPool | null =>
-  (payload.db as unknown as { pool?: SqlPool }).pool ?? null
-
-const num = (v: unknown): number | null => {
-  if (v === null || v === undefined) return null
-  const x = Number(v)
-  return Number.isFinite(x) ? x : null
 }
 
 /**
@@ -362,12 +350,12 @@ export async function cullList(
       identNumber: String(r.ident_number ?? ''),
       name: r.name ? String(r.name) : null,
       lactation: Number(r.lactation ?? 0),
-      dim: num(r.dim),
+      dim: numOrNull(r.dim),
       services: Number(r.services ?? 0),
       pregnant: Boolean(r.pregnant),
-      scc: num(r.scc),
-      milk305: num(r.milk305),
-      ipc: num(r.ipc),
+      scc: numOrNull(r.scc),
+      milk305: numOrNull(r.milk305),
+      ipc: numOrNull(r.ipc),
       reasons: reasonsOf(r),
       notBred: Boolean(r.not_bred),
     })),

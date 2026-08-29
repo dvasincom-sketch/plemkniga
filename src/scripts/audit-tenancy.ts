@@ -2,6 +2,7 @@ import 'dotenv/config'
 import { getPayload, type Payload } from 'payload'
 import config from '@payload-config'
 import type { User } from '@/payload-types'
+import { relId } from '@/lib/visibility'
 
 /**
  * Ревизия мультиарендности: не отдаёт ли система чужие записи.
@@ -53,9 +54,6 @@ const ORG_SCOPED = ['data-submissions', 'documents'] as const
 
 type Finding = { collection: string; detail: string }
 
-const idOf = (v: unknown): number | null =>
-  typeof v === 'number' ? v : typeof v === 'object' && v && 'id' in v ? (v as { id: number }).id : null
-
 async function main() {
   const payload = await getPayload({ config })
   const findings: Finding[] = []
@@ -76,7 +74,7 @@ async function main() {
     console.log('\nНет ни одного фермера с организацией — проверять не от чьего лица.')
     return
   }
-  const myOrg = idOf(user.organization)
+  const myOrg = relId(user.organization)
 
   // Чужая закрытая запись: другая организация и без публичной видимости
   const foreign = await payload.find({
@@ -94,7 +92,7 @@ async function main() {
   console.log(`\nПроверяем от лица: ${user.email} (организация ${myOrg})`)
   console.log(
     victim
-      ? `Чужая закрытая запись для прицельной проверки: ${victim.identNumber} (владелец ${idOf(victim.owner)})\n`
+      ? `Чужая закрытая запись для прицельной проверки: ${victim.identNumber} (владелец ${relId(victim.owner)})\n`
       : 'Чужих закрытых записей в базе нет — прицельная проверка невозможна.\n',
   )
 
@@ -107,7 +105,7 @@ async function main() {
     if (!animal || typeof animal !== 'object') return true // связь не раскрыта — судить нечем
     const a = animal as { owner?: unknown; publicVisible?: boolean | null }
     if (a.publicVisible) return true
-    return idOf(a.owner) === myOrg
+    return relId(a.owner) === myOrg
   }
 
   const scanList = async (collection: string, limit = 200) => {
@@ -132,7 +130,7 @@ async function main() {
       // Запись на животном судится по животному, но только если связь заполнена
       if (d.animal) return !allowedAnimal(d.animal)
 
-      const org = idOf(d.organization ?? d.owner)
+      const org = relId(d.organization ?? d.owner)
       return org !== null && org !== myOrg
     })
 

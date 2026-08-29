@@ -5,13 +5,7 @@ import { AGE_GROUPS, STATES } from '@/lib/dictionaries'
 import { EXPORT_LIMIT, exportFormat, toTsv, toXml } from '@/lib/export-formats'
 import { toXlsx } from '@/lib/xlsx'
 import type { Payload } from 'payload'
-
-type SqlPool = {
-  query: (q: string, p?: unknown[]) => Promise<{ rows?: Record<string, unknown>[] }>
-}
-
-const poolOf = (payload: Payload): SqlPool | null =>
-  (payload.db as unknown as { pool?: SqlPool }).pool ?? null
+import { poolOf } from '@/lib/sql'
 
 /**
  * Выгрузка стада файлом.

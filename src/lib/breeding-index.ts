@@ -573,54 +573,6 @@ export function computeIndex(
  *                           Достоверность                             *
  * ------------------------------------------------------------------ */
 
-/**
- * Достоверность оценки по признаку — доля объяснённой дисперсии, 0…100 %.
- *
- * Три источника информации, и каждый считается по своей формуле.
- *
- * Дочери (для быка):        R = n / (n + k),  k = (4 − h²) / h²
- *   Классическая формула для оценки производителя по потомству. При h² = 0,3
- *   константа k ≈ 12,3: половина достоверности набирается на двенадцати
- *   дочерях, а девяносто процентов требуют больше сотни. Отсюда и практика
- *   не выпускать быка в широкое использование по десятку дочерей.
- *
- * Собственные лактации (для коровы):  R = n·h² / (1 + (n − 1)·rep)
- *   Повторные измерения одного животного не независимы, поэтому вторая
- *   лактация добавляет меньше первой.
- *
- * Родители:                 R_PA = (R_отца + R_матери) / 4
- *   Каждый родитель передаёт половину генома, и вклад в дисперсию — четверть.
- *
- * Источники объединяются как независимые: R = 1 − Π (1 − Rᵢ). Это приближение;
- * строго нужна матрица родства, но для карточки животного разница
- * несущественна, а формула остаётся объяснимой зоотехнику.
- */
-export function traitReliability(
-  trait: TraitBase,
-  input: { daughters?: number; ownRecords?: number; sireR?: number; damR?: number },
-): number {
-  const parts: number[] = []
-
-  const daughters = input.daughters ?? 0
-  if (daughters > 0) {
-    const k = (4 - trait.heritability) / trait.heritability
-    parts.push(daughters / (daughters + k))
-  }
-
-  const own = input.ownRecords ?? 0
-  if (own > 0) {
-    const r = trait.repeatability
-    parts.push((own * trait.heritability) / (1 + (own - 1) * r))
-  }
-
-  const pa = ((input.sireR ?? 0) + (input.damR ?? 0)) / 4
-  if (pa > 0) parts.push(pa)
-
-  if (parts.length === 0) return 0
-
-  const combined = 1 - parts.reduce((acc, r) => acc * (1 - Math.min(Math.max(r, 0), 0.99)), 1)
-  return Math.round(combined * 1000) / 10
-}
 
 /**
  * Достоверность индекса.
@@ -649,39 +601,4 @@ function indexReliability(
 
   if (!den) return 0
   return Math.round((num / den) * 10) / 10
-}
-
-/* ------------------------------------------------------------------ *
- *                             Процентиль                              *
- * ------------------------------------------------------------------ */
-
-/**
- * Место животного в группе сравнения, 0…99.
- *
- * Считается долей группы со значением ниже. Группа задаётся тем же, чем
- * и база: порода и год рождения — сравнивать первотёлку с быком 2010 года
- * бессмысленно. Полуцелая поправка на равные значения (`ties / 2`) — обычная
- * практика: при большом числе одинаковых оценок без неё все они получили бы
- * процентиль нижней границы.
- */
-export function percentileOf(value: number, cohort: number[]): number | null {
-  if (cohort.length < 2) return null
-
-  let below = 0
-  let equal = 0
-  for (const v of cohort) {
-    if (v < value) below++
-    else if (v === value) equal++
-  }
-
-  const p = ((below + equal / 2) / cohort.length) * 100
-  return Math.max(0, Math.min(99, Math.round(p)))
-}
-
-/** Группа сравнения: порода и год рождения. */
-export const cohortKey = (animal: Animal): string => {
-  const breed =
-    typeof animal.breed === 'object' && animal.breed ? animal.breed.id : (animal.breed ?? 'x')
-  const year = animal.birthDate ? new Date(animal.birthDate).getFullYear() : 0
-  return `${breed}:${year}`
 }

@@ -1,5 +1,6 @@
 import { TRAIT_BASE, type IndexProfile } from '@/lib/breeding-index'
 import { sharesOf } from '@/lib/index-profiles'
+import { plural } from '@/lib/format'
 
 /**
  * Веса профиля одной картинкой.
@@ -19,14 +20,6 @@ import { sharesOf } from '@/lib/index-profiles'
  */
 
 const label = (key: string) => TRAIT_BASE.find((t) => t.key === key)?.label ?? key
-
-const plural = (n: number, one: string, few: string, many: string) => {
-  const n10 = n % 10
-  const n100 = n % 100
-  if (n10 === 1 && n100 !== 11) return one
-  if (n10 >= 2 && n10 <= 4 && (n100 < 12 || n100 > 14)) return few
-  return many
-}
 
 export function ProfileWeights({ profile, limit }: { profile: IndexProfile; limit?: number }) {
   const shares = sharesOf(profile)

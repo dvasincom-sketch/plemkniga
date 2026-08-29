@@ -3,7 +3,8 @@ import { stampOwnerOrg } from '@/access/guards'
 import { ownerOrgField } from '@/collections/shared'
 import { EXTERIOR_COMPOSITES, EXTERIOR_TRAITS } from '@/lib/dictionaries'
 import { animalScopedReadFor, isAdmin } from '@/access'
-import { applyExteriorSnapshot, idOf } from '@/lib/evaluation-snapshot'
+import { applyExteriorSnapshot } from '@/lib/evaluation-snapshot'
+import { relId } from '@/lib/visibility'
 
 /**
  * Линейная оценка экстерьера — история измерений.
@@ -169,7 +170,7 @@ export const AnimalExteriors: CollectionConfig = {
     afterChange: [
       async ({ doc, req }) => {
         if (!doc.isCurrent) return doc
-        const animal = idOf(doc.animal)
+        const animal = relId(doc.animal)
         if (!animal) return doc
 
         try {
@@ -188,7 +189,7 @@ export const AnimalExteriors: CollectionConfig = {
     afterDelete: [
       async ({ doc, req }) => {
         if (!doc.isCurrent) return doc
-        const animal = idOf(doc.animal)
+        const animal = relId(doc.animal)
         if (!animal) return doc
 
         const rest = await req.payload.find({

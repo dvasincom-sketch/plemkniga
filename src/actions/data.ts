@@ -8,6 +8,7 @@ import { columnsOf, datasetByKey, headerMapOf, type Dataset } from '@/lib/import
 import { IDENT_FIELD_LABEL, IDENT_VALUES_SQL, identCore } from '@/lib/animal-id'
 import { DOMAIN_RULES } from '@/lib/db-constraints'
 import { quarantineColumns } from '@/lib/pending-columns'
+import { type SqlPool } from '@/lib/sql'
 
 export type ImportState = {
   error?: string
@@ -411,10 +412,6 @@ const changedFields = (doc: Record<string, unknown>, data: Record<string, unknow
  * с разбором json — не та цена, чтобы платить её тысячу раз.
  */
 type Accepted = { line: number; ident: string; core: string }
-
-type SqlPool = {
-  query: (q: string, p?: unknown[]) => Promise<{ rows?: Record<string, unknown>[] }>
-}
 
 async function identCoreMatches(
   payload: Awaited<ReturnType<typeof getClient>>,

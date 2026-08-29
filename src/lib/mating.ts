@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 import { INBREEDING_THRESHOLD } from '@/lib/herd-analytics'
+import { poolOf } from '@/lib/sql'
 
 /**
  * Подбор: инбридинг потомка для каждой пары «корова × бык».
@@ -105,13 +106,6 @@ export type MatingPlan = {
   /** Пар выше порога. */
   risky: number
 }
-
-type SqlPool = {
-  query: (q: string, p?: unknown[]) => Promise<{ rows?: Record<string, unknown>[] }>
-}
-
-const poolOf = (payload: Payload): SqlPool | null =>
-  (payload.db as unknown as { pool?: SqlPool }).pool ?? null
 
 /**
  * Кого подбирают.

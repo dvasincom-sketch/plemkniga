@@ -2,6 +2,7 @@ import 'dotenv/config'
 import { getPayload } from 'payload'
 import config from '../payload.config'
 import { ANCESTRY_DEPTH } from '../lib/ancestry'
+import { relId } from '@/lib/visibility'
 
 /**
  * Достройка родословной вглубь — без единого удаления.
@@ -53,12 +54,6 @@ const SIZES: Record<number, number> = {
   9: 140,
 }
 
-const idOf = (v: unknown): number | null => {
-  if (typeof v === 'number') return v
-  if (v && typeof v === 'object' && 'id' in v) return (v as { id: number }).id
-  return null
-}
-
 async function main() {
   const [rawKey, rawDepth] = process.argv.slice(2)
   if (!rawKey) {
@@ -107,14 +102,14 @@ async function main() {
 
   log(`Животное: ${animal.name ?? '—'}, инд. № ${animal.identNumber} (id ${animal.id})`)
 
-  if (!idOf(animal.father) || !idOf(animal.mother)) {
+  if (!relId(animal.father) || !relId(animal.mother)) {
     console.error('У животного не заполнены оба родителя — достраивать не от чего.')
     console.error('Свяжите отца и мать карточками, затем повторите запуск.')
     process.exit(1)
   }
 
-  const orgId = idOf(animal.owner)
-  const authorId = idOf(animal.author)
+  const orgId = relId(animal.owner)
+  const authorId = relId(animal.author)
 
   // Владелец у животного обязателен по схеме — служебным предкам он достаётся
   // тот же, что у потомка: иначе записи повиснут ничьими
@@ -152,11 +147,11 @@ async function main() {
     })
 
     // Кому чего не хватает
-    const needy = docs.docs.filter((d) => !idOf(d.father) || !idOf(d.mother))
+    const needy = docs.docs.filter((d) => !relId(d.father) || !relId(d.mother))
     const nextIds = new Set<number>()
     for (const d of docs.docs) {
-      const f = idOf(d.father)
-      const m = idOf(d.mother)
+      const f = relId(d.father)
+      const m = relId(d.mother)
       if (f) nextIds.add(f)
       if (m) nextIds.add(m)
     }
@@ -232,8 +227,8 @@ async function main() {
     for (let i = 0; i < needy.length; i++) {
       const d = needy[i]
       const patch: Record<string, number> = {}
-      if (!idOf(d.father)) patch.father = pool[i % males]
-      if (!idOf(d.mother)) {
+      if (!relId(d.father)) patch.father = pool[i % males]
+      if (!relId(d.mother)) {
         patch.mother = pool[males + ((i + Math.floor(i / femaleCount)) % femaleCount)]
       }
 

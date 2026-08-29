@@ -8,6 +8,7 @@ import {
   type Change,
 } from '@/lib/product-versions'
 import { CloseOnEscape } from './ChangeDetails'
+import { plural } from '@/lib/format'
 
 /**
  * Вкладка «Версии» — журнал изменений платформы.
@@ -109,7 +110,8 @@ export function EvolutionVersions({ openVersion }: { openVersion?: string }) {
               <div className="md:sticky md:top-6 md:self-start">
                 <div className="font-mono text-[15px] font-medium text-ink-900">{m.version}</div>
                 <div className="mt-1 text-[12px] text-ink-500">
-                  {m.changes.length} {plural(m.changes.length)}
+                  {m.changes.length}{' '}
+                  {plural(m.changes.length, 'изменение', 'изменения', 'изменений')}
                 </div>
               </div>
 
@@ -257,14 +259,4 @@ function DetailsPanel({ change }: { change: Change }) {
       </aside>
     </>
   )
-}
-
-/** Русский счёт: 1 изменение, 2 изменения, 5 изменений */
-function plural(n: number) {
-  const mod100 = n % 100
-  const mod10 = n % 10
-  if (mod100 >= 11 && mod100 <= 14) return 'изменений'
-  if (mod10 === 1) return 'изменение'
-  if (mod10 >= 2 && mod10 <= 4) return 'изменения'
-  return 'изменений'
 }

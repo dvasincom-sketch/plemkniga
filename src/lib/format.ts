@@ -96,8 +96,6 @@ export const dateTimeRu = (value?: string | null, timeZone = FALLBACK_TIME_ZONE)
   })
 }
 
-export const dash = <T,>(v: T | null | undefined): T | '—' =>
-  v === null || v === undefined || v === '' ? '—' : v
 
 /**
  * Форма слова при числе: «1 запись», «2 записи», «5 записей».
@@ -107,13 +105,22 @@ export const dash = <T,>(v: T | null | undefined): T | '—' =>
  * к «один или много», и написанное на глаз условие `n === 1 ? … : …`
  * ошибается на каждом числе от двух до четырёх — то есть на самых частых.
  *
- * Формы передаются как есть: `['запись', 'записи', 'записей']`.
+ * Формы передаются тремя доводами: `plural(n, 'запись', 'записи', 'записей')`.
+ *
+ * ## Почему одна на всё приложение
+ *
+ * Своих `plural` в проекте было одиннадцать, и они разошлись. В подписи
+ * к дочерям быка стояло условие `n100 < 10 || n100 >= 20` вместо
+ * `n100 < 12 || n100 > 14`: на двенадцати, тринадцати и четырнадцати
+ * дочерях выходило «12 дочери». Ошибка живёт в копии ровно потому,
+ * что копия — правило пишут по памяти, а память подводит на редких
+ * числах, которые потом никто не перечитывает.
  */
-export const plural = (n: number, forms: [string, string, string]): string => {
+export const plural = (n: number, one: string, few: string, many: string): string => {
   const abs = Math.abs(n) % 100
   const last = abs % 10
-  if (abs > 10 && abs < 20) return forms[2]
-  if (last > 1 && last < 5) return forms[1]
-  if (last === 1) return forms[0]
-  return forms[2]
+  if (abs > 10 && abs < 20) return many
+  if (last > 1 && last < 5) return few
+  if (last === 1) return one
+  return many
 }

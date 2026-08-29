@@ -4,6 +4,7 @@ import config from '@payload-config'
 import type { User } from '@/payload-types'
 import { forgetGrants } from '@/lib/grants'
 import { ACCESS_SCOPES } from '@/lib/dictionaries'
+import { relId } from '@/lib/visibility'
 
 /**
  * Ревизия точечного доступа: открывает ли грант ровно то, что обещает.
@@ -36,8 +37,6 @@ import { ACCESS_SCOPES } from '@/lib/dictionaries'
 type Finding = { step: string; detail: string }
 
 const findings: Finding[] = []
-const idOf = (v: unknown): number | null =>
-  typeof v === 'number' ? v : typeof v === 'object' && v && 'id' in v ? (v as { id: number }).id : null
 
 /**
  * Сообщение вместе со всеми вложенными причинами.
@@ -124,7 +123,7 @@ async function main() {
     console.log('\nНет ни одного фермера с организацией — проверять не от чьего лица.\n')
     return
   }
-  const myOrg = idOf(viewer.organization)
+  const myOrg = relId(viewer.organization)
   if (myOrg === null) {
     console.log('\nУ найденного фермера нет организации — грант выдавать некому.\n')
     return
@@ -174,7 +173,7 @@ async function main() {
   }
 
   const closedParent = async (a: { father?: unknown; mother?: unknown }): Promise<boolean> => {
-    for (const parent of [idOf(a.father), idOf(a.mother)]) {
+    for (const parent of [relId(a.father), relId(a.mother)]) {
       if (parent === null) continue
       const doc = await payload.findByID({
         collection: 'animals',
@@ -208,7 +207,7 @@ async function main() {
     console.log('\nЧужих закрытых записей в базе нет — проверять нечего.\n')
     return
   }
-  const ownerOrg = idOf(victim.owner)
+  const ownerOrg = relId(victim.owner)
   if (ownerOrg === null) {
     console.log('\nУ найденной чужой записи не заполнен владелец — проверять нечего.\n')
     return
@@ -333,7 +332,7 @@ async function main() {
 
   console.log('\nПредки\n' + '─'.repeat(74))
 
-  const parents = [idOf(victim.father), idOf(victim.mother)].filter((v): v is number => v !== null)
+  const parents = [relId(victim.father), relId(victim.mother)].filter((v): v is number => v !== null)
   if (!parents.length) {
     skip('у записи не заполнены отец и мать — проверять нечего')
   }

@@ -1,6 +1,6 @@
 import type { Where } from 'payload'
 import { getClient } from '@/lib/payload'
-import { dateRu, nf } from '@/lib/format'
+import { dateRu, nf, plural } from '@/lib/format'
 import { CALVING_RESULTS } from '@/collections/Calvings'
 import { eventTypeLabel } from '@/lib/dictionaries'
 import { ageAtMonths, ageLabel, monthsLabel } from '@/lib/afc'
@@ -59,15 +59,6 @@ const MONTHS = [
 ]
 
 const monthTitle = (d: Date) => `${MONTHS[d.getMonth()]} ${d.getFullYear()}`
-
-/** Склонение по числу: 1 дойка, 2 дойки, 5 доек. */
-const plural = (n: number, one: string, few: string, many: string) => {
-  const n10 = n % 10
-  const n100 = n % 100
-  if (n10 === 1 && n100 !== 11) return one
-  if (n10 >= 2 && n10 <= 4 && (n100 < 12 || n100 > 14)) return few
-  return many
-}
 
 export async function AnimalHistory({ animal }: { animal: Animal }) {
   const payload = await getClient()

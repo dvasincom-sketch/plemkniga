@@ -193,7 +193,7 @@ export function HerdSelection({ children }: { children: React.ReactNode }) {
               Сравнить{' '}
               {bulls.length > MAX_BULLS
                 ? `${MAX_BULLS} из ${bulls.length}`
-                : `${bulls.length} ${plural(bulls.length, ['быка', 'быков', 'быков'])}`}
+                : `${bulls.length} ${plural(bulls.length, 'быка', 'быков', 'быков')}`}
             </button>
           )}
 

@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 import { checkSpecByCode } from '@/lib/checks-registry'
+import { numOf, poolOf, type SqlPool } from '@/lib/sql'
 
 /**
  * Качество книги — сводка по всей базе, а не по выборке.
@@ -37,17 +38,6 @@ export type BookQuality = {
   issues: QualityRow[]
   queues: { label: string; count: number; late: number }[]
 }
-
-type SqlPool = {
-  query: (q: string, p?: unknown[]) => Promise<{ rows?: Record<string, unknown>[] }>
-  connect?: () => Promise<{
-    query: (q: string, p?: unknown[]) => Promise<{ rows?: Record<string, unknown>[] }>
-    release: () => void
-  }>
-}
-
-const poolOf = (payload: Payload): SqlPool | null =>
-  (payload.db as unknown as { pool?: SqlPool }).pool ?? null
 
 /**
  * Потолок времени на запрос.
@@ -99,8 +89,6 @@ const TRUST_LABEL: Record<number, string> = {
   2: 'Подтверждено лабораторией',
   3: 'Верифицировано ассоциацией',
 }
-
-const n = (v: unknown): number => Number(v ?? 0)
 
 export async function bookQuality(payload: Payload): Promise<BookQuality | null> {
   const pool = poolOf(payload)
@@ -216,7 +204,7 @@ export async function bookQuality(payload: Payload): Promise<BookQuality | null>
     return {
       key,
       label: spec?.label ?? label,
-      count: n(value),
+      count: numOf(value),
       severity: spec?.severity ?? severity,
       hint: spec?.why ?? hint,
     }
@@ -260,7 +248,7 @@ export async function bookQuality(payload: Payload): Promise<BookQuality | null>
   }
 
   return {
-    animals: n(r.animals),
+    animals: numOf(r.animals),
     /** Какие части сводки не сошлись — о них честно сказано на странице */
     missing: [
       issues === null ? ('issues' as const) : null,
@@ -268,15 +256,15 @@ export async function bookQuality(payload: Payload): Promise<BookQuality | null>
       queues === null ? ('queues' as const) : null,
     ].filter((x): x is 'issues' | 'trust' | 'queues' => x !== null),
     trust: (trust ?? []).map((t) => ({
-      level: n(t.level),
-      label: TRUST_LABEL[n(t.level)] ?? String(t.level),
-      count: n(t.total),
+      level: numOf(t.level),
+      label: TRUST_LABEL[numOf(t.level)] ?? String(t.level),
+      count: numOf(t.total),
     })),
     issues: rows,
     queues: (queues ?? []).map((q) => ({
       label: QUEUE_LABEL[String(q.kind)] ?? String(q.kind),
-      count: n(q.total),
-      late: n(q.late),
+      count: numOf(q.total),
+      late: numOf(q.late),
     })),
   }
 }

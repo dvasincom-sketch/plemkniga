@@ -1,4 +1,5 @@
 import type { Payload } from 'payload'
+import { numOf, numOrNull, poolOf } from '@/lib/sql'
 
 /**
  * Отчёты по стаду для «Обзора»: структура, тренд, выбытие, воспроизводство.
@@ -24,21 +25,6 @@ import type { Payload } from 'payload'
  * которого система не проверяла. Поэтому запросы не глушатся `catch`,
  * возвращающим нули: отказ идёт наверх и попадает в лог.
  */
-
-type SqlPool = {
-  query: (q: string, p?: unknown[]) => Promise<{ rows?: Record<string, unknown>[] }>
-}
-
-const poolOf = (payload: Payload): SqlPool | null =>
-  (payload.db as unknown as { pool?: SqlPool }).pool ?? null
-
-const n = (v: unknown): number => Number(v ?? 0)
-
-const f = (v: unknown): number | null => {
-  if (v === null || v === undefined) return null
-  const x = Number(v)
-  return Number.isFinite(x) ? x : null
-}
 
 /* ------------------------------------------------------------------ *
  *                    1. Структура стада по лактациям                  *
@@ -111,7 +97,7 @@ export async function lactationStructure(
   )
 
   const rows = (res.rows ?? []) as { bucket: unknown; cows: unknown }[]
-  const byBucket = new Map(rows.map((r) => [n(r.bucket), n(r.cows)]))
+  const byBucket = new Map(rows.map((r) => [numOf(r.bucket), numOf(r.cows)]))
 
   const LABELS: Record<number, string> = {
     1: 'Первотёлки',
@@ -219,11 +205,11 @@ export async function heiferAges(
 
   const r = (res.rows?.[0] ?? {}) as Record<string, unknown>
   return {
-    young: n(r.young),
-    ready: n(r.ready),
-    overdue: n(r.overdue),
-    total: n(r.total),
-    meanReadyAge: f(r.mean_ready),
+    young: numOf(r.young),
+    ready: numOf(r.ready),
+    overdue: numOf(r.overdue),
+    total: numOf(r.total),
+    meanReadyAge: numOrNull(r.mean_ready),
   }
 }
 
@@ -308,10 +294,10 @@ export async function geneticTrend(
   )
 
   const points = ((res.rows ?? []) as Record<string, unknown>[]).map((r) => ({
-    year: n(r.year),
-    animals: n(r.animals),
-    ipc: f(r.ipc),
-    inbreeding: f(r.inbreeding),
+    year: numOf(r.year),
+    animals: numOf(r.animals),
+    ipc: numOrNull(r.ipc),
+    inbreeding: numOrNull(r.inbreeding),
   }))
 
   const share = await pool.query(
@@ -331,9 +317,9 @@ export async function geneticTrend(
 
   return {
     points,
-    aboveThreshold: n(s.above),
-    withInbreeding: n(s.total),
-    meanInbreeding: f(s.mean),
+    aboveThreshold: numOf(s.above),
+    withInbreeding: numOf(s.total),
+    meanInbreeding: numOrNull(s.mean),
   }
 }
 
@@ -418,8 +404,8 @@ export async function culling(
   )
 
   const r = (res.rows?.[0] ?? {}) as Record<string, unknown>
-  const total = n(r.total)
-  const liveCows = n(r.live_cows)
+  const total = numOf(r.total)
+  const liveCows = numOf(r.live_cows)
 
   const byReason = await pool.query(
     `
@@ -438,13 +424,13 @@ export async function culling(
 
   return {
     total,
-    firstLactation: n(r.first_lactation),
-    meanLactation: f(r.mean_lactation),
+    firstLactation: numOf(r.first_lactation),
+    meanLactation: numOrNull(r.mean_lactation),
     rate: total + liveCows > 0 ? (total / (total + liveCows)) * 100 : null,
     reasons: ((byReason.rows ?? []) as Record<string, unknown>[]).map((x) => ({
       reason: String(x.reason ?? 'Причина не указана'),
-      count: n(x.count),
-      meanLactation: f(x.mean_lactation),
+      count: numOf(x.count),
+      meanLactation: numOrNull(x.mean_lactation),
     })),
   }
 }
@@ -575,19 +561,19 @@ export async function reproduction(
   )
 
   const r = (res.rows?.[0] ?? {}) as Record<string, unknown>
-  const insTotal = n(r.ins_total)
-  const insOk = n(r.ins_ok)
+  const insTotal = numOf(r.ins_total)
+  const insOk = numOf(r.ins_ok)
 
   return {
-    serviceperiod: f(r.service_period),
+    serviceperiod: numOrNull(r.service_period),
     /*
      * Индекс осеменения считается только когда стельности отмечены.
      * Делить на ноль нельзя, а показать «0 доз на стельность» —
      * значит соврать: это не отличная работа, это незаполненный результат.
      */
     perConception: insOk > 0 ? Math.round((insTotal / insOk) * 100) / 100 : null,
-    calvingInterval: f(r.calving_interval),
-    calvings: n(r.calvings_year),
+    calvingInterval: numOrNull(r.calving_interval),
+    calvings: numOf(r.calvings_year),
     inseminations: insTotal,
   }
 }
@@ -674,13 +660,13 @@ export async function udderHealth(
   )
 
   const r = (res.rows?.[0] ?? {}) as Record<string, unknown>
-  const measured = n(r.measured)
+  const measured = numOf(r.measured)
 
   return {
-    meanScc: f(r.mean_scc),
-    above: n(r.above),
+    meanScc: numOrNull(r.mean_scc),
+    above: numOf(r.above),
     measured,
-    share: measured > 0 ? (n(r.above) / measured) * 100 : null,
+    share: measured > 0 ? (numOf(r.above) / measured) * 100 : null,
     lastTest: r.last_test ? new Date(String(r.last_test)).toISOString() : null,
   }
 }
@@ -806,12 +792,12 @@ export async function milkByLactation(
       return {
         key,
         label: LABELS[key],
-        cows: n(r.cows),
-        milk305: f(r.milk305),
-        fatPercent: f(r.fat),
-        proteinPercent: f(r.protein),
+        cows: numOf(r.cows),
+        milk305: numOrNull(r.milk305),
+        fatPercent: numOrNull(r.fat),
+        proteinPercent: numOrNull(r.protein),
       }
     }),
-    inProgress: n((progress.rows?.[0] ?? {}).n),
+    inProgress: numOf((progress.rows?.[0] ?? {}).n),
   }
 }

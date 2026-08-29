@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 import { AFC_PLAUSIBLE } from '@/lib/afc'
+import { poolOf } from '@/lib/sql'
 
 /**
  * Возраст первого отёла по стаду хозяйства и в разрезе быков.
@@ -36,13 +37,6 @@ import { AFC_PLAUSIBLE } from '@/lib/afc'
  * по одному дал бы шесть тысяч запросов (отёл первый, отёл второй) ради
  * страницы, которую открывают раз в месяц.
  */
-
-type SqlPool = {
-  query: (q: string, p?: unknown[]) => Promise<{ rows?: Record<string, unknown>[] }>
-}
-
-const poolOf = (payload: Payload): SqlPool | null =>
-  (payload.db as unknown as { pool?: SqlPool }).pool ?? null
 
 /**
  * Границы групп.

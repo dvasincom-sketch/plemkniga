@@ -91,12 +91,6 @@ export const AFC_PLAUSIBLE = {
   max: 48,
 } as const
 
-/** Ориентиры для подписи, откуда они взяты — в `docs/vneshnie-dannye.md`. */
-export const AFC_REFERENCE = {
-  ukMean: 29.1,
-  ukMedian: 28,
-  source: 'Eastham et al., PLOS ONE 2018, doi:10.1371/journal.pone.0197764',
-} as const
 
 export type AfcVerdict = 'ok' | 'tooYoung' | 'tooOld'
 

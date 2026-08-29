@@ -389,9 +389,6 @@ export async function resolveThresholds(payload: Payload): Promise<Thresholds> {
   return values
 }
 
-/** Пороги, отличающиеся от заложенных, — для показа в каталоге. */
-export const overriddenThresholds = (t: Thresholds): ThresholdSpec[] =>
-  (THRESHOLDS as readonly ThresholdSpec[]).filter((s) => t[s.key as ThresholdKey] !== s.default)
 
 /** Пороги, которые использует правило. */
 export const thresholdsOfCheck = (code: string): ThresholdSpec[] =>

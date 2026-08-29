@@ -24,6 +24,7 @@ import {
   resolveThresholds,
   type Thresholds,
 } from '@/lib/check-thresholds'
+import { relId } from '@/lib/visibility'
 
 /**
  * Автоматический поиск несостыковок в данных.
@@ -74,12 +75,6 @@ const time = (d?: string | null): number | null => {
   if (!d) return null
   const t = new Date(d).getTime()
   return Number.isNaN(t) ? null : t
-}
-
-const idOf = (v: unknown): number | null => {
-  if (typeof v === 'number') return v
-  if (v && typeof v === 'object' && 'id' in v) return (v as { id: number }).id
-  return null
 }
 
 const rel = (v: unknown): Record<string, unknown> | null =>
@@ -382,8 +377,8 @@ async function relationalIssues(
 
   const parentIds = new Set<number>()
   for (const a of animals) {
-    const f = idOf(a.father)
-    const m = idOf(a.mother)
+    const f = relId(a.father)
+    const m = relId(a.mother)
     if (f) parentIds.add(f)
     if (m) parentIds.add(m)
   }
@@ -435,7 +430,7 @@ async function relationalIssues(
 
     for (const d of docs) {
       const row = d as { animal?: unknown; percentile?: number | null }
-      const id = idOf(row.animal)
+      const id = relId(row.animal)
       if (id && typeof row.percentile === 'number') ourPercentile.set(id, row.percentile)
     }
 
@@ -497,7 +492,7 @@ async function relationalIssues(
       ['father', 'Отец', 'male', 'fatherId'],
       ['mother', 'Мать', 'female', 'motherId'],
     ] as const) {
-      const pid = idOf(a[side])
+      const pid = relId(a[side])
 
       /*
        * Родословная по бумаге против связи.
@@ -577,8 +572,8 @@ async function relationalIssues(
      * по кровности — единственный дешёвый признак, по которому такое
      * видно без сверки документов.
      */
-    const fatherDoc = parents.get(idOf(a.father) ?? -1)
-    const motherDoc = parents.get(idOf(a.mother) ?? -1)
+    const fatherDoc = parents.get(relId(a.father) ?? -1)
+    const motherDoc = parents.get(relId(a.mother) ?? -1)
     const own = a.bloodPercent
     const fb = fatherDoc?.bloodPercent
     const mb = motherDoc?.bloodPercent
@@ -651,7 +646,7 @@ async function relationalIssues(
     const byAnimal = new Map<number, Row[]>()
 
     for (const c of calvings.docs) {
-      const id = idOf(c.animal)
+      const id = relId(c.animal)
       if (!id || !c.date) continue
       byAnimal.set(id, [
         ...(byAnimal.get(id) ?? []),

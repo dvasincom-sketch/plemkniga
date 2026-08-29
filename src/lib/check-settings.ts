@@ -86,6 +86,3 @@ export async function resolveCheckSettings(payload: Payload): Promise<CheckSetti
   return map
 }
 
-/** Настройки, отличающиеся от реестра, — для показа в каталоге. */
-export const overriddenChecks = (map: CheckSettingsMap): ResolvedCheck[] =>
-  [...map.values()].filter((c) => c.overridden)

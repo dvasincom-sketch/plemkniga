@@ -8,6 +8,7 @@ import { herdSummary } from '@/lib/herd-summary'
 import { EXPORT_LIMIT } from '@/lib/export-formats'
 import { isLocalDatabase, resolveDatabase } from '@/lib/db-url'
 import type { BenchMeasurement, BenchRow, BenchServer } from '@/lib/bench-report'
+import { poolOf } from '@/lib/sql'
 
 /**
  * Замер по критериям приёмки: поиск, свидетельство, выгрузка.
@@ -100,13 +101,6 @@ const timed = async <T,>(fn: () => Promise<T>): Promise<[T, number]> => {
   const out = await fn()
   return [out, Number(process.hrtime.bigint() - t) / 1e6]
 }
-
-type SqlPool = {
-  query: (q: string, p?: unknown[]) => Promise<{ rows?: Record<string, unknown>[] }>
-}
-
-const poolOf = (payload: Payload): SqlPool | null =>
-  (payload.db as unknown as { pool?: SqlPool }).pool ?? null
 
 /**
  * На чём мерили.
