@@ -76,7 +76,7 @@ export async function lactationStructure(
   const res = await pool.query(
     `
     with cows as (
-      select a.id
+      select a.id, a.age_group
         from animals a
        where a.owner_id = $1
          and a.archived is not true
