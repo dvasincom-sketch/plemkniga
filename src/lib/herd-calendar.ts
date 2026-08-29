@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 import { poolOf } from '@/lib/sql'
+import { calvingsCount, lastCalvingDate, liveFemale, notArchived } from '@/lib/sql-herd'
 
 /**
  * Календарь стада: запуск, отёл, проверка стельности.
@@ -131,14 +132,13 @@ const BASE = `
     select a.id, a.ident_number, a.name
       from animals a
      where a.owner_id = $1
-       and a.archived is not true
-       and a.sex = 'female'
-       and a.state = 'alive'
+       and ${notArchived()}
+       and ${liveFemale()}
   ),
   calv as (
     select m.id,
-           (select count(*) from calvings k where k.animal_id = m.id)::int as lactation,
-           (select max(k."date") from calvings k where k.animal_id = m.id) as last_calving
+           ${calvingsCount('m')}::int as lactation,
+           ${lastCalvingDate('m')} as last_calving
       from mine m
   ),
   /*

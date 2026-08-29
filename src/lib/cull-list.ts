@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 import { SCC_LABEL, SCC_THRESHOLD } from '@/lib/herd-analytics'
+import { calvingsCount, lastCalvingDate, liveFemale, notArchived } from '@/lib/sql-herd'
 import { numOrNull, poolOf } from '@/lib/sql'
 import { finishedLactation, hasMilk305 } from '@/lib/sql-lactation'
 
@@ -171,9 +172,8 @@ const BODY = `
     select a.id, a.ident_number, a.name, a.ipc
       from animals a
      where a.owner_id = $1
-       and a.archived is not true
-       and a.sex = 'female'
-       and a.state = 'alive'
+       and ${notArchived()}
+       and ${liveFemale()}
   ),
   /*
    * Лактация и дата последнего отёла — счётом событий, а не из возрастной
@@ -182,8 +182,8 @@ const BODY = `
    */
   calv as (
     select m.id,
-           (select count(*) from calvings k where k.animal_id = m.id)::int as lactation,
-           (select max(k."date") from calvings k where k.animal_id = m.id) as last_calving
+           ${calvingsCount('m')}::int as lactation,
+           ${lastCalvingDate('m')} as last_calving
       from mine m
   ),
   /*
@@ -311,9 +311,8 @@ export async function cullList(
 
   const [cows, flagged, rows] = await Promise.all([
     pool.query(
-      `select count(*)::int as n from animals
-        where owner_id = $1 and archived is not true
-          and sex = 'female' and state = 'alive'`,
+      `select count(*)::int as n from animals a
+        where a.owner_id = $1 and ${notArchived()} and ${liveFemale()}`,
       [organizationId],
     ),
     pool.query(`${BODY} select count(*)::int as n from flagged where score > 0`, params),

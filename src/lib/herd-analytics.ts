@@ -89,9 +89,8 @@ export async function lactationStructure(
       select a.id, a.age_group
         from animals a
        where a.owner_id = $1
-         and a.archived is not true
-         and a.sex = 'female'
-         and a.state = 'alive'
+         and ${notArchived()}
+         and ${liveFemale()}
     ),
     /*
      * Номер лактации — число отёлов, а не максимальный номер из записи.

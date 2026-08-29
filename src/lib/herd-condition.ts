@@ -2,7 +2,14 @@ import type { Payload } from 'payload'
 import { INBREEDING_THRESHOLD, SCC_THRESHOLD } from '@/lib/herd-analytics'
 import type { SignalInput } from '@/lib/herd-signals'
 import { numOf, poolOf } from '@/lib/sql'
-import { ageMonths, culledYear, isHeifer, liveFemale, notArchived } from '@/lib/sql-herd'
+import {
+  ageMonths,
+  calvingsCount,
+  culledYear,
+  isHeifer,
+  liveFemale,
+  notArchived,
+} from '@/lib/sql-herd'
 
 /**
  * Состояние стад — разом по всем хозяйствам, для кабинета Ассоциации.
@@ -152,9 +159,7 @@ export async function herdConditions(payload: Payload): Promise<Map<number, Herd
     left join (
       select a.owner_id,
              count(*) as total,
-             count(*) filter (
-               where (select count(*) from calvings k where k.animal_id = a.id) <= 1
-             ) as first_lactation
+             count(*) filter (where ${calvingsCount()} <= 1) as first_lactation
         from animals a
        where ${culledYear()}
        group by a.owner_id

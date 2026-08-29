@@ -1,6 +1,7 @@
 import type { Payload } from 'payload'
 import { plural } from '@/lib/format'
 import { numOf, poolOf } from '@/lib/sql'
+import { liveFemale } from '@/lib/sql-herd'
 
 /**
  * Что хозяйству стоит сделать прямо сейчас.
@@ -91,7 +92,7 @@ export async function farmTodo(payload: Payload, organizationId: number): Promis
                  and coalesce(pedigree_text_father_id, '') = ''
                  and coalesce(pedigree_text_mother_id, '') = ''))                as incomplete,
         (select count(*) from mine a
-          where a.sex = 'female' and a.state = 'alive'
+          where ${liveFemale()}
             and not exists (select 1 from milked k where k.animal_id = a.id))    as no_milk_year,
         (select max(submitted_at) from data_submissions
           where organization_id = $1)                                           as last_submission

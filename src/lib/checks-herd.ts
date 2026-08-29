@@ -17,6 +17,7 @@ import {
 } from '@/lib/check-settings'
 import { IDENT_CORE_MIN, IDENT_FIELD_LABEL, IDENT_VALUES_SQL } from '@/lib/animal-id'
 import { numOf, poolOf } from '@/lib/sql'
+import { liveFemale, notArchived } from '@/lib/sql-herd'
 
 /**
  * Проверки, у которых предмет — стадо, а не запись.
@@ -260,9 +261,8 @@ export async function herdIssues(
               )::int as silent
          from animals a
         where a.owner_id = $1
-          and a.archived is not true
-          and a.sex = 'female'
-          and a.state = 'alive'`,
+          and ${notArchived()}
+          and ${liveFemale()}`,
       org,
     ),
     /*

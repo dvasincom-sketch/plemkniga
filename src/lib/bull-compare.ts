@@ -1,6 +1,7 @@
 import type { Payload } from 'payload'
 import { BULL_COMPARISON_MIN } from '@/lib/bull-proof'
 import { numOf, poolOf } from '@/lib/sql'
+import { liveFemale, notArchived } from '@/lib/sql-herd'
 
 /**
  * Сравнение быков между собой (ТЗ, требование №5).
@@ -229,12 +230,11 @@ export async function compareBulls(
                from animals a
                cross join lateral (values (a.father_id), (a.mother_id)) as p(anc)
               where a.owner_id = $2
-                and a.sex = 'female'
-                and a.archived is not true
+                and ${notArchived()}
                 -- Живые: «родня в вашем стаде» должна считать то же стадо,
                 -- что и подбор пар рядом, иначе выходит «родня у 40 коров»
                 -- при 32 в подборе
-                and a.state = 'alive'
+                and ${liveFemale()}
                 and p.anc is not null
              union all
              select u.cow, q.anc, u.gen + 1

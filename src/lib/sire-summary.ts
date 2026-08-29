@@ -1,6 +1,7 @@
 import type { Payload } from 'payload'
 import { numOrNull, poolOf } from '@/lib/sql'
 import { finishedLactation, hasMilk305, lactationGroup } from '@/lib/sql-lactation'
+import { liveFemale, notArchived } from '@/lib/sql-herd'
 
 /**
  * Что каждый бык дал именно в этом стаде.
@@ -84,9 +85,8 @@ export async function sireSummary(
       select a.id, a.father_id
         from animals a
        where a.owner_id = $1
-         and a.archived is not true
-         and a.sex = 'female'
-         and a.state = 'alive'
+         and ${notArchived()}
+         and ${liveFemale()}
     ),
     /*
      * Последняя законченная лактация коровы. То же условие, что
@@ -166,9 +166,8 @@ export async function sireSummary(
   const totals = await pool.query(
     `select count(*)::int                                   as cows,
             count(*) filter (where father_id is null)::int   as without_sire
-       from animals
-      where owner_id = $1 and archived is not true
-        and sex = 'female' and state = 'alive'`,
+       from animals a
+      where a.owner_id = $1 and ${notArchived()} and ${liveFemale()}`,
     [organizationId],
   )
 

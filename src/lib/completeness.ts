@@ -1,4 +1,5 @@
 import type { Payload } from 'payload'
+import { hasCalved } from '@/lib/sql-herd'
 
 /**
  * Полнота записи: передано ли всё, без чего подтверждать нечего.
@@ -133,8 +134,7 @@ export async function completenessGaps(payload: Payload, ids: number[]): Promise
          and coalesce(a.pedigree_text_father_id, '') = '') as no_father,
       (a.mother_id is null
          and coalesce(a.pedigree_text_mother_id, '') = '') as no_mother,
-      (a.kind = 'cow'
-         and not exists (select 1 from calvings c where c.animal_id = a.id)) as no_calving,
+      (a.kind = 'cow' and not ${hasCalved()}) as no_calving,
       /*
        * Заявлена продуктивность — должны быть замеры. Заявкой считается
        * удой за 305 дней хотя бы в одной строке лактаций карточки:

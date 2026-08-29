@@ -1,5 +1,13 @@
 import type { Payload } from 'payload'
 import { INBREEDING_THRESHOLD } from '@/lib/herd-analytics'
+import {
+  ageMonths,
+  calvingsCount,
+  hasCalved,
+  lastCalvingDate,
+  liveFemale,
+  notArchived,
+} from '@/lib/sql-herd'
 import { poolOf } from '@/lib/sql'
 
 /**
@@ -120,18 +128,15 @@ export type MatingPlan = {
 const COWS = `
   cows as (
     select a.id, a.ident_number, a.name,
-           (select count(*) from calvings k where k.animal_id = a.id)::int as lactation,
-           (select max(k."date") from calvings k where k.animal_id = a.id) as last_calving
+           ${calvingsCount()}::int as lactation,
+           ${lastCalvingDate()} as last_calving
       from animals a
      where a.owner_id = $1
-       and a.archived is not true
-       and a.sex = 'female'
-       and a.state = 'alive'
+       and ${notArchived()}
+       and ${liveFemale()}
        and (
-         exists (select 1 from calvings k where k.animal_id = a.id)
-         or (a.birth_date is not null
-             and extract(year from age(now(), a.birth_date)) * 12
-               + extract(month from age(now(), a.birth_date)) >= 13)
+         ${hasCalved()}
+         or (a.birth_date is not null and ${ageMonths()} >= 13)
        )
        and not exists (
          select 1
@@ -139,9 +144,7 @@ const COWS = `
            left join insemination_results r on r.id = i.result_id
           where i.animal_id = a.id
             and r.code = '1'
-            and i."date" > coalesce(
-                  (select max(k."date") from calvings k where k.animal_id = a.id),
-                  '-infinity'::timestamptz)
+            and i."date" > coalesce(${lastCalvingDate()}, '-infinity'::timestamptz)
        )
   )
 `

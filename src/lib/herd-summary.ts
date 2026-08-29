@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 import { numOf, numOrNull, poolOf } from '@/lib/sql'
+import { liveFemale, notArchived } from '@/lib/sql-herd'
 
 /**
  * Числа по стаду для «Обзора».
@@ -91,8 +92,8 @@ export async function herdSummary(
         from animals
        where owner_id = $1
     ),
-    live as (select * from mine where archived is not true),
-    cows as (select * from live where sex = 'female' and state = 'alive')
+    live as (select * from mine a where ${notArchived()}),
+    cows as (select * from live a where ${liveFemale()})
     select
       (select count(*) from live)                                  as total,
       (select count(*) from cows)                                  as cows,
