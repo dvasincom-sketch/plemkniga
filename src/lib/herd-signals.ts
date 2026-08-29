@@ -1,5 +1,6 @@
 import { INBREEDING_THRESHOLD, SCC_THRESHOLD } from '@/lib/herd-analytics'
 import type { Culling, GeneticTrend, HeiferAges, UdderHealth } from '@/lib/herd-analytics'
+import { plural } from '@/lib/format'
 
 /**
  * Сигналы по стаду: числа, которые требуют решения сегодня.
@@ -66,6 +67,8 @@ export type Signal = {
    * выдуманный знаменатель хуже отсутствующего.
    */
   of: number | null
+  /** Чем является база, если это не «столько же, сколько в числе». */
+  ofLabel?: string
   /** Доля от базы, 0…1. */
   share: number | null
   /** Чем это грозит, одной строкой. */
@@ -80,6 +83,16 @@ export type Signal = {
    */
   mass: boolean
 }
+
+/**
+ * Подпись базы: из чего именно эти столько-то.
+ *
+ * Обычно база — само стадо, и слово в подписи повторяет слово в числе:
+ * «6 тёлок в передержке из 22». У соматики иначе: знаменатель — коровы
+ * **с замером**, а не все коровы. Разница видна сразу («из 25» при 28
+ * в стаде) и без объяснения читается как ошибка счёта. Объяснение стоит
+ * одного слова.
+ */
 
 /**
  * Собрать сигнал, посчитав долю и подменив совет при большой доле.
@@ -98,6 +111,7 @@ const signal = (
     count: s.count,
     label: s.label,
     of: s.of,
+    ofLabel: s.ofLabel,
     share,
     hint: mass && s.massHint ? s.massHint : s.hint,
     href: s.href,
@@ -130,7 +144,7 @@ export function herdSignals({
         key: 'heifers-overdue',
         count: heifers.overdue,
         of: heifers.total,
-        label: 'тёлок в передержке',
+        label: `${plural(heifers.overdue, 'тёлка', 'тёлки', 'тёлок')} в передержке`,
         hint: 'старше 15 месяцев без отёла — корм без отдачи',
         massHint:
           'передержан почти весь молодняк — похоже, отёлы вносят не все ' +
@@ -147,7 +161,8 @@ export function herdSignals({
         key: 'scc-above',
         count: udder.above,
         of: udder.measured,
-        label: `коров выше ${SCC_THRESHOLD} тыс. соматики`,
+        label: `${plural(udder.above, 'корова', 'коровы', 'коров')} выше ${SCC_THRESHOLD} тыс. соматики`,
+        ofLabel: 'коров с замером',
         hint: 'скрытый мастит: удой, сортность и выбраковка сразу',
         massHint:
           'выше порога больше половины стада — сперва проверьте, все ли ' +
@@ -164,7 +179,10 @@ export function herdSignals({
         key: 'inbreeding-above',
         count: trend.aboveThreshold,
         of: trend.withInbreeding,
-        label: `животных с инбридингом выше ${INBREEDING_THRESHOLD} %`,
+        label:
+          `${plural(trend.aboveThreshold, 'животное', 'животных', 'животных')} ` +
+          `с инбридингом выше ${INBREEDING_THRESHOLD} %`,
+        ofLabel: 'с посчитанным коэффициентом',
         hint: 'решается подбором быка, а не лечением',
         massHint:
           'инбридинг выше порога у большинства — стадо давно закрыто ' +
@@ -186,7 +204,10 @@ export function herdSignals({
         key: 'culled-first',
         count: cull.firstLactation,
         of: cull.total,
-        label: 'первотёлок выбыло за год',
+        label:
+          `${plural(cull.firstLactation, 'первотёлка', 'первотёлки', 'первотёлок')} ` +
+          `${plural(cull.firstLactation, 'выбыла', 'выбыли', 'выбыло')} за год`,
+        ofLabel: 'от всего выбытия',
         hint: 'выращивание не окупилось — самая дорогая потеря',
         massHint:
           'больше половины выбытия — первотёлки: беда не в отдельных ' +
@@ -208,7 +229,7 @@ export function herdSignals({
         key: 'heifers-ready',
         count: heifers.ready,
         of: heifers.total,
-        label: 'тёлок пора осеменять',
+        label: `${plural(heifers.ready, 'тёлку', 'тёлок', 'тёлок')} пора осеменять`,
         hint: '13–15 месяцев — возраст осеменения голштинки',
         href: '/account/reports/heifers-ready',
         urgent: false,

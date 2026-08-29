@@ -572,7 +572,8 @@ async function OverviewTab({ orgId }: { orgId?: number }) {
                 */}
                 {s.of !== null && s.share !== null && (
                   <span className="mt-0.5 block text-[12px] leading-snug text-ink-700">
-                    из {nf(s.of, 0)} — это{' '}
+                    из {nf(s.of, 0)}
+                    {s.ofLabel ? ` ${s.ofLabel}` : ''} — это{' '}
                     <span className={s.mass ? 'font-medium' : undefined}>
                       {s.share < 0.01 ? 'менее 1' : nf(s.share * 100, 0)} %
                     </span>
