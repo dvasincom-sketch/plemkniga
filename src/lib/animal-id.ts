@@ -128,8 +128,6 @@ export function transliterate(value: string): string {
 export const INBREEDING_WARNING = 6.25
 export const INBREEDING_MANUAL_APPROVAL = 25
 
-/** Минимальный возраст матери на дату первого отёла, месяцев (ТЗ, п. 1.5, шаг 5). */
-export const MIN_DAM_AGE_MONTHS = 18
 
 /**
  * Цифровое ядро идентификатора — для сопоставления, а не для хранения.

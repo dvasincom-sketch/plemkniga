@@ -1,6 +1,8 @@
 import 'dotenv/config'
 import { Pool } from 'pg'
 import { maskUri, resolveDatabase } from '../lib/db-url'
+import { applyThresholdRows, defaultThresholds, type Thresholds } from '../lib/check-thresholds'
+import { monthsBetween } from '../lib/afc'
 
 /**
  * Ревизия родословной: то, что не умеет проверить база.
@@ -15,8 +17,23 @@ import { maskUri, resolveDatabase } from '../lib/db-url'
  *    открываться, и причину по одной строке не найти;
  *  - **пол родителя**: отцом записан не бык, матерью не корова;
  *  - **порядок дат**: потомок родился раньше родителя;
- *  - **возраст матери**: отёл раньше, чем ей исполнилось полтора года
- *    (`MIN_DAM_AGE_MONTHS` в коде объявлена, но нигде не проверяется).
+ *  - **возраст родителя**: слишком мало или слишком много лет на момент
+ *    рождения потомка.
+ *
+ * ## Пороги и арифметика — общие с разбором
+ *
+ * Возраст родителя ревизия считала по-своему: восемнадцать месяцев,
+ * зашитые числом, только для матери, и делением миллисекунд на 30,4 дня.
+ * Разбор заявки в это время брал порог из настроек Ассоциации, смотрел
+ * обоих родителей, знал ещё и верхнюю границу и считал месяцы
+ * по календарю. Два ответа на один вопрос об одном животном — и оба
+ * с нашей стороны.
+ *
+ * Теперь пороги читаются из той же таблицы, что видит эксперт
+ * (`applyThresholdRows`), а месяцы считает тот же `monthsBetween`.
+ * Обход остаётся своим: разбор поднимает родословную заявки уровнями
+ * через Payload, а здесь нужен один проход по всей книге, и грузить
+ * триста тысяч записей документами ради этого незачем.
  *
  * Приложение первые три случая не создаёт: `beforeValidate` их отклоняет.
  * Но записи приходят и мимо приложения — перенос из «Селэкса», ручная правка,
@@ -49,7 +66,10 @@ type Node = {
   father: number | null
   mother: number | null
   sex: string | null
+  /** Время рождения — для сравнения «кто раньше». */
   birth: number | null
+  /** Она же датой — `monthsBetween` считает по календарю, а не по миллисекундам. */
+  birthDate: string | null
 }
 
 const ru = (n: number) => n.toLocaleString('ru-RU')
@@ -102,9 +122,35 @@ const report = (title: string, lines: string[]) => {
   return real.length
 }
 
+/**
+ * Пороги — из базы, а не из умолчаний.
+ *
+ * Ассоциация двигает их на странице настроек, и ревизия обязана мерить
+ * тем же. Таблицы может не быть на свежей базе — тогда умолчания
+ * и строка об этом: молча смерить другим значит объяснять потом,
+ * почему прогон и разбор не сошлись.
+ */
+async function loadThresholds(): Promise<{ t: Thresholds; source: string }> {
+  try {
+    const { rows } = await pool.query<{ key: string; value: string }>(
+      'select key, value from check_thresholds',
+    )
+    if (!rows.length) return { t: defaultThresholds(), source: 'умолчания: настроек в базе нет' }
+    return { t: applyThresholdRows(rows), source: `настройки Ассоциации, строк: ${rows.length}` }
+  } catch {
+    return { t: defaultThresholds(), source: 'умолчания: таблица порогов недоступна' }
+  }
+}
+
 async function main() {
   console.log(`\nБаза: ${maskUri(uri ?? '')}`)
   console.log(`Источник строки подключения: ${source}\n`)
+
+  const { t, source: thresholdSource } = await loadThresholds()
+  console.log(
+    `Пороги возраста родителя: от ${t.parentAgeMinMonths} мес. до ${t.parentAgeMaxYears} лет ` +
+      `(${thresholdSource})\n`,
+  )
 
   const { rows } = await pool.query<{
     id: number
@@ -130,6 +176,7 @@ async function main() {
       mother: r.mother_id,
       sex: r.sex,
       birth: r.birth_date ? new Date(r.birth_date).getTime() : null,
+      birthDate: r.birth_date ? new Date(r.birth_date).toISOString() : null,
     })
   }
 
@@ -206,10 +253,8 @@ async function main() {
   const wrongFather: string[] = []
   const wrongMother: string[] = []
   const bornBeforeParent: string[] = []
-  const youngDam: string[] = []
-
-  /** Восемнадцать месяцев — минимальный возраст первого отёла. */
-  const MIN_DAM_AGE_MS = 18 * 30.4 * 24 * 3600 * 1000
+  const tooYoung: string[] = []
+  const tooOld: string[] = []
 
   for (const n of nodes.values()) {
     const father = n.father !== null ? nodes.get(n.father) : undefined
@@ -227,14 +272,33 @@ async function main() {
       [mother, 'мать'],
     ] as const) {
       if (!parent || n.birth === null || parent.birth === null) continue
+
       if (parent.birth >= n.birth) {
         bornBeforeParent.push(
           `${n.ident} (${new Date(n.birth).toLocaleDateString('ru-RU')}) — ` +
             `${role} ${parent.ident} (${new Date(parent.birth).toLocaleDateString('ru-RU')})`,
         )
-      } else if (role === 'мать' && n.birth - parent.birth < MIN_DAM_AGE_MS) {
-        const months = Math.round((n.birth - parent.birth) / (30.4 * 24 * 3600 * 1000))
-        youngDam.push(`${n.ident}: матери ${parent.ident} на момент отёла ${months} мес.`)
+        continue
+      }
+
+      /*
+       * Возраст родителя проверяется у обоих, а не только у матери.
+       * Бык-производитель годовалым отцом быть не может ровно так же,
+       * как корова не телится в год, и прежняя ревизия молчала об этом
+       * просто потому, что правило писали от материнской стороны.
+       */
+      const months = monthsBetween(parent.birthDate, n.birthDate)
+      if (months === null || months <= 0) continue
+
+      if (months < t.parentAgeMinMonths) {
+        tooYoung.push(
+          `${n.ident}: ${role} ${parent.ident} — ${months} мес. на момент рождения потомка`,
+        )
+      } else if (months > t.parentAgeMaxYears * 12) {
+        tooOld.push(
+          `${n.ident}: ${role} ${parent.ident} — ${Math.round(months / 12)} лет ` +
+            'на момент рождения потомка',
+        )
       }
     }
   }
@@ -242,7 +306,8 @@ async function main() {
   problems += report('Отцом записана самка', wrongFather)
   problems += report('Матерью записан самец', wrongMother)
   problems += report('Потомок родился раньше родителя', bornBeforeParent)
-  problems += report('Мать моложе 18 месяцев на момент отёла', youngDam)
+  problems += report(`Родитель моложе ${t.parentAgeMinMonths} мес. на момент рождения потомка`, tooYoung)
+  problems += report(`Родитель старше ${t.parentAgeMaxYears} лет на момент рождения потомка`, tooOld)
 
   /* ------------------------------- Глубина -------------------------------- */
 

@@ -353,20 +353,19 @@ export const thresholdSpec = (key: string): ThresholdSpec | undefined =>
  * ненайденной таблицы настроек значило бы, что необязательная возможность
  * выключает обязательную (то же решение, что в `check-settings.ts`).
  */
-export async function resolveThresholds(payload: Payload): Promise<Thresholds> {
+/**
+ * Наложить сохранённые значения на умолчания.
+ *
+ * Отдельно от чтения потому, что читают их двумя разными способами:
+ * приложение — через Payload, ревизия родословной — прямым запросом
+ * своим пулом, у неё Payload не поднят вовсе. Правило применения при этом
+ * обязано быть одним: разойдись оно, и прогон нашёл бы то, чего разбор
+ * не находит, — при одинаковых настройках на экране.
+ */
+export const applyThresholdRows = (
+  rows: readonly { key?: unknown; value?: unknown }[],
+): Thresholds => {
   const values = defaultThresholds()
-
-  const rows = await payload
-    .find({
-      collection: 'check-thresholds',
-      limit: THRESHOLDS.length,
-      depth: 0,
-      overrideAccess: true,
-    })
-    .then((r) => r.docs)
-    .catch(() => null)
-
-  if (!rows) return values
 
   for (const row of rows) {
     const spec = thresholdSpec(String(row.key))
@@ -387,6 +386,20 @@ export async function resolveThresholds(payload: Payload): Promise<Thresholds> {
   }
 
   return values
+}
+
+export async function resolveThresholds(payload: Payload): Promise<Thresholds> {
+  const rows = await payload
+    .find({
+      collection: 'check-thresholds',
+      limit: THRESHOLDS.length,
+      depth: 0,
+      overrideAccess: true,
+    })
+    .then((r) => r.docs)
+    .catch(() => null)
+
+  return rows ? applyThresholdRows(rows) : defaultThresholds()
 }
 
 
