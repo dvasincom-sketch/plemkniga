@@ -1,8 +1,9 @@
 import Link from 'next/link'
 import { InfoTip } from './InfoTip'
 import { Computed } from './Computed'
-import { nf, signed } from '@/lib/format'
+import { nf, plural, signed } from '@/lib/format'
 import type { IndexResult } from '@/lib/breeding-index'
+import type { CowEvidence } from '@/lib/cow-evidence'
 
 /**
  * Индекс племенной ценности в карточке — с разбором, откуда взялось число.
@@ -16,6 +17,33 @@ import type { IndexResult } from '@/lib/breeding-index'
  * решил больше всех. Отрицательные вклады не прячутся — у профиля Ассоциации
  * композит тела весит со знаком минус, и животное может терять на нём очки,
  * оставаясь хорошим в целом.
+ *
+ * ## Когда считать нечего, панель схлопывается
+ *
+ * У коровы без геномной оценки ни одного признака профиля нет — и это
+ * не исключение, а обычное состояние. Панель при этом рисовала шесть
+ * значений, чтобы сказать «нет данных»: крупный ноль очков, достоверность
+ * 0 %, процентиль, «учтено 0 из 11», базу сравнения и строку-пояснение.
+ *
+ * Одно из них было неправдой. **Процентиль 50** — это середина
+ * по умолчанию, а выглядит как измерение: читатель видит «средняя корова»,
+ * хотя её не мерили. Тот же случай, что с прочерком вместо нуля в сводке
+ * стада: ноль — утверждение, которого система не проверяла.
+ *
+ * Поэтому при `used === 0` остаётся заголовок, одна строка и основание.
+ * Место, занимаемое блоком, должно быть соразмерно тому, сколько в нём
+ * сведений.
+ *
+ * ## Почему основание живёт здесь, а не отдельной карточкой
+ *
+ * «На чём стоит оценка» стояло соседней карточкой со своим заголовком,
+ * своей рамкой и тремя плашками под три однозначных числа. Предмет
+ * у них один: сколько стоит индекс и на чём он держится. Два заголовка
+ * об одном читаются как два разных разговора, а плашка в треть ширины
+ * ради цифры «1» — это место, потраченное не на сведения.
+ *
+ * Плашки оправданы, когда числа сравнивают взглядом между карточками;
+ * эти читают один раз, сверху вниз. Поэтому строка, а не сетка.
  */
 
 export function IndexBreakdown({
@@ -23,6 +51,7 @@ export function IndexBreakdown({
   percentile,
   computedAt,
   href,
+  evidence,
 }: {
   result: IndexResult
   /** Место в группе сравнения; считается по хранимым значениям. */
@@ -30,10 +59,63 @@ export function IndexBreakdown({
   computedAt?: string | null
   /** Ссылка на настройку профилей — только своим. */
   href?: string
+  /** На чём стоит надёжность: собственные наблюдения и родители в книге. */
+  evidence?: CowEvidence | null
 }) {
   const { profile, contributions, value, reliability, used, total, baseVersion } = result
   const economic = profile.kind === 'economic'
   const max = Math.max(...contributions.map((c) => Math.abs(c.points)), 1)
+
+  /*
+   * Ни одного измеренного признака — считать нечего, и показывать нечего.
+   * Разбор в шапке файла.
+   */
+  const nothingToCount = used === 0
+
+  const basis = evidence && (
+    <div className={`${nothingToCount ? 'mt-4' : 'mt-5'} border-t border-ink-100 pt-4`}>
+      <p className="text-[13px] leading-relaxed text-ink-500">
+        Надёжность считается из числа собственных наблюдений и из того, что известно
+        о родителях. Основание целиком:{' '}
+        <span className="text-ink-900">
+          {nf(evidence.lactations, 0)}{' '}
+          {plural(evidence.lactations, 'отёл', 'отёла', 'отёлов')} ·{' '}
+          {nf(evidence.milkTests, 0)}{' '}
+          {plural(evidence.milkTests, 'контрольная дойка', 'контрольные дойки', 'контрольных доек')}{' '}
+          ·{' '}
+          {evidence.hasSire && evidence.hasDam
+            ? 'оба родителя в книге'
+            : evidence.hasSire
+              ? 'в книге только отец'
+              : evidence.hasDam
+                ? 'в книге только мать'
+                : 'родителей в книге нет'}
+        </span>
+      </p>
+
+      {/*
+         Предупреждение об одной лактации — по той же причине, по какой
+         у быка предупреждение об одном хозяйстве: среднее по одному
+         наблюдению не среднее, а само наблюдение, и знать об этом надо
+         до килограммов.
+      */}
+      {evidence.lactations <= 1 && (
+        <p className="mt-2 max-w-[80ch] text-[13px] leading-relaxed text-ink-700">
+          {evidence.lactations === 0
+            ? 'Отёлов в книге нет: оценка опирается только на происхождение, собственных наблюдений за животным нет ни одного.'
+            : 'Учтён один отёл. Оценка по одной лактации сдвинется с каждой следующей — она пока говорит об этом годе, а не о животном.'}
+        </p>
+      )}
+
+      {!evidence.hasSire && !evidence.hasDam && (
+        <p className="mt-2 max-w-[80ch] text-[13px] leading-relaxed text-ink-700">
+          Ни один из родителей не найден в книге связью. Четверть надёжности,
+          которую даёт происхождение, здесь не работает — даже если родители
+          записаны текстом в родословной.
+        </p>
+      )}
+    </div>
+  )
 
   return (
     /*
@@ -62,16 +144,32 @@ export function IndexBreakdown({
           </p>
         </div>
 
-        <div className="text-right">
-          {/* Само число индекса — первое, что читают, и первое, что нужно
-              уметь проверить: под пунктиром формула целиком */}
-          <p className={`text-[30px] font-medium leading-none tabular-nums ${value < 0 ? 'text-[#c0392b]' : 'text-forest-600'}`}>
-            <Computed formula="index">{signed(Math.round(value))}</Computed>
-          </p>
-          <p className="mt-1 text-[12px] text-ink-500">{economic ? '₽ за жизнь' : 'очков индекса'}</p>
-        </div>
+        {/* Нуля очков у неизмеренного животного не бывает: это не «плохо»,
+            а «неизвестно», и крупная цифра сказала бы первое */}
+        {!nothingToCount && (
+          <div className="text-right">
+            {/* Само число индекса — первое, что читают, и первое, что нужно
+                уметь проверить: под пунктиром формула целиком */}
+            <p className={`text-[30px] font-medium leading-none tabular-nums ${value < 0 ? 'text-[#c0392b]' : 'text-forest-600'}`}>
+              <Computed formula="index">{signed(Math.round(value))}</Computed>
+            </p>
+            <p className="mt-1 text-[12px] text-ink-500">{economic ? '₽ за жизнь' : 'очков индекса'}</p>
+          </div>
+        )}
       </div>
 
+      {nothingToCount && (
+        <>
+          <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
+            Индекс не посчитан: ни один из {total} признаков профиля у животного
+            не оценён. Он появится, когда приедут оценки признаков — из расчётного
+            центра или по геномному тесту.
+          </p>
+          {basis}
+        </>
+      )}
+
+      {!nothingToCount && (
       <dl className="mb-5 grid grid-cols-2 gap-x-6 gap-y-3 border-y border-ink-100 py-4 sm:grid-cols-4">
         <div>
           <dt className="text-[12px] text-ink-500">Достоверность</dt>
@@ -117,12 +215,9 @@ export function IndexBreakdown({
           )}
         </div>
       </dl>
+      )}
 
-      {contributions.length === 0 ? (
-        <p className="text-[14px] leading-relaxed text-ink-500">
-          По признакам этого профиля у животного нет ни одной оценки — считать нечего.
-        </p>
-      ) : (
+      {!nothingToCount && (
         /*
            Разбор свёрнут по умолчанию. За индексом приходят чаще, чем
            за его устройством: обычный вопрос — «сколько», а не «из чего».
@@ -216,6 +311,8 @@ export function IndexBreakdown({
           </p>
         </details>
       )}
+
+      {!nothingToCount && basis}
     </div>
   )
 }

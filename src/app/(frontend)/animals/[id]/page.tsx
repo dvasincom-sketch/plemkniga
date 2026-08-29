@@ -50,7 +50,7 @@ import {
 import { THRESHOLDS } from '@/lib/bull-status'
 import { afcMonths } from '@/lib/afc'
 import { cowEvidence } from '@/lib/cow-evidence'
-import { dateRu, nf, signed } from '@/lib/format'
+import { dateRu, nf, plural, signed } from '@/lib/format'
 import { IndexBreakdown } from '@/components/IndexBreakdown'
 import { EvaluationHistory } from '@/components/EvaluationHistory'
 import { Collapsible } from '@/components/Collapsible'
@@ -1051,73 +1051,48 @@ export default async function AnimalPage({
                   result={indexBlock.result}
                   percentile={indexBlock.percentile}
                   href={isMine ? '/account/indices' : undefined}
+                  evidence={evidence}
                 />
               </section>
             )}
 
             {/*
-               На чём стоит оценка коровы.
+               «На чём стоит оценка» переехало внутрь панели индекса.
 
-               У быка это блок «Оценка по дочерям» с числом дочерей
-               и хозяйств. У коровы такого не было: надёжность стояла
-               в колонке, а откуда она взялась — нигде. Показаны ровно
-               те величины, из которых она и складывается: собственные
-               наблюдения и родители в книге.
+               Стояло соседней карточкой со своим заголовком, своей рамкой
+               и тремя плашками под три однозначных числа. Предмет у них
+               один — сколько стоит индекс и на чём он держится, — а два
+               заголовка об одном читаются как два разных разговора.
+               Разбор и сама строка основания — в `IndexBreakdown`.
+
+               Здесь остался только случай, когда панели индекса нет вовсе:
+               профиль не выбран или расчёт не построен. Основание при этом
+               показать всё равно нужно — оно про животное, а не про индекс.
             */}
-            {evidence && (
+            {evidence && !indexBlock && (
               <section className="card mt-8">
                 <h2 className="panel-heading mb-0">На чём стоит оценка</h2>
                 <p className="mt-2 max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
-                  Надёжность в колонке «R, %» считается из числа собственных наблюдений
-                  и из того, что известно о родителях. Вот это основание целиком.
+                  Индекс по этому животному не построен, но основание для надёжности
+                  видно и без него: {nf(evidence.lactations, 0)}{' '}
+                  {plural(evidence.lactations, 'отёл', 'отёла', 'отёлов')},{' '}
+                  {nf(evidence.milkTests, 0)}{' '}
+                  {plural(
+                    evidence.milkTests,
+                    'контрольная дойка',
+                    'контрольные дойки',
+                    'контрольных доек',
+                  )}
+                  ,{' '}
+                  {evidence.hasSire && evidence.hasDam
+                    ? 'оба родителя в книге'
+                    : evidence.hasSire
+                      ? 'в книге только отец'
+                      : evidence.hasDam
+                        ? 'в книге только мать'
+                        : 'родителей в книге нет'}
+                  .
                 </p>
-
-                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  {[
-                    { label: 'Отёлов в книге', value: nf(evidence.lactations, 0) },
-                    { label: 'Контрольных доек', value: nf(evidence.milkTests, 0) },
-                    {
-                      label: 'Родители в книге',
-                      value:
-                        evidence.hasSire && evidence.hasDam
-                          ? 'оба'
-                          : evidence.hasSire
-                            ? 'только отец'
-                            : evidence.hasDam
-                              ? 'только мать'
-                              : 'нет',
-                    },
-                  ].map((s) => (
-                    <div key={s.label} className="rounded-xl bg-canvas px-4 py-3.5">
-                      <p className="text-[13px] leading-snug text-ink-500">{s.label}</p>
-                      <p className="mt-1 text-[24px] font-medium leading-none tabular-nums">
-                        {s.value}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-
-                {/*
-                   Предупреждение об одной лактации — по той же причине,
-                   по какой у быка предупреждение об одном хозяйстве:
-                   среднее по одному наблюдению не среднее, а само
-                   наблюдение, и знать об этом надо до килограммов.
-                */}
-                {evidence.lactations <= 1 && (
-                  <p className="mt-4 max-w-[75ch] text-[14px] leading-relaxed text-ink-700">
-                    {evidence.lactations === 0
-                      ? 'Отёлов в книге нет: оценка опирается только на происхождение, и собственных наблюдений за этим животным нет ни одного.'
-                      : 'Учтён один отёл. Оценка по одной лактации сдвинется с каждой следующей — она пока говорит об этом годе, а не о животном.'}
-                  </p>
-                )}
-
-                {!evidence.hasSire && !evidence.hasDam && (
-                  <p className="mt-2 max-w-[75ch] text-[14px] leading-relaxed text-ink-700">
-                    Ни один из родителей не найден в книге связью. Четверть надёжности,
-                    которую даёт происхождение, здесь не работает — даже если родители
-                    записаны текстом в родословной.
-                  </p>
-                )}
               </section>
             )}
 

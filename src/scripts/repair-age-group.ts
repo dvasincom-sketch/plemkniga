@@ -50,6 +50,20 @@ const rel = (v: unknown): number | undefined =>
 
 const labelOf = (v: unknown) => AGE_GROUPS.find((g) => g.value === v)?.label ?? '(пусто)'
 
+/**
+ * Все записи коллекции постранично — с сортировкой по `id`.
+ *
+ * ## `sort: 'id'` — не украшение, а условие правильности
+ *
+ * Без него листание берёт сортировку коллекции по умолчанию, и для
+ * `calvings` это `number` — номер отёла, у которого на две тысячи строк
+ * шесть различных значений. Порядок строк с одинаковым ключом PostgreSQL
+ * не обещает и между запросами не сохраняет: `LIMIT/OFFSET` по такому
+ * ключу возвращает часть строк дважды, а часть не возвращает вовсе.
+ *
+ * Стоило это ложной тревоги, описанной в решении №229. `id` уникален
+ * по построению, и порядок по нему один и тот же всегда.
+ */
 async function all(
   payload: Awaited<ReturnType<typeof getPayload>>,
   collection: string,
@@ -61,6 +75,7 @@ async function all(
       collection: collection as never,
       limit: 500,
       page,
+      sort: 'id',
       depth: 0,
       overrideAccess: true,
     })
