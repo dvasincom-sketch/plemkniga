@@ -332,7 +332,7 @@ async function main() {
         { owner: { equals: orgId } },
         { sex: { equals: 'female' } },
         { state: { equals: 'alive' } },
-        { kind: { equals: 'cow' } },
+        { ageGroup: { in: ['firstCalf', 'cow2', 'cow3'] } },
         { archived: { not_equals: true } },
       ],
     },

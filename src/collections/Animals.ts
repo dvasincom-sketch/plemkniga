@@ -2,7 +2,6 @@ import type { CollectionConfig } from 'payload'
 import { randomUUID } from 'crypto'
 import {
   AGE_GROUPS,
-  ANIMAL_KINDS,
   COMPLEX_GRADES,
   EXTERIOR_COMPOSITES,
   EXTERIOR_TRAITS,
@@ -141,13 +140,6 @@ export const Animals: CollectionConfig = {
               type: 'row',
               fields: [
                 {
-                  name: 'kind',
-                  type: 'select',
-                  label: 'Тип животного',
-                  defaultValue: 'cow',
-                  options: toOptions(ANIMAL_KINDS),
-                },
-                {
                   name: 'sex',
                   type: 'select',
                   label: 'Пол',
@@ -163,11 +155,37 @@ export const Animals: CollectionConfig = {
                   options: STATES.map((s) => ({ value: s.value, label: s.full })),
                 },
                 {
+                  /*
+                   * Группа хранится, а не вычисляется из отёлов, и это
+                   * решение, а не недоделка. Отёл её повышает — тёлка,
+                   * которая отелилась, обязана стать первотёлкой; отсутствие
+                   * отёлов не понижает ничего, потому что незаписанное
+                   * событие и несостоявшееся событие — разное. Правило
+                   * целиком лежит в `lib/age-group.ts`.
+                   */
                   name: 'ageGroup',
                   type: 'select',
                   label: 'Возрастная группа',
                   defaultValue: 'firstCalf',
                   options: toOptions(AGE_GROUPS),
+                },
+                {
+                  /*
+                   * Дата определения группы — не украшение отчёта.
+                   * Её спрашивает ФГИАС ПР отдельной колонкой рядом
+                   * с самой группой, и так же — рядом с породой
+                   * и назначением: реестр хранит не функцию от событий,
+                   * а зафиксированное решение и день, когда его приняли.
+                   * Заодно она отвечает на вопрос, который до сих пор
+                   * задать было некому: группа устарела или её только что
+                   * подтвердили?
+                   */
+                  name: 'ageGroupDate',
+                  type: 'date',
+                  label: 'Дата определения группы',
+                  admin: {
+                    description: 'Проставляется отёлом; для ФГИАС ПР обязательна',
+                  },
                 },
               ],
             },

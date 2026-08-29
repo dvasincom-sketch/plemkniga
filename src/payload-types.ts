@@ -346,10 +346,13 @@ export interface Animal {
     gpkMark?: string | null;
     gpkNumber?: string | null;
   };
-  kind?: ('cow' | 'bull' | 'heifer' | 'calf') | null;
   sex: 'female' | 'male';
   state?: ('alive' | 'sold' | 'culled' | 'dead') | null;
   ageGroup?: ('calf' | 'heifer' | 'firstCalf' | 'cow2' | 'cow3' | 'bull') | null;
+  /**
+   * Проставляется отёлом; для ФГИАС ПР обязательна
+   */
+  ageGroupDate?: string | null;
   /**
    * По инструкции бонитировки, из племенных документов
    */
@@ -2417,10 +2420,10 @@ export interface AnimalsSelect<T extends boolean = true> {
         gpkMark?: T;
         gpkNumber?: T;
       };
-  kind?: T;
   sex?: T;
   state?: T;
   ageGroup?: T;
+  ageGroupDate?: T;
   grade?: T;
   birthDate?: T;
   breed?: T;

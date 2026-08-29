@@ -351,7 +351,6 @@ async function main() {
             idFormat: 'internal',
             name: `Дочь ${i + 1}`,
             sex: 'female',
-            kind: 'cow',
             ageGroup: i % 3 === 0 ? 'firstCalf' : 'cow2',
             state: 'alive',
             owner,

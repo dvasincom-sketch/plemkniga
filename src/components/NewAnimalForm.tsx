@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { useActionState } from 'react'
 import { createAnimalAction, type AnimalFormState } from '@/actions/animals'
-import { AGE_GROUPS, ANIMAL_KINDS, ID_FORMATS, SEXES } from '@/lib/dictionaries'
+import { AGE_GROUPS, ID_FORMATS, SEXES } from '@/lib/dictionaries'
 import { Select } from '@/components/Select'
 import { DateField } from '@/components/DateField'
 import { ParentNumber } from '@/components/ParentNumber'
@@ -80,7 +80,6 @@ const FIELDS: Record<Scenario, string[]> = {
   born: [
     'name',
     'sex',
-    'kind',
     'ageGroup',
     'birthDate',
     'breed',
@@ -95,7 +94,6 @@ const FIELDS: Record<Scenario, string[]> = {
     'idFormat',
     'name',
     'sex',
-    'kind',
     'ageGroup',
     'birthDate',
     'breed',
@@ -112,7 +110,6 @@ const FIELDS: Record<Scenario, string[]> = {
     'idFormat',
     'name',
     'sex',
-    'kind',
     'birthDate',
     'breed',
     'bloodPercent',
@@ -342,9 +339,6 @@ export function NewAnimalForm({
           </>
         )}
 
-        <SelectField label="Тип животного">
-          <Select name="kind" options={asOptions(ANIMAL_KINDS)} placeholder="Не указан" onLight />
-        </SelectField>
       </div>
 
       {/* ------------------------ Происхождение ------------------------ */}

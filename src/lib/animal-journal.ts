@@ -1,7 +1,6 @@
 import type { PayloadRequest } from 'payload'
 import {
   AGE_GROUPS,
-  ANIMAL_KINDS,
   ID_FORMATS,
   SEXES,
   STATES,
@@ -53,7 +52,6 @@ export const JOURNALLED: JournalField[] = [
   f('altIds.isoId', 'ISO-ID'),
   f('altIds.internationalId', 'Международный ID'),
   f('altIds.earTag', 'Номер ушной бирки'),
-  f('kind', 'Тип животного', 'select', { options: ANIMAL_KINDS }),
   f('sex', 'Пол', 'select', { options: SEXES.map((s) => ({ value: s.value, label: s.full })) }),
   f('state', 'Состояние', 'select', { options: STATES.map((s) => ({ value: s.value, label: s.full })) }),
   f('ageGroup', 'Возрастная группа', 'select', { options: AGE_GROUPS }),

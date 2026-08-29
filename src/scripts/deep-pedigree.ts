@@ -193,7 +193,6 @@ async function main() {
           identNumber: number,
           idFormat: 'internal',
           name: `${male ? 'Предок' : 'Праматерь'} ${generation}-${i + 1}`,
-          kind: male ? 'bull' : 'cow',
           sex: male ? 'male' : 'female',
           state: 'sold',
           ageGroup: male ? 'bull' : 'cow3',

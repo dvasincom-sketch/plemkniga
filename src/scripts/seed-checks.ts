@@ -69,7 +69,7 @@ const ymd = (y: number, m: number, d: number) => new Date(Date.UTC(y, m - 1, d))
 /* ------------------------------- Животные -------------------------------- */
 
 const COLS = [
-  'ident_number', 'id_format', 'uuid', 'name', 'kind', 'sex', 'state', 'age_group',
+  'ident_number', 'id_format', 'uuid', 'name', 'sex', 'state', 'age_group',
   'birth_date', 'breed_id', 'blood_percent', 'owner_id', 'herd_id',
   'father_id', 'mother_id', 'trust_level', 'public_visible', 'public_details',
   'inbreeding', 'archived', 'alt_ids_ear_tag',
@@ -98,7 +98,6 @@ const base = (ctx: Ctx, n: number, over: Partial<Row> = {}): Row => derive({
   id_format: 'internal',
   uuid: randomUUID(),
   name: `Контрольная ${n}`,
-  kind: 'cow',
   sex: 'female',
   state: 'alive',
   age_group: 'cow2',
@@ -252,7 +251,6 @@ async function main() {
     base(ctx, 900, {
       ident_number: `${PREFIX}SIRE`,
       name: 'Контрольный бык',
-      kind: 'bull',
       sex: 'male',
       age_group: 'bull',
       /*
@@ -356,13 +354,12 @@ async function main() {
     base(ctx, 37, { ...parents, summary_protein_percent: 0.4 }),                      // protein-implausible
     base(ctx, 38, { ...parents, summary_fat_kg: 90 }),                                // fat-kg-mismatch
     /*
-     * Быку записали удой коровы. Пол при этом мужской, а `kind` — бык:
-     * именно так выглядит перенос из таблицы, где пол лежал отдельной
-     * колонкой и не совпал со строкой.
+     * Быку записали удой коровы. Пол при этом мужской, и возрастная
+     * группа — бык: именно так выглядит перенос из таблицы, где пол лежал
+     * отдельной колонкой и не совпал со строкой.
      */
     base(ctx, 60, {
       ...parents,
-      kind: 'bull',
       sex: 'male',
       age_group: 'bull',
       birth_date: ymd(2018, 4, 2),
@@ -467,7 +464,6 @@ async function main() {
     base(ctx, 902, {
       ident_number: `${PREFIX}GONE`,
       name: 'Выбывший бык',
-      kind: 'bull',
       sex: 'male',
       age_group: 'bull',
       birth_date: ymd(2014, 2, 1),
@@ -495,7 +491,6 @@ async function main() {
     base(ctx, 903, {
       ident_number: `${PREFIX}YOUNG`,
       name: 'Молодой бык',
-      kind: 'bull',
       sex: 'male',
       age_group: 'bull',
       birth_date: ymd(2024, 6, 1),

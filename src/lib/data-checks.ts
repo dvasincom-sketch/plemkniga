@@ -275,7 +275,7 @@ function localIssues(a: Animal, t: Thresholds): Issue[] {
    * Смотрим на любое из полей продуктивности, а не только на удой: перенос
    * ошибается целой строкой, и жир с белком приезжают вместе с ним.
    */
-  if (a.kind === 'bull') {
+  if (a.sex === 'male') {
     const own =
       typeof s.milkYield === 'number' ||
       typeof s.fatPercent === 'number' ||
@@ -304,7 +304,7 @@ function localIssues(a: Animal, t: Thresholds): Issue[] {
    * карточке. Считать отёлы значило бы поймать заодно корову, у которой
    * отёлы просто не загружены, — а это другая беда с другим лечением.
    */
-  if (a.kind !== 'bull' && (a.ageGroup === 'calf' || a.ageGroup === 'heifer')) {
+  if (a.sex !== 'male' && (a.ageGroup === 'calf' || a.ageGroup === 'heifer')) {
     const own =
       typeof s.milkYield === 'number' ||
       typeof s.fatPercent === 'number' ||

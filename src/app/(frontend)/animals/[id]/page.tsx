@@ -37,7 +37,7 @@ import { after } from 'next/server'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { isAnimalLocked, relId, viewerOf } from '@/lib/visibility'
 import {
-  ANIMAL_KINDS,
+  AGE_GROUPS,
   CALVING_ROLE_TRAITS,
   CALVING_TRAITS,
   DOCUMENT_TYPES,
@@ -105,7 +105,6 @@ const IDENTITY_FIELDS = [
   'identNumber',
   'idFormat',
   'name',
-  'kind',
   'sex',
   'state',
   'ageGroup',
@@ -327,7 +326,6 @@ export default async function AnimalPage({
   const owner =
     typeof animal.owner === 'object' && animal.owner ? animal.owner.name : '—'
 
-  const kindLabel = labelOf(ANIMAL_KINDS, animal.kind)
   const exteriorRaw = (animal.exterior ?? {}) as Record<string, number | null | undefined>
 
   /*
@@ -482,7 +480,7 @@ export default async function AnimalPage({
    * а вид животного словами не сказан нигде до самой шапки. Терять цветом
    * то, что уже сказано текстом, дешевле, чем то, что не сказано.
    */
-  const isBullHeader = animal.kind === 'bull'
+  const isBullHeader = animal.sex === 'male'
   const headerTone = isBullHeader
     ? 'rounded-card bg-basement p-7 text-white sm:p-8'
     : isForeign
@@ -634,11 +632,14 @@ export default async function AnimalPage({
    *
    * Ниже он решает не одно «показывать ли», а как подписаны блоки:
    * у быка все оценки — прогноз по дочерям, у коровы те же блоки
-   * означают её собственные измерения. Проверка `kind === 'bull'`,
-   * повторённая в пяти местах, разошлась бы при первом же новом виде
-   * животного.
+   * означают её собственные измерения. Проверка, повторённая в пяти
+   * местах, разошлась бы при первом же расхождении полей.
+   *
+   * Спрашивается пол, а не бывшее поле «Тип животного»: оно убрано,
+   * потому что на живой базе оказалось умолчанием формы и полу
+   * не противоречило ни разу. Разбор — в `lib/dictionaries.ts`.
    */
-  const isBull = animal.kind === 'bull'
+  const isBull = animal.sex === 'male'
 
   /*
    * Есть ли на карточке хоть один слабый прогноз — считается один раз
@@ -932,7 +933,7 @@ export default async function AnimalPage({
                     onDark ? 'bg-white/20 text-white' : 'bg-[#eeeeee] text-ink-700'
                   }`}
                 >
-                  {kindLabel}
+                  {labelOf(AGE_GROUPS, animal.ageGroup)}
                 </span>
               </h1>
 
@@ -1584,7 +1585,7 @@ export default async function AnimalPage({
                не завезли» и заставляют искать, кто их не завёз, — тогда как
                лактаций у быка не бывает по устройству животного.
             */}
-            {animal.kind !== 'bull' && (
+            {animal.sex !== 'male' && (
             <section className="mt-6">
               <Collapsible
                 title="Фенотип по лактациям"
@@ -1667,7 +1668,7 @@ export default async function AnimalPage({
 
             <div>
               {/* Кривая лактации быку не строится по той же причине. */}
-              {animal.kind !== 'bull' && <LactationDynamics animal={animal} />}
+              {animal.sex !== 'male' && <LactationDynamics animal={animal} />}
               {animal.notes && (
                 <p className="mt-4 text-sm leading-relaxed text-ink-700">{animal.notes}</p>
               )}

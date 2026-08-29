@@ -567,7 +567,7 @@ async function ensureScaffolding(client: PoolClient): Promise<Ctx> {
 }
 
 const ANIMAL_COLUMNS = [
-  'ident_number', 'id_format', 'uuid', 'name', 'name_latin', 'kind', 'sex', 'state',
+  'ident_number', 'id_format', 'uuid', 'name', 'name_latin', 'sex', 'state',
   'disposal_date', 'disposal_reason_id',
   'age_group', 'birth_date', 'breed_id', 'blood_percent', 'owner_id', 'herd_id',
   'father_id', 'mother_id', 'trust_level', 'public_visible', 'public_details',
