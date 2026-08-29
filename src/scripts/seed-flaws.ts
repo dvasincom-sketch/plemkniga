@@ -194,6 +194,16 @@ async function main() {
    * Именно отец, а не мать: `siblings-too-close` группирует потомков
    * по матери, и общая мать у всего стенда объявила бы сотню записей
    * близнецами.
+   *
+   * Двадцать лет, а не двенадцать. С двенадцатью правило
+   * `parent-younger` срабатывало девять раз: оно считает находкой
+   * и рождение родителя в тот же день, а быки, заводимые ради других
+   * посадок, рождались ровно той же датой, что и общий предок.
+   * Предок обязан быть старше всех, кроме той записи, которая заведена
+   * ради «слишком стар и жив», — та вовсе без связи.
+   *
+   * Выше двадцати пяти его поднимать нельзя: он сам стал бы находкой
+   * `too-old-alive`.
    */
   let baseFather = 0
 
@@ -234,7 +244,7 @@ async function main() {
     sex: 'male',
     state: 'alive',
     age_group: 'bull',
-    birth_date: yearsAgo(12),
+    birth_date: yearsAgo(20),
     breed_id: breedId,
     blood_percent: 93,
     owner_id: orgId,
@@ -266,8 +276,18 @@ async function main() {
     await animal({ breed_id: null })
   })
 
+  /*
+   * Единственная запись стенда без связи с общим предком: она старше
+   * его самого, и связь означала бы «родитель младше потомка» —
+   * находку не про то, ради чего запись заведена. Номер отца
+   * по документам ставится, чтобы не поднялось ещё и «нет родителей».
+   */
   await plant(['too-old-alive'], 'тридцать лет и числится живой', async () => {
-    await animal({ birth_date: yearsAgo(30) })
+    await animal({
+      birth_date: yearsAgo(30),
+      father_id: null,
+      pedigree_text_father_id: 'RU9800000001',
+    })
   })
 
   await plant(['disposal-vs-state'], 'причина выбытия при состоянии «в стаде»', async () => {
@@ -771,11 +791,11 @@ async function main() {
    * поднялось бы тридцать находок `afc-too-old`, к делу не относящихся.
    */
   await plant(['event-year-gap'], 'поток отёлов с пропущенным годом посередине', async () => {
-    const birth = yearsAgo(7.5)
-    for (let i = 0; i < 30; i++) {
+    const birth = yearsAgo(11.5)
+    for (let i = 0; i < 40; i++) {
       await withCalvings(
         { birth_date: birth },
-        [5, 4, 2, 1].map((yearsBack, k) => ({ number: k + 1, date: yearsAgo(yearsBack) })),
+        [9, 8, 6, 5].map((yearsBack, k) => ({ number: k + 1, date: yearsAgo(yearsBack) })),
       )
     }
   })
