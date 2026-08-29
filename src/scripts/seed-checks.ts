@@ -422,6 +422,15 @@ async function main() {
      */
     base(ctx, 65, { ...parents, age_group: 'heifer' }),                                // production-before-calving
 
+    /*
+     * Бык с коровьей группой. До решения №228 такую запись прикрывало
+     * третье поле — «Тип животного» со значением «бык», — и расхождение
+     * выглядело мелочью оформления. Поле убрано, и на живой базе таких
+     * нашлось семь. Заготовка женская, поэтому меняются оба поля разом:
+     * пол на мужской, группа остаётся коровьей.
+     */
+    base(ctx, 66, { ...parents, sex: 'male', age_group: 'cow2' }),                     // age-group-vs-sex
+
     base(ctx, 63, { ...parents, ident_number: 'CHK-771122334455' }),                  // ident-core-shared
     base(ctx, 64, {
       ...parents,
