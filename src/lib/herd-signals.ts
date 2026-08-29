@@ -29,18 +29,81 @@ import type { Culling, GeneticTrend, HeiferAges, UdderHealth } from '@/lib/herd-
  * их своим запросом было бы быстрее на «Обзоре», но однажды два запроса
  * разошлись бы — и «Обзор» тревожил бы о том, чего в отчёте нет. Ровно
  * так уже расходились числа стада.
+ *
+ * ## Почему рядом с числом стоит база
+ *
+ * «4033 коровы выше порога соматики» — само по себе не сообщение.
+ * Четыре тысячи из сорока это работа на неделю; четыре тысячи
+ * из четырёх тысяч восьмисот — совсем другой разговор. Доля меняет
+ * не масштаб беды, а её природу, и без базы число вводит в заблуждение
+ * ровно того, кто на него смотрит первым.
+ *
+ * ## Почему при большой доле меняется совет
+ *
+ * «Разберите 4033 коровы» — указание, которое никто не выполнит,
+ * и потому оно хуже молчания: полоса приучает к тому, что её советы
+ * невыполнимы. Когда за порогом больше половины стада, дело почти
+ * никогда не в животных: не приехала часть замеров, замеры пришли
+ * из лаборатории с другой методикой, порог настроен не под это
+ * хозяйство. Про это и надо говорить — проверить причину, а не лечить
+ * следствие.
+ *
+ * Порог в половину взят не из статистики, а из смысла: пока беда
+ * у меньшинства, это выборка, с которой работают поголовно; когда
+ * у большинства — это уже свойство всего стада или всех данных.
  */
+
+/** Доля, начиная с которой сигнал говорит не о животных, а о данных. */
+const MASS_SHARE = 0.5
 
 export type Signal = {
   key: string
   /** Число — оно и есть повод. */
   count: number
   label: string
+  /**
+   * Из скольких. `null` — база неизвестна, и тогда её не показывают:
+   * выдуманный знаменатель хуже отсутствующего.
+   */
+  of: number | null
+  /** Доля от базы, 0…1. */
+  share: number | null
   /** Чем это грозит, одной строкой. */
   hint: string
   href: string
   /** Красным — то, что уже стоит денег; обычным — то, что просит внимания. */
   urgent: boolean
+  /**
+   * Беда охватила большинство — совет сменился с разбора животных
+   * на проверку данных. Полоса рисует такие иначе: это не список задач,
+   * а повод остановиться.
+   */
+  mass: boolean
+}
+
+/**
+ * Собрать сигнал, посчитав долю и подменив совет при большой доле.
+ *
+ * Подмена живёт здесь, а не в вёрстке: это решение о смысле, а не о виде.
+ * Вынеси его на страницу — и второй показ сигналов (письмо, выгрузка,
+ * кабинет Ассоциации) отправит человека разбирать четыре тысячи коров.
+ */
+const signal = (
+  s: Omit<Signal, 'share' | 'mass'> & { massHint?: string },
+): Signal => {
+  const share = s.of && s.of > 0 ? s.count / s.of : null
+  const mass = share !== null && share >= MASS_SHARE
+  return {
+    key: s.key,
+    count: s.count,
+    label: s.label,
+    of: s.of,
+    share,
+    hint: mass && s.massHint ? s.massHint : s.hint,
+    href: s.href,
+    urgent: s.urgent,
+    mass,
+  }
 }
 
 export function herdSignals({
@@ -62,36 +125,54 @@ export function herdSignals({
    * через поколение.
    */
   if (heifers && heifers.overdue > 0) {
-    out.push({
-      key: 'heifers-overdue',
-      count: heifers.overdue,
-      label: 'тёлок в передержке',
-      hint: 'старше 15 месяцев без отёла — корм без отдачи',
-      href: '/account/reports/heifers-overdue',
-      urgent: true,
-    })
+    out.push(
+      signal({
+        key: 'heifers-overdue',
+        count: heifers.overdue,
+        of: heifers.total,
+        label: 'тёлок в передержке',
+        hint: 'старше 15 месяцев без отёла — корм без отдачи',
+        massHint:
+          'передержан почти весь молодняк — похоже, отёлы вносят не все ' +
+          'или даты рождения приехали неверными',
+        href: '/account/reports/heifers-overdue',
+        urgent: true,
+      }),
+    )
   }
 
   if (udder && udder.above > 0) {
-    out.push({
-      key: 'scc-above',
-      count: udder.above,
-      label: `коров выше ${SCC_THRESHOLD} тыс. соматики`,
-      hint: 'скрытый мастит: удой, сортность и выбраковка сразу',
-      href: '/account/reports/scc-above',
-      urgent: true,
-    })
+    out.push(
+      signal({
+        key: 'scc-above',
+        count: udder.above,
+        of: udder.measured,
+        label: `коров выше ${SCC_THRESHOLD} тыс. соматики`,
+        hint: 'скрытый мастит: удой, сортность и выбраковка сразу',
+        massHint:
+          'выше порога больше половины стада — сперва проверьте, все ли ' +
+          'замеры приехали и той ли лабораторией сделаны',
+        href: '/account/reports/scc-above',
+        urgent: true,
+      }),
+    )
   }
 
   if (trend && trend.aboveThreshold > 0) {
-    out.push({
-      key: 'inbreeding-above',
-      count: trend.aboveThreshold,
-      label: `животных с инбридингом выше ${INBREEDING_THRESHOLD} %`,
-      hint: 'решается подбором быка, а не лечением',
-      href: '/account/reports/inbreeding-above',
-      urgent: false,
-    })
+    out.push(
+      signal({
+        key: 'inbreeding-above',
+        count: trend.aboveThreshold,
+        of: trend.withInbreeding,
+        label: `животных с инбридингом выше ${INBREEDING_THRESHOLD} %`,
+        hint: 'решается подбором быка, а не лечением',
+        massHint:
+          'инбридинг выше порога у большинства — стадо давно закрыто ' +
+          'по завозу, и подбором внутри него это уже не решается',
+        href: '/account/reports/inbreeding-above',
+        urgent: false,
+      }),
+    )
   }
 
   /*
@@ -100,14 +181,20 @@ export function herdSignals({
    * то, чего быть не должно, — иначе это просто ещё одно число.
    */
   if (cull && cull.firstLactation > 0) {
-    out.push({
-      key: 'culled-first',
-      count: cull.firstLactation,
-      label: 'первотёлок выбыло за год',
-      hint: 'выращивание не окупилось — самая дорогая потеря',
-      href: '/account/reports/culled-first',
-      urgent: false,
-    })
+    out.push(
+      signal({
+        key: 'culled-first',
+        count: cull.firstLactation,
+        of: cull.total,
+        label: 'первотёлок выбыло за год',
+        hint: 'выращивание не окупилось — самая дорогая потеря',
+        massHint:
+          'больше половины выбытия — первотёлки: беда не в отдельных ' +
+          'коровах, а в выращивании или в раздое',
+        href: '/account/reports/culled-first',
+        urgent: false,
+      }),
+    )
   }
 
   /*
@@ -116,14 +203,17 @@ export function herdSignals({
    * охота становится передержкой через месяц.
    */
   if (heifers && heifers.ready > 0) {
-    out.push({
-      key: 'heifers-ready',
-      count: heifers.ready,
-      label: 'тёлок пора осеменять',
-      hint: '13–15 месяцев — возраст осеменения голштинки',
-      href: '/account/reports/heifers-ready',
-      urgent: false,
-    })
+    out.push(
+      signal({
+        key: 'heifers-ready',
+        count: heifers.ready,
+        of: heifers.total,
+        label: 'тёлок пора осеменять',
+        hint: '13–15 месяцев — возраст осеменения голштинки',
+        href: '/account/reports/heifers-ready',
+        urgent: false,
+      }),
+    )
   }
 
   return out

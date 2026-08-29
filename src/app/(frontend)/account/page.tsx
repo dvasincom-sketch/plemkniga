@@ -560,9 +560,25 @@ async function OverviewTab({ orgId }: { orgId?: number }) {
                 }`}
               >
                 <span className="block text-[15px] font-medium">
-                  <span className="tabular-nums">{s.count} </span>
+                  <span className="tabular-nums">{nf(s.count, 0)} </span>
                   {s.label}
                 </span>
+
+                {/*
+                   База и доля — второй строкой, а не рядом с числом.
+                   «4033 из 4790 коров выше порога» в одну строку читается
+                   как одно длинное число; разведённые, они читаются
+                   как утверждение и его масштаб.
+                */}
+                {s.of !== null && s.share !== null && (
+                  <span className="mt-0.5 block text-[12px] leading-snug text-ink-700">
+                    из {nf(s.of, 0)} — это{' '}
+                    <span className={s.mass ? 'font-medium' : undefined}>
+                      {s.share < 0.01 ? 'менее 1' : nf(s.share * 100, 0)} %
+                    </span>
+                  </span>
+                )}
+
                 <span className="mt-0.5 block text-[12px] leading-snug text-ink-500">{s.hint}</span>
               </Link>
             ))}
