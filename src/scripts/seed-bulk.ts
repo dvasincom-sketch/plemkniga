@@ -396,6 +396,8 @@ type Ctx = {
   dnaTypes: number[]
   /** Причины выбытия: без них выбывшее животное противоречит само себе. */
   disposalReasons: number[]
+  /** Результаты осеменения по коду: без них не считается индекс осеменения. */
+  insResults: Map<string, number>
 }
 
 async function ensureScaffolding(client: PoolClient): Promise<Ctx> {
@@ -411,6 +413,13 @@ async function ensureScaffolding(client: PoolClient): Promise<Ctx> {
   const disposalReasons = (
     await client.query<{ id: number }>('select id from disposal_reasons limit 20')
   ).rows.map((r) => r.id)
+  const insResults = new Map<string, number>(
+    (
+      await client.query<{ id: number; code: string }>(
+        'select id, code from insemination_results',
+      )
+    ).rows.map((r) => [String(r.code), r.id]),
+  )
 
   const needHerds = Math.ceil(TOTAL / HERD_SIZE)
   const needOrgs = Math.max(1, Math.ceil(needHerds / 4))
@@ -459,7 +468,10 @@ async function ensureScaffolding(client: PoolClient): Promise<Ctx> {
   if (!disposalReasons.length) {
     console.log('Справочник причин выбытия пуст — выбывшие останутся без причины (npm run seed)')
   }
-  return { client, orgs, herds, breeds, healthTypes, dnaTypes, disposalReasons }
+  if (!insResults.size) {
+    console.log('Справочник результатов осеменения пуст — индекс осеменения не посчитается (npm run seed)')
+  }
+  return { client, orgs, herds, breeds, healthTypes, dnaTypes, disposalReasons, insResults }
 }
 
 const ANIMAL_COLUMNS = [
@@ -1283,7 +1295,7 @@ async function fillEvents(
 ) {
   const calvingCols = ['animal_id', 'number', 'date', 'result', 'milking_days', 'ease', 'calf_weight', 'updated_at', 'created_at']
   const milkCols = ['animal_id', 'date', 'lactation_number', 'daily_yield', 'fat_percent', 'protein_percent', 'somatic_cells', 'updated_at', 'created_at']
-  const insCols = ['animal_id', 'bull_id', 'date', 'attempt_number', 'doses', 'lactation_number', 'updated_at', 'created_at']
+  const insCols = ['animal_id', 'bull_id', 'date', 'attempt_number', 'doses', 'lactation_number', 'result_id', 'updated_at', 'created_at']
   const healthCols = ['animal_id', 'type_id', 'date', 'severity', 'updated_at', 'created_at']
   const lactCols = [
     '_order', '_parent_id', 'id', 'number', 'calving_date', 'insemination_date',
@@ -1452,12 +1464,27 @@ async function fillEvents(
         ])
       }
 
-      // Осеменения: первое через два месяца после отёла, иногда повторные
+      /*
+       * Осеменения: первое через два месяца после отёла, иногда повторные.
+       *
+       * Результат проставляется, и это не украшение. Индекс осеменения
+       * — сколько доз ушло на одну стельность — считается делением всех
+       * осеменений на отмеченные стельными, и без результата отчёт
+       * показывал прочерк: не «ноль доз», а «считать не по чему».
+       * Отчёт по воспроизводству молчал об этом числе на всей книге.
+       *
+       * Стельным помечается последнее осеменение серии, предыдущие —
+       * яловыми. Это не выдумка ради красоты: корова, у которой дальше
+       * есть отёл, забеременела именно с последней попытки, а раньше
+       * попыток было столько, сколько их записано. Индекс получается
+       * равен среднему числу попыток — полтора-два, как в жизни.
+       */
       const attempts = int(1, 3)
       for (let a = 1; a <= attempts; a++) {
         const at = new Date(calvingDate.getTime() + (60 + a * 21) * 86_400_000)
         if (at > now) break
-        ins.push([id, pick(bulls), at, a, 1, l, now, now])
+        const result = ctx.insResults.get(a === attempts ? '1' : '2') ?? null
+        ins.push([id, pick(bulls), at, a, 1, l, result, now, now])
       }
 
       if (ctx.healthTypes.length && chance(0.25)) {
