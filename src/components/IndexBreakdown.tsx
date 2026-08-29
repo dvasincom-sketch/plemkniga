@@ -81,49 +81,60 @@ export function IndexBreakdown({
    */
   const nothingToCount = used === 0
 
-  const basis = evidence && (
-    <div className={`${nothingToCount ? 'mt-4' : 'mt-5'} border-t border-ink-100 pt-4`}>
-      <p className="text-[13px] leading-relaxed text-ink-500">
-        Надёжность считается из числа собственных наблюдений и из того, что известно
-        о родителях. Основание целиком:{' '}
-        <span className="text-ink-900">
-          {nf(evidence.lactations, 0)}{' '}
-          {plural(evidence.lactations, 'отёл', 'отёла', 'отёлов')} ·{' '}
-          {nf(evidence.milkTests, 0)}{' '}
-          {plural(evidence.milkTests, 'контрольная дойка', 'контрольные дойки', 'контрольных доек')}{' '}
-          ·{' '}
-          {evidence.hasSire && evidence.hasDam
-            ? 'оба родителя в книге'
-            : evidence.hasSire
-              ? 'в книге только отец'
-              : evidence.hasDam
-                ? 'в книге только мать'
-                : 'родителей в книге нет'}
-        </span>
-      </p>
-
-      {/*
-         Предупреждение об одной лактации — по той же причине, по какой
-         у быка предупреждение об одном хозяйстве: среднее по одному
-         наблюдению не среднее, а само наблюдение, и знать об этом надо
-         до килограммов.
-      */}
-      {evidence.lactations <= 1 && (
-        <p className="mt-2 max-w-[80ch] text-[13px] leading-relaxed text-ink-700">
-          {evidence.lactations === 0
-            ? 'Отёлов в книге нет: оценка опирается только на происхождение, собственных наблюдений за животным нет ни одного.'
-            : 'Учтён один отёл. Оценка по одной лактации сдвинется с каждой следующей — она пока говорит об этом годе, а не о животном.'}
-        </p>
-      )}
-
-      {!evidence.hasSire && !evidence.hasDam && (
-        <p className="mt-2 max-w-[80ch] text-[13px] leading-relaxed text-ink-700">
-          Ни один из родителей не найден в книге связью. Четверть надёжности,
-          которую даёт происхождение, здесь не работает — даже если родители
-          записаны текстом в родословной.
-        </p>
-      )}
+  /**
+   * Подвал: подпись — значение, тем же ритмом, что плитки выше.
+   *
+   * Основание надёжности стояло длинным серым предложением во всю
+   * ширину: сто тридцать знаков, которые надо прочесть, чтобы достать
+   * из них три числа. Само объяснение переехало подсказкой к слову
+   * «Достоверность» — оно объясняет именно её, — а в подвале осталось
+   * то, ради чего его читали.
+   *
+   * Ритм тот же, что у плиток, но без подложки: наверху измеренное,
+   * внизу основание и соседние величины. Разница в весе и есть
+   * иерархия, которой блоку не хватало.
+   */
+  const fact = (label: string, value: ReactNode) => (
+    <div key={label}>
+      <p className="text-[12px] leading-snug text-ink-500">{label}</p>
+      <p className="mt-1 text-[15px] leading-snug">{value}</p>
     </div>
+  )
+
+  const basis =
+    evidence &&
+    fact(
+      'Основание надёжности',
+      <>
+        {nf(evidence.lactations, 0)}{' '}
+        {plural(evidence.lactations, 'отёл', 'отёла', 'отёлов')} ·{' '}
+        {nf(evidence.milkTests, 0)}{' '}
+        {plural(evidence.milkTests, 'дойка', 'дойки', 'доек')} ·{' '}
+        {evidence.hasSire && evidence.hasDam
+          ? 'оба родителя'
+          : evidence.hasSire
+            ? 'только отец'
+            : evidence.hasDam
+              ? 'только мать'
+              : 'родителей нет'}
+      </>,
+    )
+
+  /*
+   * Предупреждение об одной лактации — по той же причине, по какой
+   * у быка предупреждение об одном хозяйстве: среднее по одному
+   * наблюдению не среднее, а само наблюдение, и знать об этом надо
+   * до килограммов. Стоит отдельной строкой под подвалом: это не факт
+   * о животном, а оговорка о том, как читать остальные.
+   */
+  const caveat = evidence && (evidence.lactations <= 1 || (!evidence.hasSire && !evidence.hasDam)) && (
+    <p className="mt-3 max-w-[80ch] text-[13px] leading-relaxed text-ink-700">
+      {evidence.lactations === 0
+        ? 'Отёлов в книге нет: оценка опирается только на происхождение, собственных наблюдений за животным нет ни одного.'
+        : evidence.lactations === 1
+          ? 'Учтён один отёл. Оценка по одной лактации сдвинется с каждой следующей — она пока говорит об этом годе, а не о животном.'
+          : 'Ни один из родителей не найден в книге связью. Четверть надёжности, которую даёт происхождение, здесь не работает.'}
+    </p>
   )
 
   return (
@@ -169,61 +180,69 @@ export function IndexBreakdown({
 
       {nothingToCount && (
         <>
-          <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
+          <p className="mb-4 max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
             Индекс не посчитан: ни один из {total} признаков профиля у животного
             не оценён. Он появится, когда приедут оценки признаков — из расчётного
             центра или по геномному тесту.
           </p>
-          {basis}
         </>
       )}
 
+      {/*
+         Плитки, а не тонкий ряд подписей.
+         
+         Ряд `dl` с шестнадцатым кеглем читался как продолжение текста:
+         четыре величины расползались по всей ширине и не отличались
+         от объяснений вокруг. Плитка на подложке — язык, которым
+         на сайте уже говорят «Стадо в числах» и блок надёжности быка,
+         и величина в ней читается как величина, а не как строка абзаца.
+      */}
       {!nothingToCount && (
-      <dl className="mb-5 grid grid-cols-2 gap-x-6 gap-y-3 border-y border-ink-100 py-4 sm:grid-cols-4">
-        <div>
-          <dt className="text-[12px] text-ink-500">Достоверность</dt>
-          <dd className="mt-0.5 text-[16px] tabular-nums">
-            <Computed formula="combinedReliability">{nf(reliability, 0)} %</Computed>
-          </dd>
+        <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {[
+            {
+              label: 'Достоверность',
+              tip: 'Считается из числа собственных наблюдений животного и из того, что известно о родителях. Основание целиком — в подвале блока',
+              value: <Computed formula="combinedReliability">{nf(reliability, 0)} %</Computed>,
+              note: null,
+            },
+            {
+              label: 'Процентиль',
+              tip: null,
+              value: percentile ? (
+                <Computed formula="percentile">{percentile.percentile}</Computed>
+              ) : (
+                '—'
+              ),
+              note: percentile
+                ? `из ${percentile.group}${percentile.sameYear ? ' ровесников' : ' животных книги'}`
+                : 'сравнивать не с кем',
+            },
+            {
+              label: 'Учтено признаков',
+              tip: null,
+              value: `${used} из ${total}`,
+              note: used < total ? 'по остальным нет оценок' : null,
+            },
+            {
+              label: 'База сравнения',
+              tip: null,
+              value: <span className="text-[17px]">{baseVersion}</span>,
+              note: computedAt
+                ? `рассчитано ${new Date(computedAt).toLocaleDateString('ru-RU')}`
+                : null,
+            },
+          ].map((m) => (
+            <div key={m.label} className="rounded-xl bg-canvas px-4 py-3.5">
+              <p className="flex items-center gap-1.5 text-[13px] leading-snug text-ink-500">
+                {m.label}
+                {m.tip && <InfoTip>{m.tip}</InfoTip>}
+              </p>
+              <p className="mt-1.5 text-[24px] font-medium leading-none tabular-nums">{m.value}</p>
+              {m.note && <p className="mt-1.5 text-[12px] leading-tight text-ink-500">{m.note}</p>}
+            </div>
+          ))}
         </div>
-
-        <div>
-          <dt className="text-[12px] text-ink-500">Процентиль</dt>
-          <dd className="mt-0.5 text-[16px] tabular-nums">
-            {percentile ? (
-              <Computed formula="percentile">{percentile.percentile}</Computed>
-            ) : (
-              '—'
-            )}
-          </dd>
-          {percentile && (
-            <dd className="text-[11px] leading-tight text-ink-500">
-              из {percentile.group}
-              {percentile.sameYear ? ' ровесников' : ' животных книги'}
-            </dd>
-          )}
-        </div>
-
-        <div>
-          <dt className="text-[12px] text-ink-500">Учтено признаков</dt>
-          <dd className="mt-0.5 text-[16px] tabular-nums">
-            {used} из {total}
-          </dd>
-          {used < total && (
-            <dd className="text-[11px] leading-tight text-ink-500">по остальным нет оценок</dd>
-          )}
-        </div>
-
-        <div>
-          <dt className="text-[12px] text-ink-500">База сравнения</dt>
-          <dd className="mt-0.5 text-[14px]">{baseVersion}</dd>
-          {computedAt && (
-            <dd className="text-[11px] leading-tight text-ink-500">
-              рассчитано {new Date(computedAt).toLocaleDateString('ru-RU')}
-            </dd>
-          )}
-        </div>
-      </dl>
       )}
 
       {!nothingToCount && (
@@ -321,8 +340,6 @@ export function IndexBreakdown({
         </details>
       )}
 
-      {!nothingToCount && basis}
-
       {/*
          Инбридинг и возраст первого отёла стояли двумя плашками под
          панелью — между ней и следующим блоком, ничьи. Читаются они
@@ -331,9 +348,13 @@ export function IndexBreakdown({
          сразу. Место им — в подвале той же рамки, а не в промежутке
          между рамками.
       */}
-      {facts && (
-        <div className="mt-4 flex flex-wrap gap-x-10 gap-y-3 border-t border-ink-100 pt-4">
-          {facts}
+      {(basis || facts) && (
+        <div className="mt-5 border-t border-ink-100 pt-4">
+          <div className="flex flex-wrap gap-x-12 gap-y-3">
+            {basis}
+            {facts}
+          </div>
+          {caveat}
         </div>
       )}
     </div>

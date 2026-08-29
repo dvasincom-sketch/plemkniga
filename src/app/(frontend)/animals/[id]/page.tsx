@@ -782,12 +782,9 @@ export default async function AnimalPage({
   const fact = (label: string, value: ReactNode, href: string, linkText: string) => (
     <div key={label}>
       <p className="text-[12px] leading-snug text-ink-500">{label}</p>
-      <p className="mt-0.5 flex items-baseline gap-2.5">
-        <span className="text-[18px] font-medium leading-none tabular-nums">{value}</span>
-        <Link
-          href={href}
-          className="text-[13px] underline underline-offset-4 hover:text-forest-500"
-        >
+      <p className="mt-1 flex items-baseline gap-2.5 text-[15px] leading-snug">
+        <span className="tabular-nums">{value}</span>
+        <Link href={href} className="underline underline-offset-4 hover:text-forest-500">
           {linkText}
         </Link>
       </p>
