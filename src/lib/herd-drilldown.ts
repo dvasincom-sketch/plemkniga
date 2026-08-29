@@ -6,6 +6,14 @@ import {
   SCC_THRESHOLD,
 } from '@/lib/herd-analytics'
 import { NBSP } from '@/lib/format'
+import {
+  ageMonths,
+  calvingsCount,
+  culledYear,
+  isHeifer,
+  liveFemale,
+  notArchived,
+} from '@/lib/sql-herd'
 import { poolOf } from '@/lib/sql'
 
 /**
@@ -78,29 +86,22 @@ export type HerdDrilldown = {
   rows: HerdRow[]
 }
 
-/** Возраст в месяцах — тем же выражением, что в `heiferAges`. */
-const MONTHS =
-  "extract(year from age(now(), a.birth_date)) * 12 + extract(month from age(now(), a.birth_date))"
-
-/** Отёлов в книге — тем же подзапросом, что в `lactationStructure`. */
-const CALVINGS = '(select count(*) from calvings k where k.animal_id = a.id)'
-
-/**
- * Тёлки: живые, женского пола, без единого отёла.
+/*
+ * Возраст, отёлы и тёлки берутся из общего объявления (`sql-herd.ts`),
+ * а не переписываются здесь.
  *
- * «Без отёла», а не «возрастная группа тёлка» — ровно как в отчёте:
- * группу заполняет человек и забывает обновить после отёла, отёл же
- * есть событие с датой. Сам список это и показывает: строка, где
- * возрастная группа «Корова», а отёлов нет, — находка, а не сбой.
+ * До этого над каждым из них стоял комментарий «тем же выражением, что
+ * в `heiferAges`» — обещание, которое ничто не проверяло. Расхождение
+ * стоило бы дорого и заметили бы его поздно: число в отчёте и длина
+ * списка за ним считались бы по-разному, а сойтись они обязаны, иначе
+ * человек перестанет верить обоим сразу.
  */
+const MONTHS = ageMonths()
+const CALVINGS = calvingsCount()
 const HEIFERS = `
   from animals a
  where a.owner_id = $1
-   and a.archived is not true
-   and a.sex = 'female'
-   and a.state = 'alive'
-   and a.birth_date is not null
-   and not exists (select 1 from calvings k where k.animal_id = a.id)
+   and ${isHeifer()}
 `
 
 /**
@@ -171,7 +172,7 @@ const RULES: Record<string, Rule> = {
     body: `
       from animals a
      where a.owner_id = $1
-       and a.archived is not true
+       and ${notArchived()}
        and a.inbreeding is not null
        and a.inbreeding > $2`,
     detail: `${ruNum('round(a.inbreeding, 2)')} || '${NBSP}%'`,
@@ -203,9 +204,8 @@ const RULES: Record<string, Rule> = {
          limit 1
       ) t on true
      where a.owner_id = $1
-       and a.archived is not true
-       and a.sex = 'female'
-       and a.state = 'alive'
+       and ${notArchived()}
+       and ${liveFemale()}
        and t.scc > $2`,
     detail: `t.scc::text || '${NBSP}тыс./мл · ' || to_char(t.at, 'DD.MM.YYYY')`,
     order: 't.scc desc',
@@ -227,8 +227,7 @@ const RULES: Record<string, Rule> = {
       from animals a
       left join disposal_reasons r on r.id = a.disposal_reason_id
      where a.owner_id = $1
-       and a.disposal_date is not null
-       and a.disposal_date > now() - interval '12 months'`,
+       and ${culledYear()}`,
     detail: `
       coalesce(r.name, 'Причина не указана')
       || ' · лактация ' || ${CALVINGS}::text
@@ -255,8 +254,7 @@ const RULES: Record<string, Rule> = {
       from animals a
       left join disposal_reasons r on r.id = a.disposal_reason_id
      where a.owner_id = $1
-       and a.disposal_date is not null
-       and a.disposal_date > now() - interval '12 months'
+       and ${culledYear()}
        and ${CALVINGS} <= 1`,
     detail: `
       coalesce(r.name, 'Причина не указана')
@@ -279,9 +277,8 @@ const RULES: Record<string, Rule> = {
     body: `
       from animals a
      where a.owner_id = $1
-       and a.archived is not true
-       and a.sex = 'female'
-       and a.state = 'alive'
+       and ${notArchived()}
+       and ${liveFemale()}
        and (a.age_group is null or a.age_group not in ('calf', 'heifer'))
        and ${CALVINGS} = 0`,
     detail: `case when a.birth_date is null then 'дата рождения не указана'
@@ -307,7 +304,7 @@ const RULES: Record<string, Rule> = {
          limit 1
       ) l on true
      where a.owner_id = $1
-       and a.archived is not true`,
+       and ${notArchived()}`,
     detail: `
       '№ ' || coalesce(l.num, 0)::text
       || ' · ' || round(l.milk305)::text || '${NBSP}кг'
@@ -335,9 +332,8 @@ function lactationRule(k: number, label: string): Rule {
     body: `
       from animals a
      where a.owner_id = $1
-       and a.archived is not true
-       and a.sex = 'female'
-       and a.state = 'alive'
+       and ${notArchived()}
+       and ${liveFemale()}
        and least(${CALVINGS}, 4) = $2`,
     detail: `
       ${CALVINGS}::text

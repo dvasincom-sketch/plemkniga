@@ -1,6 +1,14 @@
 import type { Payload } from 'payload'
 import { NBSP, nf } from '@/lib/format'
 import { numOf, numOrNull, poolOf } from '@/lib/sql'
+import {
+  ageMonths,
+  calvingsCount,
+  culledYear,
+  isHeifer,
+  liveFemale,
+  notArchived,
+} from '@/lib/sql-herd'
 import { finishedLactation, hasMilk305, lactationGroup, LACTATION_GROUP_LABEL } from '@/lib/sql-lactation'
 
 /**
@@ -217,18 +225,10 @@ export async function heiferAges(
   const res = await pool.query(
     `
     with heifers as (
-      select a.id,
-             extract(year from age(now(), a.birth_date)) * 12
-             + extract(month from age(now(), a.birth_date)) as months
+      select a.id, ${ageMonths()} as months
         from animals a
        where a.owner_id = $1
-         and a.archived is not true
-         and a.sex = 'female'
-         and a.state = 'alive'
-         and a.birth_date is not null
-         /* Отёлов нет — значит ещё не корова, чем бы ни была заполнена
-            возрастная группа в карточке */
-         and not exists (select 1 from calvings k where k.animal_id = a.id)
+         and ${isHeifer()}
     )
     select
       count(*) filter (where months < 13)::int                  as young,
@@ -358,10 +358,10 @@ export async function geneticTrend(
       count(*) filter (where inbreeding > $2)::int as above,
       count(*)::int                                as total,
       round(avg(inbreeding), 2)                    as mean
-      from animals
-     where owner_id = $1
-       and archived is not true
-       and inbreeding is not null`,
+      from animals a
+     where a.owner_id = $1
+       and ${notArchived()}
+       and a.inbreeding is not null`,
     [organizationId, INBREEDING_THRESHOLD],
   )
 
@@ -429,12 +429,11 @@ export async function culling(
     with gone as (
       select a.id,
              coalesce(r.name, 'Причина не указана') as reason,
-             (select count(*) from calvings k where k.animal_id = a.id) as lactations
+             ${calvingsCount()} as lactations
         from animals a
         left join disposal_reasons r on r.id = a.disposal_reason_id
        where a.owner_id = $1
-         and a.disposal_date is not null
-         and a.disposal_date > now() - interval '12 months'
+         and ${culledYear()}
     ),
     /*
      * Знаменатель — нынешнее стадо плюс выбывшие за год. Взять только
@@ -443,9 +442,8 @@ export async function culling(
      */
     live as (
       select count(*)::int as cows
-        from animals
-       where owner_id = $1 and archived is not true
-         and sex = 'female' and state = 'alive'
+        from animals a
+       where a.owner_id = $1 and ${notArchived()} and ${liveFemale()}
     )
     select
       (select count(*) from gone)::int                                   as total,
@@ -463,12 +461,11 @@ export async function culling(
     `
     select coalesce(r.name, 'Причина не указана') as reason,
            count(*)::int                          as count,
-           round(avg(nullif((select count(*) from calvings k where k.animal_id = a.id), 0)), 1) as mean_lactation
+           round(avg(nullif(${calvingsCount()}, 0)), 1) as mean_lactation
       from animals a
       left join disposal_reasons r on r.id = a.disposal_reason_id
      where a.owner_id = $1
-       and a.disposal_date is not null
-       and a.disposal_date > now() - interval '12 months'
+       and ${culledYear()}
      group by 1
      order by count desc`,
     [organizationId],
@@ -699,9 +696,8 @@ export async function udderHealth(
   const res = await pool.query(
     `
     with mine as (
-      select id from animals
-       where owner_id = $1 and archived is not true
-         and sex = 'female' and state = 'alive'
+      select a.id from animals a
+       where a.owner_id = $1 and ${notArchived()} and ${liveFemale()}
     ),
     /*
      * По одному — последнему — замеру на корову. Взяв все замеры,

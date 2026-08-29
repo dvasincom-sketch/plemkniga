@@ -49,6 +49,7 @@
     "check:pool": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-pool.ts",
     "check:herd": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-herd-analytics.ts",
     "check:drilldown": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-drilldown.ts",
+    "check:condition": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-condition.ts",
     "check:mating": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-mating.ts",
     "check:all": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-all.ts",
     "check:nav": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-nav.ts",

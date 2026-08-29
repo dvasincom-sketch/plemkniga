@@ -120,17 +120,29 @@ const signal = (
   }
 }
 
-export function herdSignals({
-  heifers,
-  trend,
-  udder,
-  cull,
-}: {
-  heifers: HeiferAges | null
-  trend: GeneticTrend | null
-  udder: UdderHealth | null
-  cull: Culling | null
-}): Signal[] {
+/**
+ * Что нужно сигналам от отчётов — и ничего сверх.
+ *
+ * Просились сами `HeiferAges`, `GeneticTrend`, `UdderHealth` и `Culling`:
+ * так оно и было, пока считал их один вызов на одно хозяйство. Но те же
+ * числа теперь считаются ещё и разом по всем хозяйствам, для кабинета
+ * Ассоциации, и там нет ни ряда по годам рождения, ни разбивки выбытия
+ * по причинам — они не нужны ни одному сигналу, а стоят полного прохода
+ * по книге.
+ *
+ * Требовать их значило бы заставить групповой запрос считать лишнее
+ * или, что хуже, подставить пустой ряд — то есть соврать типом ради того,
+ * чтобы он сошёлся. Поэтому здесь перечислено ровно то, что читается
+ * ниже; полные отчёты подходят под это как есть.
+ */
+export type SignalInput = {
+  heifers: Pick<HeiferAges, 'overdue' | 'ready' | 'total'> | null
+  trend: Pick<GeneticTrend, 'aboveThreshold' | 'withInbreeding'> | null
+  udder: Pick<UdderHealth, 'above' | 'measured'> | null
+  cull: Pick<Culling, 'firstLactation' | 'total'> | null
+}
+
+export function herdSignals({ heifers, trend, udder, cull }: SignalInput): Signal[] {
   const out: Signal[] = []
 
   /*

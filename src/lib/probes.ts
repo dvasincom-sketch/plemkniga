@@ -1,6 +1,8 @@
 import type { Payload } from 'payload'
 import { runDoctor } from '@/lib/doctor'
 import { herdDrilldown } from '@/lib/herd-drilldown'
+import { herdConditions } from '@/lib/herd-condition'
+import { herdSignals } from '@/lib/herd-signals'
 import { biggestHerd } from '@/lib/biggest-herd'
 import {
   culling,
@@ -141,6 +143,85 @@ export async function drilldownConsistency(
 }
 
 /* ------------------------------------------------------------------ *
+ *          Числа Ассоциации против чисел самого хозяйства              *
+ * ------------------------------------------------------------------ */
+
+/**
+ * Одно стадо, посчитанное двумя путями.
+ *
+ * Кабинет хозяйства считает свои сигналы четырьмя запросами по одному
+ * владельцу; кабинет Ассоциации — одним запросом с группировкой по всем.
+ * Условия у них общие (`sql-herd.ts`), но запросы разной формы, и форма
+ * умеет соврать там, где правило верно: `left join` по владельцу
+ * без животных даёт `null` вместо нуля, `distinct on` в подзапросе берёт
+ * последний замер по другому порядку, `count(*) filter` считает строки
+ * соединения вместо коров.
+ *
+ * Цена расхождения не в числах, а в разговоре: Ассоциация звонит
+ * про передержку у двенадцати тёлок, хозяйство открывает свой кабинет
+ * и видит восемь. После такого не верят уже ничему в системе.
+ */
+export async function conditionConsistency(
+  payload: Payload,
+  organizationId: number,
+): Promise<{ findings: string[]; notes: string[] }> {
+  const findings: string[] = []
+  const notes: string[] = []
+
+  const all = await herdConditions(payload)
+  const mine = all.get(organizationId)
+
+  if (!mine) {
+    return { findings: [`хозяйства #${organizationId} нет в сводке по всем`], notes }
+  }
+
+  const [heifers, trend, cull, udder] = await Promise.all([
+    heiferAges(payload, organizationId),
+    geneticTrend(payload, organizationId),
+    culling(payload, organizationId),
+    udderHealth(payload, organizationId),
+  ])
+
+  const agree = (name: string, own: number | null | undefined, joint: number) => {
+    if (own === null || own === undefined) return
+    if (own !== joint) {
+      findings.push(`${name}: у хозяйства ${own}, у Ассоциации ${joint}`)
+      return
+    }
+    notes.push(`${name} — ${joint}`)
+  }
+
+  agree('Тёлок всего', heifers?.total, mine.heifers?.total ?? 0)
+  agree('Тёлок пора осеменять', heifers?.ready, mine.heifers?.ready ?? 0)
+  agree('Тёлок в передержке', heifers?.overdue, mine.heifers?.overdue ?? 0)
+  agree('С посчитанным инбридингом', trend?.withInbreeding, mine.trend?.withInbreeding ?? 0)
+  agree('Инбридинг выше порога', trend?.aboveThreshold, mine.trend?.aboveThreshold ?? 0)
+  agree('Коров с замером соматики', udder?.measured, mine.udder?.measured ?? 0)
+  agree('Соматика выше порога', udder?.above, mine.udder?.above ?? 0)
+  agree('Выбыло за год', cull?.total, mine.cull?.total ?? 0)
+  agree('Первотёлок выбыло', cull?.firstLactation, mine.cull?.firstLactation ?? 0)
+
+  /*
+   * Сами подписи сигналов тоже обязаны совпасть, а не только числа
+   * под ними: собирает их один и тот же `herdSignals`, и если он вдруг
+   * получит с двух сторон разное — например, пустую базу вместо
+   * известной, — числа сойдутся, а сообщения разойдутся.
+   */
+  const ownSignals = herdSignals({ heifers, trend, udder, cull })
+  const jointSignals = herdSignals(mine)
+  const line = (s: { key: string; count: number }[]) =>
+    s.map((x) => `${x.key}:${x.count}`).join(' ')
+
+  if (line(ownSignals) !== line(jointSignals)) {
+    findings.push(`сигналы разошлись: «${line(ownSignals)}» против «${line(jointSignals)}»`)
+  } else {
+    notes.push(`Сигналов совпало: ${ownSignals.length}`)
+  }
+
+  return { findings, notes }
+}
+
+/* ------------------------------------------------------------------ *
  *                              Сами пробы                             *
  * ------------------------------------------------------------------ */
 
@@ -196,6 +277,13 @@ const PROBES: Record<string, Probe> = {
     const orgId = await biggestHerd(payload)
     if (!orgId) return { findings: ['в книге нет животных с хозяйством'], notes: [] }
     return drilldownConsistency(payload, orgId)
+  },
+
+  /* --------- Сводка Ассоциации сходится с кабинетом хозяйства --------- */
+  'check:condition': async (payload) => {
+    const orgId = await biggestHerd(payload)
+    if (!orgId) return { findings: ['в книге нет животных с хозяйством'], notes: [] }
+    return conditionConsistency(payload, orgId)
   },
 
   /* --------------------- Присмотр за пулом ---------------------------- */

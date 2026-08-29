@@ -141,6 +141,18 @@ export const CHECKS: CheckSpec[] = [
     where: { href: '/account?tab=herd&sub=reports', label: 'Отчёты по стаду' },
   },
   {
+    code: 'check:condition',
+    title: 'Ассоциация и хозяйство видят одно и то же',
+    what:
+      'Сводка по стадам считается группировкой по всем хозяйствам, кабинет — по одному; ' +
+      'разойдись они, Ассоциация позвонит про беду, которой хозяйство у себя не видит',
+    area: 'data',
+    writes: false,
+    needsServer: false,
+    probe: true,
+    where: { href: '/association/herds', label: 'Состояние стад' },
+  },
+  {
     code: 'audit:checks',
     title: 'Ревизия зоотехнических правил',
     what: 'Все правила реестра прогоняются по настоящим данным: какие срабатывают, какие молчат',
