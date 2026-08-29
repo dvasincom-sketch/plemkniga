@@ -1,7 +1,8 @@
 import 'dotenv/config'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { biggestHerd, drilldownConsistency } from '@/lib/probes'
+import { drilldownConsistency } from '@/lib/probes'
+import { biggestHerd } from '@/lib/biggest-herd'
 
 /**
  * Списки животных за числами отчётов — прогон на живой базе.

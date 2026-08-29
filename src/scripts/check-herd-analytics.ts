@@ -10,6 +10,7 @@ import {
   reproduction,
   udderHealth,
 } from '@/lib/herd-analytics'
+import { biggestHerd } from '@/lib/biggest-herd'
 
 /**
  * Отчёты по стаду — прогон на живой базе.
@@ -45,20 +46,17 @@ async function main() {
   const payload = await getPayload({ config })
 
   /*
-   * Берётся хозяйство с наибольшим стадом: на пустом все семь отчётов
-   * честно вернут пустоту, и проверка окажется зелёной, ничего не проверив.
+   * Хозяйство с наибольшим стадом — и берётся тем же кодом, что берёт
+   * ночной прогон.
+   *
+   * Оговорка о наибольшем стаде стояла здесь и раньше, а запрос под ней
+   * брал владельца самого свежего животного. Расхождение подписи с кодом
+   * само по себе не ломает ничего — ломает то, что следует: прогон
+   * попадал на хозяйство с одной коровой, все семь отчётов честно
+   * возвращали пустоту, и проверка была зелёной, ничего не проверив.
+   * «Считается» тогда означает «не упало», а не «посчитало».
    */
-  const { docs } = await payload.find({
-    collection: 'animals',
-    where: { owner: { exists: true } },
-    limit: 1,
-    depth: 0,
-    sort: '-createdAt',
-    overrideAccess: true,
-  })
-
-  const orgId =
-    typeof docs[0]?.owner === 'number' ? docs[0].owner : (docs[0]?.owner as { id?: number })?.id
+  const orgId = await biggestHerd(payload)
 
   if (!orgId) {
     console.log('  ✗ в книге нет животных с хозяйством — проверять нечего')

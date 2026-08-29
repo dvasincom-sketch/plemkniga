@@ -9,6 +9,7 @@ import { EXPORT_LIMIT } from '@/lib/export-formats'
 import { isLocalDatabase, resolveDatabase } from '@/lib/db-url'
 import type { BenchMeasurement, BenchRow, BenchServer } from '@/lib/bench-report'
 import { poolOf } from '@/lib/sql'
+import { biggestHerd } from '@/lib/biggest-herd'
 
 /**
  * Замер по критериям приёмки: поиск, свидетельство, выгрузка.
@@ -326,14 +327,15 @@ export async function runBench(
   /* ---------------------------------------------------------------- */
   startGroup('Кабинет хозяйства')
 
-  const org = await payload.find({
-    collection: 'organizations',
-    limit: 1,
-    depth: 0,
-    sort: '-createdAt',
-    overrideAccess: true,
-  })
-  const orgId = org.docs[0]?.id as number | undefined
+  /*
+   * Хозяйство с наибольшим стадом, а не первое попавшееся.
+   *
+   * Брался самый свежий заведённый — а это чаще всего хозяйство
+   * с одной записью или вовсе без животных. Сводка по стаду на таком
+   * считается мгновенно, и замер показывал не скорость запроса,
+   * а скорость ответа «ничего нет». Мерить надо там, где тяжело.
+   */
+  const orgId = (await biggestHerd(payload)) ?? undefined
 
   if (!orgId) note('Организаций в базе нет — сводку по стаду мерить не на чем.')
   else
