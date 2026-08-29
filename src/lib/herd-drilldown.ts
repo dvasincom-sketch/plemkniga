@@ -260,7 +260,7 @@ const RULES: Record<string, Rule> = {
        and a.archived is not true
        and a.sex = 'female'
        and a.state = 'alive'
-       and coalesce(a.age_group, '') not in ('calf', 'heifer')
+       and (a.age_group is null or a.age_group not in ('calf', 'heifer'))
        and ${CALVINGS} = 0`,
     detail: `case when a.birth_date is null then 'дата рождения не указана'
                   else (${MONTHS})::text || ' мес.' end`,
