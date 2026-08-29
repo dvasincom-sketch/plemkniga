@@ -8,6 +8,7 @@ import { herdIssues } from '@/lib/checks-herd'
 import { farmStats } from '@/lib/farm-stats'
 import { ALL_CHECKS, CHECKS, checkSpec, guardedChecks, type CheckCode } from '@/lib/checks-registry'
 import { trustLabel } from '@/lib/dictionaries'
+import { poolOf } from '@/lib/sql'
 
 /**
  * Ревизия автоматических проверок на настоящих данных.
@@ -426,26 +427,72 @@ async function main() {
   /* ------------------------ Проверки по записям ------------------------ */
 
   /*
-   * Выборка по номеру, а не случайная. Случайная давала бы каждый раз
-   * другой ответ, и «проверка перестала срабатывать» нельзя было бы
-   * отличить от «в этот раз не попались такие записи».
+   * Выборка устойчивая и по всей книге — а не первые триста по номеру.
+   *
+   * Стояло `sort: 'identNumber'` с пределом в триста, и довод под этим
+   * был верный: случайная выборка давала бы каждый раз другой ответ,
+   * и «проверка перестала срабатывать» нельзя было бы отличить
+   * от «в этот раз не попались такие записи».
+   *
+   * Но устойчивость была куплена ценой представительности. Синтетика
+   * заводится с приставкой `99`, живые записи начинаются с `30` и `36` —
+   * и триста первых по номеру это всегда одни и те же семьсот старых
+   * записей ручного сида. Ревизия печатала «записей в разборе 300
+   * из 280 708», а смотрела на одну тысячную книги, всегда на одну
+   * и ту же, и выводы делала оттуда же: «сработали больше чем
+   * на 20 % разобранных» — на двухстах записях, заведённых руками
+   * два года назад.
+   *
+   * Поймалось это на правке сида: `state-vs-disposal` («выбыло,
+   * а причина не указана») продолжала показывать 49 % после того, как
+   * причина стала проставляться всем выбывшим. Причину проставили
+   * в синтетике, а ревизия синтетику не видела ни разу.
+   *
+   * Устойчивость сохраняется другим способом: порядок задаёт хеш
+   * от идентификатора. Он не меняется от прогона к прогону, но и не
+   * связан ни с номером, ни с возрастом записи, — выборка ложится
+   * на всю книгу и повторяется в точности, пока книга та же.
    */
+  const pool = poolOf(payload)
+  if (!pool) {
+    console.log('\nПрямой доступ к базе недоступен — ревизия по записям не проводится\n')
+    process.exit(1)
+  }
+
+  const picked = await pool.query(
+    `select id from animals
+      ${onlyOrg === null ? '' : 'where owner_id = $2'}
+      order by md5(id::text)
+      limit $1`,
+    onlyOrg === null ? [limit] : [limit, onlyOrg],
+  )
+  const pickedIds = (picked.rows ?? []).map((r) => Number((r as { id: unknown }).id))
+
+  /* Размер книги — знаменатель для строки «записей в разборе». */
+  const sizeRow = await pool.query(
+    `select count(*)::int as n from animals
+      ${onlyOrg === null ? '' : 'where owner_id = $1'}`,
+    onlyOrg === null ? [] : [onlyOrg],
+  )
+  const bookSize = Number((sizeRow.rows?.[0] as { n?: unknown })?.n ?? 0)
+
   /*
    * Тип указан явно. Вытащенный в переменную объект-условие TypeScript
    * расширяет до объединения с `?: undefined`, а это нарушает индексную
    * подпись `Where` — ошибка вылезает не здесь, а в `payload.find`,
    * и читается как ошибка вызова.
    */
-  const where: Where = onlyOrg === null ? {} : { owner: { equals: onlyOrg } }
+  const where: Where = { id: { in: pickedIds } }
 
-  const found = await payload.find({
-    collection: 'animals',
-    where,
-    limit,
-    sort: 'identNumber',
-    depth: 0,
-    overrideAccess: true,
-  })
+  const found = pickedIds.length
+    ? await payload.find({
+        collection: 'animals',
+        where,
+        limit,
+        depth: 0,
+        overrideAccess: true,
+      })
+    : { docs: [] }
 
   const animals = found.docs as Animal[]
 
@@ -475,7 +522,11 @@ async function main() {
   console.log('')
   console.log('РЕВИЗИЯ АВТОМАТИЧЕСКИХ ПРОВЕРОК')
   console.log('')
-  console.log(`  записей в разборе   ${animals.length} из ${found.totalDocs}`)
+  /*
+     Знаменатель — вся книга, а не то, что попало в выборку: иначе
+     строка читалась бы как «разобрали всё».
+  */
+  console.log(`  записей в разборе   ${animals.length} из ${bookSize} (по всей книге)`)
   console.log(`  хозяйств по стаду   ${orgIds.length}`)
   console.log(`  время               по записям ${animalMs} мс, по стаду ${herdMs} мс`)
   console.log('')

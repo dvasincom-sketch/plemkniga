@@ -132,6 +132,49 @@ const BULL_NAMES = [
   'Кристалл', 'Лидер', 'Магнат', 'Норд', 'Орион', 'Пилот', 'Рубин', 'Сокол',
 ]
 
+/**
+ * План отёлов коровы: даты, которые уже наступили.
+ *
+ * ## Почему он считается один раз и на двоих
+ *
+ * Число отёлов решалось внутри прохода по событиям, а карточка животного
+ * заводилась раньше и об этом решении не знала. Отсюда шло расхождение
+ * записи с самой собой: возрастная группа говорила «корова», отёлов
+ * не было ни одного; продуктивность за 305 дней стояла у тёлки, которая
+ * ещё не телилась. Проверка `production-before-calving` написана ровно
+ * про второе и находила бы это у каждой второй записи книги.
+ *
+ * Теперь план строится до карточки и передаётся дальше: карточка знает,
+ * сколько отёлов у животного будет, и не утверждает ничего сверх этого.
+ *
+ * ## Откуда сроки
+ *
+ * 24–30 месяцев до первого отёла — середина рамки правдоподобия
+ * из `docs/vozrast-pervogo-otela.md`. 320–400 дней между отёлами —
+ * заведомо больше стельности (270 в нашей рамке, около 279 в жизни).
+ *
+ * Без единого отёла остаётся двадцатая корова, а не четвёртая. Стояло
+ * `int(0, 3)` — то есть каждая четвёртая корова любого возраста
+ * не телилась ни разу, а отчёт «коровы без отёлов» означает «пробел
+ * в данных, а не молодость стада» и при четверти книги перестаёт быть
+ * находкой. Пять процентов — тот же приём, что с инбредными парами:
+ * пример должен быть, потока быть не должно.
+ */
+function plannedCalvings(birth: Date): Date[] {
+  const planned = chance(0.05) ? 0 : int(1, 3)
+  const now = Date.now()
+  const out: Date[] = []
+
+  let at = birth.getTime() + int(730, 913) * 86_400_000
+  for (let l = 1; l <= planned; l++) {
+    if (l > 1) at += int(320, 400) * 86_400_000
+    // Отёл, до которого корова ещё не дожила, не случился
+    if (at > now) break
+    out.push(new Date(at))
+  }
+  return out
+}
+
 /** Индивидуальный номер РФ: префикс синтетики + порядковый номер до 12 цифр. */
 const identOf = (n: number) => PREFIX + String(n).padStart(10, '0')
 
@@ -361,8 +404,14 @@ function animalRow(opts: {
    * родословной, которую она же и строит. Не случайное число.
    */
   inbreeding: number
+  /**
+   * Отёлы, которые у животного будут: решаются до карточки, чтобы
+   * карточка не утверждала того, чего события не подтвердят.
+   * У быков список пуст.
+   */
+  calvings: Date[]
 }): { row: unknown[]; ipc: number; milk: number } {
-  const { n, sex, birth, ctx, herdIndex, father, mother, inbreeding } = opts
+  const { n, sex, birth, ctx, herdIndex, father, mother, inbreeding, calvings } = opts
   const herd = ctx.herds[herdIndex % ctx.herds.length]!
   const male = sex === 'male'
 
@@ -397,30 +446,66 @@ function animalRow(opts: {
    * «коровы без отёлов в книге» и должен находить: в жизни оно означает
    * не молодость стада, а пробел в данных.
    */
+  /*
+   * Возрастная группа — по числу отёлов, а не по жребию и не по возрасту.
+   *
+   * Стояло `pick(['heifer', 'firstCalf', 'cow2', 'cow3'])`: четырёхлетняя
+   * корова с тремя отёлами могла числиться тёлкой, а годовалая тёлка —
+   * коровой третьей лактации. Поле при этом читают отчёты: «коровы без
+   * отёлов в книге» отбирает именно по нему.
+   *
+   * Возраст решает только там, где отёлов ещё нет: телёнок до года,
+   * дальше тёлка. Отелившаяся становится коровой по номеру лактации —
+   * ровно так, как это поле и понимают.
+   *
+   * Совпадения с фактом теперь не может не быть: план отёлов посчитан
+   * до карточки и передан сюда, а проход по событиям пишет его же.
+   */
+  /*
+   * Двадцатая взрослая без отёлов остаётся противоречивой намеренно.
+   *
+   * Полное согласие карточки с событиями делает две проверки
+   * непроверяемыми: `no-calvings` («числится коровой, отёлов нет»)
+   * и `production-before-calving` («у тёлки заполнен удой») перестают
+   * находить что-либо вовсе. А написаны они не про выдуманный случай:
+   * в жизни отёл случается и не попадает в книгу — доярка записала
+   * в тетрадь, выгрузка до системы не дошла, — и признаком остаётся
+   * либо возрастная группа, проставленная человеком, либо продуктивность,
+   * приехавшая из доильного зала.
+   *
+   * Поэтому у части взрослых без отёлов остаётся ровно один из двух
+   * следов недовнесённого отёла — тот же приём, что с инбредными парами
+   * выше: пример должен быть, потока быть не должно.
+   */
+  const unrecordedCalving = !male && !calvings.length && ageMonths >= 34 && chance(0.2)
+  const groupSaysCow = unrecordedCalving && chance(0.5)
+
   const ageGroup = male
     ? 'bull'
-    : ageMonths < 12
-      ? 'calf'
-      : /*
-         * Тёлкой животное числится до тридцати четырёх месяцев,
-         * а не до двадцати пяти.
-         *
-         * Первый отёл здесь приходится на 24–30 месяцев, и граница
-         * в 25 объявила бы коровой каждую, кому ещё только предстоит
-         * отелиться. Отчёт «коровы без отёлов в книге» отбирает как раз
-         * по этому полю — и получил бы разом десятую часть книги,
-         * то есть перестал бы читаться.
-         *
-         * К тридцати четырём месяцам отелились все, кому это было
-         * назначено; кто не отелился — тот и есть находка отчёта.
-         */
-        ageMonths < 34
-        ? 'heifer'
-        : ageMonths < 50
-          ? 'firstCalf'
-          : ageMonths < 66
-            ? 'cow2'
-            : 'cow3'
+    : calvings.length === 0
+      ? groupSaysCow
+        ? 'cow2'
+        : ageMonths < 12
+          ? 'calf'
+          : 'heifer'
+      : calvings.length === 1
+        ? 'firstCalf'
+        : calvings.length === 2
+          ? 'cow2'
+          : 'cow3'
+
+  /*
+   * Продуктивность за 305 дней бывает только у отелившейся.
+   *
+   * До первого отёла лактации нет — доить нечем, — и проверка
+   * `production-before-calving` написана ровно про это. Раньше сид
+   * ставил удой, жир и белок каждой самке подряд, включая тёлок,
+   * и находка была бы у каждой второй записи книги.
+   *
+   * Место в порядке по удою у недоившихся то же, что у быков:
+   * не «ноль килограммов», а «не участвует».
+   */
+  const producing = !male && (calvings.length > 0 || (unrecordedCalving && !groupSaysCow))
 
   /*
    * Выбывшее животное получает дату и причину выбытия.
@@ -511,13 +596,13 @@ function animalRow(opts: {
       ipc,
       ipc, // ipc_rank: обычно заполняет хук beforeChange
       evaluated > now ? now : evaluated,
-      male ? null : milk,
-      male ? -1_000_000 : milk, // summary_milk_rank
-      male ? null : fat,
-      male ? null : protein,
-      male ? null : fatKg,
-      male ? null : proteinKg,
-      male ? null : round(fatKg + proteinKg, 1),
+      producing ? milk : null,
+      producing ? milk : -1_000_000, // summary_milk_rank
+      producing ? fat : null,
+      producing ? protein : null,
+      producing ? fatKg : null,
+      producing ? proteinKg : null,
+      producing ? round(fatKg + proteinKg, 1) : null,
       now,
       now,
     ],
@@ -587,6 +672,8 @@ async function generate(client: PoolClient) {
         n: counter++,
         sex: 'male',
         birth,
+        // Бык не телится: план пуст, продуктивности в карточке нет
+        calvings: [],
         ctx,
         herdIndex: i,
         father: null,
@@ -603,11 +690,15 @@ async function generate(client: PoolClient) {
 
   const damIds: number[] = []
   const damBirths: Date[] = []
+  /* План отёлов решается до карточки — им же потом пишутся события */
+  const damCalvingPlans: Date[][] = []
   const damBatch: unknown[][] = []
   for (let i = 0; i < dams; i++) {
     // Матери: шесть лет с разбегом в полгода — старше самой старшей дочери
     const birth = monthsAgo(72, 100)
     damBirths.push(birth)
+    const damCalvings = plannedCalvings(birth)
+    damCalvingPlans.push(damCalvings)
     damBatch.push(
       animalRow({
         n: counter++,
@@ -619,6 +710,7 @@ async function generate(client: PoolClient) {
         mother: null,
         // Известен один родитель: пути от общего предка не замыкаются.
         inbreeding: 0,
+        calvings: damCalvings,
       }).row,
     )
     if (damBatch.length >= CHUNK * 5 || i === dams - 1) {
@@ -690,6 +782,7 @@ async function generate(client: PoolClient) {
 
   const daughterIds: number[] = []
   const daughterBirths: Date[] = []
+  const daughterCalvingPlans: Date[][] = []
   const dBatch: unknown[][] = []
   for (let i = 0; i < daughters; i++) {
     const nBulls = bullIds.length
@@ -716,6 +809,8 @@ async function generate(client: PoolClient) {
 
     const birth = daughterBirth(damIds.length ? Math.floor(i / damIds.length) : 0)
     daughterBirths.push(birth)
+    const dCalvings = plannedCalvings(birth)
+    daughterCalvingPlans.push(dCalvings)
 
     dBatch.push(
       animalRow({
@@ -727,6 +822,7 @@ async function generate(client: PoolClient) {
         father: bullIds[fatherIdx]!,
         mother,
         inbreeding: coi,
+        calvings: dCalvings,
       }).row,
     )
     if (dBatch.length >= CHUNK * 5 || i === daughters - 1) {
@@ -771,8 +867,8 @@ async function generate(client: PoolClient) {
     await fillEvents(
       client,
       [
-        ...damIds.map((id, j) => ({ id, birth: damBirths[j]! })),
-        ...daughterIds.map((id, j) => ({ id, birth: daughterBirths[j]! })),
+        ...damIds.map((id, j) => ({ id, calvings: damCalvingPlans[j]! })),
+        ...daughterIds.map((id, j) => ({ id, calvings: daughterCalvingPlans[j]! })),
       ],
       bullIds,
       ctx,
@@ -961,7 +1057,7 @@ async function fillEvaluations(client: PoolClient, ids: { id: number; birth: Dat
  */
 async function fillEvents(
   client: PoolClient,
-  cows: { id: number; birth: Date }[],
+  cows: { id: number; calvings: Date[] }[],
   bulls: number[],
   ctx: Ctx,
 ) {
@@ -994,41 +1090,18 @@ async function fillEvents(
 
   for (const [i, cow] of cows.entries()) {
     const id = cow.id
-    /*
-     * Без единого отёла остаётся двадцатая корова, а не четвёртая.
-     *
-     * Стояло `int(0, 3)` — то есть каждая четвёртая корова любого
-     * возраста в книге не телилась ни разу. Отчёт «коровы без отёлов»
-     * написан ровно про такие записи и означает «пробел в данных,
-     * а не молодость стада»; при четверти книги он перестаёт быть
-     * находкой и становится фоном.
-     *
-     * Пять процентов — тот же приём, что с инбредными парами: пример
-     * должен быть, потока быть не должно. Ноль здесь означал бы, что
-     * отчёт не проверен ни разу.
-     */
-    const lactations = chance(0.05) ? 0 : int(1, 3)
 
     /*
-     * Отёлы считаются от рождения коровы, а не от календаря.
+     * Даты отёлов приходят готовыми, а не разыгрываются здесь.
      *
-     * Раньше отёл номер `l` ставился в год `2022 + l` независимо от того,
-     * когда корова родилась и когда телилась в прошлый раз. Отсюда две
-     * невозможности сразу: первый отёл в пять лет у старших поколений
-     * и межотельный интервал в несколько дней, когда прошлый отёл
-     * приходился на декабрь, а следующий на январь.
-     *
-     * 24–30 месяцев до первого отёла — середина рамки правдоподобия
-     * из `docs/vozrast-pervogo-otela.md`. 320–400 дней между отёлами —
-     * заведомо больше стельности (270 в нашей рамке, около 279 в жизни).
+     * Разыгрывались — и карточка животного, заведённая раньше, об этом
+     * розыгрыше не знала: возрастная группа и продуктивность за 305 дней
+     * ставились наугад и противоречили собственным событиям записи.
+     * Один розыгрыш на карточку и события — единственный способ, которым
+     * запись не может разойтись сама с собой. Разбор — `plannedCalvings`.
      */
-    let calvingDate = new Date(cow.birth.getTime() + int(730, 913) * 86_400_000)
-
-    for (let l = 1; l <= lactations; l++) {
-      if (l > 1) {
-        calvingDate = new Date(calvingDate.getTime() + int(320, 400) * 86_400_000)
-      }
-      if (calvingDate > now) break
+    for (const [k, calvingDate] of cow.calvings.entries()) {
+      const l = k + 1
 
       calvings.push([
         id, l, calvingDate,
