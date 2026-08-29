@@ -7,7 +7,7 @@ import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { getClient } from '@/lib/payload'
 import { requireAssociation } from '@/lib/association'
 import { afcSireBook, AFC_SIRE_MIN_DAUGHTERS } from '@/lib/afc-sires'
-import { nf } from '@/lib/format'
+import { nf, signed } from '@/lib/format'
 
 export const metadata: Metadata = { title: 'Возраст первого отёла по быкам' }
 export const dynamic = 'force-dynamic'
@@ -42,12 +42,6 @@ export const dynamic = 'force-dynamic'
  * уже один раз оказались перепутаны с качеством хозяйства, и показывать
  * их как цель мы отказались.
  */
-
-const signed = (v: number | null): string => {
-  if (typeof v !== 'number' || !Number.isFinite(v)) return '—'
-  const s = v.toLocaleString('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-  return v > 0 ? `+${s}` : s
-}
 
 export default async function AssociationAfcPage() {
   await requireAssociation()

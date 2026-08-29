@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { BULL_COMPARISON_MIN, type BullProof as Proof } from '@/lib/bull-proof'
 import { bullStatus } from '@/lib/bull-status'
 import { Computed } from '@/components/Computed'
-import { plural } from '@/lib/format'
+import { plural, signed } from '@/lib/format'
 
 /**
  * Оценка быка по дочерям — блок карточки вместо собственной продуктивности.
@@ -30,12 +30,6 @@ const nf = (v: number | null | undefined, digits = 0): string =>
   typeof v === 'number' && Number.isFinite(v)
     ? v.toLocaleString('ru-RU', { minimumFractionDigits: digits, maximumFractionDigits: digits })
     : '—'
-
-const signed = (v: number | null): string => {
-  if (typeof v !== 'number' || !Number.isFinite(v)) return '—'
-  const r = Math.round(v)
-  return `${r > 0 ? '+' : ''}${r.toLocaleString('ru-RU')}`
-}
 
 /**
  * Ссылка на сравнение — здесь, а не в общем меню.
@@ -319,7 +313,7 @@ export function BullProofBlock({ data, bullId }: { data: Proof; bullId?: number 
         ) : (
           <div className="mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-2">
             <span className="text-[34px] font-medium leading-none tabular-nums">
-              <Computed formula="vsMates">{signed(data.vsMates)}</Computed>
+              <Computed formula="vsMates">{signed(data.vsMates, 0)}</Computed>
             </span>
             <span className="text-[15px] text-ink-700">
               кг молока к сверстницам, по {data.compared}{' '}

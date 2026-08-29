@@ -11,6 +11,7 @@ import { getClient, getCurrentUser } from '@/lib/payload'
 import { relId } from '@/lib/visibility'
 import { compareBulls, KINSHIP_DEPTH, MAX_BULLS, type BullRow } from '@/lib/bull-compare'
 import { BULL_COMPARISON_MIN } from '@/lib/bull-proof'
+import { signed } from '@/lib/format'
 
 export const metadata: Metadata = { title: 'Сравнение быков' }
 export const dynamic = 'force-dynamic'
@@ -34,8 +35,6 @@ export const dynamic = 'force-dynamic'
  */
 
 const kg = (v: number | null): string => (v === null ? '—' : `${v.toLocaleString('ru-RU')}`)
-const signed = (v: number | null): string =>
-  v === null ? '—' : v > 0 ? `+${v.toLocaleString('ru-RU')}` : v.toLocaleString('ru-RU')
 
 /** Значение с числом животных, на которых оно посчитано. */
 function Cell({ value, on, unit }: { value: string; on?: number; unit?: string }) {
@@ -167,7 +166,7 @@ export default async function BullComparePage({
                       <td className="font-medium">Разница со сверстницами, кг</td>
                       {rows.map((b) => (
                         <td key={b.id} className="text-right">
-                          <Cell value={signed(b.vsMates)} on={b.vsMates === null ? undefined : b.compared} />
+                          <Cell value={signed(b.vsMates, 0)} on={b.vsMates === null ? undefined : b.compared} />
                           {b.vsMates === null && (
                             <span className="block text-[12px] text-ink-500">
                               дочерей меньше {BULL_COMPARISON_MIN}
