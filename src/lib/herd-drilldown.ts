@@ -214,6 +214,35 @@ const RULES: Record<string, Rule> = {
     order: 'a.disposal_date desc',
   },
 
+  /*
+   * Первотёлки отдельным правилом, а не отбором внутри общего списка.
+   *
+   * Сигнал «12 первотёлок выбыло за год» вёл на `culled-year` — список
+   * всех сорока выбывших. Число и список отвечали на разные вопросы,
+   * и понять это можно было только пересчитав строки руками.
+   *
+   * Условие списано с `culling` дословно, включая `lactations <= 1`:
+   * ноль отёлов тоже сюда — животное, выбывшее до первого отёла, это
+   * та же непокрытая стоимость выращивания, только полная.
+   */
+  'culled-first': {
+    label: 'Первотёлки, выбывшие за год',
+    note: 'Выбыли до второго отёла: выращивание не окупилось',
+    detailLabel: 'Причина и лактация',
+    body: `
+      from animals a
+      left join disposal_reasons r on r.id = a.disposal_reason_id
+     where a.owner_id = $1
+       and a.disposal_date is not null
+       and a.disposal_date > now() - interval '12 months'
+       and ${CALVINGS} <= 1`,
+    detail: `
+      coalesce(r.name, 'Причина не указана')
+      || ' · лактация ' || ${CALVINGS}::text
+      || ' · ' || to_char(a.disposal_date, 'DD.MM.YYYY')`,
+    order: 'a.disposal_date desc',
+  },
+
   /* ----------------------- Структура по лактациям ---------------------- */
 
   'lactation-1': lactationRule(1, 'Первотёлки'),
@@ -231,7 +260,7 @@ const RULES: Record<string, Rule> = {
        and a.archived is not true
        and a.sex = 'female'
        and a.state = 'alive'
-       and a.age_group not in ('calf', 'heifer')
+       and coalesce(a.age_group, '') not in ('calf', 'heifer')
        and ${CALVINGS} = 0`,
     detail: `case when a.birth_date is null then 'дата рождения не указана'
                   else (${MONTHS})::text || ' мес.' end`,

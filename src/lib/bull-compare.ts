@@ -198,6 +198,10 @@ export async function compareBulls(
       where a.father_id = any($1)
         and a.archived is not true
         and a.birth_date is not null
+        -- Отёл раньше рождения — перепутанная дата. В карточке быка эта
+        -- отсечка стояла, здесь её не было, и один и тот же бык показывал
+        -- в карточке и в сравнении разный возраст первого отёла дочерей
+        and c."date" > a.birth_date
       group by a.father_id`,
       [ids],
     ),
@@ -227,6 +231,10 @@ export async function compareBulls(
               where a.owner_id = $2
                 and a.sex = 'female'
                 and a.archived is not true
+                -- Живые: «родня в вашем стаде» должна считать то же стадо,
+                -- что и подбор пар рядом, иначе выходит «родня у 40 коров»
+                -- при 32 в подборе
+                and a.state = 'alive'
                 and p.anc is not null
              union all
              select u.cow, q.anc, u.gen + 1

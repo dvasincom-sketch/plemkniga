@@ -54,8 +54,13 @@ import { numOf, numOrNull, poolOf } from '@/lib/sql'
 export type LactationStructure = {
   /** Коров по номеру лактации: 1, 2, 3, 4+. */
   byLactation: { lactation: number; label: string; cows: number }[]
-  /** Коров, у которых отёлов в книге нет вовсе. */
+  /**
+   * Коровы без единого отёла — пробел в данных, а не молодость стада.
+   * Молодняк сюда не входит: у тёлки отсутствие отёла это возраст.
+   */
   withoutCalvings: number
+  /** Тёлки и телята без отёлов — отдельным числом, чтобы не путались. */
+  youngStock: number
   /** Средняя лактация по стаду — показатель долголетия. */
   meanLactation: number | null
   cows: number
@@ -84,20 +89,42 @@ export async function lactationStructure(
      * ошибиться не может.
      */
     counted as (
-      select c.id, (select count(*) from calvings k where k.animal_id = c.id) as calvings
+      select
+        c.id,
+        c.age_group,
+        (select count(*) from calvings k where k.animal_id = c.id) as calvings
         from cows c
     )
     select
       least(calvings, 4) as bucket,
-      count(*)::int      as cows
+      count(*)::int      as cows,
+      /*
+       * Внутри нулевого ведра — две разные вещи, и путать их нельзя.
+       *
+       * Ноль отёлов у тёлки это её возраст, у коровы — пробел в данных.
+       * Раньше оба считались одним числом, а подпись под ним говорила
+       * «коров без отёлов» и вела на список, где молодняк отсечён.
+       * Число включало телят, список — нет, и расходились они тем сильнее,
+       * чем больше в хозяйстве ремонта.
+       *
+       * coalesce не украшение: «age_group not in (...)» даёт NULL
+       * у животного без заполненной группы, и такое животное выпало бы
+       * и из числа, и из списка — то есть пробел в данных прятал бы
+       * сам себя. Пустая группа считается коровой: самка без отёлов
+       * и без группы — как раз то, на что стоит посмотреть.
+       */
+      count(*) filter (
+        where coalesce(age_group, '') not in ('calf', 'heifer')
+      )::int as mature
       from counted
      group by least(calvings, 4)
      order by bucket`,
     [organizationId],
   )
 
-  const rows = (res.rows ?? []) as { bucket: unknown; cows: unknown }[]
+  const rows = (res.rows ?? []) as { bucket: unknown; cows: unknown; mature: unknown }[]
   const byBucket = new Map(rows.map((r) => [numOf(r.bucket), numOf(r.cows)]))
+  const matureByBucket = new Map(rows.map((r) => [numOf(r.bucket), numOf(r.mature)]))
 
   const LABELS: Record<number, string> = {
     1: 'Первотёлки',
@@ -125,9 +152,15 @@ export async function lactationStructure(
       ? byLactation.reduce((sum, r) => sum + r.lactation * r.cows, 0) / withCalvings
       : null
 
+  const zeroAll = byBucket.get(0) ?? 0
+  const zeroMature = matureByBucket.get(0) ?? 0
+
   return {
     byLactation,
-    withoutCalvings: byBucket.get(0) ?? 0,
+    /** Коровы без отёлов — пробел в данных. Молодняк сюда не входит. */
+    withoutCalvings: zeroMature,
+    /** Тёлки и телята без отёлов — это их возраст, а не пробел. */
+    youngStock: zeroAll - zeroMature,
     meanLactation,
     cows,
   }
@@ -483,6 +516,18 @@ export async function reproduction(
 
   const res = await pool.query(
     `
+    /*
+     * Выбывшие остаются в расчёте, и это не забытое условие.
+     *
+     * Соседние отчёты берут стадо со state = 'alive', здесь его нет —
+     * расхождение намеренное. Показатель меряется за окно (12 и 18
+     * месяцев), а корова, проданная в марте, доила и телилась январь
+     * с февралём внутри этого окна. Отбросив её, мы посчитали бы
+     * по выжившим: чем хуже шли дела, тем лучше выглядело бы число.
+     *
+     * Архив при этом отсекается: он про то, что запись убрали из книги,
+     * а не про то, что животное выбыло из стада.
+     */
     with mine as (
       select id from animals
        where owner_id = $1 and archived is not true and sex = 'female'
@@ -731,6 +776,13 @@ export async function milkByLactation(
 
   const res = await pool.query(
     `
+    /*
+     * Выбывшие остаются в расчёте — по той же причине, что
+     * в воспроизводстве выше. Законченная лактация коровы, проданной
+     * после неё, это надоенное молоко: выбросив его, мы получили бы
+     * среднее по тем, кого не выбраковали, то есть завышенное тем
+     * сильнее, чем строже отбраковка.
+     */
     with mine as (
       select id from animals
        where owner_id = $1 and archived is not true and sex = 'female'
@@ -775,9 +827,20 @@ export async function milkByLactation(
     mature: 'Третья и старше',
   } as const
 
+  /*
+   * Считаются коровы, а не строки лактаций.
+   *
+   * Было `count(*)` по строкам, а список за числом (`milk-in-progress`)
+   * берёт по строке на животное. У коровы с двумя незакрытыми лактациями
+   * число говорило «две», список показывал одну — и объяснить разницу
+   * читателю было нечем, потому что подпись у обоих одна.
+   *
+   * Верна сторона списка: незакрытая лактация это не единица учёта,
+   * а состояние коровы, и работать идут с коровой.
+   */
   const progress = await pool.query(
     `
-    select count(*)::int as n
+    select count(distinct a.id)::int as n
       from animals_lactations l
       join animals a on a.id = l._parent_id
      where a.owner_id = $1 and a.archived is not true

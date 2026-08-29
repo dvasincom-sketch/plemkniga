@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { nf } from '@/lib/format'
+import { nf, plural } from '@/lib/format'
 import { Moment } from '@/components/Moment'
 import { InfoTip } from '@/components/InfoTip'
 import { INBREEDING_THRESHOLD, SCC_THRESHOLD } from '@/lib/herd-analytics'
@@ -330,6 +330,13 @@ export function HerdAnalytics({
               })}
             </div>
 
+            {/*
+               Два числа, а не одно. Прежде здесь стояло нулевое ведро
+               целиком — вместе с тёлками и телятами, — и называлось
+               «коровами без отёлов». Ссылка при этом вела на список,
+               где молодняк отсечён: число и список расходились тем
+               сильнее, чем больше в хозяйстве ремонта.
+            */}
             {structure.withoutCalvings > 0 && (
               <p className="mt-3 text-[12px] leading-snug text-ink-500">
                 Ещё{' '}
@@ -337,10 +344,19 @@ export function HerdAnalytics({
                   href="/account/reports/no-calvings"
                   className="underline underline-offset-2 hover:text-forest-500"
                 >
-                  {nf(structure.withoutCalvings, 0)} коров без отёлов
+                  {nf(structure.withoutCalvings, 0)}{' '}
+                  {plural(structure.withoutCalvings, 'корова', 'коровы', 'коров')} без отёлов
                 </Link>{' '}
                 в книге — в среднюю лактацию не входят: это пробел в данных, а не молодость
                 стада.
+              </p>
+            )}
+
+            {structure.youngStock > 0 && (
+              <p className="mt-1 text-[12px] leading-snug text-ink-500">
+                Плюс {nf(structure.youngStock, 0)}{' '}
+                {plural(structure.youngStock, 'голова', 'головы', 'голов')} молодняка без
+                отёлов — здесь это возраст, а не пробел.
               </p>
             )}
           </Report>
@@ -455,7 +471,8 @@ export function HerdAnalytics({
                   href="/account/reports/milk-in-progress"
                   className="underline underline-offset-2 hover:text-forest-500"
                 >
-                  {nf(milk.inProgress, 0)} лактаций в ходу
+                  {nf(milk.inProgress, 0)}{' '}
+                  {plural(milk.inProgress, 'корова доит', 'коровы доят', 'коров доят')} сейчас
                 </Link>{' '}
                 — в средние не входят: «ещё доит» не то же, что «мало надоила».
               </p>
@@ -511,7 +528,7 @@ export function HerdAnalytics({
         {repro && (repro.calvings > 0 || repro.inseminations > 0) && (
           <Report
             title="Воспроизводство"
-            note={`За год: отёлов ${nf(repro.calvings, 0)}, осеменений ${nf(repro.inseminations, 0)}`}
+            note={`За год: отёлов ${nf(repro.calvings, 0)}, осеменений ${nf(repro.inseminations, 0)} — включая выбывших за это время`}
             why={
               <>
                 <p className="mb-2 font-medium text-ink-900">Это не племенная оценка</p>

@@ -65,9 +65,12 @@ export type ProbeResult = {
  * выглядит правдоподобно с обеих сторон, и человек перестаёт верить
  * обоим сразу.
  *
- * Два случая расходятся законно и в находки не идут: «коров без отёлов»
- * отчёт считает по всем самкам, список — по числящимся коровами;
- * «лактаций в ходу» отчёт считает строками лактаций, список — коровами.
+ * Два случая раньше расходились «законно», и оговорка стояла здесь же:
+ * «коров без отёлов» отчёт считал по всем самкам, а список — по одним
+ * коровам; «лактаций в ходу» отчёт считал строками, список — коровами.
+ * Оговорка и была ошибкой: она объясняла расхождение вместо того, чтобы
+ * его убрать, и человеку на экране об этом не говорилось ни слова.
+ * Оба свелись (решение №205), и оба проверяются наравне с остальными.
  */
 export async function drilldownConsistency(
   payload: Payload,
@@ -109,14 +112,21 @@ export async function drilldownConsistency(
   if (udder) await agree('Соматика выше порога', udder.above, 'scc-above')
 
   const cull = await culling(payload, organizationId)
-  if (cull) await agree('Выбыло за год', cull.total, 'culled-year')
+  if (cull) {
+    await agree('Выбыло за год', cull.total, 'culled-year')
+    await agree('Первотёлок выбыло за год', cull.firstLactation, 'culled-first')
+  }
 
   const structure = await lactationStructure(payload, organizationId)
   if (structure) {
     for (const row of structure.byLactation) {
       await agree(row.label, row.cows, `lactation-${row.lactation}`)
     }
+    await agree('Коровы без отёлов', structure.withoutCalvings, 'no-calvings')
   }
+
+  const milk = await milkByLactation(payload, organizationId)
+  if (milk) await agree('Коровы с незакрытой лактацией', milk.inProgress, 'milk-in-progress')
 
   /*
    * Неизвестный код обязан отклоняться. Проверка не про опечатки в адресе,

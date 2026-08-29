@@ -105,7 +105,7 @@ export function herdSignals({
       count: cull.firstLactation,
       label: 'первотёлок выбыло за год',
       hint: 'выращивание не окупилось — самая дорогая потеря',
-      href: '/account/reports/culled-year',
+      href: '/account/reports/culled-first',
       urgent: false,
     })
   }
