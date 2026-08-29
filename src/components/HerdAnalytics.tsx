@@ -2,7 +2,12 @@ import Link from 'next/link'
 import { nf, plural } from '@/lib/format'
 import { Moment } from '@/components/Moment'
 import { InfoTip } from '@/components/InfoTip'
-import { INBREEDING_THRESHOLD, SCC_THRESHOLD } from '@/lib/herd-analytics'
+import {
+  INBREEDING_LABEL,
+  INBREEDING_THRESHOLD,
+  SCC_LABEL,
+  SCC_THRESHOLD,
+} from '@/lib/herd-analytics'
 import type {
   Culling,
   GeneticTrend,
@@ -198,7 +203,7 @@ function TrendChart({ points }: { points: GeneticTrend['points'] }) {
           textAnchor="end"
           className="fill-ink-400 text-[10px]"
         >
-          порог {INBREEDING_THRESHOLD} %
+          порог {INBREEDING_LABEL}
         </text>
 
         <polyline points={line((p) => p.ipc, yIpc)} fill="none" stroke="#2e8757" strokeWidth="2.5" />
@@ -508,7 +513,7 @@ export function HerdAnalytics({
                 tone={udder.meanScc !== null && udder.meanScc > SCC_THRESHOLD ? 'warn' : 'good'}
               />
               <Tile
-                label={`Выше ${SCC_THRESHOLD} тыс.`}
+                label={`Выше ${SCC_LABEL}`}
                 value={nf(udder.above, 0)}
                 tone={udder.above > 0 ? 'warn' : 'good'}
                 href={udder.above > 0 ? '/account/reports/scc-above' : undefined}
@@ -660,7 +665,7 @@ export function HerdAnalytics({
                   и не смотреть второй.
                 </p>
                 <p>
-                  {INBREEDING_THRESHOLD} % — эквивалент спаривания двоюродных. Выше начинается
+                  {INBREEDING_LABEL} — эквивалент спаривания двоюродных. Выше начинается
                   заметная инбредная депрессия по продуктивности и воспроизводству; это
                   граница внимания, а не запрет.
                 </p>
@@ -675,7 +680,7 @@ export function HerdAnalytics({
                 value={trend.meanInbreeding === null ? '—' : `${nf(trend.meanInbreeding, 2)} %`}
               />
               <Tile
-                label={`Животных выше ${INBREEDING_THRESHOLD} %`}
+                label={`Животных выше ${INBREEDING_LABEL}`}
                 value={nf(trend.aboveThreshold, 0)}
                 tone={trend.aboveThreshold > 0 ? 'warn' : 'good'}
                 href={

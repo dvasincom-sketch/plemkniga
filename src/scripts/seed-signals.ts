@@ -3,7 +3,12 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import type { Payload } from 'payload'
 import { relId } from '@/lib/visibility'
-import { SCC_THRESHOLD, INBREEDING_THRESHOLD } from '@/lib/herd-analytics'
+import {
+  INBREEDING_LABEL,
+  INBREEDING_THRESHOLD,
+  SCC_LABEL,
+  SCC_THRESHOLD,
+} from '@/lib/herd-analytics'
 
 /**
  * Демо-стадо, в котором есть что делать.
@@ -381,7 +386,7 @@ async function main() {
     tests += 1
   }
   console.log(
-    `  Замеров добавлено: ${tests}, из них выше ${SCC_THRESHOLD} тыс.: ${sick} ` +
+    `  Замеров добавлено: ${tests}, из них выше ${SCC_LABEL}: ${sick} ` +
       `(${Math.round(share * 100)} % стада)${mass ? ' — режим «беда у большинства»' : ''}`,
   )
 
@@ -402,7 +407,7 @@ async function main() {
       data: { inbreeding: INBREEDING_THRESHOLD + 2.5 },
     })
   }
-  console.log(`  Инбридинг выше ${INBREEDING_THRESHOLD} % проставлен: ${inbred.length}`)
+  console.log(`  Инбридинг выше ${INBREEDING_LABEL} проставлен: ${inbred.length}`)
 
   /* ---------------------- Незакрытые лактации -------------------------- */
 

@@ -11,7 +11,7 @@ import { getClient, getCurrentUser } from '@/lib/payload'
 import { denyAssociation } from '@/lib/association'
 import { relId } from '@/lib/visibility'
 import { nf } from '@/lib/format'
-import { INBREEDING_THRESHOLD } from '@/lib/herd-analytics'
+import { INBREEDING_LABEL, INBREEDING_THRESHOLD } from '@/lib/herd-analytics'
 import {
   MATING_BULLS_MAX,
   MATING_COWS_MAX,
@@ -176,7 +176,7 @@ export default async function MatingPage({ searchParams }: { searchParams: Searc
             <p className="mb-4 text-[13px] text-ink-500">
               Коров в подборе {nf(plan.cows, 0)}
               {plan.cows > plan.rows.length && <> · показаны первые {plan.rows.length}</>} · пар
-              выше {INBREEDING_THRESHOLD} % — <b>{nf(plan.risky, 0)}</b>. Порядок строк —
+              выше {INBREEDING_LABEL} — <b>{nf(plan.risky, 0)}</b>. Порядок строк —
               от самых засидевшихся после отёла: с ними решать раньше.
             </p>
 
@@ -223,7 +223,7 @@ export default async function MatingPage({ searchParams }: { searchParams: Searc
                               }`}
                               title={
                                 over
-                                  ? `Выше порога ${INBREEDING_THRESHOLD} % — эквивалент спаривания двоюродных`
+                                  ? `Выше порога ${INBREEDING_LABEL} — эквивалент спаривания двоюродных`
                                   : c.coi === 0
                                     ? 'Общих предков в пределах глубины расчёта не найдено'
                                     : undefined
@@ -240,7 +240,7 @@ export default async function MatingPage({ searchParams }: { searchParams: Searc
               </div>
 
               <p className="mt-4 max-w-[80ch] text-[13px] leading-relaxed text-ink-500">
-                Розовым отмечены пары выше {INBREEDING_THRESHOLD} % — это эквивалент
+                Розовым отмечены пары выше {INBREEDING_LABEL} — это эквивалент
                 спаривания двоюродных. Порог предупреждающий, а не запрет: решение
                 за вами. Прочерк означает, что общих предков в пределах {MATING_DEPTH} колен
                 не нашлось, а не то, что их нет вовсе, — родословная может быть неполной.

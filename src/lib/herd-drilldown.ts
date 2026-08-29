@@ -1,5 +1,11 @@
 import type { Payload } from 'payload'
-import { INBREEDING_THRESHOLD, SCC_THRESHOLD } from '@/lib/herd-analytics'
+import {
+  INBREEDING_LABEL,
+  INBREEDING_THRESHOLD,
+  SCC_LABEL,
+  SCC_THRESHOLD,
+} from '@/lib/herd-analytics'
+import { NBSP } from '@/lib/format'
 import { poolOf } from '@/lib/sql'
 
 /**
@@ -97,6 +103,22 @@ const HEIFERS = `
    and not exists (select 1 from calvings k where k.animal_id = a.id)
 `
 
+/**
+ * Число из запроса — русской записью.
+ *
+ * Пояснения к строкам собирает сама база: `round(a.inbreeding, 2)::text`.
+ * PostgreSQL пишет дробную часть через точку, и в таблице стояло «8.75 %»
+ * под заголовком «Животные с инбридингом выше 6,25 %» — одно и то же
+ * число двумя способами на одном экране, причём порог по-русски,
+ * а значение по-английски.
+ *
+ * Приводить это в `nf` на стороне приложения было бы правильнее,
+ * но пояснение — свободный текст, склеенный в запросе из числа, единицы
+ * и даты, и разбирать его обратно на части ради одной запятой значило бы
+ * усложнить куда больше, чем исправить.
+ */
+const ruNum = (expr: string) => `replace(${expr}::text, '.', ',')`
+
 type Rule = {
   label: string
   note: string
@@ -118,7 +140,7 @@ const RULES: Record<string, Rule> = {
     note: '13–15 месяцев, отёлов в книге нет',
     detailLabel: 'Возраст',
     body: `${HEIFERS} and (${MONTHS}) between 13 and 15`,
-    detail: `(${MONTHS})::text || ' мес.'`,
+    detail: `(${MONTHS})::text || '${NBSP}мес.'`,
     order: `${MONTHS} desc`,
   },
 
@@ -127,7 +149,7 @@ const RULES: Record<string, Rule> = {
     note: 'Старше 15 месяцев и ни одного отёла',
     detailLabel: 'Возраст',
     body: `${HEIFERS} and (${MONTHS}) > 15`,
-    detail: `(${MONTHS})::text || ' мес.'`,
+    detail: `(${MONTHS})::text || '${NBSP}мес.'`,
     order: `${MONTHS} desc`,
   },
 
@@ -136,14 +158,14 @@ const RULES: Record<string, Rule> = {
     note: 'Младше 13 месяцев',
     detailLabel: 'Возраст',
     body: `${HEIFERS} and (${MONTHS}) < 13`,
-    detail: `(${MONTHS})::text || ' мес.'`,
+    detail: `(${MONTHS})::text || '${NBSP}мес.'`,
     order: `${MONTHS} desc`,
   },
 
   /* --------------------------- Инбридинг ------------------------------- */
 
   'inbreeding-above': {
-    label: `Животные с инбридингом выше ${INBREEDING_THRESHOLD} %`,
+    label: `Животные с инбридингом выше ${INBREEDING_LABEL}`,
     note: 'По коэффициенту, записанному в карточке',
     detailLabel: 'Коэффициент',
     body: `
@@ -152,7 +174,7 @@ const RULES: Record<string, Rule> = {
        and a.archived is not true
        and a.inbreeding is not null
        and a.inbreeding > $2`,
-    detail: "round(a.inbreeding, 2)::text || ' %'",
+    detail: `${ruNum('round(a.inbreeding, 2)')} || '${NBSP}%'`,
     order: 'a.inbreeding desc',
     params: [INBREEDING_THRESHOLD],
   },
@@ -166,7 +188,7 @@ const RULES: Record<string, Rule> = {
    * одним уровнем ради соединения с карточкой.
    */
   'scc-above': {
-    label: `Коровы с соматикой выше ${SCC_THRESHOLD} тыс.`,
+    label: `Коровы с соматикой выше ${SCC_LABEL}`,
     note: 'По последнему замеру каждой коровы',
     detailLabel: 'Последний замер',
     body: `
@@ -185,7 +207,7 @@ const RULES: Record<string, Rule> = {
        and a.sex = 'female'
        and a.state = 'alive'
        and t.scc > $2`,
-    detail: "t.scc::text || ' тыс./мл · ' || to_char(t.at, 'DD.MM.YYYY')",
+    detail: `t.scc::text || '${NBSP}тыс./мл · ' || to_char(t.at, 'DD.MM.YYYY')`,
     order: 't.scc desc',
     params: [SCC_THRESHOLD],
   },
@@ -263,7 +285,7 @@ const RULES: Record<string, Rule> = {
        and (a.age_group is null or a.age_group not in ('calf', 'heifer'))
        and ${CALVINGS} = 0`,
     detail: `case when a.birth_date is null then 'дата рождения не указана'
-                  else (${MONTHS})::text || ' мес.' end`,
+                  else (${MONTHS})::text || '${NBSP}мес.' end`,
     order: 'a.ident_number',
   },
 
@@ -288,8 +310,8 @@ const RULES: Record<string, Rule> = {
        and a.archived is not true`,
     detail: `
       '№ ' || coalesce(l.num, 0)::text
-      || ' · ' || round(l.milk305)::text || ' кг'
-      || ' · ' || coalesce(l.dd, 0)::text || ' дн.'`,
+      || ' · ' || round(l.milk305)::text || '${NBSP}кг'
+      || ' · ' || coalesce(l.dd, 0)::text || '${NBSP}дн.'`,
     order: 'l.milk305 desc',
   },
 }

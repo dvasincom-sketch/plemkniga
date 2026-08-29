@@ -61,7 +61,8 @@ import {
   RulesIcon,
   SingleRecordIcon,
 } from '@/components/CardIcons'
-import { dateRu, nf } from '@/lib/format'
+import { dateRu, nf, pct } from '@/lib/format'
+import { SignalCard, SignalRow } from '@/components/SignalCard'
 import { ARCHIVE_RETENTION_DAYS } from '@/lib/archive-retention'
 import { RANKING_CAP, rankByProfile } from '@/lib/index-column'
 import { indexValuesLag } from '@/lib/index-values'
@@ -462,25 +463,18 @@ async function OverviewTab({ orgId }: { orgId?: number }) {
       */}
       {todo.length > 0 && (
         <section className="mt-6">
-          <div className="flex flex-wrap gap-3">
+          <SignalRow>
             {todo.map((t) => (
-              <Link
+              <SignalCard
                 key={t.key}
                 href={t.href}
-                className={`min-w-[190px] flex-1 rounded-xl px-4 py-3 transition-colors ${
-                  t.urgent
-                    ? 'bg-[#fdecea] hover:bg-[#fbe0dc]'
-                    : 'bg-white shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] hover:bg-[#f6f6f6]'
-                }`}
-              >
-                <span className="block text-[15px] font-medium">
-                  {t.count > 0 && <span className="tabular-nums">{t.count} </span>}
-                  {t.label}
-                </span>
-                <span className="mt-0.5 block text-[12px] leading-snug text-ink-500">{t.hint}</span>
-              </Link>
+                count={t.count}
+                label={t.label}
+                hint={t.hint}
+                urgent={t.urgent}
+              />
             ))}
-          </div>
+          </SignalRow>
         </section>
       )}
 
@@ -548,42 +542,36 @@ async function OverviewTab({ orgId }: { orgId?: number }) {
       {signals.length > 0 && (
         <section className="mt-9">
           <h2 className="section-title mb-5">Требует решения</h2>
-          <div className="flex flex-wrap gap-3">
+          <SignalRow>
             {signals.map((s) => (
-              <Link
+              <SignalCard
                 key={s.key}
                 href={s.href}
-                className={`min-w-[220px] flex-1 rounded-xl px-4 py-3 transition-colors ${
-                  s.urgent
-                    ? 'bg-[#fdecea] hover:bg-[#fbe0dc]'
-                    : 'bg-white shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] hover:bg-[#f6f6f6]'
-                }`}
-              >
-                <span className="block text-[15px] font-medium">
-                  <span className="tabular-nums">{nf(s.count, 0)} </span>
-                  {s.label}
-                </span>
-
-                {/*
-                   База и доля — второй строкой, а не рядом с числом.
-                   «4033 из 4790 коров выше порога» в одну строку читается
-                   как одно длинное число; разведённые, они читаются
-                   как утверждение и его масштаб.
-                */}
-                {s.of !== null && s.share !== null && (
-                  <span className="mt-0.5 block text-[12px] leading-snug text-ink-700">
-                    из {nf(s.of, 0)}
-                    {s.ofLabel ? ` ${s.ofLabel}` : ''} — это{' '}
-                    <span className={s.mass ? 'font-medium' : undefined}>
-                      {s.share < 0.01 ? 'менее 1' : nf(s.share * 100, 0)} %
-                    </span>
-                  </span>
-                )}
-
-                <span className="mt-0.5 block text-[12px] leading-snug text-ink-500">{s.hint}</span>
-              </Link>
+                count={s.count}
+                label={s.label}
+                urgent={s.urgent}
+                hint={s.hint}
+                note={
+                  s.of !== null && s.share !== null ? (
+                    <>
+                      из {nf(s.of, 0)}
+                      {s.ofLabel ? ` ${s.ofLabel}` : ''} — это{' '}
+                      {/*
+                         Доля не должна отрываться от знака процента,
+                         а знак — уезжать на свою строку. Разбор — `NBSP`
+                         в `format.ts`; здесь она склеена вёрсткой, потому
+                         что рядом стоит слово «это», и переносить строку
+                         между ними можно.
+                      */}
+                      <span className={`whitespace-nowrap ${s.mass ? 'font-medium' : ''}`}>
+                        {pct(s.share)}
+                      </span>
+                    </>
+                  ) : undefined
+                }
+              />
             ))}
-          </div>
+          </SignalRow>
 
           <p className="mt-3 text-[13px] text-ink-500">
             Полностью —{' '}

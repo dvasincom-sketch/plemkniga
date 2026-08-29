@@ -1,5 +1,5 @@
 import type { Payload } from 'payload'
-import { SCC_THRESHOLD } from '@/lib/herd-analytics'
+import { SCC_LABEL, SCC_THRESHOLD } from '@/lib/herd-analytics'
 import { numOrNull, poolOf } from '@/lib/sql'
 import { finishedLactation, hasMilk305 } from '@/lib/sql-lactation'
 
@@ -107,7 +107,7 @@ export const CULL_REASONS: Record<CullReason, { label: string; hint: string }> =
   },
   scc: {
     label: 'Соматика',
-    hint: `последний замер выше ${SCC_THRESHOLD} тыс./мл`,
+    hint: `последний замер выше ${SCC_LABEL}/мл`,
   },
   ipc: {
     label: 'Низкий индекс',

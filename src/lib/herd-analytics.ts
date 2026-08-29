@@ -1,4 +1,5 @@
 import type { Payload } from 'payload'
+import { NBSP, nf } from '@/lib/format'
 import { numOf, numOrNull, poolOf } from '@/lib/sql'
 import { finishedLactation, hasMilk305, lactationGroup, LACTATION_GROUP_LABEL } from '@/lib/sql-lactation'
 
@@ -279,6 +280,21 @@ export async function heiferAges(
  * и воспроизводству. Это общепринятая граница внимания, а не запрет.
  */
 export const INBREEDING_THRESHOLD = 6.25
+
+/**
+ * Тот же порог словами — для подписей, заголовков и подсказок.
+ *
+ * Подставленное в текст число само по себе пишется не по-русски:
+ * `${INBREEDING_THRESHOLD} %` даёт «6.25 %» — с точкой вместо запятой
+ * и с обычным пробелом, по которому строка переносится, оставляя знак
+ * процента одного на новой строке. И то и другое было видно в кабинете.
+ *
+ * Мест, где порог выводится текстом, восемь. Чинить их по одному значило бы
+ * получить «6,25» в кабинете и «6.25» в отчёте — одно число, записанное
+ * двумя способами на соседних страницах, хуже, чем неверно записанное
+ * везде одинаково: второе выглядит опечаткой, первое — разными числами.
+ */
+export const INBREEDING_LABEL = `${nf(INBREEDING_THRESHOLD, 2)}${NBSP}%`
 
 export type TrendPoint = {
   year: number
@@ -669,6 +685,9 @@ export type UdderHealth = {
 }
 
 export const SCC_THRESHOLD = 200
+
+/** Тот же порог словами: «200 тыс.» одним куском, без переноса. */
+export const SCC_LABEL = `${nf(SCC_THRESHOLD, 0)}${NBSP}тыс.`
 
 export async function udderHealth(
   payload: Payload,

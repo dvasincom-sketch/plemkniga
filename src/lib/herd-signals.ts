@@ -1,4 +1,4 @@
-import { INBREEDING_THRESHOLD, SCC_THRESHOLD } from '@/lib/herd-analytics'
+import { INBREEDING_LABEL, SCC_LABEL } from '@/lib/herd-analytics'
 import type { Culling, GeneticTrend, HeiferAges, UdderHealth } from '@/lib/herd-analytics'
 import { plural } from '@/lib/format'
 
@@ -161,7 +161,7 @@ export function herdSignals({
         key: 'scc-above',
         count: udder.above,
         of: udder.measured,
-        label: `${plural(udder.above, 'корова', 'коровы', 'коров')} выше ${SCC_THRESHOLD} тыс. соматики`,
+        label: `${plural(udder.above, 'корова', 'коровы', 'коров')} выше ${SCC_LABEL} соматики`,
         ofLabel: 'коров с замером',
         hint: 'скрытый мастит: удой, сортность и выбраковка сразу',
         massHint:
@@ -181,7 +181,7 @@ export function herdSignals({
         of: trend.withInbreeding,
         label:
           `${plural(trend.aboveThreshold, 'животное', 'животных', 'животных')} ` +
-          `с инбридингом выше ${INBREEDING_THRESHOLD} %`,
+          `с инбридингом выше ${INBREEDING_LABEL}`,
         ofLabel: 'с посчитанным коэффициентом',
         hint: 'решается подбором быка, а не лечением',
         massHint:
