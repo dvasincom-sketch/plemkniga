@@ -1,6 +1,7 @@
 import type { Payload } from 'payload'
 import { SCC_THRESHOLD } from '@/lib/herd-analytics'
 import { numOrNull, poolOf } from '@/lib/sql'
+import { finishedLactation, hasMilk305 } from '@/lib/sql-lactation'
 
 /**
  * Кандидаты на выбраковку — одной таблицей.
@@ -231,8 +232,8 @@ const BODY = `
         select l.milk305, l."number" as lact
           from animals_lactations l
          where l._parent_id = m.id
-           and l.milk305 is not null and l.milk305 > 0
-           and (l.end_date is not null or coalesce(l.dd, 0) >= 305)
+           and ${hasMilk305('l')}
+           and ${finishedLactation('l')}
          order by l."number" desc
          limit 1
       ) l on true

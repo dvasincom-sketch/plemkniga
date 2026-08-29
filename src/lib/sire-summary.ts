@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 import { numOrNull, poolOf } from '@/lib/sql'
+import { finishedLactation, hasMilk305, lactationGroup } from '@/lib/sql-lactation'
 
 /**
  * Что каждый бык дал именно в этом стаде.
@@ -94,14 +95,14 @@ export async function sireSummary(
      */
     milk as (
       select m.id, m.father_id, l.milk305, l.fat305, l.protein305,
-             case when l.lact <= 1 then 1 when l.lact = 2 then 2 else 3 end as grp
+             ${lactationGroup('l.lact')} as grp
         from mine m
         join lateral (
           select l.milk305, l.fat305, l.protein305, l."number" as lact
             from animals_lactations l
            where l._parent_id = m.id
-             and l.milk305 is not null and l.milk305 > 0
-             and (l.end_date is not null or coalesce(l.dd, 0) >= 305)
+             and ${hasMilk305('l')}
+             and ${finishedLactation('l')}
            order by l."number" desc
            limit 1
         ) l on true

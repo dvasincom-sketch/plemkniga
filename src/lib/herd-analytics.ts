@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 import { numOf, numOrNull, poolOf } from '@/lib/sql'
+import { finishedLactation, hasMilk305, lactationGroup, LACTATION_GROUP_LABEL } from '@/lib/sql-lactation'
 
 /**
  * Отчёты по стаду для «Обзора»: структура, тренд, выбытие, воспроизводство.
@@ -757,7 +758,16 @@ export async function udderHealth(
  */
 export type MilkByLactation = {
   groups: {
-    key: 'first' | 'second' | 'mature'
+    /**
+     * Номер группы, а не слово.
+     *
+     * Раньше запрос отдавал `'first' | 'second' | 'mature'`, а соседний
+     * отчёт по дочерям быка — 1, 2, 3, при одинаковом делении. Два
+     * представления одного и того же означают, что сравнить их можно
+     * только глазами. Номер выбран потому, что он же и есть лактация:
+     * третья группа начинается с третьей.
+     */
+    key: 1 | 2 | 3
     label: string
     cows: number
     /** Средний удой за 305 дней по законченным лактациям. */
@@ -789,26 +799,18 @@ export async function milkByLactation(
       select id from animals
        where owner_id = $1 and archived is not true and sex = 'female'
     ),
-    /*
-     * Законченной считается лактация с проставленной датой окончания
-     * либо с числом дойных дней не меньше 305. Второе условие нужно
-     * потому, что дату окончания заполняют не все, а лактация в 320 дней
-     * заведомо не в ходу.
-     */
     rows as (
       select l."number"           as lactation,
              l.milk305,
              l.fat305,
              l.protein305,
-             (l.end_date is not null or coalesce(l.dd, 0) >= 305) as finished
+             ${finishedLactation('l')} as finished
         from animals_lactations l
         join mine m on m.id = l._parent_id
-       where l.milk305 is not null and l.milk305 > 0
+       where ${hasMilk305('l')}
     )
     select
-      case when lactation <= 1 then 'first'
-           when lactation = 2 then 'second'
-           else 'mature' end                         as grp,
+      ${lactationGroup('lactation')}                 as grp,
       count(*)::int                                   as cows,
       round(avg(milk305))::int                        as milk305,
       round(avg(fat305), 2)                           as fat,
@@ -820,14 +822,8 @@ export async function milkByLactation(
   )
 
   const byKey = new Map(
-    ((res.rows ?? []) as Record<string, unknown>[]).map((r) => [String(r.grp), r]),
+    ((res.rows ?? []) as Record<string, unknown>[]).map((r) => [numOf(r.grp), r]),
   )
-
-  const LABELS = {
-    first: 'Первотёлки',
-    second: 'Вторая лактация',
-    mature: 'Третья и старше',
-  } as const
 
   /*
    * Считаются коровы, а не строки лактаций.
@@ -852,11 +848,11 @@ export async function milkByLactation(
   )
 
   return {
-    groups: (['first', 'second', 'mature'] as const).map((key) => {
+    groups: ([1, 2, 3] as const).map((key) => {
       const r = byKey.get(key) ?? {}
       return {
         key,
-        label: LABELS[key],
+        label: LACTATION_GROUP_LABEL[key]!,
         cows: numOf(r.cows),
         milk305: numOrNull(r.milk305),
         fatPercent: numOrNull(r.fat),
