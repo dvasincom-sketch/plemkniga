@@ -410,8 +410,14 @@ function animalRow(opts: {
    * У быков список пуст.
    */
   calvings: Date[]
+  /**
+   * Кровность по голштину. Считает вызывающая сторона: у потомка она
+   * должна следовать из родительских, а родителей знает только тот,
+   * кто строит родословную.
+   */
+  blood: number
 }): { row: unknown[]; ipc: number; milk: number } {
-  const { n, sex, birth, ctx, herdIndex, father, mother, inbreeding, calvings } = opts
+  const { n, sex, birth, ctx, herdIndex, father, mother, inbreeding, calvings, blood } = opts
   const herd = ctx.herds[herdIndex % ctx.herds.length]!
   const male = sex === 'male'
 
@@ -562,7 +568,7 @@ function animalRow(opts: {
       ageGroup,
       birth,
       ctx.breeds.length ? pick(ctx.breeds) : null,
-      round(gauss(93, 8, 50, 100), 1),
+      blood,
       herd.org,
       herd.id,
       father,
@@ -663,10 +669,19 @@ async function generate(client: PoolClient) {
   const bullRows: unknown[][] = []
   /* Даты рождения быков нужны потом: туры оценки считаются от рождения. */
   const bullBirths: Date[] = []
+  /*
+   * Кровность быков и матерей — из распределения, кровность дочерей —
+   * из родительских. Иначе `blood-vs-parents` находит расхождение
+   * у каждой четырнадцатой записи: правило сверяет кровность потомка
+   * с полусуммой родительских, а сид разыгрывал её независимо.
+   */
+  const bullBloods: number[] = []
   for (let i = 0; i < bulls; i++) {
     // Быки старше всех: десять лет с разбегом в год
     const birth = monthsAgo(120, 200)
     bullBirths.push(birth)
+    const blood = round(gauss(93, 8, 50, 100), 1)
+    bullBloods.push(blood)
     bullRows.push(
       animalRow({
         n: counter++,
@@ -674,6 +689,7 @@ async function generate(client: PoolClient) {
         birth,
         // Бык не телится: план пуст, продуктивности в карточке нет
         calvings: [],
+        blood,
         ctx,
         herdIndex: i,
         father: null,
@@ -692,6 +708,7 @@ async function generate(client: PoolClient) {
   const damBirths: Date[] = []
   /* План отёлов решается до карточки — им же потом пишутся события */
   const damCalvingPlans: Date[][] = []
+  const damBloods: number[] = []
   const damBatch: unknown[][] = []
   for (let i = 0; i < dams; i++) {
     // Матери: шесть лет с разбегом в полгода — старше самой старшей дочери
@@ -699,6 +716,8 @@ async function generate(client: PoolClient) {
     damBirths.push(birth)
     const damCalvings = plannedCalvings(birth)
     damCalvingPlans.push(damCalvings)
+    const damBlood = round(gauss(93, 8, 50, 100), 1)
+    damBloods.push(damBlood)
     damBatch.push(
       animalRow({
         n: counter++,
@@ -711,6 +730,7 @@ async function generate(client: PoolClient) {
         // Известен один родитель: пути от общего предка не замыкаются.
         inbreeding: 0,
         calvings: damCalvings,
+        blood: damBlood,
       }).row,
     )
     if (damBatch.length >= CHUNK * 5 || i === dams - 1) {
@@ -812,6 +832,24 @@ async function generate(client: PoolClient) {
     const dCalvings = plannedCalvings(birth)
     daughterCalvingPlans.push(dCalvings)
 
+    /*
+     * Кровность дочери — полусумма родительских.
+     *
+     * Разбег ±0,4 п. п. на округление: правило допускает расхождение
+     * до одной доли восьмой части (12,5 п. п.), и укладываться надо
+     * с запасом, а не впритык.
+     *
+     * Каждая пятидесятая уходит за допуск намеренно. Правило написано
+     * не про выдумку: перепутанный отец — обычная ошибка выгрузки,
+     * и кровность первой её и выдаёт. Проверка без единого примера
+     * не проверена ничем.
+     */
+    const parentBlood = (bullBloods[fatherIdx]! + damBloods[i % damIds.length]!) / 2
+    const dBlood = round(
+      Math.min(100, Math.max(50, parentBlood + (chance(0.02) ? int(14, 30) * (chance(0.5) ? 1 : -1) : gauss(0, 0.4)))),
+      1,
+    )
+
     dBatch.push(
       animalRow({
         n: counter++,
@@ -823,6 +861,7 @@ async function generate(client: PoolClient) {
         mother,
         inbreeding: coi,
         calvings: dCalvings,
+        blood: dBlood,
       }).row,
     )
     if (dBatch.length >= CHUNK * 5 || i === daughters - 1) {
