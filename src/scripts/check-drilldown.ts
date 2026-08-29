@@ -1,9 +1,7 @@
 import 'dotenv/config'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { lactationStructure, milkByLactation } from '@/lib/herd-analytics'
-import { herdDrilldown } from '@/lib/herd-drilldown'
-import { drilldownConsistency } from '@/lib/probes'
+import { biggestHerd, drilldownConsistency } from '@/lib/probes'
 
 /**
  * Списки животных за числами отчётов — прогон на живой базе.
@@ -33,17 +31,13 @@ import { drilldownConsistency } from '@/lib/probes'
 async function main() {
   const payload = await getPayload({ config })
 
-  const { docs } = await payload.find({
-    collection: 'animals',
-    where: { owner: { exists: true } },
-    limit: 1,
-    depth: 0,
-    sort: '-createdAt',
-    overrideAccess: true,
-  })
-
-  const owner = docs[0]?.owner
-  const orgId = typeof owner === 'number' ? owner : (owner as { id?: number } | undefined)?.id
+  /*
+   * То же хозяйство, что берёт ночной прогон, и берётся тем же кодом.
+   * Раньше скрипт искал своё — владельца самого свежего животного, —
+   * и ручной прогон со ночным сверяли разные стада. Проверка, которая
+   * зависит от того, кто её запустил, отвечает не на тот вопрос.
+   */
+  const orgId = await biggestHerd(payload)
 
   if (!orgId) {
     console.log('  ✗ в книге нет животных с хозяйством — проверять нечего')
@@ -58,31 +52,12 @@ async function main() {
   for (const f of findings) console.log(`  ✗ ${f}`)
 
   /*
-   * Два случая расходятся законно и потому печатаются, а не считаются
-   * находками: «коров без отёлов» отчёт считает по всем самкам, список —
-   * по числящимся коровами; «лактаций в ходу» отчёт считает строками
-   * лактаций, список — коровами, а у коровы их может быть несколько.
-   *
-   * Молча уравнивать их было бы хуже расхождения: смысл у чисел разный,
-   * и одинаковыми они станут только по недоразумению.
+   * Здесь печатались две «законно расходящиеся» пары — «коров без отёлов»
+   * и «лактаций в ходу». Оговорка пережила саму причину: оба расхождения
+   * убраны (решение №205), пары проверяются наравне с остальными,
+   * а строки продолжали объяснять то, чего уже нет. Оговорка, отставшая
+   * от кода, врёт увереннее самого кода: её читают как знание.
    */
-  const structure = await lactationStructure(payload, orgId)
-  if (structure) {
-    const noCalvings = await herdDrilldown(payload, orgId, 'no-calvings')
-    console.log(
-      `  · Коров без отёлов — в отчёте ${structure.withoutCalvings} (все самки без отёлов), ` +
-        `в списке ${noCalvings?.total ?? '—'} (только числящиеся коровами)`,
-    )
-  }
-
-  const milk = await milkByLactation(payload, orgId)
-  if (milk) {
-    const inProgress = await herdDrilldown(payload, orgId, 'milk-in-progress')
-    console.log(
-      `  · Лактации в ходу — в отчёте ${milk.inProgress} (строк лактаций), ` +
-        `в списке ${inProgress?.total ?? '—'} (коров): у коровы их может быть несколько`,
-    )
-  }
 
   console.log(
     findings.length === 0

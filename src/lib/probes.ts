@@ -1,6 +1,7 @@
 import type { Payload } from 'payload'
 import { runDoctor } from '@/lib/doctor'
 import { herdDrilldown } from '@/lib/herd-drilldown'
+import { poolOf } from '@/lib/sql'
 import {
   culling,
   geneticTrend,
@@ -143,19 +144,35 @@ export async function drilldownConsistency(
  *                              Сами пробы                             *
  * ------------------------------------------------------------------ */
 
-/** Хозяйство с наибольшим стадом: на пустом любая проверка зелена и пуста. */
-async function biggestHerd(payload: Payload): Promise<number | null> {
-  const { docs } = await payload.find({
-    collection: 'animals',
-    where: { owner: { exists: true } },
-    limit: 1,
-    depth: 0,
-    sort: '-createdAt',
-    overrideAccess: true,
-  })
-  const owner = docs[0]?.owner
-  if (typeof owner === 'number') return owner
-  return (owner as { id?: number } | null | undefined)?.id ?? null
+/**
+ * Хозяйство с наибольшим стадом.
+ *
+ * Подпись обещала это и раньше, а код брал владельца самого свежего
+ * животного — `sort: '-createdAt', limit: 1`. Разница не косметическая:
+ * последним заведённым легко оказывается хозяйство с одной записью,
+ * и тогда сходимость сверяет нули с нулями. Проверка проходит, потому
+ * что проверять нечего, и зелёный цвет означает не «сошлось»,
+ * а «не смотрели».
+ *
+ * Считается запросом с группировкой: перебирать записи через Payload
+ * ради одного числа на хозяйство — сотни тысяч документов в памяти
+ * ради `max(count)`.
+ */
+export async function biggestHerd(payload: Payload): Promise<number | null> {
+  const pool = poolOf(payload)
+  if (!pool) return null
+
+  const { rows } = await pool.query(
+    `select owner_id
+       from animals
+      where owner_id is not null and archived is not true
+      group by owner_id
+      order by count(*) desc
+      limit 1`,
+  )
+
+  const id = (rows ?? [])[0]?.owner_id
+  return typeof id === 'number' ? id : id != null ? Number(id) : null
 }
 
 type Probe = (payload: Payload) => Promise<{ findings: string[]; notes: string[] }>
