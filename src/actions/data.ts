@@ -6,6 +6,7 @@ import { decodeText, parseCsv, type TextEncodingName } from '@/lib/csv'
 import { detectTableKind, readSpreadsheet } from '@/lib/xlsx'
 import { columnsOf, datasetByKey, matchHeader, normalizeHeader, type Dataset } from '@/lib/import-format'
 import { parseDate, parseNumber } from '@/lib/import-values'
+import { duplicateIdents, isMangledNumber, isServiceRow, parseSex } from '@/lib/import-rows'
 import { IDENT_FIELD_LABEL, IDENT_VALUES_SQL, identCore } from '@/lib/animal-id'
 import { DOMAIN_RULES } from '@/lib/db-constraints'
 import { quarantineColumns } from '@/lib/pending-columns'
@@ -65,6 +66,16 @@ export type ImportState = {
   /** Сколько таких ячеек всего: список показывает первые пятьдесят. */
   valueProblems?: number
   /**
+   * Строки отчёта, а не данных: «Итого», «Всего по ферме», подпись.
+   *
+   * Отдельно от непринятых строк намеренно. Это не ошибка хозяйства —
+   * так устроен любой отчёт, выгруженный для печати, — и считать их
+   * пропущенными значит послать человека искать беду, которой нет.
+   * Но и молчать нельзя: до этой правки «Итого» заводило карточку
+   * животного, потому что номер у него непустой.
+   */
+  serviceRows?: number[]
+  /**
    * Что именно прочитали из книги Excel.
    *
    * Только для книг: у CSV листа нет, и поле остаётся пустым. Сказано
@@ -106,22 +117,6 @@ export type IdentMatch = { core: string; text: string; row?: number }
  * файла целиком. Теперь разбор отвечает парой «значение или причина»,
  * и причина обязана дойти до человека — за это отвечает `note` ниже.
  */
-
-/*
- * Разбор пола из файла хозяйства.
- *
- * «Самка» и «самец» добавлены вместе со сменой подписей в интерфейсе,
- * а «женский» и «мужской» оставлены. Выбросить их было бы ошибкой:
- * выгрузки из хозяйственных программ и старые шаблоны написаны прежними
- * словами, и файл, который вчера читался, перестал бы читаться сегодня —
- * из-за правки, которую делали ради удобства этих же людей.
- */
-const sexOf = (v?: string) => {
-  const s = (v || '').trim().toLowerCase()
-  if (['ж', 'f', 'female', 'женский', 'самка'].includes(s)) return 'female'
-  if (['м', 'm', 'male', 'мужской', 'самец'].includes(s)) return 'male'
-  return undefined
-}
 
 /** Значение по пути вида `summary.milkYield` — с созданием вложенных объектов. */
 const assign = (target: Record<string, unknown>, path: string, value: unknown) => {
@@ -642,6 +637,31 @@ async function importAnimals(
     if (valueIssues.length < 50) valueIssues.push({ row: line, ident, column, reason })
   }
 
+  /*
+   * Номера, встречающиеся в файле дважды, считаются заранее — до разбора
+   * строк, потому что решение о первой строке зависит от того, будет ли
+   * вторая. Так выглядит выгрузка «по строке на лактацию»: одно животное,
+   * три строки, в каждой свой удой. Прежде последняя молча переписывала
+   * предыдущие, и хозяйство недосчитывалось двух лактаций из трёх.
+   * Разбор, почему отклоняются все три, — в `lib/import-rows`.
+   */
+  const identColumn = header.indexOf('identNumber')
+  const repeated = duplicateIdents(
+    identColumn === -1 ? [] : rows.slice(1).map((r) => r[identColumn] ?? ''),
+  )
+
+  /*
+   * Служебные строки — отдельным счётчиком, а не среди непринятых.
+   *
+   * «Итого» и подпись зоотехника не ошибка хозяйства: так устроен любой
+   * отчёт, выгруженный для печати. Считать их непринятыми строками значит
+   * сказать «пропущено 3» там, где пропущено ноль, и отправить человека
+   * искать ошибку, которой нет. Но и промолчать нельзя — до этой правки
+   * «Итого» проходило все заслоны и заводило карточку животного: номер
+   * непустой, а номер у нас единственная обязательная колонка.
+   */
+  const serviceRows: number[] = []
+
   for (const [i, row] of rows.slice(1).entries()) {
     const line = i + 2
     const get = readerFor(header, row)
@@ -652,17 +672,51 @@ async function importAnimals(
       continue
     }
 
+    if (isServiceRow(identNumber)) {
+      serviceRows.push(line)
+      continue
+    }
+
+    if (isMangledNumber(identNumber)) {
+      skip(
+        line,
+        `Номер «${identNumber}» записан научной записью — так Excel показывает длинное число. ` +
+          'Исходные цифры по нему не восстановить: задайте колонке номера текстовый формат ' +
+          'и выгрузите файл заново',
+        identNumber,
+      )
+      continue
+    }
+
+    if (repeated.has(identNumber.trim())) {
+      skip(
+        line,
+        `Номер встречается в файле ${repeated.get(identNumber.trim())} раза. В наборе «Животные» ` +
+          'строка описывает животное целиком, поэтому какая из них верна — не определить. ' +
+          'Если это выгрузка по лактациям, оставьте по строке на животное, а лактации загрузите ' +
+          'набором «Контрольные дойки»',
+        identNumber,
+      )
+      continue
+    }
+
+    /*
+     * Пол: непонятое значение больше не растворяется в умолчании.
+     *
+     * Умолчание осталось прежним — женский: большинство файлов о коровах
+     * и колонки «Пол» не имеют вовсе, и требовать её значило бы отвергать
+     * половину настоящих выгрузок. Но раньше «бычок» и «1» давали то же
+     * самое молча, и файл с быками заводил стадо коров. Теперь ячейка,
+     * которую разобрать не вышло, попадает в протокол приёмки поимённо.
+     */
+    const sex = parseSex(get('sex'))
+    if (sex.problem) note(line, 'Пол', sex.problem, identNumber)
+
     const data: Record<string, unknown> = {
       identNumber,
       owner: orgId,
       author: user.id,
-      /*
-       * Пол по умолчанию — женский. Правило старое и небезобидное: файл
-       * с быками без колонки «Пол» молча заводит их коровами. Убрать
-       * умолчание нельзя (большинство файлов — коровы и колонки не имеют),
-       * поэтому оговорка вынесена в описание формата и в шаблон.
-       */
-      sex: sexOf(get('sex')) ?? 'female',
+      sex: sex.value ?? 'female',
     }
 
     for (const col of cols) {
@@ -844,6 +898,7 @@ async function importAnimals(
     unverified,
     valueIssues,
     valueProblems,
+    serviceRows,
   }
 }
 
@@ -1164,6 +1219,14 @@ async function importEvents(
     unverified: [] as { ident: string; fields: string[] }[],
     valueIssues,
     valueProblems,
+    /*
+     * У набора событий служебных строк не бывает по построению: строка
+     * без номера животного отклоняется раньше, а «Итого» номером
+     * животного быть не может. Пустой список стоит здесь затем же,
+     * зачем и пустой `identMatches`, — чтобы обе ветви загрузки
+     * возвращали одинаковую форму.
+     */
+    serviceRows: [] as number[],
   }
 }
 
@@ -1392,6 +1455,7 @@ export async function importDataAction(
     unverified: res.unverified,
     valueIssues: res.valueIssues,
     valueProblems: res.valueProblems,
+    serviceRows: res.serviceRows,
     sheet,
     encoding,
   }

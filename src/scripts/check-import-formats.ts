@@ -5,6 +5,7 @@ import { decodeText, parseCsv } from '@/lib/csv'
 import { detectTableKind, readSpreadsheet } from '@/lib/xlsx'
 import { datasetByKey, matchHeader } from '@/lib/import-format'
 import { parseDate, parseNumber } from '@/lib/import-values'
+import { duplicateIdents, isMangledNumber, isServiceRow, parseSex } from '@/lib/import-rows'
 
 /**
  * Что загрузка делает с чужими форматами — файл за файлом.
@@ -236,21 +237,19 @@ function main() {
     console.log(`\n  ${f}`)
     const { header, body } = parse(load(f))
 
-    const idents = body.map((r) => cell(header, r, 'identNumber'))
-    check(idents.includes('Итого'), 'строка «Итого» дошла до разбора как данные', idents.join(' | '))
+    const idents = body.map((r) => cell(header, r, 'identNumber') ?? '')
+    const service = idents.filter(isServiceRow)
+    const data = idents.filter((v) => v && !isServiceRow(v))
 
-    /*
-     * Здесь и есть молчаливая порча: «Итого» — непустой номер, а номер
-     * у нас единственная обязательная колонка. Строка пройдёт все
-     * проверки формата и заведёт карточку животного по кличке «Итого».
-     */
+    check(service.length === 3, 'служебные строки опознаны', `опознано ${service.length}: ${service.join(', ')}`)
     check(
-      false,
-      'строка «Итого» не отсеивается — заведёт карточку животного',
-      'номер непустой, обязательная колонка заполнена, отказать нечему',
+      data.length === 2 && data.every((v) => v.startsWith('RU')),
+      'осталось ровно два животных',
+      data.join(' | '),
     )
+    check(!data.includes('Итого'), '«Итого» карточку не заведёт')
 
-    say(f, 'испорчен молча', '«Итого» и «Всего по ферме» заведут две карточки животных')
+    say(f, 'принят', 'три строки отчёта отсеяны и названы, два животных приняты')
   }
 
   /* ---------------- 07 — номера животных ---------------- */
@@ -263,19 +262,15 @@ function main() {
     check(id(0) === '0012345', 'ведущие нули в тексте сохранены', String(id(0)))
     check(id(2) === 'XXRUS880808231818', 'чужая система нумерации прочитана как есть', String(id(2)))
 
-    /*
-     * Научная запись — вторая молчаливая порча набора. Номер разбирается
-     * текстом, поэтому в книгу уедет строка «1,23E+11»: не число, не номер,
-     * а след того, как Excel показал длинное число. Найти животное по нему
-     * потом нельзя ничем.
-     */
-    check(
-      id(1) !== '1,23E+11',
-      'научная запись номера распознана',
-      `в книгу уйдёт «${id(1)}» — так Excel показал длинный номер`,
-    )
+    check(isMangledNumber(id(1) ?? ''), 'научная запись номера опознана', String(id(1)))
+    check(!isMangledNumber(id(0) ?? ''), 'ведущие нули за научную запись не приняты')
+    check(!isMangledNumber(id(2) ?? ''), 'чужая система нумерации за научную запись не принята')
 
-    say(f, 'испорчен молча', 'номер «1,23E+11» уедет в книгу строкой и животное по нему не найдётся')
+    say(
+      f,
+      'отвергнут внятно',
+      'строка с «1,23E+11» не принимается: восстановить цифры нельзя, сказано задать колонке текстовый формат',
+    )
   }
 
   /* ---------------- 08 — перечисления ---------------- */
@@ -284,24 +279,27 @@ function main() {
     console.log(`\n  ${f}`)
     const { header, body } = parse(load(f))
 
-    /*
-     * Пол разбирается в `actions/data.ts` списком написаний, и «тёлка»,
-     * «бычок», «F», «1» в него не входят. Значение не из списка не роняет
-     * строку — животное молча становится коровой, о чём сказано в описании
-     * формата. Проверка утверждает именно это: не то, что разбор упал,
-     * а то, что он умолчал.
-     */
-    const known = ['ж', 'f', 'female', 'женский', 'самка', 'м', 'm', 'male', 'мужской', 'самец']
-    const sexes = body.map((r) => (cell(header, r, 'sex') ?? '').toLowerCase())
-    const lost = sexes.filter((s) => !known.includes(s))
+    const sexOf = (i: number) => parseSex(cell(header, body[i]!, 'sex'))
 
+    check(sexOf(0).value === 'female', '«тёлка» → женский', String(sexOf(0).value))
+    check(sexOf(1).value === 'male', '«бычок» → мужской', String(sexOf(1).value))
+    check(sexOf(2).value === 'female', '«Ж» → женский', String(sexOf(2).value))
+    check(sexOf(3).value === 'female', '«F» → женский', String(sexOf(3).value))
+    check(sexOf(5).value === 'male', '«М» → мужской', String(sexOf(5).value))
+
+    /*
+     * Цифровой код не разбирается намеренно: в одной программе единица
+     * означает быка, в другой корову, и по файлу не узнать, в какой он
+     * собран. Проверка утверждает не молчание, а именно жалобу.
+     */
+    const digit = sexOf(4)
     check(
-      lost.length === 0,
-      'все написания пола распознаны',
-      `не распознаны: ${lost.join(', ')} — животные станут коровами по умолчанию`,
+      digit.value === undefined && !!digit.problem,
+      '«1» не разобрано и названо в протоколе, а не подставлено',
+      digit.problem ?? `приняли ${digit.value}`,
     )
 
-    say(f, 'испорчен молча', '«тёлка», «бычок», «1» не распознаны как пол; бычок станет коровой')
+    say(f, 'принят', 'слова разобраны, цифровой код назван непонятым — животное не станет коровой молча')
   }
 
   /* ---------------- 09 — дубли по лактациям ---------------- */
@@ -310,18 +308,20 @@ function main() {
     console.log(`\n  ${f}`)
     const { header, body } = parse(load(f))
 
-    const idents = body.map((r) => cell(header, r, 'identNumber'))
-    const unique = new Set(idents)
+    const idents = body.map((r) => cell(header, r, 'identNumber') ?? '')
+    const repeated = duplicateIdents(idents)
+
+    check(repeated.size === 1, 'повтор номера опознан', `повторов: ${repeated.size}`)
     check(
-      unique.size === idents.length,
-      'в наборе «Животные» номер не повторяется',
-      `${idents.length} строк на ${unique.size} животное — последняя перезапишет предыдущие`,
+      repeated.get('RU0000000126') === 3,
+      'сосчитаны все три строки',
+      String(repeated.get('RU0000000126')),
     )
 
     say(
       f,
-      'испорчен молча',
-      'три строки на одну корову: в карточке останется удой последней, две лактации пропадут',
+      'отвергнут внятно',
+      'все три строки отклоняются: выбрать «верную» нельзя, в причине названы лактации отдельным набором',
     )
   }
 
