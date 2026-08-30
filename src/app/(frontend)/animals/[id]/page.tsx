@@ -1129,35 +1129,39 @@ export default async function AnimalPage({
                почему он не видит подробностей.
             */}
             <TrustBadge level={animal.trustLevel} onDark={onDark} />
+
+            {/*
+               Управление записью — в правом верхнем углу шапки, рядом
+               с датой обновления, счётчиком просмотров и знаком
+               достоверности. Всё это уже про запись, а не про животное,
+               и половина видна только владельцу. Панель раскрывается
+               поверх содержимого и ничего не сдвигает: разбор
+               в `RecordBar`.
+            */}
+            {isMine && (
+              <RecordBar
+                animalId={animal.id as number}
+                publicVisible={Boolean(animal.publicVisible)}
+                publicDetails={Boolean(animal.publicDetails)}
+                archived={Boolean(animal.archived)}
+                onDark={onDark}
+                archive={
+                  archiveFacts ? (
+                    <ArchiveBlock
+                      animalId={animal.id as number}
+                      archived={Boolean(animal.archived)}
+                      archivedAt={animal.archivedAt ? String(animal.archivedAt) : null}
+                      archiveReason={animal.archiveReason ?? null}
+                      dependents={archiveFacts.dependents}
+                      blockers={archiveFacts.blockers}
+                    />
+                  ) : null
+                }
+              />
+            )}
           </div>
         </section>
 
-        {/*
-           Полоса владельца стоит между шапкой и меню разделов и не зависит
-           от вкладки: настройки относятся ко всей записи, а лежали внизу
-           одной из вкладок — переключишься, и они исчезли. Разбор —
-           в `RecordBar`.
-        */}
-        {isMine && (
-          <RecordBar
-            animalId={animal.id as number}
-            publicVisible={Boolean(animal.publicVisible)}
-            publicDetails={Boolean(animal.publicDetails)}
-            archived={Boolean(animal.archived)}
-            archive={
-              archiveFacts ? (
-                <ArchiveBlock
-                  animalId={animal.id as number}
-                  archived={Boolean(animal.archived)}
-                  archivedAt={animal.archivedAt ? String(animal.archivedAt) : null}
-                  archiveReason={animal.archiveReason ?? null}
-                  dependents={archiveFacts.dependents}
-                  blockers={archiveFacts.blockers}
-                />
-              ) : null
-            }
-          />
-        )}
 
         {/* ------------------------------ Вкладки ---------------------------- */}
         <p className="mb-3 mt-8 text-[12px] uppercase tracking-[0.09em] text-ink-500">

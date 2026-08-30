@@ -326,9 +326,27 @@ export interface Herd {
 export interface Animal {
   id: number;
   /**
-   * Присваивается автоматически при создании и никогда не меняется
+   * Наш ключ: присваивается при создании и никогда не меняется. Уезжает во ФГИАС ПР в колонку «Идентификатор учётной системы»
    */
   uuid?: string | null;
+  /**
+   * Номера, присвоенные государственным реестром. Заполняются обратным файлом
+   */
+  fgias?: {
+    /**
+     * Ключ животного в реестре. Без него выгрузка по животному невозможна
+     */
+    baseUuid?: string | null;
+    registrationUuid?: string | null;
+    /**
+     * Номер бирки или чипа по правилам маркирования — не УНЖ
+     */
+    unsm?: string | null;
+    /**
+     * Дата обратного файла, из которого их взяли
+     */
+    syncedAt?: string | null;
+  };
   identNumber: string;
   idFormat?: ('rf' | 'rus' | 'icar' | 'usa' | 'can' | 'deu' | 'internal') | null;
   name?: string | null;
@@ -2460,6 +2478,14 @@ export interface HerdsSelect<T extends boolean = true> {
  */
 export interface AnimalsSelect<T extends boolean = true> {
   uuid?: T;
+  fgias?:
+    | T
+    | {
+        baseUuid?: T;
+        registrationUuid?: T;
+        unsm?: T;
+        syncedAt?: T;
+      };
   identNumber?: T;
   idFormat?: T;
   name?: T;
