@@ -44,7 +44,7 @@ export function ExportCard() {
     /* Якорь `export` — на него ведёт кнопка «Выгрузка» из «Моих животных»:
        страница называется «Загрузка и выгрузка», и без якоря человек,
        нажавший «выгрузка», попадал бы на загрузку */
-    <div id="export" className="card flex scroll-mt-8 items-start justify-between gap-4">
+    <div id="export" className="card flex h-fit scroll-mt-8 items-start justify-between gap-4">
       <div className="min-w-0 flex-1">
         <h3 className="text-[21px] font-medium">Экспорт данных</h3>
         <p className="mt-1.5 text-[13px] text-ink-500">
