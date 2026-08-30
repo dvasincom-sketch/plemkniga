@@ -6,6 +6,7 @@ import { decodeText, parseCsv, type TextEncodingName } from '@/lib/csv'
 import { detectTableKind, readSpreadsheet } from '@/lib/xlsx'
 import { columnsOf, datasetByKey, matchHeader, normalizeHeader, type Dataset } from '@/lib/import-format'
 import { parseDate, parseNumber } from '@/lib/import-values'
+import { fgiasTemplateOf } from '@/lib/fgias-export'
 import { duplicateIdents, isMangledNumber, isServiceRow, parseSex } from '@/lib/import-rows'
 import { IDENT_FIELD_LABEL, IDENT_VALUES_SQL, identCore } from '@/lib/animal-id'
 import { DOMAIN_RULES } from '@/lib/db-constraints'
@@ -33,6 +34,15 @@ export type ImportState = {
    * в карточках того, что точно грузил. Теперь они названы сразу.
    */
   unknownColumns?: string[]
+  /**
+   * Файл опознан как шаблон ФГИАС ПР — и какой именно.
+   *
+   * Без этой строки отчёт о загрузке файла реестра читается как разгром:
+   * тридцать три нераспознанных заголовка, и не понять, беда это или
+   * норма. С ней — «это шаблон ФГИАС, книга ведёт тринадцать колонок
+   * из сорока шести», и вопросов не остаётся.
+   */
+  fgiasTemplate?: string
   /** Значения, которых не нашлось в справочниках, — порода и стадо. */
   unresolved?: string[]
   /**
@@ -552,11 +562,20 @@ function readTable(rows: string[][], ds: Dataset) {
         .map((c) => `«${c.title}»`)
         .join(', ')}. Скачайте шаблон, чтобы свериться`,
       unknownColumns,
+      fgiasTemplate: fgiasTemplateOf(rawHeader) ?? undefined,
       unknownData,
     }
   }
 
-  return { rows, header, unknownColumns, unknownData }
+  return {
+    rows,
+    header,
+    unknownColumns,
+    unknownData,
+    /* `null` наружу не отдаём: у состояния поле необязательное, и `undefined`
+       читается как «не шаблон ФГИАС» без второго значения для того же. */
+    fgiasTemplate: fgiasTemplateOf(rawHeader) ?? undefined,
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -1376,6 +1395,7 @@ export async function importDataAction(
     return {
       error: parsed.error,
       unknownColumns: parsed.unknownColumns,
+      fgiasTemplate: parsed.fgiasTemplate,
       dataset: ds.label,
       sheet,
       encoding,
@@ -1527,6 +1547,7 @@ export async function importDataAction(
     submissionNumber,
     issues: res.issues,
     unknownColumns: parsed.unknownColumns,
+    fgiasTemplate: parsed.fgiasTemplate,
     unresolved: res.unresolved,
     identMatches: res.identMatches,
     unverified: res.unverified,

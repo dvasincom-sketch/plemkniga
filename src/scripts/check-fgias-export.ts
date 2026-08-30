@@ -14,6 +14,7 @@ import {
   buildPedigree,
   chooseSignums,
   fgiasDate,
+  fgiasTemplateOf,
   fgiasInt,
   FORECAST_KEY,
   holdSummary,
@@ -905,6 +906,35 @@ function fgiasImport() {
   for (const must of ['identNumber', 'fgias.baseUuid', 'fgias.unsm', 'ageGroup']) {
     check(known.includes(must), `узнаётся «${must}»`)
   }
+
+  /*
+   * Опознание шаблона по паре колонок — на всех трёх настоящих файлах
+   * сразу. Утверждение дешёвое, а без него человек, положивший файл
+   * реестра, читает отчёт как разгром: тридцать три чужих заголовка
+   * и ни слова о том, что файл вообще-то понят.
+   */
+  console.log('')
+  const known3: [string, string][] = [
+    ['КРС_Основные_сведения_v.2.1_2.6.0.xlsx', 'Основные сведения'],
+    ['КРС_Лактация_молочная_продуктивность_v.1.4_2.6.0.xlsx', 'Лактация: молочная продуктивность'],
+    ['КРС_Родословная_v1.1_2.6.0.xlsx', 'Родословная'],
+  ]
+  for (const [f, label] of known3) {
+    const path = join(DIR, f)
+    if (!existsSync(path)) continue
+    const r = readSpreadsheet(new Uint8Array(readFileSync(path)))
+    if ('error' in r) continue
+    const titles = (r.rows[0] ?? []).map((t) => t.trim()).filter(Boolean)
+    check(fgiasTemplateOf(titles) === label, `опознаётся как «${label}»`, String(fgiasTemplateOf(titles)))
+  }
+
+  /*
+   * И обратное: наш собственный шаблон загрузки шаблоном ФГИАС
+   * не объявляется. Опознание по двум колонкам ошибается редко, но
+   * «редко» — не «никогда», и проверить это стоит одной строки.
+   */
+  const ours = columnsOf(ds).map((c) => c.title)
+  check(fgiasTemplateOf(ours) === null, 'наш образец шаблоном ФГИАС не объявляется', String(fgiasTemplateOf(ours)))
 }
 
 /* ------------------------------------------------------------------ */
