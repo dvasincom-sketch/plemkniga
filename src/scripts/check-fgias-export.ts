@@ -1951,6 +1951,43 @@ function inputPath() {
    * в файле называется иначе, чем поле в базе.
    */
   check(columns.has('date'), 'дата осмотра — колонка ведомости')
+
+  /*
+   * То же для полей карточки, заведённых под шаблоны реестра.
+   *
+   * Список выписан руками, и это осознанно: вывести его из сборщиков
+   * нельзя — они принимают уже готовый объект и о том, откуда взялись
+   * его поля, ничего не знают. Список растёт вместе с шаблонами,
+   * и забыть дописать сюда строку — это забыть завести колонку,
+   * то есть та же ошибка, которую проверка и ловит.
+   */
+  const animals = DATASETS.find((d) => d.key === 'animals')
+  check(!!animals, 'набор загрузки животных на месте')
+  if (!animals) return
+
+  const animalColumns = new Set(animals.groups.flatMap((g) => g.columns).map((c) => c.key))
+
+  const needAnimal = [
+    'breedType',
+    'breedDate',
+    'purposeDate',
+    'receiptMethod',
+    'ageGroupDate',
+    'birthPlace.country',
+    'birthPlace.region',
+    'birthPlace.district',
+    'birthPlace.farmName',
+    'semen.stock.code',
+    'semen.stock.available',
+    'semen.stock.updatedAt',
+  ]
+
+  const gone = needAnimal.filter((k) => !animalColumns.has(k))
+  check(
+    gone.length === 0,
+    'поля, заведённые под шаблоны реестра, принимаются загрузкой животных',
+    gone.join(', '),
+  )
 }
 
 /**

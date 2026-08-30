@@ -12,7 +12,7 @@ import {
   normalizeHeader,
   type Dataset,
 } from '@/lib/import-format'
-import { parseDate, parseNumber } from '@/lib/import-values'
+import { parseBoolean, parseDate, parseNumber } from '@/lib/import-values'
 import { fgiasTemplateOf } from '@/lib/fgias-export'
 import { duplicateIdents, isMangledNumber, isServiceRow, parseSex } from '@/lib/import-rows'
 import { IDENT_FIELD_LABEL, IDENT_VALUES_SQL, identCore } from '@/lib/animal-id'
@@ -919,6 +919,17 @@ async function importAnimals(
           assign(data, col.key, dt.value)
           break
         }
+        case 'boolean': {
+          /*
+           * Непонятное значение стоит поля, а не строки, и называется
+           * вслух: «под запрос» в колонке наличия — это не «нет»,
+           * а состояние, которого колонка не описывает.
+           */
+          const b = parseBoolean(raw)
+          if (b.problem) note(line, col.title, b.problem, identNumber)
+          assign(data, col.key, b.value)
+          break
+        }
         case 'dictionary': {
           const id = dictionaries.get(col.collection ?? '')?.get(norm(raw))
           if (id) assign(data, col.key, id)
@@ -1609,6 +1620,13 @@ async function importEvents(
         )
         if (opt) assign(data, col.key, opt.value)
         else unresolved.add(`${col.title.toLowerCase()} «${raw}»`)
+        continue
+      }
+
+      if (col.kind === 'boolean') {
+        const b = parseBoolean(raw)
+        if (b.problem) note(line, col.title, b.problem, rawIdent)
+        assign(data, col.key, b.value)
         continue
       }
 

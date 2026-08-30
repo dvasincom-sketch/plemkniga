@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import { parseDate, parseNumber } from '@/lib/import-values'
+import { parseBoolean, parseDate, parseNumber } from '@/lib/import-values'
 
 /**
  * Проверка разбора чисел и дат из чужой таблицы.
@@ -247,6 +247,33 @@ function main() {
     check(got.value?.slice(0, 10) === '2023-04-17', `в поясе ${tz} — 17 апреля`, got.value)
   }
   process.env.TZ = was
+
+  console.log('\nДа и нет: непонятное — вопрос, а не «нет»\n')
+
+  /*
+   * Правило «непустое значит да» было бы проще и неверно: в ведомостях
+   * пишут «нет», «отсутствует», «0», и всё это непустое. Ошибка пошла
+   * бы в дорогую сторону — реестр получил бы предложение семени,
+   * которого нет.
+   */
+  for (const yes of ['да', 'Да', 'ДА', 'true', '1', 'есть', 'в наличии', '+']) {
+    check(parseBoolean(yes).value === true, `«${yes}» — да`)
+  }
+  for (const no of ['нет', 'НЕТ', 'false', '0', 'отсутствует', 'не в наличии', '-']) {
+    check(parseBoolean(no).value === false, `«${no}» — нет`)
+  }
+
+  /* Пусто — не «нет», а «не сказано»: поле остаётся незаполненным. */
+  const blank = parseBoolean('')
+  check(blank.value === undefined && !blank.problem, 'пусто не превращается в «нет»')
+
+  /*
+   * «Под запрос» — состояние, которого колонка не описывает. Решать
+   * за человека, что он имел в виду, нельзя: значение называется
+   * непонятым, а поле остаётся пустым.
+   */
+  const odd = parseBoolean('под запрос')
+  check(odd.value === undefined && !!odd.problem, 'непонятное названо непонятым', odd.problem)
 
   console.log(failures === 0 ? '\nВсё сходится.\n' : `\nНе сходится: ${failures}.\n`)
   process.exit(failures === 0 ? 0 : 1)
