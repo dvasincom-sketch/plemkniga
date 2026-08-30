@@ -1770,6 +1770,8 @@ export const Animals: CollectionConfig = {
                 id: pid as number,
                 depth: 0,
                 overrideAccess: true,
+                /* Внутри транзакции записи — решение №20. */
+                req,
               })
               if (
                 parent?.birthDate &&

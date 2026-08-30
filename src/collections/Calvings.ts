@@ -53,6 +53,7 @@ const raiseAnimalAgeGroup: CollectionAfterChangeHook = async ({ doc, req }) => {
       id: animalId,
       depth: 0,
       overrideAccess: true,
+      req,
     })
 
     /*
@@ -88,6 +89,7 @@ const raiseAnimalAgeGroup: CollectionAfterChangeHook = async ({ doc, req }) => {
         ],
       },
       overrideAccess: true,
+      req,
     })
 
     const next = raiseAgeGroup(animal.ageGroup as AgeGroup | null, totalDocs)
@@ -106,6 +108,20 @@ const raiseAnimalAgeGroup: CollectionAfterChangeHook = async ({ doc, req }) => {
         ageGroupDate: doc.date ?? new Date().toISOString(),
       } as never,
       overrideAccess: true,
+      /*
+       * `req` обязателен: хук работает внутри транзакции записи отёла,
+       * и правка карточки должна попасть в неё же. Отдельное подключение
+       * здесь даёт не ошибку, а зависание до таймаута — вставка отёла
+       * держит на строке животного блокировку по внешнему ключу,
+       * а правка со стороны ждёт её снятия, которое случится только
+       * после хука (решение №20).
+       *
+       * Здесь этого не замечали годом: `raiseAgeGroup` возвращает пустое
+       * почти всегда, и до обновления дело доходило редко. Тем и опасно —
+       * ловушка стояла заряженной и ждала стада, где группы проставлены
+       * не заранее.
+       */
+      req,
       context: { skipJournal: true },
     })
   } catch (e) {

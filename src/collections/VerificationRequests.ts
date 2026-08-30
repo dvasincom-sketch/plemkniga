@@ -352,6 +352,13 @@ export const VerificationRequests: CollectionConfig = {
             collection: 'verification-requests',
             where: { number: { like: `В-${year}-` } },
             overrideAccess: true,
+            /*
+             * Счёт обязан идти внутри транзакции записи (решение №20).
+             * Отдельное подключение не видит строк, которые эта же
+             * запись уже вставила, — и две заявки, заведённые подряд,
+             * получили бы один номер. Номер этот произносят по телефону.
+             */
+            req,
           })
           data.number = `В-${year}-${String(totalDocs + 1).padStart(3, '0')}`
         }

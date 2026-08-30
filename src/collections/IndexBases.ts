@@ -125,6 +125,8 @@ export const IndexBases: CollectionConfig = {
             },
             data: { isActive: false },
             overrideAccess: true,
+            /* Внутри транзакции записи — решение №20. */
+            req,
           })
         }
         return data

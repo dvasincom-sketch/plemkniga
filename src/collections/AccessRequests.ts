@@ -169,6 +169,8 @@ export const AccessRequests: CollectionConfig = {
               id: animalId,
               depth: 0,
               overrideAccess: true,
+              /* Внутри транзакции записи — решение №20. */
+              req,
             })
             data.owner = (animal as { owner?: number | { id: number } })?.owner ?? null
           }

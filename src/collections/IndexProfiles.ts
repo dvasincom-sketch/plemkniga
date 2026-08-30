@@ -173,6 +173,8 @@ export const IndexProfiles: CollectionConfig = {
               },
               data: { isDefault: false },
               overrideAccess: true,
+              /* Внутри транзакции записи — решение №20. */
+              req,
             })
           }
         }
