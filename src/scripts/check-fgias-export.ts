@@ -17,6 +17,7 @@ import {
   FORECAST_KEY,
   holdSummary,
   idOrigin,
+  NO_KEY_LIST_CAP,
   pedigreeGaps,
   withForecastKeys,
   type ExportAnimal,
@@ -404,6 +405,43 @@ function pedigree() {
     popular.noKeyAnimals.foreign === 1,
     'а различный предок один — номер узнавать один раз',
     String(popular.noKeyAnimals.foreign),
+  )
+  check(
+    popular.noKeyList.foreign.join(',') === 'HOUSA13599440',
+    'и он назван поимённо — двенадцать номеров человек выпишет, «12» не выпишет',
+    popular.noKeyList.foreign.join(','),
+  )
+
+  /*
+   * Список ограничен сверху. Без потолка две с половиной сотни российских
+   * предков утопили бы те двенадцать иностранных, ради которых он и заведён.
+   */
+  const many: PedigreeSource[] = [
+    ...Array.from({ length: NO_KEY_LIST_CAP + 10 }, (_, i) => ({
+      id: 1000 + i,
+      identNumber: `RU-ПРЕДОК-${i}`,
+      idFormat: 'rf',
+      fatherId: null,
+      motherId: null,
+    })),
+    ...Array.from({ length: NO_KEY_LIST_CAP + 10 }, (_, i) => ({
+      id: 2000 + i,
+      identNumber: `RU-ПОТОМОК-${i}`,
+      idFormat: 'rf',
+      fatherId: 1000 + i,
+      motherId: null,
+    })),
+  ]
+  const capped = pedigreeGaps(many)
+  check(
+    capped.noKeyAnimals.ours === NO_KEY_LIST_CAP + 10,
+    'считаются все предки без номера',
+    String(capped.noKeyAnimals.ours),
+  )
+  check(
+    capped.noKeyList.ours.length === NO_KEY_LIST_CAP,
+    'а запоминается лишь потолок — счёт и список это разное',
+    String(capped.noKeyList.ours.length),
   )
 }
 

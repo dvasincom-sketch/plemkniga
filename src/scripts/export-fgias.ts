@@ -331,6 +331,26 @@ async function main() {
   line('с иностранным (HOUSA, HOCAN, HODEU, ICAR)', 'foreign')
   line('с внутрихозяйственным или без вида номера', 'internal')
 
+  /*
+   * Немногочисленное называется поимённо.
+   *
+   * Живой прогон показал двенадцать иностранных быков на сто шестьдесят
+   * восемь связей. Двенадцать номеров человек выпишет и отнесёт
+   * в поддержку реестра за вечер; «12» без номеров — это ещё один заход
+   * в базу с вопросом «а какие именно». Двух с половиной сотен российских
+   * это не касается: там работа не поимённая, а общей сдачей стада.
+   */
+  const NAME_UP_TO = 25
+  const byName = (label: string, origin: 'foreign' | 'internal') => {
+    const list = gaps.noKeyList[origin]
+    const total = gaps.noKeyAnimals[origin]
+    if (total === 0 || total > NAME_UP_TO) return
+    console.log(`\n  ${label} — вот они целиком:`)
+    for (const n of list) console.log(`    ${n}`)
+  }
+  byName('Иностранные быки без номера реестра', 'foreign')
+  byName('Внутрихозяйственные без номера реестра', 'internal')
+
   if (withBase === 0) {
     /*
      * Пока номера нет ни у кого, доля «без номера» равна единице

@@ -474,9 +474,25 @@ export type PedigreeGaps = {
    * человек решает, браться руками или ждать ответа реестра.
    */
   noKeyAnimals: Record<IdOrigin, number>
+  /**
+   * Их номера — чтобы отчёт мог назвать поимённо, когда их немного.
+   *
+   * Живой прогон показал, зачем: двенадцать иностранных быков на сто
+   * шестьдесят восемь связей. Двенадцать номеров человек выпишет
+   * и отнесёт в поддержку реестра за вечер, а «12» без номеров — это
+   * ещё один запрос ко мне.
+   *
+   * Список ограничен сверху: по российским предкам их две с половиной
+   * сотни, и печатать их значит утопить те двенадцать, ради которых
+   * всё и затевалось.
+   */
+  noKeyList: Record<IdOrigin, string[]>
   /** Ссылок на родителя, которого в книге нет вовсе. */
   dangling: number
 }
+
+/** Сколько номеров запоминать на каждый вид. Дальше — только счёт. */
+export const NO_KEY_LIST_CAP = 40
 
 /**
  * Отчего родословная не собирается — с разбором по видам номера.
@@ -510,6 +526,7 @@ export function pedigreeGaps(animals: PedigreeSource[]): PedigreeGaps {
     links: 0,
     noKey: { ours: 0, foreign: 0, internal: 0 },
     noKeyAnimals: { ours: 0, foreign: 0, internal: 0 },
+    noKeyList: { ours: [], foreign: [], internal: [] },
     dangling: 0,
   }
 
@@ -538,6 +555,9 @@ export function pedigreeGaps(animals: PedigreeSource[]): PedigreeGaps {
       if (!seen.has(parent.id)) {
         seen.add(parent.id)
         gaps.noKeyAnimals[origin] += 1
+        if (gaps.noKeyList[origin].length < NO_KEY_LIST_CAP) {
+          gaps.noKeyList[origin].push(parent.identNumber)
+        }
       }
     }
   }
