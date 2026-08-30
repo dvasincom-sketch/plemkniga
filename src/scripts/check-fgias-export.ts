@@ -930,8 +930,25 @@ function fgiasImport() {
   check(known.length >= 10, 'узнаётся не меньше десяти колонок', String(known.length))
   check(new Set(known).size === known.length, 'и ни одна колонка не занята дважды', known.join(', '))
 
-  for (const must of ['identNumber', 'fgias.baseUuid', 'fgias.unsm', 'ageGroup']) {
+  for (const must of ['identNumber', 'uuid', 'fgias.baseUuid', 'fgias.unsm', 'ageGroup']) {
     check(known.includes(must), `узнаётся «${must}»`)
+  }
+
+  /*
+   * Ключ учётной системы и номера реестра в образец шаблона не идут.
+   *
+   * Колонка, которую человеку негде взять, но которую у него просят
+   * заполнить, — приглашение выдумать значение. Для базового номера это
+   * значит второе животное в реестре, для ключа — попытка назначить
+   * животному чужую личность.
+   */
+  const sample = templateRowsOf(ds).headers
+  for (const hidden of [
+    'Идентификатор учётной системы',
+    'Базовый номер ФГИАС ПР',
+    'Регистрационный номер ФГИАС ПР',
+  ]) {
+    check(!sample.includes(hidden), `«${hidden}» принимается, но в образце не предлагается`)
   }
 
   /*
