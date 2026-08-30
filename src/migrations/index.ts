@@ -50,7 +50,8 @@ import * as migration_20260829_090000_pending_columns from './20260829_090000_pe
 import * as migration_20260827_120000_check_runs from './20260827_120000_check_runs';
 import * as migration_20260830_090000_lab_name from './20260830_090000_lab_name'
 import * as migration_20260830_120000_age_group_source from './20260830_120000_age_group_source'
-import * as migration_20260830_150000_submission_value_issues from './20260830_150000_submission_value_issues';
+import * as migration_20260830_150000_submission_value_issues from './20260830_150000_submission_value_issues'
+import * as migration_20260830_170000_fgias_uuid from './20260830_170000_fgias_uuid';
 
 export const migrations = [
   {
@@ -317,5 +318,10 @@ export const migrations = [
     up: migration_20260830_150000_submission_value_issues.up,
     down: migration_20260830_150000_submission_value_issues.down,
     name: '20260830_150000_submission_value_issues',
+  },
+  {
+    up: migration_20260830_170000_fgias_uuid.up,
+    down: migration_20260830_170000_fgias_uuid.down,
+    name: '20260830_170000_fgias_uuid',
   },
 ];

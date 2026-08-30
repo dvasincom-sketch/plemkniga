@@ -10,6 +10,7 @@ import { EvolutionRoadmap } from '@/components/EvolutionRoadmap'
 import { EvolutionBench } from '@/components/EvolutionBench'
 import { EvolutionChecks } from '@/components/EvolutionChecks'
 import { EvolutionVisualCode } from '@/components/EvolutionVisualCode'
+import { EvolutionFgias } from '@/components/EvolutionFgias'
 import { loadBenchReports } from '@/lib/bench-report'
 import { loadCheckRuns } from '@/lib/check-report'
 import { getClient, getCurrentUser } from '@/lib/payload'
@@ -67,6 +68,17 @@ const TABS = [
      понять, что система делает и чего не делает.
   */
   { key: 'processes', label: 'Бизнес-процессы' },
+  /*
+     «ФГИАС ПР» стоит рядом с бизнес-процессами и перед документацией:
+     это тоже ответ на вопрос «что система делает и чего не делает»,
+     только заданный государственным реестром. И читатель тот же —
+     хозяйство, а не инженер.
+
+     Отдельной вкладкой, а не разделом документации, потому что вопрос
+     задают отдельно и часто: сдавать данные в реестр обязаны все,
+     и выбирая, где вести учёт, спрашивают в первую очередь про это.
+  */
+  { key: 'fgias', label: 'ФГИАС ПР' },
   { key: 'docs', label: 'Документация' },
 ] as const
 
@@ -101,6 +113,11 @@ const LEAD: Record<TabKey, string> = {
     'сделать в системе и что из этого выйдет. У каждого сценария отдельно названо, чего ' +
     'он не даст: ограничение, названное заранее, стоит дешевле разочарования, которое ' +
     'приходит, когда на систему уже положились.',
+  fgias:
+    'Все хозяйства обязаны передавать данные в государственный реестр, и вопрос к книге ' +
+    'у них один: что из этого она отдаст, а чего не хватит. Здесь ответ по каждому ' +
+    'из двадцати шаблонов — с числами, сосчитанными по живой базе, и с честно названным ' +
+    'тем, чего система пока не ведёт вовсе.',
   docs:
     'Техническое описание системы для тех, кому предстоит с ней работать: модель данных, ' +
     'процессы, архитектура, контракты обмена, развёртывание и — отдельно — ограничения.',
@@ -184,6 +201,7 @@ export default async function EvolutionPage({
           )}
           {tab === 'visual' && <EvolutionVisualCode />}
           {tab === 'processes' && <EvolutionProcesses />}
+          {tab === 'fgias' && <EvolutionFgias />}
           {tab === 'docs' && <EvolutionDocs />}
         </div>
       </main>

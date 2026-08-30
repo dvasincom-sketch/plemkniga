@@ -670,6 +670,10 @@ export interface Breed {
   sortOrder?: number | null;
   description?: string | null;
   /**
+   * UUID той же записи в государственном реестре. Заполняется сверкой
+   */
+  fgiasUuid?: string | null;
+  /**
    * Снимите галочку, чтобы скрыть из выпадающих списков
    */
   isActive?: boolean | null;
@@ -700,6 +704,10 @@ export interface CoatColor {
   sortOrder?: number | null;
   description?: string | null;
   /**
+   * UUID той же записи в государственном реестре. Заполняется сверкой
+   */
+  fgiasUuid?: string | null;
+  /**
    * Снимите галочку, чтобы скрыть из выпадающих списков
    */
   isActive?: boolean | null;
@@ -725,6 +733,10 @@ export interface BloodGroup {
   sortOrder?: number | null;
   description?: string | null;
   /**
+   * UUID той же записи в государственном реестре. Заполняется сверкой
+   */
+  fgiasUuid?: string | null;
+  /**
    * Снимите галочку, чтобы скрыть из выпадающих списков
    */
   isActive?: boolean | null;
@@ -749,6 +761,10 @@ export interface AnimalPurpose {
    */
   sortOrder?: number | null;
   description?: string | null;
+  /**
+   * UUID той же записи в государственном реестре. Заполняется сверкой
+   */
+  fgiasUuid?: string | null;
   /**
    * Снимите галочку, чтобы скрыть из выпадающих списков
    */
@@ -817,6 +833,10 @@ export interface BreedingCategory {
   sortOrder?: number | null;
   description?: string | null;
   /**
+   * UUID той же записи в государственном реестре. Заполняется сверкой
+   */
+  fgiasUuid?: string | null;
+  /**
    * Снимите галочку, чтобы скрыть из выпадающих списков
    */
   isActive?: boolean | null;
@@ -846,6 +866,10 @@ export interface BreedingClass {
   sortOrder?: number | null;
   description?: string | null;
   /**
+   * UUID той же записи в государственном реестре. Заполняется сверкой
+   */
+  fgiasUuid?: string | null;
+  /**
    * Снимите галочку, чтобы скрыть из выпадающих списков
    */
   isActive?: boolean | null;
@@ -870,6 +894,10 @@ export interface Line {
    */
   sortOrder?: number | null;
   description?: string | null;
+  /**
+   * UUID той же записи в государственном реестре. Заполняется сверкой
+   */
+  fgiasUuid?: string | null;
   /**
    * Снимите галочку, чтобы скрыть из выпадающих списков
    */
@@ -896,6 +924,10 @@ export interface HaplotypeType {
   sortOrder?: number | null;
   description?: string | null;
   /**
+   * UUID той же записи в государственном реестре. Заполняется сверкой
+   */
+  fgiasUuid?: string | null;
+  /**
    * Снимите галочку, чтобы скрыть из выпадающих списков
    */
   isActive?: boolean | null;
@@ -918,6 +950,10 @@ export interface DnaTestType {
    */
   sortOrder?: number | null;
   description?: string | null;
+  /**
+   * UUID той же записи в государственном реестре. Заполняется сверкой
+   */
+  fgiasUuid?: string | null;
   /**
    * Снимите галочку, чтобы скрыть из выпадающих списков
    */
@@ -944,6 +980,10 @@ export interface DisposalReason {
    */
   sortOrder?: number | null;
   description?: string | null;
+  /**
+   * UUID той же записи в государственном реестре. Заполняется сверкой
+   */
+  fgiasUuid?: string | null;
   /**
    * Снимите галочку, чтобы скрыть из выпадающих списков
    */
@@ -1051,6 +1091,10 @@ export interface SemenType {
   sortOrder?: number | null;
   description?: string | null;
   /**
+   * UUID той же записи в государственном реестре. Заполняется сверкой
+   */
+  fgiasUuid?: string | null;
+  /**
    * Снимите галочку, чтобы скрыть из выпадающих списков
    */
   isActive?: boolean | null;
@@ -1075,6 +1119,10 @@ export interface ReproductionMethod {
    */
   sortOrder?: number | null;
   description?: string | null;
+  /**
+   * UUID той же записи в государственном реестре. Заполняется сверкой
+   */
+  fgiasUuid?: string | null;
   /**
    * Снимите галочку, чтобы скрыть из выпадающих списков
    */
@@ -1115,6 +1163,10 @@ export interface InseminationResult {
    */
   sortOrder?: number | null;
   description?: string | null;
+  /**
+   * UUID той же записи в государственном реестре. Заполняется сверкой
+   */
+  fgiasUuid?: string | null;
   /**
    * Снимите галочку, чтобы скрыть из выпадающих списков
    */
@@ -1183,6 +1235,10 @@ export interface HealthEventType {
    */
   sortOrder?: number | null;
   description?: string | null;
+  /**
+   * UUID той же записи в государственном реестре. Заполняется сверкой
+   */
+  fgiasUuid?: string | null;
   /**
    * Снимите галочку, чтобы скрыть из выпадающих списков
    */
@@ -3430,6 +3486,7 @@ export interface BreedsSelect<T extends boolean = true> {
   name?: T;
   sortOrder?: T;
   description?: T;
+  fgiasUuid?: T;
   isActive?: T;
   whffCode?: T;
   isImprover?: T;
@@ -3445,6 +3502,7 @@ export interface LinesSelect<T extends boolean = true> {
   name?: T;
   sortOrder?: T;
   description?: T;
+  fgiasUuid?: T;
   isActive?: T;
   kind?: T;
   parentLine?: T;
@@ -3460,6 +3518,7 @@ export interface BreedingCategoriesSelect<T extends boolean = true> {
   name?: T;
   sortOrder?: T;
   description?: T;
+  fgiasUuid?: T;
   isActive?: T;
   allowsIncompletePedigree?: T;
   updatedAt?: T;
@@ -3474,6 +3533,7 @@ export interface BreedingClassesSelect<T extends boolean = true> {
   name?: T;
   sortOrder?: T;
   description?: T;
+  fgiasUuid?: T;
   isActive?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -3487,6 +3547,7 @@ export interface AnimalPurposesSelect<T extends boolean = true> {
   name?: T;
   sortOrder?: T;
   description?: T;
+  fgiasUuid?: T;
   isActive?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -3500,6 +3561,7 @@ export interface DisposalReasonsSelect<T extends boolean = true> {
   name?: T;
   sortOrder?: T;
   description?: T;
+  fgiasUuid?: T;
   isActive?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -3513,6 +3575,7 @@ export interface CoatColorsSelect<T extends boolean = true> {
   name?: T;
   sortOrder?: T;
   description?: T;
+  fgiasUuid?: T;
   isActive?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -3526,6 +3589,7 @@ export interface BloodGroupsSelect<T extends boolean = true> {
   name?: T;
   sortOrder?: T;
   description?: T;
+  fgiasUuid?: T;
   isActive?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -3539,6 +3603,7 @@ export interface ReproductionMethodsSelect<T extends boolean = true> {
   name?: T;
   sortOrder?: T;
   description?: T;
+  fgiasUuid?: T;
   isActive?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -3552,6 +3617,7 @@ export interface SemenTypesSelect<T extends boolean = true> {
   name?: T;
   sortOrder?: T;
   description?: T;
+  fgiasUuid?: T;
   isActive?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -3565,6 +3631,7 @@ export interface InseminationResultsSelect<T extends boolean = true> {
   name?: T;
   sortOrder?: T;
   description?: T;
+  fgiasUuid?: T;
   isActive?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -3578,6 +3645,7 @@ export interface DnaTestTypesSelect<T extends boolean = true> {
   name?: T;
   sortOrder?: T;
   description?: T;
+  fgiasUuid?: T;
   isActive?: T;
   markerKind?: T;
   updatedAt?: T;
@@ -3592,6 +3660,7 @@ export interface HaplotypeTypesSelect<T extends boolean = true> {
   name?: T;
   sortOrder?: T;
   description?: T;
+  fgiasUuid?: T;
   isActive?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -3605,6 +3674,7 @@ export interface HealthEventTypesSelect<T extends boolean = true> {
   name?: T;
   sortOrder?: T;
   description?: T;
+  fgiasUuid?: T;
   isActive?: T;
   affectsProductivity?: T;
   updatedAt?: T;

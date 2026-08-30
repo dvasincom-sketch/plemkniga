@@ -42,6 +42,7 @@
     "audit:checks": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/audit-checks.ts",
     "audit:gate": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/audit-gate.ts",
     "archive:purge": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/archive-purge.ts",
+    "sync:fgias-nsi": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/sync-fgias-nsi.ts",
     "check:schema": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-schema.ts",
     "check:openapi": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-openapi.ts",
     "check:bulls": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-bulls.ts",
