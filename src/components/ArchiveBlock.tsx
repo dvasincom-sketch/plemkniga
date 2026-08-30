@@ -57,8 +57,7 @@ export function ArchiveBlock({
 
   if (archived) {
     return (
-      <form action={formAction} className="card mt-6">
-        <h2 className="panel-heading">Запись в архиве</h2>
+      <form action={formAction}>
 
         <p className="max-w-[70ch] text-[14px] leading-relaxed text-ink-700">
           {archiveReason ? `Причина: ${archiveReason}. ` : ''}
@@ -100,8 +99,7 @@ export function ArchiveBlock({
   }
 
   return (
-    <form action={formAction} className="card mt-6">
-      <h2 className="panel-heading">Убрать запись из книги</h2>
+    <form action={formAction}>
 
       <p className="max-w-[70ch] text-[14px] leading-relaxed text-ink-700">
         Запись уходит в архив: пропадает из книги и из вашего списка стада, но{' '}

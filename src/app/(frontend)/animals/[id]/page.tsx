@@ -1143,6 +1143,19 @@ export default async function AnimalPage({
             animalId={animal.id as number}
             publicVisible={Boolean(animal.publicVisible)}
             publicDetails={Boolean(animal.publicDetails)}
+            archived={Boolean(animal.archived)}
+            archive={
+              archiveFacts ? (
+                <ArchiveBlock
+                  animalId={animal.id as number}
+                  archived={Boolean(animal.archived)}
+                  archivedAt={animal.archivedAt ? String(animal.archivedAt) : null}
+                  archiveReason={animal.archiveReason ?? null}
+                  dependents={archiveFacts.dependents}
+                  blockers={archiveFacts.blockers}
+                />
+              ) : null
+            }
           />
         )}
 
@@ -1899,18 +1912,6 @@ export default async function AnimalPage({
               )}
             </div>
           </section>
-        )}
-        {/* Архив стоит последним блоком вкладки: убрать запись — не то,
-            что предлагают раньше, чем показали саму запись */}
-        {isMine && tab === 'general' && archiveFacts && (
-          <ArchiveBlock
-            animalId={animal.id as number}
-            archived={Boolean(animal.archived)}
-            archivedAt={animal.archivedAt ? String(animal.archivedAt) : null}
-            archiveReason={animal.archiveReason ?? null}
-            dependents={archiveFacts.dependents}
-            blockers={archiveFacts.blockers}
-          />
         )}
 
         {/* Форма запроса живёт внизу страницы, а не на каждой закрытой

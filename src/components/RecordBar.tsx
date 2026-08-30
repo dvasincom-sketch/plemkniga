@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useActionState } from 'react'
+import { useActionState, type ReactNode } from 'react'
 import { setAnimalVisibilityAction, type FormState } from '@/actions/account'
 import { publicityLabel } from '@/lib/visibility'
 
@@ -47,22 +47,39 @@ import { publicityLabel } from '@/lib/visibility'
  * это лишний экран прокрутки до вкладок. Свёрнутая полоса — одна строка,
  * в которой уже написано главное: в каком состоянии запись.
  *
- * ## Чего здесь нет
+ * ## Почему архив всё-таки здесь
  *
- * Архива. Убрать запись из книги — необратимо: карточка исчезает отовсюду.
- * Такому не место в сантиметре от переключателя, который нажимают часто, —
- * рука промахивается. Частое на виду, необратимое за дверью; архив остался
- * последним блоком вкладки.
+ * Первая редакция оставила его внизу вкладки с доводом «необратимое —
+ * за дверью». Довод был неверен по факту: архив обратим все тридцать
+ * дней, и в самом блоке об этом написано — кнопка там нарочно не красная,
+ * потому что красный в книге означает необратимое. Необратимым архив
+ * становится по истечении срока, а не в момент нажатия.
+ *
+ * А раз так, разносить две настройки записи по разным местам не за что.
+ * Оставленный внизу вкладки архив воспроизводил ровно ту беду, ради
+ * которой полоса и заводилась: настройка записи там, где написано «данные
+ * животного», и исчезает при переключении вкладки.
+ *
+ * Расстояние всё же сохранено, но не местом, а количеством шагов: полоса
+ * свёрнута, у архива своя створка, и внутри требуется причина. Три
+ * действия до отправки в архив — этого хватает, чтобы не промахнуться
+ * рукой.
  */
 
 export function RecordBar({
   animalId,
   publicVisible,
   publicDetails,
+  archived,
+  archive,
 }: {
   animalId: number
   publicVisible: boolean
   publicDetails: boolean
+  /** Запись уже в архиве: тогда створка предлагает вернуть, а не убрать. */
+  archived?: boolean
+  /** Блок архива приходит готовым: он серверный по данным, клиентский по форме. */
+  archive?: ReactNode
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(
     setAnimalVisibilityAction,
@@ -71,13 +88,16 @@ export function RecordBar({
 
   return (
     <section className="mt-6 rounded-xl bg-white px-5 py-4 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)]">
-      <details className="group">
-        <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1.5 text-[14px]">
-          <span className="text-[12px] uppercase tracking-[0.09em] text-ink-500">Ваша запись</span>
-          <span className="font-medium">
-            {publicityLabel(publicVisible, publicDetails)}
-          </span>
-          <span className="flex items-center gap-1.5 text-ink-500 underline underline-offset-4 group-open:text-forest-600">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[14px]">
+        <span className="text-[12px] uppercase tracking-[0.09em] text-ink-500">Ваша запись</span>
+        <span className="font-medium">
+          {archived ? 'В архиве' : publicityLabel(publicVisible, publicDetails)}
+        </span>
+      </div>
+
+      <details className="group mt-2">
+        <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[14px] text-ink-500 underline underline-offset-4 group-open:text-forest-600">
+          <span className="flex items-center gap-1.5">
             настроить видимость
             <svg
               width="14"
@@ -173,6 +193,39 @@ export function RecordBar({
           </div>
         </form>
       </details>
+
+      {/*
+         Архив — своей створкой, а не соседним переключателем.
+         
+         Настройка записи должна лежать там же, где остальные настройки
+         записи, — но открываться отдельно: у видимости и у архива разная
+         цена ошибки, и одна створка на двоих ставила бы их рядом.
+      */}
+      {archive && (
+        <details className="group mt-2">
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[14px] text-ink-500 underline underline-offset-4 group-open:text-forest-600">
+            {archived ? 'вернуть из архива' : 'убрать запись из книги'}
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+              className="transition-transform group-open:rotate-180"
+            >
+              <polyline
+                points="6 9 12 15 18 9"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </summary>
+
+          <div className="mt-4 border-t border-ink-100 pt-4">{archive}</div>
+        </details>
+      )}
     </section>
   )
 }
