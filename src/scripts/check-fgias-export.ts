@@ -20,11 +20,15 @@ import {
   SHOW_COLUMNS,
   WEIGHING_COLUMNS,
   DNA_COLUMNS,
+  GRADE_COLUMNS,
+  CALVING_COLUMNS,
   buildLactations,
   buildPedigree,
   buildDna,
   buildShows,
   buildWeighings,
+  buildGrades,
+  buildCalvings,
   chooseSignums,
   fgiasDate,
   fgiasTemplateOf,
@@ -46,6 +50,8 @@ import {
   MAIN_ESSENTIAL,
 } from '@/lib/fgias-main'
 import { ISAG_LOCI, authMethodUuid, isagField, VERDICT_UUID } from '@/lib/isag'
+import { COMPLEX_GRADE_UUID } from '@/lib/grading'
+import { birthTypeOf, birthTypeUuid, calvingEaseUuid, calvingEventUuid } from '@/lib/calving'
 
 /**
  * Что уедет во ФГИАС ПР, а что придержано и почему.
@@ -544,6 +550,23 @@ function templates() {
       file: 'КРС_Родословная_v1.1_2.6.0.xlsx',
       titles: PEDIGREE_COLUMNS.map((c) => c.title),
       label: 'Родословная',
+    },
+    {
+      /*
+       * У комплексного класса «Идентификатор учётной системы» третий,
+       * а не первый и не второй, как в соседних шаблонах. Порядок
+       * ключей реестр расставляет по-своему в каждом файле, и поймать
+       * это может только сверка с настоящим шаблоном.
+       */
+      file: 'КРС_Комплексный_класс_v1.6_2.6.0.xlsx',
+      titles: GRADE_COLUMNS.map((c) => c.title),
+      label: 'Комплексный класс',
+    },
+    {
+      /* А здесь он вовсе первый — единственный такой шаблон из двадцати. */
+      file: 'КРС_Отел_Аборт_Запуск_v1.3_2.6.0.xlsx',
+      titles: CALVING_COLUMNS.map((c) => c.title),
+      label: 'Отёл / Аборт / Запуск',
     },
   ]
 
@@ -1267,6 +1290,164 @@ function weighings() {
 }
 
 /**
+ * Комплексный класс: дата обязательна, балл — нет.
+ */
+function grades() {
+  console.log('\nКомплексный класс: что уезжает\n')
+
+  const base = {
+    identNumber: 'RU0000000070028',
+    accountingId: '1a421c44-36d2-41c3-881e-38bf83c4f756',
+    baseUuid: '60b5cc43-7b0a-416d-920b-6782c2192fcf',
+  }
+  const full = {
+    date: '2026-02-01T00:00:00.000Z',
+    gradeUuid: COMPLEX_GRADE_UUID.elite,
+    score: 82.5,
+    assessor: {
+      name: 'ЗАО «Назаровское»',
+      inn: '2456000123',
+      kpp: '245601001',
+      countryUuid: 'b425442a-d055-43e1-9931-1d3b6d5592cd',
+    },
+  }
+
+  const ok = buildGrades([{ ...base, gradings: [full] }])
+  check(ok.rows.length === 1, 'полная бонитировка уезжает')
+  const row = ok.rows[0]!
+  check(row.length === 10, 'в строке десять значений', String(row.length))
+  /*
+   * Порядок ключей здесь свой: базовый номер первым, наш — третьим.
+   * Перепутать их местами значило бы отправить реестру наш ключ туда,
+   * где он ждёт свой, и получить отказ по всему файлу.
+   */
+  check(row[0] === base.baseUuid, 'базовый номер первым')
+  check(row[2] === base.accountingId, 'наш ключ третьим')
+  check(row[3] === '2026-02-01', 'дата в виде ГГГГ-ММ-ДД', String(row[3]))
+  check(row[4] === 82.5, 'балл не округляется', String(row[4]))
+  check(row[5] === COMPLEX_GRADE_UUID.elite, 'класс ключом реестра')
+
+  /* Балл необязателен: в свидетельствах его печатают не всегда. */
+  const noScore = buildGrades([{ ...base, gradings: [{ ...full, score: null }] }])
+  check(noScore.rows.length === 1, 'без балла бонитировка всё равно уезжает')
+  check(noScore.rows[0]![4] === '', 'балл уходит пустым, а не нулём', String(noScore.rows[0]![4]))
+
+  /* А без даты — нет: класс без даты не говорит, действует ли он сейчас. */
+  const noDate = buildGrades([{ ...base, gradings: [{ ...full, date: null }] }])
+  check(
+    noDate.rows.length === 0 && noDate.held[0]?.why === 'Дата оценки',
+    'без даты придержано и причина названа',
+    String(noDate.held[0]?.why),
+  )
+
+  /* И без класса: строка «оценили, но неизвестно как» реестру не нужна. */
+  const noGrade = buildGrades([{ ...base, gradings: [{ ...full, gradeUuid: null }] }])
+  check(noGrade.rows.length === 0, 'без класса строка не уезжает')
+
+  /*
+   * Пять классов КРС — и все пять разные. Опечатка в одном ключе свела бы
+   * два класса в один, и заметить это на живых данных было бы нельзя:
+   * файл ушёл бы и был бы принят.
+   */
+  const uuids = Object.values(COMPLEX_GRADE_UUID)
+  check(uuids.length === 5, 'классов пять', String(uuids.length))
+  check(new Set(uuids).size === 5, 'и все ключи разные')
+}
+
+/**
+ * Отёл, аборт и запуск: тип события и три числа.
+ */
+function calvings() {
+  console.log('\nОтёл / Аборт / Запуск: что уезжает\n')
+
+  const base = {
+    identNumber: 'RU0000000070028',
+    accountingId: '1a421c44-36d2-41c3-881e-38bf83c4f756',
+    baseUuid: '60b5cc43-7b0a-416d-920b-6782c2192fcf',
+  }
+  const full = {
+    date: '2026-03-15T00:00:00.000Z',
+    eventUuid: calvingEventUuid('calving'),
+    birthTypeUuid: birthTypeUuid('one'),
+    easeUuid: calvingEaseUuid('easy'),
+    number: 3,
+    liveHeifers: 1,
+    liveBulls: 0,
+    stillborn: 0,
+  }
+
+  const ok = buildCalvings([{ ...base, calvings: [full] }])
+  check(ok.rows.length === 1, 'полный отёл уезжает')
+  const row = ok.rows[0]!
+  check(row.length === 11, 'в строке одиннадцать значений', String(row.length))
+  /*
+   * Единственный шаблон из двадцати, где наш ключ стоит первым,
+   * а базовый номер вторым. Списано с файла и закреплено здесь.
+   */
+  check(row[0] === base.accountingId, 'наш ключ первым')
+  check(row[1] === base.baseUuid, 'базовый номер вторым')
+  check(row[3] === '2026-03-15', 'дата в виде ГГГГ-ММ-ДД', String(row[3]))
+  check(row[5] === 3, 'номер лактации числом', String(row[5]))
+
+  /*
+   * Ноль уезжает нулём, а пусто — пустым. Это не придирка: ноль
+   * мертворождённых и «не считали» — разные утверждения, и подмена
+   * одного другим меняет долю мертворождений по стаду.
+   */
+  check(row[10] === 0, 'ноль мертворождённых уезжает нулём', String(row[10]))
+  const unknown = buildCalvings([
+    { ...base, calvings: [{ ...full, liveHeifers: null, liveBulls: null, stillborn: null }] },
+  ])
+  check(
+    unknown.rows[0]![10] === '',
+    'а несосчитанные уходят пустыми, а не нулями',
+    String(unknown.rows[0]![10]),
+  )
+
+  /* Без типа события строка не уезжает: отёл и аборт — не одно и то же. */
+  const noEvent = buildCalvings([{ ...base, calvings: [{ ...full, eventUuid: null }] }])
+  check(
+    noEvent.rows.length === 0 && noEvent.held[0]?.why === 'Тип события',
+    'без типа события придержано и причина названа',
+    String(noEvent.held[0]?.why),
+  )
+
+  /* Без номера лактации — тоже: на нём висит вся хронология. */
+  const noNumber = buildCalvings([{ ...base, calvings: [{ ...full, number: null }] }])
+  check(noNumber.rows.length === 0, 'без номера лактации строка не уезжает')
+
+  /*
+   * Три ключа события — три разных значения. Аборт, ушедший ключом
+   * отёла, добавил бы корове отёл, которого не было.
+   */
+  const events = ['calving', 'abortion', 'dryOff'].map((v) => calvingEventUuid(v))
+  check(events.every(Boolean) && new Set(events).size === 3, 'три типа события, три разных ключа')
+
+  /*
+   * Тип рождения из чисел. Мертворождённые считаются наравне с живыми:
+   * двойня, из которой один телёнок мёртв, остаётся двойнёй — реестр
+   * спрашивает, сколько их было, а не сколько выжило.
+   */
+  check(birthTypeOf({ liveHeifers: 1 }) === 'one', 'один плод — «Один»')
+  check(birthTypeOf({ liveHeifers: 1, stillborn: 1 }) === 'twins', 'живой и мёртвый — «Двойня»')
+  check(birthTypeOf({ liveBulls: 3 }) === 'triplets', 'три — «Тройня»')
+  check(birthTypeOf({ liveBulls: 4 }) === 'multiple', 'четыре — «Множественные роды»')
+  check(
+    birthTypeOf({}) === undefined,
+    'без чисел тип рождения не выдумывается',
+    String(birthTypeOf({})),
+  )
+
+  /*
+   * «Множественные роды смешанного типа» есть в списке, но не
+   * подставляются ниоткуда: чем они отличаются от обычных множественных,
+   * реестр не поясняет, и угадывать границу мы не стали.
+   */
+  const derived = [1, 2, 3, 4, 5].map((n) => birthTypeOf({ liveBulls: n }))
+  check(!derived.includes('multipleMixed'), '«смешанного типа» выбирает человек, а не расчёт')
+}
+
+/**
  * Достоверность происхождения: панель ISAG и пустая «Проба».
  */
 function dna() {
@@ -1384,6 +1565,8 @@ values()
 lactations()
 shows()
 weighings()
+grades()
+calvings()
 dna()
 pedigree()
 summary()

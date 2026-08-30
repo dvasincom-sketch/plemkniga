@@ -315,7 +315,8 @@ async function main() {
           animal: animal.id,
           number: n,
           date: daysAgo((g.months - 22 - (g.lact - n) * 13) * 30).toISOString(),
-          result: 'heifer',
+          result: 'one',
+          liveHeifers: 1,
         } as never,
       })
     }

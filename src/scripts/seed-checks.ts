@@ -535,7 +535,8 @@ async function main() {
     const { rows: r } = await pool.query(
       `insert into calvings (animal_id, number, date, result, milking_days, updated_at, created_at)
        values ($1, $2, $3, $4, 305, now(), now()) returning id`,
-      [animal, number, date, over.result ?? 'heifer'],
+      /* «Один» вместо прежней «Тёлки»: результат теперь про число плодов. */
+      [animal, number, date, over.result ?? 'one'],
     )
     const id = Number(r[0].id)
     for (const [i, calf] of (over.calves ?? []).entries()) {

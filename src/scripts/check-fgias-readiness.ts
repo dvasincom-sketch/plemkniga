@@ -311,14 +311,16 @@ async function main() {
 
   console.log('\nЧитаем базу…')
 
-  const [animalsAll, calvings, inseminations, milkTests, exteriors, movements] = await Promise.all([
-    all(payload, 'animals'),
-    all(payload, 'calvings'),
-    all(payload, 'inseminations'),
-    all(payload, 'milk-tests'),
-    all(payload, 'animal-exteriors'),
-    all(payload, 'movements'),
-  ])
+  const [animalsAll, calvings, inseminations, milkTests, exteriors, movements, gradings] =
+    await Promise.all([
+      all(payload, 'animals'),
+      all(payload, 'calvings'),
+      all(payload, 'inseminations'),
+      all(payload, 'milk-tests'),
+      all(payload, 'animal-exteriors'),
+      all(payload, 'movements'),
+      all(payload, 'gradings'),
+    ])
 
   /*
    * Архивные исключаются: во ФГИАС они не выгружаются, а в знаменателе
@@ -331,7 +333,7 @@ async function main() {
     `Животных ${animals.length} (в архиве ещё ${animalsAll.length - animals.length}), ` +
       `отёлов ${calvings.length}, осеменений ${inseminations.length}, ` +
       `доек ${milkTests.length}, оценок экстерьера ${exteriors.length}, ` +
-      `движений ${movements.length}`,
+      `движений ${movements.length}, бонитировок ${gradings.length}`,
   )
 
   /* ---------------------------------------------------------------- */
@@ -362,18 +364,42 @@ async function main() {
 
   report(
     'Отёл / Аборт / Запуск',
-    'Счёт телочек и бычков считается из приплода по полу — здесь мерим, есть ли сам приплод.',
+    'Счёт телочек и бычков теперь свои поля, а не вывод из связанного приплода: связь есть у четырёх отёлов из двух тысяч, и считать по ней было нечего.',
     calvings,
     [
       { title: 'Животное', path: 'animal', need: true },
       { title: 'Дата события', path: 'date', need: true },
+      { title: 'Тип события', path: 'eventType', need: true },
       { title: 'Номер лактации', path: 'number', need: true },
-      { title: 'Результат', path: 'result' },
+      { title: 'Результат (тип рождения)', path: 'result' },
       { title: 'Лёгкость отёла', path: 'ease' },
+      { title: 'Живых тёлочек', path: 'liveHeifers' },
+      { title: 'Живых бычков', path: 'liveBulls' },
+      { title: 'Мертворождённых', path: 'stillborn' },
       { title: 'Приплод связан', path: 'calves' },
       { title: 'Масса телёнка', path: 'calfWeight' },
       { title: 'Дата запуска', path: 'dryOffDate' },
       { title: 'Дойных дней', path: 'milkingDays' },
+    ],
+  )
+
+  /*
+   * Ноль строк здесь — не поломка, а правда о книге: бонитировка стала
+   * записью только что, и заполнять её начнут хозяйства. Класс, лежащий
+   * в карточках без даты, сюда не считается намеренно — иначе отчёт
+   * показал бы полторы тысячи «заполненных» строк, ни одна из которых
+   * не уедет в реестр.
+   */
+  report(
+    'Комплексный класс',
+    'Записи с датой. Класс без даты, проставленный в карточке, здесь не считается: в файл он не попадает.',
+    gradings,
+    [
+      { title: 'Животное', path: 'animal', need: true },
+      { title: 'Дата оценки', path: 'date', need: true },
+      { title: 'Комплексный класс', path: 'grade', need: true },
+      { title: 'Балл', path: 'score' },
+      { title: 'Организация-оценщик', path: 'assessorOrg' },
     ],
   )
 

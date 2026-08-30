@@ -8,6 +8,7 @@ import { DateField } from '@/components/DateField'
 import { AnimalPicker } from '@/components/AnimalPicker'
 import {
   addCalvingAction,
+  addGradingAction,
   addInseminationAction,
   addMilkTestAction,
   addShowAction,
@@ -16,6 +17,8 @@ import {
 } from '@/actions/reproduction'
 import { addEventAction, type EventFormState } from '@/actions/events'
 import { WEIGHING_SIGNS } from '@/lib/weighing'
+import { BIRTH_TYPES, CALVING_EASE, CALVING_EVENTS } from '@/lib/calving'
+import { COMPLEX_GRADES } from '@/lib/dictionaries'
 
 /**
  * Запись события — от события к животному, а не наоборот.
@@ -49,27 +52,20 @@ import { WEIGHING_SIGNS } from '@/lib/weighing'
 type Choice = { value: string; label: string }
 
 /*
- * Списки продублированы, а не импортированы из коллекций.
+ * Списки берутся из `lib/calving.ts`, а не переписываются здесь.
  *
- * `CALVING_RESULTS` лежит в `src/collections/Calvings.ts`, но этот файл
- * тянет за собой правила доступа и хуки — то есть серверный код, которому
- * в клиентской сборке делать нечего. Дублирование здесь дешевле связи:
- * значения меняются вместе с колонкой enum, то есть миграцией, и молча
- * разойтись не могут.
+ * Прежде они были продублированы: `CALVING_RESULTS` лежал
+ * в `collections/Calvings.ts`, а тот тянет за собой правила доступа
+ * и хуки — серверный код, которому в клиентской сборке делать нечего.
+ * Дублирование объяснялось тем, что значения меняются миграцией
+ * и молча разойтись не могут, — и разошлись при первой же правке:
+ * копия осталась с «Тёлкой» и «Бычком», когда оригинал перешёл
+ * на типы рождения.
+ *
+ * Теперь оба берут из одного места, в котором нет ни доступа, ни хуков.
  */
-const CALVING_RESULTS: Choice[] = [
-  { value: 'heifer', label: 'Тёлка' },
-  { value: 'bull', label: 'Бычок' },
-  { value: 'twins', label: 'Двойня' },
-  { value: 'stillborn', label: 'Мертворождение' },
-  { value: 'abortion', label: 'Аборт' },
-]
-
-const CALVING_EASE: Choice[] = [
-  { value: 'easy', label: 'Лёгкий' },
-  { value: 'assisted', label: 'С помощью' },
-  { value: 'hard', label: 'Тяжёлый' },
-]
+const choices = (list: readonly { value: string; label: string }[]): Choice[] =>
+  list.map((c) => ({ value: c.value, label: c.label }))
 
 const DISPOSAL_STATES: Choice[] = [
   { value: 'sold', label: 'Продано' },
@@ -86,6 +82,7 @@ type Kind =
   | 'move'
   | 'disposal'
   | 'show'
+  | 'grading'
 
 const TILES: { key: Kind; label: string; hint: string }[] = [
   { key: 'calving', label: 'Отёл', hint: 'Номер отёла посчитается сам' },
@@ -106,6 +103,12 @@ const TILES: { key: Kind; label: string; hint: string }[] = [
    * обычно нет, поэтому без плитки эти данные не появились бы вовсе.
    */
   { key: 'show', label: 'Выставка', hint: 'Мероприятие, награды, выигрыш' },
+  /*
+   * Бонитировка рядом с выставкой: обе записываются раз в год и обе
+   * почти всегда руками. Файла с комплексными классами у хозяйства
+   * не бывает — класс печатают в свидетельстве, а не выгружают.
+   */
+  { key: 'grading', label: 'Бонитировка', hint: 'Комплексный класс, балл, дата' },
 ]
 
 const today = () => new Date().toISOString().slice(0, 10)
@@ -283,6 +286,8 @@ export function RecordEvent({
       return <WeighingForm {...common} />
     case 'show':
       return <ShowForm {...common} />
+    case 'grading':
+      return <GradingForm {...common} />
     default:
       return (
         <SimpleEventForm
@@ -332,12 +337,42 @@ function CalvingForm({ date, setDate, onBack, onRepeat }: FormProps) {
         <Field label="Дата отёла">
           <DateField name="date" defaultValue={date} required max={today()} />
         </Field>
-        <SelectField label="Результат">
-          <Select name="result" options={CALVING_RESULTS} placeholder="Не указан" onLight />
+        {/*
+          Тип события первым после даты: от него зависит, увеличится ли
+          номер отёла. Аборт и запуск относятся к идущей лактации,
+          а новую открывает только отёл.
+        */}
+        <SelectField label="Тип события">
+          <Select
+            name="eventType"
+            options={choices(CALVING_EVENTS)}
+            defaultValue="calving"
+            onLight
+          />
+        </SelectField>
+        <SelectField label="Результат — сколько плодов">
+          <Select name="result" options={choices(BIRTH_TYPES)} placeholder="Не указан" onLight />
         </SelectField>
         <SelectField label="Лёгкость отёла">
-          <Select name="ease" options={CALVING_EASE} placeholder="Не указана" onLight />
+          <Select name="ease" options={choices(CALVING_EASE)} placeholder="Не указана" onLight />
         </SelectField>
+        {/*
+          Три числа порознь, потому что порознь их и спрашивают: доля
+          мертворождений — показатель работы с отёлами, и вытащить её
+          из слова «Мертворождение» в общем поле было нельзя.
+
+          Пустое поле не превращается в ноль: ноль означает «посчитали,
+          и никого», а это неправда всегда.
+        */}
+        <Field label="Живых тёлочек">
+          <input name="liveHeifers" inputMode="numeric" className="field field-on-light" />
+        </Field>
+        <Field label="Живых бычков">
+          <input name="liveBulls" inputMode="numeric" className="field field-on-light" />
+        </Field>
+        <Field label="Мертворождённых">
+          <input name="stillborn" inputMode="numeric" className="field field-on-light" />
+        </Field>
         <Field label="Масса телёнка, кг">
           <input name="calfWeight" inputMode="decimal" className="field field-on-light" />
         </Field>
@@ -560,6 +595,66 @@ function ShowForm({ date, setDate, onBack, onRepeat }: FormProps) {
         <Field label="Выигрыш">
           <input name="prize" className="field field-on-light" placeholder="120 000 руб. или кубок" />
         </Field>
+      </FormShell>
+    </form>
+  )
+}
+
+/* -------------------------- Бонитировка --------------------------- */
+
+/**
+ * Комплексный класс записью, а не правкой поля в карточке.
+ *
+ * ## Оценщик не спрашивается
+ *
+ * Бонитировку почти всегда проводит само хозяйство, и подставляется
+ * оно. Сторонний центр меняется в карточке бонитировки — редкий случай
+ * не стоит поля в форме, которое девять раз из десяти заполняют собой.
+ *
+ * ## Балл необязателен
+ *
+ * В племенных свидетельствах его печатают не всегда, а класс печатают
+ * всегда. Требовать балл значило бы запретить внести то, что написано
+ * в бумаге.
+ */
+function GradingForm({ date, setDate, onBack, onRepeat }: FormProps) {
+  const [state, formAction, pending] = useActionState<RecordState, FormData>(addGradingAction, {})
+
+  return (
+    <form
+      action={(fd) => {
+        keepDate(fd, setDate)
+        formAction(fd)
+      }}
+    >
+      <FormShell
+        title="Бонитировка"
+        hint="Класс с датой: бонитируют ежегодно, и «элита» без года не говорит, элита ли животное сейчас."
+        pending={pending}
+        state={state}
+        onBack={onBack}
+        onRepeat={onRepeat}
+      >
+        <AnimalPicker name="animal" label="Животное" required />
+        <Field label="Дата оценки">
+          <DateField name="date" defaultValue={date} required max={today()} />
+        </Field>
+        <SelectField label="Комплексный класс">
+          <Select
+            name="grade"
+            options={choices(COMPLEX_GRADES)}
+            placeholder="Не выбран"
+            onLight
+          />
+        </SelectField>
+        <Field label="Балл">
+          <input name="score" inputMode="decimal" className="field field-on-light" />
+        </Field>
+        <div className="sm:col-span-2">
+          <Field label="Примечание">
+            <textarea name="note" rows={2} className="field field-on-light" />
+          </Field>
+        </div>
       </FormShell>
     </form>
   )

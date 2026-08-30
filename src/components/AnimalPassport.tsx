@@ -110,7 +110,20 @@ export function AnimalPassport({ animal }: { animal: Animal }) {
            карточке без него не обойтись, иначе она не стыкуется с бумагами,
            которые лежат у зоотехника на столе.
         */}
-        <Cell label="Комплексный класс" value={labelOf(COMPLEX_GRADES, animal.grade)} />
+        {/*
+           Дата рядом с классом, а не вместо неё: бонитируют ежегодно,
+           и «элита» без года не отвечает на вопрос, элита ли животное
+           сейчас. Прочерк здесь означает «когда — неизвестно»: у записей,
+           перенесённых из прежней системы, даты нет и взяться ей неоткуда.
+        */}
+        <Cell
+          label="Комплексный класс"
+          value={
+            animal.gradeDate
+              ? `${labelOf(COMPLEX_GRADES, animal.grade)} (${dateRu(animal.gradeDate)})`
+              : labelOf(COMPLEX_GRADES, animal.grade)
+          }
+        />
 
         <div className="col-span-2 sm:col-span-4">
           <Cell

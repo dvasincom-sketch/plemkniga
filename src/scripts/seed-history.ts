@@ -178,7 +178,21 @@ async function main() {
         animal: animal.id,
         number: lactationNumber,
         date: calvingDate.toISOString(),
-        result: pick(['heifer', 'bull', 'heifer', 'bull', 'twins', 'stillborn'] as const),
+        /*
+         * Тип рождения и пол приплода выбираются одним броском, а не
+         * тремя. Три независимых броска дали бы «один плод, из них
+         * тёлочка и бычок» — стенд с невозможными данными хуже стенда
+         * без данных: по нему нельзя отличить ошибку отчёта от ошибки
+         * сида.
+         */
+        ...pick([
+          { result: 'one', liveHeifers: 1, liveBulls: 0, stillborn: 0 },
+          { result: 'one', liveHeifers: 0, liveBulls: 1, stillborn: 0 },
+          { result: 'one', liveHeifers: 1, liveBulls: 0, stillborn: 0 },
+          { result: 'one', liveHeifers: 0, liveBulls: 1, stillborn: 0 },
+          { result: 'twins', liveHeifers: 1, liveBulls: 1, stillborn: 0 },
+          { result: 'one', liveHeifers: 0, liveBulls: 0, stillborn: 1 },
+        ] as const),
         ease: pick(['easy', 'easy', 'easy', 'assisted', 'hard'] as const),
         calfWeight: int(30, 46),
         comment: '',

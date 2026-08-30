@@ -11,10 +11,10 @@ import { ISAG_LOCI, isagField } from '@/lib/isag'
  *
  * ## Зачем
  *
- * Выставки, взвешивания и подробности ДНК-теста завелись за последние дни,
- * и в книге их нет ни у одного животного. Поля есть, разделы карточки
- * написаны, выгрузка собирается — а показать нечего: каждый раздел
- * не отрисовывается, потому что пуст.
+ * Выставки, взвешивания, бонитировки и подробности ДНК-теста завелись
+ * за последние дни, и в книге их нет ни у одного животного. Поля есть,
+ * разделы карточки написаны, выгрузка собирается — а показать нечего:
+ * каждый раздел не отрисовывается, потому что пуст.
  *
  * Пустой раздел и работающий раздел выглядят одинаково, и различить их
  * можно только данными. Пока их нет, ни мы, ни хозяйство не знаем,
@@ -31,9 +31,13 @@ import { ISAG_LOCI, isagField } from '@/lib/isag'
  * Поэтому у каждой записи в примечании стоит «демонстрационная запись»,
  * а у скрипта есть `--drop`, убирающий ровно их.
  *
- *   npm run seed:fgias           — завести
- *   npm run seed:fgias -- --drop — убрать
- *   npm run seed:fgias -- --org 12
+ *   npm run seed:fgias                      — завести
+ *   npm run seed:fgias -- --drop            — убрать
+ *   npm run seed:fgias -- --org 12          — в хозяйство по номеру
+ *   npm run seed:fgias -- --org Назаровское — или по части названия
+ *
+ * Без `--org` берётся наибольшее стадо, а смотреть данные человек будет
+ * в своём. Это разные хозяйства чаще, чем кажется.
  *
  * В удалённую базу — только с подтверждением, см. `isLocalDatabase` ниже:
  *
@@ -94,6 +98,43 @@ const monthsAgo = (n: number): string => {
 const isLocalDatabase = (uri: string): boolean =>
   /@(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(uri) || !/@/.test(uri)
 
+/**
+ * Хозяйство по номеру или по части названия.
+ *
+ * Неоднозначность не разрешается за человека: два хозяйства со словом
+ * «Заря» в названии — повод спросить, а не повод угадать. Сид пишет
+ * записи в чужое стадо, и ошибка выбора стоит дороже лишнего вопроса.
+ */
+async function resolveOrg(
+  payload: Awaited<ReturnType<typeof getPayload>>,
+  what: string,
+): Promise<number | null> {
+  const asNumber = Number(what)
+  if (Number.isFinite(asNumber) && asNumber > 0) return asNumber
+
+  const { docs } = await payload.find({
+    collection: 'organizations',
+    where: { name: { like: what } },
+    limit: 10,
+    depth: 0,
+    overrideAccess: true,
+  })
+
+  if (docs.length === 0) {
+    console.error(`\nХозяйства со словом «${what}» в названии не нашлось.\n`)
+    return null
+  }
+
+  if (docs.length > 1) {
+    console.error(`\nПод «${what}» подходит несколько хозяйств — уточните номером:\n`)
+    for (const o of docs) console.error(`  --org ${o.id}   ${(o as { name?: string }).name ?? ''}`)
+    console.error('')
+    return null
+  }
+
+  return docs[0]!.id as number
+}
+
 async function main() {
   const db = resolveDatabase()
   const local = isLocalDatabase(db.uri ?? '')
@@ -114,9 +155,21 @@ async function main() {
 
   const payload = await getPayload({ config })
 
-  const orgId = arg('org') ? Number(arg('org')) : await biggestHerd(payload)
+  /*
+   * `--org` принимает и номер, и часть названия.
+   *
+   * Наибольшее стадо — разумное умолчание для проверок, но не для показа:
+   * первый прогон завёл демо-данные хозяйству «Синтетика», а смотрит
+   * их человек, вошедший под «ЗАО Назаровское». Разделы карточки
+   * остались пустыми, и виноватым выглядел код, а не выбор хозяйства.
+   *
+   * Номер своего хозяйства человек не знает и знать не должен — он знает
+   * его название. Поиск по части названия дешевле, чем поход в базу
+   * за идентификатором ради запуска сида.
+   */
+  const orgId = arg('org') ? await resolveOrg(payload, arg('org')!) : await biggestHerd(payload)
   if (!orgId) {
-    console.error('\nНе нашлось хозяйства с животными. Укажите его: --org N\n')
+    console.error('\nНе нашлось хозяйства с животными. Укажите его: --org N или --org Назаровское\n')
     process.exit(1)
   }
 
@@ -180,7 +233,29 @@ async function main() {
       cleaned += shows.length - keep.length
     }
 
-    console.log(`Убрано: взвешиваний ${doomed.docs.length}, выставок ${cleaned}`)
+    /*
+     * Бонитировки узнаются тем же примечанием. Класс в карточке при этом
+     * остаётся: снимок обновляет только запись бонитировки, а на удаление
+     * никто не подписан — и это честнее, чем стереть класс, который
+     * мог стоять там до сида.
+     */
+    const doomedGrades = await payload.find({
+      collection: 'gradings',
+      where: { note: { equals: NOTE } },
+      limit: 0,
+      pagination: false,
+      depth: 0,
+      overrideAccess: true,
+    })
+
+    for (const g of doomedGrades.docs) {
+      await payload.delete({ collection: 'gradings', id: g.id, overrideAccess: true })
+    }
+
+    console.log(
+      `Убрано: взвешиваний ${doomed.docs.length}, выставок ${cleaned}, ` +
+        `бонитировок ${doomedGrades.docs.length}`,
+    )
     console.log('ДНК-подробности не убираются: они дописаны к настоящим тестам,')
     console.log('и отличить наши поля от внесённых руками уже нельзя.\n')
     process.exit(0)
@@ -207,6 +282,7 @@ async function main() {
   let weighings = 0
   let shows = 0
   let dna = 0
+  let gradings = 0
 
   for (const [i, a] of herd.entries()) {
     /* ------------------------- Взвешивания ------------------------- */
@@ -330,11 +406,63 @@ async function main() {
       })
       dna += 1
     }
+
+    /* ------------------------- Бонитировки -------------------------- */
+
+    /*
+     * По две на животное и с разными классами: одна показала бы таблицу,
+     * но не показала бы, ради чего заведена история. Здесь видно главное —
+     * класс меняется, и в карточке стоит последний, а не лучший.
+     *
+     * У каждого пятого он падает. Так бывает и в жизни: корова, ушедшая
+     * в раздой хуже прошлогоднего, теряет класс.
+     */
+    const gradePlan =
+      i % 5 === 0
+        ? [
+            { months: 26, grade: 'elite', score: 78 + (i % 5) },
+            { months: 2, grade: 'first', score: 71 + (i % 5) },
+          ]
+        : [
+            { months: 26, grade: 'first', score: 70 + (i % 6) },
+            { months: 2, grade: 'elite', score: 80 + (i % 6) },
+          ]
+
+    for (const g of gradePlan) {
+      const at = `${monthsAgo(g.months)}T00:00:00.000Z`
+      const exists = await payload.find({
+        collection: 'gradings',
+        where: { animal: { equals: a.id }, date: { equals: at } },
+        limit: 1,
+        depth: 0,
+        overrideAccess: true,
+      })
+      if (exists.totalDocs > 0) continue
+
+      await payload.create({
+        collection: 'gradings',
+        overrideAccess: true,
+        data: {
+          animal: a.id,
+          ownerOrg: orgId,
+          date: at,
+          grade: g.grade,
+          score: g.score,
+          assessorOrg: orgId,
+          note: NOTE,
+        } as never,
+      })
+      gradings += 1
+    }
   }
 
-  console.log(`Заведено: взвешиваний ${weighings}, выставок ${shows}, ДНК-подробностей ${dna}`)
-  console.log('\nВсё помечено словами «демонстрационная запись»: взвешивания —')
-  console.log('в примечании, выставки — в месте проведения, ДНК — в результате теста.')
+  console.log(
+    `Заведено: взвешиваний ${weighings}, выставок ${shows}, ` +
+      `ДНК-подробностей ${dna}, бонитировок ${gradings}`,
+  )
+  console.log('\nВсё помечено словами «демонстрационная запись»: взвешивания')
+  console.log('и бонитировки — в примечании, выставки — в месте проведения,')
+  console.log('ДНК — в результате теста.')
   console.log('Убрать: npm run seed:fgias -- --drop\n')
 
   process.exit(0)

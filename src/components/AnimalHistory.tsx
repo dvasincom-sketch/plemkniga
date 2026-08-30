@@ -144,9 +144,23 @@ export async function AnimalHistory({ animal }: { animal: Animal }) {
       id: `c${c.id}`,
       at: new Date(c.date).getTime(),
       kind: 'calving',
-      title: `Отёл № ${c.number} — ${CALVING_RESULTS.find((r) => r.value === c.result)?.label ?? '—'}`,
+      /*
+       * Заголовок называет событие своим именем: аборт — абортом,
+       * запуск — запуском. Пока тип события был свален в «Результат»,
+       * лента писала «Отёл № 3 — Аборт», то есть противоречила себе
+       * в одной строке.
+       */
+      title:
+        c.eventType === 'abortion'
+          ? `Аборт (лактация № ${c.number})`
+          : c.eventType === 'dryOff'
+            ? `Запуск (лактация № ${c.number})`
+            : `Отёл № ${c.number} — ${CALVING_RESULTS.find((r) => r.value === c.result)?.label ?? '—'}`,
       detail: [
         afc !== null && afc >= 0 ? `первый отёл в ${monthsLabel(afc)}` : null,
+        c.liveHeifers ? `тёлочек ${c.liveHeifers}` : null,
+        c.liveBulls ? `бычков ${c.liveBulls}` : null,
+        c.stillborn ? `мертворождённых ${c.stillborn}` : null,
         c.ease === 'easy' ? 'лёгкий' : c.ease === 'assisted' ? 'с помощью' : c.ease === 'hard' ? 'трудный' : null,
         c.calfWeight ? `масса телёнка ${nf(c.calfWeight, 0)} кг` : null,
       ]

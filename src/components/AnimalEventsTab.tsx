@@ -9,8 +9,38 @@ import type { Animal } from '@/payload-types'
  * межотельный цикл, осеменения, продуктивность по лактациям, контрольные дойки.
  */
 
-const resultLabel = (v?: string | null) =>
-  CALVING_RESULTS.find((r) => r.value === v)?.label ?? '—'
+/**
+ * Что показать в колонке «Результат».
+ *
+ * Тип рождения сам по себе беднее прежней записи: «Один» вместо «Тёлки»
+ * — потеря для читателя, хотя для реестра это уточнение. Поэтому пол
+ * дописывается числами приплода, которые теперь есть рядом: «Один,
+ * тёлочка», «Двойня, 1 тёлочка и 1 бычок», «Один, мертворождённый».
+ *
+ * Аборт и запуск вытесняют тип рождения целиком: у них его нет
+ * по существу, и «Аборт — не определено» звучало бы как незаполненная
+ * запись, а не как записанное событие.
+ */
+const resultLabel = (c: {
+  eventType?: string | null
+  result?: string | null
+  liveHeifers?: number | null
+  liveBulls?: number | null
+  stillborn?: number | null
+}): string => {
+  if (c.eventType === 'abortion') return 'Аборт'
+  if (c.eventType === 'dryOff') return 'Запуск'
+
+  const birth = CALVING_RESULTS.find((r) => r.value === c.result)?.label
+  const parts = [
+    c.liveHeifers ? `${c.liveHeifers} тёл.` : null,
+    c.liveBulls ? `${c.liveBulls} быч.` : null,
+    c.stillborn ? `${c.stillborn} мертв.` : null,
+  ].filter(Boolean)
+
+  if (!birth) return parts.length ? parts.join(', ') : '—'
+  return parts.length ? `${birth}: ${parts.join(', ')}` : birth
+}
 
 const identOf = (v: unknown): string => {
   if (v && typeof v === 'object' && 'identNumber' in v) {
@@ -151,7 +181,7 @@ export async function AnimalEventsTab({ animal }: { animal: Animal }) {
                 <tr key={c.id}>
                   <td>{c.number ?? i + 1}</td>
                   <td>{dateRu(c.date)}</td>
-                  <td>{resultLabel(c.result)}</td>
+                  <td>{resultLabel(c)}</td>
                   <td className="tabular-nums">{c.milkingDays ?? '—'}</td>
                   <td>{dateRu(c.dryOffDate)}</td>
                 </tr>

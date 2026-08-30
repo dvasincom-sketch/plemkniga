@@ -474,7 +474,9 @@ async function main() {
           animal: cowId,
           number: 1,
           date: iso(firstDate),
-          result: chance(0.48) ? 'heifer' : 'bull',
+          /* Один плод, а пол — числом: «Результат» теперь про количество. */
+          result: 'one',
+          ...(chance(0.48) ? { liveHeifers: 1 } : { liveBulls: 1 }),
           comment: patchNote(patched),
         } as never,
         overrideAccess: true,
@@ -500,7 +502,9 @@ async function main() {
             animal: cowId,
             number: 2,
             date: iso(secondDate),
-            result: chance(0.48) ? 'heifer' : 'bull',
+            /* Один плод, а пол — числом: «Результат» теперь про количество. */
+          result: 'one',
+          ...(chance(0.48) ? { liveHeifers: 1 } : { liveBulls: 1 }),
             /* У второго отёла отметки о правках нет: поля животного чинил первый */
             comment: patchNote([]),
           } as never,

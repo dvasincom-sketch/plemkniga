@@ -194,5 +194,4 @@ export async function down({ db }: MigrateDownArgs): Promise<void> {
   await db.execute(sql`DROP TABLE IF EXISTS "regions" CASCADE;`)
   await db.execute(sql`DROP TABLE IF EXISTS "districts" CASCADE;`)
   await db.execute(sql`DROP TABLE IF EXISTS "breed_types" CASCADE;`)
-  await db.execute(sql`DROP TABLE IF EXISTS "breed_types" CASCADE;`)
 }

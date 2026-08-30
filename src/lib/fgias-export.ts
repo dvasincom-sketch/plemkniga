@@ -361,6 +361,278 @@ export function buildWeighings(animals: WeighingRow[]): Built {
 }
 
 /**
+ * Десять колонок шаблона «КРС_Комплексный_класс_v1.6».
+ *
+ * Порядок непривычный: «Идентификатор учётной системы» здесь третий,
+ * а не первый, как в «Основных сведениях», и не второй, как в «Живой
+ * массе». Списано с файла — реестр расставляет ключи по-своему в каждом
+ * шаблоне, и приводить их к общему виду нельзя: заголовок и место
+ * колонки — единственное, по чему он узнаёт, что куда класть.
+ */
+export const GRADE_COLUMNS: FgiasColumn[] = [
+  { title: 'Базовый номер ФГИАС ПР', type: 'uuid', width: 38 },
+  { title: 'Идентификатор ФГИАС ПР', type: 'uuid', width: 38 },
+  { title: 'Идентификатор учётной системы', type: 'string', width: 38 },
+  { title: 'Дата оценки', type: 'date', width: 14 },
+  { title: 'Комплексный класс, балл', type: 'float', width: 14 },
+  { title: 'Комплексный класс', type: 'uuid', width: 38 },
+  { title: 'Организация-оценщик наименование', type: 'string', width: 30 },
+  { title: 'Организация-оценщик ИНН', type: 'string', width: 14 },
+  { title: 'Организация-оценщик КПП', type: 'string', width: 12 },
+  { title: 'Организация-оценщик страна регистрации', type: 'uuid', width: 38 },
+]
+
+export type Grading = {
+  date?: string | null
+  /** Ключ класса из справочника реестра — подставляет вызывающий. */
+  gradeUuid?: string | null
+  score?: number | null
+  assessor?: {
+    name?: string | null
+    inn?: string | null
+    kpp?: string | null
+    countryUuid?: string | null
+  } | null
+}
+
+export type GradingAnimal = {
+  identNumber: string
+  accountingId?: string | null
+  baseUuid?: string | null
+  gradings?: Grading[] | null
+}
+
+/**
+ * Комплексный класс — по строке на бонитировку.
+ *
+ * ## Что обязательно
+ *
+ * Дата и класс. Класс без даты — не запись о бонитировке, а свойство
+ * неизвестного возраста: корову бонитируют ежегодно, и «элита» без года
+ * не отвечает на вопрос, элита ли она сейчас.
+ *
+ * Именно поэтому класс, записанный в карточке до этой правки, сюда
+ * не попадает и попасть не может. Даты у него нет и взяться ей неоткуда,
+ * а подставить сегодняшнюю значило бы сказать реестру, что мы оценили
+ * полторы тысячи животных сегодня.
+ *
+ * ## Балл может быть пустым
+ *
+ * Инструкция по бонитировке считает балл по трём группам признаков,
+ * но в племенных свидетельствах его печатают не всегда, а класс печатают
+ * всегда. Требовать балл значило бы придержать записи, у которых
+ * с реестром всё в порядке.
+ *
+ * ## Оценщик берётся из связи
+ *
+ * Наименование, ИНН и КПП — из организации, а не копией в каждой
+ * строке: копия однажды уехала бы со старым ИНН. Страна регистрации
+ * выводится из наличия ИНН, разбор — в `lib/grading.ts`.
+ */
+export function buildGrades(animals: GradingAnimal[]): Built {
+  const rows: (string | number)[][] = []
+  const held: Held[] = []
+
+  const txt = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : '')
+
+  for (const a of animals) {
+    const list = (a.gradings ?? []).filter(Boolean)
+    if (list.length === 0) continue
+
+    if (!a.baseUuid) {
+      held.push({
+        identNumber: a.identNumber,
+        what: `бонитировок: ${list.length}`,
+        why: 'Базовый номер ФГИАС ПР',
+      })
+      continue
+    }
+
+    if (!a.accountingId) {
+      held.push({
+        identNumber: a.identNumber,
+        what: `бонитировок: ${list.length}`,
+        why: 'Идентификатор учётной системы',
+      })
+      continue
+    }
+
+    for (const g of list) {
+      const date = fgiasDate(g.date)
+      const grade = txt(g.gradeUuid)
+
+      const missing = !date ? 'Дата оценки' : !grade ? 'Комплексный класс' : null
+      if (missing) {
+        held.push({
+          identNumber: a.identNumber,
+          what: `бонитировка ${g.date ?? '?'}`,
+          why: missing,
+        })
+        continue
+      }
+
+      const score = fgiasFloat(g.score)
+
+      rows.push([
+        a.baseUuid,
+        '',
+        a.accountingId,
+        date!,
+        score ?? '',
+        grade,
+        txt(g.assessor?.name),
+        txt(g.assessor?.inn),
+        txt(g.assessor?.kpp),
+        txt(g.assessor?.countryUuid),
+      ])
+    }
+  }
+
+  return { columns: GRADE_COLUMNS, rows, held, rounded: 0 }
+}
+
+/**
+ * Одиннадцать колонок шаблона «КРС_Отел_Аборт_Запуск_v1.3».
+ *
+ * Здесь «Идентификатор учётной системы» стоит **первым**, а базовый
+ * номер вторым — единственный шаблон с таким порядком. Списано с файла.
+ */
+export const CALVING_COLUMNS: FgiasColumn[] = [
+  { title: 'Идентификатор учётной системы', type: 'string', width: 38 },
+  { title: 'Базовый номер ФГИАС ПР', type: 'uuid', width: 38 },
+  { title: 'Идентификатор ФГИАС ПР', type: 'uuid', width: 38 },
+  { title: 'Дата события', type: 'date', width: 14 },
+  { title: 'Тип события', type: 'uuid', width: 38 },
+  { title: 'Номер лактации события', type: 'int' },
+  { title: 'Результат', type: 'uuid', width: 38 },
+  { title: 'Легкость отела', type: 'uuid', width: 38 },
+  { title: 'Количество живых телочек', type: 'int' },
+  { title: 'Количество живых бычков', type: 'int' },
+  { title: 'Количество мертворожденных (нежизнеспособных)', type: 'int' },
+]
+
+export type CalvingEvent = {
+  date?: string | null
+  /** Ключи реестра — подставляет вызывающий. */
+  eventUuid?: string | null
+  birthTypeUuid?: string | null
+  easeUuid?: string | null
+  number?: number | null
+  liveHeifers?: number | null
+  liveBulls?: number | null
+  stillborn?: number | null
+}
+
+export type CalvingAnimal = {
+  identNumber: string
+  accountingId?: string | null
+  baseUuid?: string | null
+  calvings?: CalvingEvent[] | null
+}
+
+/**
+ * Отёл, аборт и запуск — по строке на событие.
+ *
+ * ## Что обязательно
+ *
+ * Дата, тип события и номер лактации. Первые два очевидны, третий —
+ * ось всей отчётности: события воспроизводства реестр вешает на номер
+ * отёла, и строка без него не встаёт в хронологию ни у нас, ни у него.
+ *
+ * ## Три числа уходят пустыми, а не нулями
+ *
+ * Ноль мертворождённых и «не считали» — разные утверждения, и колонка
+ * объявлена целым числом, а не обязательным. У аборта чисел нет
+ * по существу; у отёлов, загруженных до этой правки, они есть только
+ * там, где прежнее поле «Результат» их подразумевало: «Тёлка» — одна
+ * живая тёлочка, «Мертворождение» — один мертворождённый. Двойня
+ * молчит про пол, и выдумывать его миграция не стала.
+ *
+ * Ноль в этих колонках означал бы «мы посчитали, и не родилось никого» —
+ * для отёла это неправда всегда.
+ *
+ * ## Тип рождения подставляется из чисел
+ *
+ * Если его не выбрали руками, он считается по сумме плодов: один,
+ * двойня, тройня, множественные. Мертворождённые считаются наравне
+ * с живыми — двойня, из которой один телёнок мёртв, остаётся двойнёй.
+ * Когда чисел нет вовсе, колонка уходит пустой: «Не определено» —
+ * это утверждение о родах, а не признание, что мы не знаем.
+ */
+export function buildCalvings(animals: CalvingAnimal[]): Built {
+  const rows: (string | number)[][] = []
+  const held: Held[] = []
+
+  const txt = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : '')
+
+  for (const a of animals) {
+    const list = (a.calvings ?? []).filter(Boolean)
+    if (list.length === 0) continue
+
+    if (!a.baseUuid) {
+      held.push({
+        identNumber: a.identNumber,
+        what: `событий отёла: ${list.length}`,
+        why: 'Базовый номер ФГИАС ПР',
+      })
+      continue
+    }
+
+    if (!a.accountingId) {
+      held.push({
+        identNumber: a.identNumber,
+        what: `событий отёла: ${list.length}`,
+        why: 'Идентификатор учётной системы',
+      })
+      continue
+    }
+
+    for (const c of list) {
+      const date = fgiasDate(c.date)
+      const event = txt(c.eventUuid)
+      const number = fgiasInt(c.number)
+
+      const missing = !date
+        ? 'Дата события'
+        : !event
+          ? 'Тип события'
+          : number.value === undefined
+            ? 'Номер лактации события'
+            : null
+
+      if (missing) {
+        held.push({
+          identNumber: a.identNumber,
+          what: `событие ${c.date ?? '?'}`,
+          why: missing,
+        })
+        continue
+      }
+
+      const heifers = fgiasInt(c.liveHeifers)
+      const bulls = fgiasInt(c.liveBulls)
+      const dead = fgiasInt(c.stillborn)
+
+      rows.push([
+        a.accountingId,
+        a.baseUuid,
+        '',
+        date!,
+        event,
+        number.value!,
+        txt(c.birthTypeUuid),
+        txt(c.easeUuid),
+        heifers.value ?? '',
+        bulls.value ?? '',
+        dead.value ?? '',
+      ])
+    }
+  }
+
+  return { columns: CALVING_COLUMNS, rows, held, rounded: 0 }
+}
+
+/**
  * Двадцать семь колонок шаблона «КРС_Достоверность_происхождения_v1.1».
  *
  * Последние двенадцать — панель ISAG в порядке шаблона: BM1818, BM1824,
@@ -1218,6 +1490,19 @@ export const FGIAS_SIGNATURES: { label: string; needs: string[] }[] = [
      */
     label: 'Родословная',
     needs: ['Базовый номер ФГИАС ПР', 'ООМ'],
+  },
+  {
+    /*
+     * Балл, а не класс: заголовок «Комплексный класс» встречается
+     * и в наших выгрузках, и в хозяйственных таблицах, а «Комплексный
+     * класс, балл» — только в шаблоне реестра.
+     */
+    label: 'Комплексный класс',
+    needs: ['Базовый номер ФГИАС ПР', 'Комплексный класс, балл'],
+  },
+  {
+    label: 'Отёл / Аборт / Запуск',
+    needs: ['Тип события', 'Количество мертворожденных'],
   },
 ]
 

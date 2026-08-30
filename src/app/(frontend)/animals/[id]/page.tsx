@@ -61,6 +61,7 @@ import {
   AGE_GROUPS,
   CALVING_ROLE_TRAITS,
   CALVING_TRAITS,
+  COMPLEX_GRADES,
   DOCUMENT_TYPES,
   EXTERIOR_COMPOSITES,
   EXTERIOR_TRAITS,
@@ -810,6 +811,30 @@ export default async function AnimalPage({
             sort: '-date',
             limit: 100,
             depth: 0,
+            overrideAccess: true,
+          })
+        ).docs
+      : []
+
+  /*
+   * Бонитировки — история комплексного класса.
+   *
+   * Область `evaluation`, а не `production`: класс — вывод о племенной
+   * ценности, и открывается он тем же точечным доступом, что линейная
+   * оценка, а не тем, что удои.
+   *
+   * Потолка нет: бонитируют раз в год, и за всю жизнь животного строк
+   * набирается меньше десятка — обрезать нечего.
+   */
+  const gradings =
+    tab === 'evaluation' && maySee('evaluation')
+      ? (
+          await payload.find({
+            collection: 'gradings',
+            where: { animal: { equals: animal.id } },
+            sort: '-date',
+            limit: 50,
+            depth: 1,
             overrideAccess: true,
           })
         ).docs
@@ -1937,6 +1962,59 @@ export default async function AnimalPage({
                               <td>{show.prize || '—'}</td>
                             </tr>
                           ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Collapsible>
+              </section>
+            )}
+
+            {/*
+               Бонитировка — последней среди оценок.
+
+               Комплексный класс это итог, а не наблюдение: его выводят
+               из продуктивности, экстерьера и происхождения, то есть
+               из всего, что стоит выше. Читать его первым значило бы
+               предложить вывод раньше оснований — а действующий класс
+               и так стоит в паспорте, на первой вкладке.
+
+               Раздел не показывается, пока бонитировок нет. У полутора
+               тысяч животных класс проставлен в карточке без даты
+               и сюда не попадает: запись о бонитировке без даты —
+               не запись, и подставлять ей дату переноса значило бы
+               выдумать день оценки.
+            */}
+            {gradings.length > 0 && (
+              <section className="mt-6">
+                <Collapsible
+                  title="Комплексный класс"
+                  note="История бонитировок: когда, какой класс и кто присвоил"
+                >
+                  <div className="overflow-x-auto">
+                    <table className="metric-table min-w-[620px]">
+                      <thead>
+                        <tr>
+                          <th>Дата оценки</th>
+                          <th>Класс</th>
+                          <th>Балл</th>
+                          <th>Организация-оценщик</th>
+                          <th>Примечание</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {gradings.map((g) => (
+                          <tr key={g.id}>
+                            <td className="whitespace-nowrap">{dateRu(g.date)}</td>
+                            <td>{labelOf(COMPLEX_GRADES, g.grade)}</td>
+                            <td className="tabular-nums">{g.score ?? '—'}</td>
+                            <td>
+                              {typeof g.assessorOrg === 'object' && g.assessorOrg
+                                ? (g.assessorOrg.name ?? '—')
+                                : '—'}
+                            </td>
+                            <td>{g.note || '—'}</td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                   </div>

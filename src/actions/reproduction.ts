@@ -126,7 +126,22 @@ export async function addCalvingAction(
   if (!date) return { error: 'Дата отёла обязательна' }
   if (new Date(date).getTime() > Date.now()) return { error: 'Дата отёла не может быть в будущем' }
 
-  const nextNumber = (await calvingCount(payload, animalId)) + 1
+  const eventType = text(formData, 'eventType') ?? 'calving'
+
+  /*
+   * Номер увеличивает только отёл. Аборт и запуск относятся к той
+   * лактации, которая уже идёт, а не открывают новую: записать аборт
+   * номером «следующий» значило бы сказать, что корова отелилась.
+   *
+   * Минимум единица: аборт у тёлки, которая ещё ни разу не телилась, —
+   * событие первой стельности, и ноль здесь означал бы отсутствие
+   * номера, а не первый.
+   */
+  const count = await calvingCount(payload, animalId)
+  const nextNumber = eventType === 'calving' ? count + 1 : Math.max(count, 1)
+
+  const what =
+    eventType === 'abortion' ? 'аборт' : eventType === 'dryOff' ? 'запуск' : 'отёл'
 
   try {
     const created = (await payload.create({
@@ -137,8 +152,17 @@ export async function addCalvingAction(
         animal: animalId,
         number: nextNumber,
         date,
+        eventType,
         result: (text(formData, 'result') ?? undefined) as never,
         ease: (text(formData, 'ease') ?? undefined) as never,
+        /*
+         * Числа приплода уходят только тогда, когда их ввели. Ноль
+         * означает «посчитали, и никого», и подставлять его вместо
+         * пустого поля значило бы утверждать это за человека.
+         */
+        liveHeifers: num(formData, 'liveHeifers') ?? undefined,
+        liveBulls: num(formData, 'liveBulls') ?? undefined,
+        stillborn: num(formData, 'stillborn') ?? undefined,
         calfWeight: num(formData, 'calfWeight') ?? undefined,
         dryOffDate: iso(formData, 'dryOffDate') ?? undefined,
         comment: text(formData, 'comment'),
@@ -148,9 +172,9 @@ export async function addCalvingAction(
     revalidatePath(`/animals/${animalId}`)
     revalidatePath('/account')
 
-    return { message: `Записан отёл № ${nextNumber}`, created: created.id }
+    return { message: `Записан ${what} № ${nextNumber}`, created: created.id }
   } catch (e) {
-    return { error: e instanceof Error ? e.message : 'Не удалось записать отёл' }
+    return { error: e instanceof Error ? e.message : `Не удалось записать ${what}` }
   }
 }
 
@@ -417,5 +441,72 @@ export async function addShowAction(
     return { message: 'Выставка записана' }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Не удалось записать выставку' }
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Бонитировка                                                        */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Комплексный класс — записью с датой, а не правкой поля.
+ *
+ * ## Почему оценщик по умолчанию своё хозяйство
+ *
+ * Бонитировку почти всегда проводит само хозяйство, и заставлять
+ * выбирать себя из списка организаций — лишний шаг там, где ответ
+ * известен. Сторонний центр выбирается явно, и тогда умолчание
+ * не срабатывает.
+ *
+ * Это не то же самое, что подставить признак взвешивания: там оба
+ * ответа равновероятны, здесь один встречается в девяти случаях
+ * из десяти.
+ *
+ * ## Дата обязательна
+ *
+ * Класс без даты — то самое, из-за чего эта коллекция и появилась:
+ * в карточке он лежал именно так, и сказать, устарел ли он, было
+ * нельзя. Повторять ту же дыру новым путём незачем.
+ */
+export async function addGradingAction(
+  _prev: RecordState,
+  formData: FormData,
+): Promise<RecordState> {
+  const ctx = await guard(formData)
+  if ('error' in ctx) return { error: ctx.error }
+  const { user, payload, animalId } = ctx
+
+  const date = iso(formData, 'date')
+  if (!date) return { error: 'Дата оценки обязательна' }
+  if (new Date(date).getTime() > Date.now()) {
+    return { error: 'Дата оценки не может быть в будущем' }
+  }
+
+  const grade = String(formData.get('grade') || '').trim()
+  if (!grade) return { error: 'Комплексный класс обязателен' }
+
+  const own = relId((user as { organization?: unknown }).organization)
+
+  try {
+    await payload.create({
+      collection: 'gradings',
+      overrideAccess: true,
+      user,
+      data: {
+        animal: animalId,
+        date,
+        grade,
+        score: num(formData, 'score') ?? undefined,
+        ...(own ? { assessorOrg: own } : {}),
+        note: String(formData.get('note') || '').trim() || undefined,
+      } as never,
+    })
+
+    revalidatePath(`/animals/${animalId}`)
+    revalidatePath('/account')
+
+    return { message: 'Бонитировка записана' }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Не удалось записать бонитировку' }
   }
 }

@@ -4,6 +4,18 @@ import { requireOwnAnimal, stampOwnerOrg } from '@/access/guards'
 import { ownerOrgField } from '@/collections/shared'
 import { raiseAgeGroup } from '@/lib/age-group'
 import type { AgeGroup } from '@/lib/dictionaries'
+import { BIRTH_TYPES, CALVING_EASE, CALVING_EVENTS, CALVING_RESULTS } from '@/lib/calving'
+
+/*
+ * Списки переехали в `lib/calving.ts` и отдаются отсюда прежними именами.
+ *
+ * Читают их трое: эта коллекция, разбор загружаемого файла и форма
+ * ручного ввода в кабинете. Последняя собирается для браузера, и импорт
+ * из коллекции тянул бы в неё правила доступа и хуки — поэтому форма
+ * держала у себя переписанную от руки копию списка. Копия и оригинал
+ * разошлись бы молча в первый же день; теперь источник один.
+ */
+export { BIRTH_TYPES, CALVING_EASE, CALVING_EVENTS, CALVING_RESULTS }
 
 /**
  * Отёл поднимает возрастную группу животного.
@@ -49,10 +61,32 @@ const raiseAnimalAgeGroup: CollectionAfterChangeHook = async ({ doc, req }) => {
      * учёта нумерация своя, и «отёл №7» может оказаться единственным
      * записанным. Группу определяет сколько их есть, а не как назван
      * последний.
+     *
+     * Считаются именно отёлы. Пока тип события был свален в «Результат»,
+     * запись об аборте считалась наравне с отёлом — и тёлка, потерявшая
+     * плод, становилась коровой. Ошибка была тихая: возрастная группа
+     * поднимается сама, и посмотреть на неё некому.
+     *
+     * Записи без типа события считаются отёлами: до этой правки других
+     * в книге не было, а миграция проставила «Аборт» ровно тем, у кого
+     * он стоял в результате.
      */
     const { totalDocs } = await req.payload.count({
       collection: 'calvings',
-      where: { animal: { equals: animalId } },
+      where: {
+        and: [
+          { animal: { equals: animalId } },
+          {
+            /*
+             * Пустой тип читается как отёл, и написано это условием,
+             * а не отрицанием: `!= 'аборт'` в SQL неверно для NULL —
+             * такая строка не попала бы ни в одну сторону сравнения
+             * и молча выпала бы из счёта.
+             */
+            or: [{ eventType: { equals: 'calving' } }, { eventType: { exists: false } }],
+          },
+        ],
+      },
       overrideAccess: true,
     })
 
@@ -80,29 +114,6 @@ const raiseAnimalAgeGroup: CollectionAfterChangeHook = async ({ doc, req }) => {
 
   return doc
 }
-
-/** Результат отёла — колонка «Результат» в таблице межотельного цикла. */
-export const CALVING_RESULTS = [
-  { value: 'heifer', label: 'Тёлка' },
-  { value: 'bull', label: 'Бычок' },
-  { value: 'twins', label: 'Двойня' },
-  { value: 'stillborn', label: 'Мертворождение' },
-  { value: 'abortion', label: 'Аборт' },
-] as const
-
-/**
- * Лёгкость отёла.
- *
- * Вынесено из поля наружу по той же причине, что и результат: этот список
- * читает не только форма, но и разбор загружаемого файла. Пока он лежал
- * внутри поля, описание допустимых кодов в формате импорта было переписано
- * от руки — и разошлось со справочником в первый же раз.
- */
-export const CALVING_EASE = [
-  { value: 'easy', label: 'Лёгкий' },
-  { value: 'assisted', label: 'С помощью' },
-  { value: 'hard', label: 'Тяжёлый' },
-] as const
 
 /**
  * Отёлы — «Таблица межотельного цикла».
@@ -159,10 +170,32 @@ export const Calvings: CollectionConfig = {
       type: 'row',
       fields: [
         {
+          /*
+           * Тип события — отёл, аборт или запуск. Все три заканчивают
+           * лактацию и меряются от одной оси, поэтому лежат одной
+           * коллекцией, как и у реестра.
+           *
+           * По умолчанию отёл: до этой правки в книге других записей
+           * не было, и значение по умолчанию говорит о прошлом правду.
+           */
+          name: 'eventType',
+          type: 'select',
+          label: 'Тип события',
+          options: CALVING_EVENTS.map((e) => ({ value: e.value, label: e.label })),
+          defaultValue: 'calving',
+          index: true,
+        },
+        {
+          /*
+           * «Результат» — это тип рождения: один, двойня, тройня.
+           * Прежде здесь лежали «Тёлка» и «Бычок», то есть ответ
+           * на другой вопрос; пол теперь считается числами ниже.
+           */
           name: 'result',
           type: 'select',
           label: 'Результат',
-          options: [...CALVING_RESULTS],
+          options: BIRTH_TYPES.map((b) => ({ value: b.value, label: b.label })),
+          admin: { description: 'Сколько плодов было; пол — числами ниже' },
         },
         { name: 'milkingDays', type: 'number', label: 'Количество дойных дней' },
         { name: 'dryOffDate', type: 'date', label: 'Дата запуска' },
@@ -175,9 +208,37 @@ export const Calvings: CollectionConfig = {
           name: 'ease',
           type: 'select',
           label: 'Лёгкость отёла',
-          options: [...CALVING_EASE],
+          options: CALVING_EASE.map((e) => ({ value: e.value, label: e.label })),
         },
         { name: 'calfWeight', type: 'number', label: 'Вес телёнка, кг' },
+      ],
+    },
+    {
+      /*
+       * Три числа, а не одно поле «приплод».
+       *
+       * Реестр спрашивает их порознь, и порознь же их спрашивает жизнь:
+       * доля мертворождений — показатель, по которому судят о работе
+       * с отёлами, и вытащить её из слова «Мертворождение» в общем поле
+       * было нельзя. Двойня, у которой один телёнок родился мёртвым,
+       * прежде записывалась либо двойнёй, либо мертворождением —
+       * и оба ответа были неполными.
+       *
+       * Пусто — не ноль. Ноль означает «посчитали, и не родилось
+       * никого»; для отёла это неправда всегда, а для аборта числа
+       * не имеют смысла по существу.
+       */
+      type: 'row',
+      fields: [
+        { name: 'liveHeifers', type: 'number', label: 'Живых тёлочек', min: 0 },
+        { name: 'liveBulls', type: 'number', label: 'Живых бычков', min: 0 },
+        {
+          name: 'stillborn',
+          type: 'number',
+          label: 'Мертворождённых',
+          min: 0,
+          admin: { description: 'Включая нежизнеспособных' },
+        },
       ],
     },
     {

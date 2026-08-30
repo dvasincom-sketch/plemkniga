@@ -7,17 +7,23 @@ import {
   buildShows,
   buildDna,
   buildWeighings,
+  buildGrades,
+  buildCalvings,
   type Built,
   type ExportAnimal,
   type PedigreeSource,
   type ShowAnimal,
   type DnaAnimal,
   type WeighingRow,
+  type GradingAnimal,
+  type CalvingAnimal,
 } from '@/lib/fgias-export'
 import { buildMain, type MainAnimal } from '@/lib/fgias-main'
 import { fgiasExport } from '@/lib/fgias-exports'
 import { weighingSignUuid } from '@/lib/weighing'
 import { ISAG_LOCI, authMethodUuid, isagField, VERDICT_UUID } from '@/lib/isag'
+import { gradeUuid, RUSSIA_CODE } from '@/lib/grading'
+import { birthTypeOf, birthTypeUuid, calvingEaseUuid, calvingEventUuid } from '@/lib/calving'
 
 /**
  * Выгрузка в шаблоны ФГИАС ПР — из кабинета, кнопкой.
@@ -197,6 +203,128 @@ export async function GET(request: Request) {
       weighings: byAnimal.get(a.id as number) ?? [],
     }))
     built = buildWeighings(rows)
+  } else if (spec.key === 'grades') {
+    /*
+     * Бонитировки лежат своей коллекцией. Оценщик читается связью,
+     * и организации берутся все, а не только своя: бонитировку часто
+     * проводит сторонний центр.
+     *
+     * Страна регистрации — ключ России из справочника `countries`,
+     * который загружается `npm run sync:fgias-geo`. Не константой:
+     * страна одна и та же, а ключ у реестра свой и меняется вместе
+     * с версией справочника. Если справочник не загружен, колонка
+     * уйдёт пустой — и это видно в файле, в отличие от подставленного
+     * наугад ключа.
+     */
+    const [orgs, russia, byAnimal] = await Promise.all([
+      payload
+        .find({ collection: 'organizations', limit: 0, pagination: false, depth: 0, overrideAccess: true })
+        .then((res) => new Map((res.docs as unknown as Row[]).map((o) => [o.id as number, o]))),
+      payload
+        .find({
+          collection: 'countries',
+          where: { code: { equals: RUSSIA_CODE } },
+          limit: 1,
+          depth: 0,
+          overrideAccess: true,
+        })
+        .then((res) => txt((res.docs as unknown as Row[])[0]?.fgiasUuid)),
+      (async () => {
+        const map = new Map<number, Row[]>()
+        for (let page = 1; ; page++) {
+          const res = await payload.find({
+            collection: 'gradings',
+            where: { animal: { in: herd.map((a) => a.id as number) } },
+            limit: 500,
+            page,
+            sort: 'id',
+            depth: 0,
+            overrideAccess: true,
+          })
+          for (const g of res.docs as unknown as Row[]) {
+            const id = rel(g.animal)
+            if (id === null) continue
+            const list = map.get(id) ?? []
+            list.push(g)
+            map.set(id, list)
+          }
+          if (!res.hasNextPage) break
+        }
+        return map
+      })(),
+    ])
+
+    const rows: GradingAnimal[] = herd.map((a) => ({
+      identNumber: String(a.identNumber ?? ''),
+      accountingId: txt(a.uuid),
+      baseUuid: txt((a.fgias as Row | undefined)?.baseUuid),
+      gradings: (byAnimal.get(a.id as number) ?? []).map((g) => {
+        const org = orgs.get(rel(g.assessorOrg) ?? -1)
+        const inn = org ? txt(org.inn) : null
+        return {
+          date: txt(g.date),
+          gradeUuid: gradeUuid(txt(g.grade)) ?? null,
+          score: typeof g.score === 'number' ? g.score : null,
+          assessor: org
+            ? {
+                name: txt(org.name),
+                inn,
+                kpp: txt(org.kpp),
+                /* ИНН выдаёт Россия — организация с ИНН в ней и зарегистрирована. */
+                countryUuid: inn ? russia : null,
+              }
+            : null,
+        }
+      }),
+    }))
+    built = buildGrades(rows)
+  } else if (spec.key === 'calvings') {
+    /*
+     * Тип рождения берётся из поля, а если его не заполнили — считается
+     * по числам приплода. Второе не догадка: сумма плодов и есть то,
+     * что спрашивает колонка, и «один» при одном телёнке верно всегда.
+     */
+    const byAnimal = new Map<number, CalvingAnimal['calvings']>()
+    for (let page = 1; ; page++) {
+      const res = await payload.find({
+        collection: 'calvings',
+        where: { animal: { in: herd.map((a) => a.id as number) } },
+        limit: 500,
+        page,
+        sort: 'id',
+        depth: 0,
+        overrideAccess: true,
+      })
+      for (const c of res.docs as unknown as Row[]) {
+        const id = rel(c.animal)
+        if (id === null) continue
+        const num = (v: unknown) => (typeof v === 'number' ? v : null)
+        const counts = {
+          liveHeifers: num(c.liveHeifers),
+          liveBulls: num(c.liveBulls),
+          stillborn: num(c.stillborn),
+        }
+        const list = byAnimal.get(id) ?? []
+        list.push({
+          date: txt(c.date),
+          eventUuid: calvingEventUuid(txt(c.eventType) ?? 'calving') ?? null,
+          birthTypeUuid: birthTypeUuid(txt(c.result) ?? birthTypeOf(counts)) ?? null,
+          easeUuid: calvingEaseUuid(txt(c.ease)) ?? null,
+          number: num(c.number),
+          ...counts,
+        })
+        byAnimal.set(id, list)
+      }
+      if (!res.hasNextPage) break
+    }
+
+    const rows: CalvingAnimal[] = herd.map((a) => ({
+      identNumber: String(a.identNumber ?? ''),
+      accountingId: txt(a.uuid),
+      baseUuid: txt((a.fgias as Row | undefined)?.baseUuid),
+      calvings: byAnimal.get(a.id as number) ?? [],
+    }))
+    built = buildCalvings(rows)
   } else if (spec.key === 'shows') {
     const rows: ShowAnimal[] = herd.map((a) => ({
       identNumber: String(a.identNumber ?? ''),

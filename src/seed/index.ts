@@ -1210,10 +1210,22 @@ const run = async () => {
   }
 
   // Отёлы — таблица межотельного цикла
+  /*
+   * «Результат» — тип рождения, а пол приплода стоит числами рядом:
+   * реестр спрашивает их порознь, и книга с некоторых пор тоже.
+   */
   const calvingPlan = [
-    { number: 1, year: 2019, result: 'heifer', milkingDays: 300, ease: 'easy' },
-    { number: 2, year: 2020, result: 'bull', milkingDays: 305, ease: 'assisted' },
-    { number: 3, year: 2021, result: 'twins', milkingDays: 298, ease: 'hard' },
+    { number: 1, year: 2019, result: 'one', heifers: 1, bulls: 0, milkingDays: 300, ease: 'easy' },
+    {
+      number: 2,
+      year: 2020,
+      result: 'one',
+      heifers: 0,
+      bulls: 1,
+      milkingDays: 305,
+      ease: 'assisted',
+    },
+    { number: 3, year: 2021, result: 'twins', heifers: 1, bulls: 1, milkingDays: 298, ease: 'hard' },
   ] as const
 
   for (const c of calvingPlan) {
@@ -1225,6 +1237,9 @@ const run = async () => {
         number: c.number,
         date: new Date(c.year, 0, 1).toISOString(),
         result: c.result,
+        liveHeifers: c.heifers,
+        liveBulls: c.bulls,
+        stillborn: 0,
         milkingDays: c.milkingDays,
         dryOffDate: new Date(c.year, 8 + (c.number - 1), 1).toISOString(),
         ease: c.ease,

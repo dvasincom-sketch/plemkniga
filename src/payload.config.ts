@@ -21,6 +21,7 @@ import { Media } from '@/collections/Media'
 import { Inseminations } from '@/collections/Inseminations'
 import { MilkTests } from '@/collections/MilkTests'
 import { Weighings } from '@/collections/Weighings'
+import { Gradings } from '@/collections/Gradings'
 import { HealthEvents } from '@/collections/HealthEvents'
 import { Calvings } from '@/collections/Calvings'
 import { DataSubmissions } from '@/collections/DataSubmissions'
@@ -82,6 +83,7 @@ export default buildConfig({
     HealthEvents,
     AnimalEvaluations,
     AnimalExteriors,
+    Gradings,
     AnimalRevisions,
     AnimalRemovals,
     DataSubmissions,

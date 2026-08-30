@@ -1462,7 +1462,9 @@ async function importEvents(
         ? 'inseminations'
         : ds.key === 'weighings'
           ? 'weighings'
-          : 'milk-tests'
+          : ds.key === 'gradings'
+            ? 'gradings'
+            : 'milk-tests'
 
   /* --- Заслон от повторной заливки того же файла --- */
 
@@ -1610,10 +1612,21 @@ async function importEvents(
         skip(line, 'Отёл записывается корове, а не быку', rawIdent)
         continue
       }
+      /*
+       * Номер увеличивает только отёл. Аборт и запуск относятся к той
+       * лактации, которая уже идёт: дать им следующий номер значило бы
+       * записать в книгу отёл, которого не было, — а от номера отёла
+       * тянется вся хронология воспроизводства.
+       *
+       * Пустой тип события читается как отёл: так же его читает и база,
+       * и так было в книге до того, как тип завёлся.
+       */
+      const isCalving = !data.eventType || data.eventType === 'calving'
       if (typeof data.number !== 'number') {
-        const next = (nextCalving.get(animal.id) ?? 0) + 1
+        const done = nextCalving.get(animal.id) ?? 0
+        const next = isCalving ? done + 1 : Math.max(done, 1)
         data.number = next
-        nextCalving.set(animal.id, next)
+        nextCalving.set(animal.id, isCalving ? next : done)
       }
     }
 

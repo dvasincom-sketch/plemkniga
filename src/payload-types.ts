@@ -79,6 +79,7 @@ export interface Config {
     'health-events': HealthEvent;
     'animal-evaluations': AnimalEvaluation;
     'animal-exteriors': AnimalExterior;
+    gradings: Grading;
     'animal-revisions': AnimalRevision;
     'animal-removals': AnimalRemoval;
     'data-submissions': DataSubmission;
@@ -139,6 +140,7 @@ export interface Config {
     'health-events': HealthEventsSelect<false> | HealthEventsSelect<true>;
     'animal-evaluations': AnimalEvaluationsSelect<false> | AnimalEvaluationsSelect<true>;
     'animal-exteriors': AnimalExteriorsSelect<false> | AnimalExteriorsSelect<true>;
+    gradings: GradingsSelect<false> | GradingsSelect<true>;
     'animal-revisions': AnimalRevisionsSelect<false> | AnimalRevisionsSelect<true>;
     'animal-removals': AnimalRemovalsSelect<false> | AnimalRemovalsSelect<true>;
     'data-submissions': DataSubmissionsSelect<false> | DataSubmissionsSelect<true>;
@@ -385,6 +387,10 @@ export interface Animal {
    * По инструкции бонитировки, из племенных документов
    */
   grade?: ('eliteRecord' | 'elite' | 'first' | 'second' | 'outOfClass') | null;
+  /**
+   * Проставляется бонитировкой
+   */
+  gradeDate?: string | null;
   birthDate?: string | null;
   breed?: (number | null) | Breed;
   breedType?: (number | null) | BreedType;
@@ -1289,11 +1295,21 @@ export interface Calving {
   animal: number | Animal;
   number: number;
   date: string;
-  result?: ('heifer' | 'bull' | 'twins' | 'stillborn' | 'abortion') | null;
+  eventType?: ('calving' | 'abortion' | 'dryOff') | null;
+  /**
+   * Сколько плодов было; пол — числами ниже
+   */
+  result?: ('one' | 'twins' | 'triplets' | 'multiple' | 'multipleMixed' | 'unknown') | null;
   milkingDays?: number | null;
   dryOffDate?: string | null;
   ease?: ('easy' | 'assisted' | 'hard') | null;
   calfWeight?: number | null;
+  liveHeifers?: number | null;
+  liveBulls?: number | null;
+  /**
+   * Включая нежизнеспособных
+   */
+  stillborn?: number | null;
   calves?: (number | Animal)[] | null;
   comment?: string | null;
   updatedAt: string;
@@ -1600,6 +1616,31 @@ export interface AnimalExterior {
   bodyComposite?: number | null;
   udderComposite?: number | null;
   legsComposite?: number | null;
+  note?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "gradings".
+ */
+export interface Grading {
+  id: number;
+  /**
+   * Проставляется автоматически, нужен для доступа прежнего владельца
+   */
+  ownerOrg?: (number | null) | Organization;
+  animal: number | Animal;
+  date: string;
+  grade: 'eliteRecord' | 'elite' | 'first' | 'second' | 'outOfClass';
+  /**
+   * Сумма баллов по инструкции; в свидетельстве бывает не всегда
+   */
+  score?: number | null;
+  /**
+   * Кто провёл бонитировку. ФГИАС ПР требует ИНН и КПП
+   */
+  assessorOrg?: (number | null) | Organization;
   note?: string | null;
   updatedAt: string;
   createdAt: string;
@@ -2446,6 +2487,10 @@ export interface PayloadLockedDocument {
         value: number | AnimalExterior;
       } | null)
     | ({
+        relationTo: 'gradings';
+        value: number | Grading;
+      } | null)
+    | ({
         relationTo: 'animal-revisions';
         value: number | AnimalRevision;
       } | null)
@@ -2768,6 +2813,7 @@ export interface AnimalsSelect<T extends boolean = true> {
   ageGroup?: T;
   ageGroupDate?: T;
   grade?: T;
+  gradeDate?: T;
   birthDate?: T;
   breed?: T;
   breedType?: T;
@@ -3131,11 +3177,15 @@ export interface CalvingsSelect<T extends boolean = true> {
   animal?: T;
   number?: T;
   date?: T;
+  eventType?: T;
   result?: T;
   milkingDays?: T;
   dryOffDate?: T;
   ease?: T;
   calfWeight?: T;
+  liveHeifers?: T;
+  liveBulls?: T;
+  stillborn?: T;
   calves?: T;
   comment?: T;
   updatedAt?: T;
@@ -3290,6 +3340,21 @@ export interface AnimalExteriorsSelect<T extends boolean = true> {
   bodyComposite?: T;
   udderComposite?: T;
   legsComposite?: T;
+  note?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "gradings_select".
+ */
+export interface GradingsSelect<T extends boolean = true> {
+  ownerOrg?: T;
+  animal?: T;
+  date?: T;
+  grade?: T;
+  score?: T;
+  assessorOrg?: T;
   note?: T;
   updatedAt?: T;
   createdAt?: T;
