@@ -25,7 +25,7 @@ import { CertificateSection } from '@/components/CertificateSection'
 import { certificateReadiness } from '@/lib/certification'
 import { ClosedAnimal } from '@/components/ClosedAnimal'
 import { AccessRequestForm } from '@/components/AccessRequestForm'
-import { RecordPanel } from '@/components/RecordPanel'
+import { RecordActions } from '@/components/RecordActions'
 import { VisibilityForm } from '@/components/VisibilityForm'
 import { ArchiveBlock } from '@/components/ArchiveBlock'
 import { ARCHIVE_RETENTION_DAYS } from '@/lib/archive-retention'
@@ -1027,7 +1027,27 @@ export default async function AnimalPage({
 
         <div>
           <div className="min-w-0">
-        <Breadcrumbs items={crumbs} />
+        {/*
+           Действия над записью — в правом конце строки пути.
+
+           Место выбрано по признаку «никого не подвинет»: крошки прижаты
+           влево, справа пусто, высота строки уже занята. Шапка карточки
+           от этого не меняется вовсе — у владельца и у чужого она одна
+           и та же. Разбор — `RecordActions`.
+        */}
+        <div className="mb-5 flex flex-wrap items-start justify-between gap-x-8 gap-y-2">
+          <Breadcrumbs items={crumbs} className="mb-0" />
+
+          {isMine && (
+            <RecordActions
+              animalId={animal.id as number}
+              publicVisible={Boolean(animal.publicVisible)}
+              publicDetails={Boolean(animal.publicDetails)}
+              archived={Boolean(animal.archived)}
+              open={manage}
+            />
+          )}
+        </div>
 
         {/* ------------------------------ Шапка ------------------------------ */}
         <section
@@ -1125,41 +1145,13 @@ export default async function AnimalPage({
             )}
 
             {/*
-               Знака публичности здесь нет намеренно.
-               
-               Первая редакция ставила его рядом с достоверностью — и тем
-               нарушала правило, ради которого полоса и заводилась: шапку
-               видят все, и меняться в зависимости от смотрящего она
-               не должна. Вдобавок состояние оказывалось написано дважды
-               в одном экране, в двух сантиметрах друг от друга.
-               
-               Состояние теперь живёт там же, где управление: в полосе
-               владельца над меню разделов. Чужому по-прежнему отвечает
-               плашка «Доступ закрыт владельцем» — она о другом, о том,
-               почему он не видит подробностей.
+               Знака публичности здесь нет намеренно: шапка обязана
+               выглядеть одинаково у владельца и у чужого. Состояние
+               записи и действия над ней стоят строкой выше, в правом
+               конце пути, — там они никого не двигают.
             */}
             <TrustBadge level={animal.trustLevel} onDark={onDark} />
           </div>
-
-          {/*
-             Третья колонка шапки — управление своей записью.
-
-             Шапка отвечает на три вопроса подряд: кто это животное,
-             что известно о записи, что я могу с ней сделать. Первые два
-             видны всем, третий только владельцу — и это не нарушение
-             единого каркаса, а его продолжение: колонка либо есть, либо
-             её нет, а две первые не съезжают. Разбор — `RecordPanel`.
-          */}
-          {isMine && (
-            <RecordPanel
-              animalId={animal.id as number}
-              publicVisible={Boolean(animal.publicVisible)}
-              publicDetails={Boolean(animal.publicDetails)}
-              archived={Boolean(animal.archived)}
-              open={manage}
-              onDark={onDark}
-            />
-          )}
         </section>
 
 

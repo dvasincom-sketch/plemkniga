@@ -8,11 +8,18 @@ import Link from 'next/link'
  */
 export function Breadcrumbs({
   items,
+  className = 'mb-5',
 }: {
   items: { label: string; href?: string }[]
+  /**
+   * Внешний отступ задаётся снаружи там, где путь стоит в одном ряду
+   * с чем-то ещё: в карточке животного справа от него живут действия
+   * над записью, и отступ там принадлежит ряду, а не самому пути.
+   */
+  className?: string
 }) {
   return (
-    <nav aria-label="Навигационная цепочка" className="mb-5">
+    <nav aria-label="Навигационная цепочка" className={className}>
       <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-ink-500">
         {items.map((item, i) => {
           const last = i === items.length - 1
