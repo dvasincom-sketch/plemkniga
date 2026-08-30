@@ -14,6 +14,7 @@ import {
   type ExportAnimal,
   type PedigreeSource,
 } from '@/lib/fgias-export'
+import { MAIN_ESSENTIAL, buildMain, type MainAnimal, type MainBuilt } from '@/lib/fgias-main'
 
 /**
  * Выгрузка книги в шаблоны ФГИАС ПР — «Лактация» и «Родословная».
@@ -33,6 +34,7 @@ import {
  *   npm run export:fgias                        — всё стадо
  *   npm run export:fgias -- --owner 12          — одно хозяйство
  *   npm run export:fgias -- --priznak нет       — не проставлять «Признак»
+ *   npm run export:fgias -- --strogo            — придержать неполные «Основные сведения»
  *
  * ## Что уедет пустым, и почему это правильно
  *
@@ -62,6 +64,7 @@ const arg = (name: string): string | undefined => {
 
 const DIR = 'data/vygruzka-fgias'
 const SIGNUM = (arg('priznak') ?? 'да').toLowerCase() !== 'нет'
+const STRICT = process.argv.includes('--strogo')
 const OWNER = arg('owner') ? Number(arg('owner')) : undefined
 
 type Row = Record<string, unknown>
@@ -169,6 +172,68 @@ const forecast = (label: string, built: Built) => {
   }
 }
 
+/**
+ * «Основные сведения» отчитываются заполненностью колонок, а не придержанием.
+ *
+ * Причина разъяснена в `lib/fgias-main.ts`: придержать строку здесь значит
+ * не получить по ней номер, то есть заморозить животное во всей выгрузке.
+ * Поэтому уезжает всё, а человек до отправки видит, где у него тонко.
+ *
+ * Колонки печатаются от пустых к полным. Полные читать незачем — они
+ * и так уедут; вопрос у читателя ровно про пустые.
+ */
+const fillReport = (built: MainBuilt) => {
+  console.log(`\n  Уедет строк: ${built.rows.length} из ${built.total}`)
+  if (built.held.length) {
+    console.log(`  Придержано (строгий режим): ${built.held.length}`)
+    for (const s2 of holdSummary(built.held)) {
+      console.log(`    ${String(s2.count).padStart(6)}  ${s2.why}`)
+    }
+  }
+
+  const rows = [...built.filled.entries()]
+    .map(([title, n]) => ({ title, n, share: built.rows.length ? n / built.rows.length : 0 }))
+    .sort((a, b) => a.share - b.share)
+
+  const empty = rows.filter((r) => r.n === 0)
+  const partial = rows.filter((r) => r.n > 0 && r.share < 1)
+  const full = rows.filter((r) => r.share >= 1)
+
+  console.log(
+    `\n  Колонок: ${rows.length} — заполнены у всех ${full.length},` +
+      ` частично ${partial.length}, пусты ${empty.length}`,
+  )
+
+  if (partial.length) {
+    console.log('\n  Заполнены не у всех — вот где тонко:')
+    for (const r of partial) {
+      console.log(
+        `    ${String(Math.round(r.share * 100)).padStart(3)}%  ${r.title.replace(/\s+/g, ' ')}` +
+          `   (${r.n} из ${built.rows.length})`,
+      )
+    }
+  }
+
+  if (empty.length) {
+    console.log('\n  Пусты у всех — книга этого не ведёт или нужен ключ реестра:')
+    for (const r of empty) console.log(`    ${r.title.replace(/\s+/g, ' ')}`)
+  }
+
+  /*
+   * Существенные поля названы отдельно и последними — это то, из-за чего
+   * реестр вероятнее всего откажет. Слово «вероятнее» здесь честное:
+   * что он требует на самом деле, скажет только первая отправка.
+   */
+  const weak = MAIN_ESSENTIAL.map((t) => ({ t, n: built.filled.get(t) ?? 0 })).filter(
+    (r) => r.n < built.rows.length,
+  )
+  if (weak.length) {
+    console.log('\n  ⚠ Из полей, без которых строка бессмысленна, заполнены не все:')
+    for (const w of weak) console.log(`    ${w.t}: ${w.n} из ${built.rows.length}`)
+    console.log('    Прогнать с ключом --strogo, чтобы такие строки не уехали.')
+  }
+}
+
 const write = (name: string, built: Built, sheet: string) => {
   const buf = toXlsx(
     built.columns.map((c) => ({
@@ -231,6 +296,88 @@ async function main() {
         '    Файлы всё равно соберутся — с шапкой и без строк, чтобы было видно устройство.',
     )
   }
+
+  /* ------------------------ Основные сведения ------------------------ */
+
+  /*
+   * Ключи реестра из наших справочников — одной выборкой на справочник,
+   * а не обращением на каждое животное. Пять справочников против полутора
+   * тысяч животных: разница между пятью запросами и семью тысячами.
+   */
+  const keyMap = async (collection: string): Promise<Map<number, string>> => {
+    const res = await payload.find({
+      collection: collection as never,
+      limit: 0,
+      pagination: false,
+      depth: 0,
+      overrideAccess: true,
+    })
+    const out = new Map<number, string>()
+    for (const d of res.docs as unknown as Row[]) {
+      const uuid = text(d.fgiasUuid)
+      if (uuid) out.set(d.id as number, uuid)
+    }
+    return out
+  }
+
+  const [breeds, lines, colors, purposes, orgs] = await Promise.all([
+    keyMap('breeds'),
+    keyMap('lines'),
+    keyMap('coat-colors'),
+    keyMap('animal-purposes'),
+    payload
+      .find({ collection: 'organizations', limit: 0, pagination: false, depth: 0, overrideAccess: true })
+      .then((r) => new Map((r.docs as unknown as Row[]).map((o) => [o.id as number, o]))),
+  ])
+
+  const keysReady = breeds.size + lines.size + colors.size + purposes.size
+  if (keysReady === 0) {
+    /*
+     * Без ключей справочника порода уедет пустой ячейкой, и реестр
+     * её не примет. Сказать это надо раньше отчёта: иначе человек увидит
+     * «порода: 0%» и решит, что порода не заполнена в книге.
+     */
+    console.log(
+      '\n  ⚠ Ни у одной записи справочников не проставлен ключ ФГИАС.\n' +
+        '    Порода, линия, масть и назначение уедут пустыми — реестр их не примет.\n' +
+        '    Сначала: npm run sync:fgias-nsi        (посмотреть расхождения)\n' +
+        '             npm run sync:fgias-nsi -- --apply  (проставить однозначные)',
+    )
+  }
+
+  const forMain: MainAnimal[] = herd.map((a) => {
+    const fgias = (a.fgias as Row | undefined) ?? {}
+    const alt = (a.altIds as Row | undefined) ?? {}
+    const org = orgs.get(relId(a.owner) ?? -1)
+    return {
+      identNumber: String(a.identNumber ?? ''),
+      accountingId: text(a.uuid),
+      baseUuid: text(fgias.baseUuid),
+      registrationUuid: text(fgias.registrationUuid),
+      unsm: text(fgias.unsm),
+      name: text(a.name),
+      birthDate: text(a.birthDate),
+      sex: text(a.sex),
+      ageGroup: text(a.ageGroup),
+      ageGroupDate: text(a.ageGroupDate),
+      bloodPercent: typeof a.bloodPercent === 'number' ? a.bloodPercent : null,
+      inventoryNumber: text(alt.inventoryNumber),
+      breedUuid: breeds.get(relId(a.breed) ?? -1) ?? null,
+      lineUuid: lines.get(relId(a.line) ?? -1) ?? null,
+      coatColorUuid: colors.get(relId(a.coatColor) ?? -1) ?? null,
+      purposeUuid: purposes.get(relId(a.purpose) ?? -1) ?? null,
+      owner: org
+        ? { name: text(org.name), inn: text(org.inn), kpp: text(org.kpp), ogrn: text(org.ogrn) }
+        : null,
+    }
+  })
+
+  const main = buildMain(forMain, { strict: STRICT })
+
+  console.log(`\n${'─'.repeat(76)}`)
+  console.log('Основные сведения — с этого файла начинается всё остальное')
+  fillReport(main)
+  write('КРС_Основные_сведения.xlsx', { ...main, rounded: 0 } as Built, 'Пример')
 
   /* ---------------------------- Лактации ---------------------------- */
 

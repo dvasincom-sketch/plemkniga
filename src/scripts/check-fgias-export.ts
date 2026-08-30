@@ -23,6 +23,13 @@ import {
   type ExportAnimal,
   type PedigreeSource,
 } from '@/lib/fgias-export'
+import {
+  buildMain,
+  fgiasAgeGroup,
+  FGIAS_AGE_GROUP,
+  MAIN_COLUMNS,
+  MAIN_ESSENTIAL,
+} from '@/lib/fgias-main'
 
 /**
  * Что уедет во ФГИАС ПР, а что придержано и почему.
@@ -552,6 +559,29 @@ function templates() {
    */
   const osnovnye = join(DIR, 'КРС_Основные_сведения_v.2.1_2.6.0.xlsx')
   if (existsSync(osnovnye)) {
+    const read0 = readSpreadsheet(new Uint8Array(readFileSync(osnovnye)))
+    if (!('error' in read0)) {
+      /*
+       * Сорок шесть заголовков против сорока шести наших. Часть из них
+       * в файле записана в две строки внутри ячейки, поэтому сравнение
+       * идёт по приведённому виду — иначе не сойдётся ни один такой.
+       */
+      const theirs = (read0.rows[0] ?? []).map((t) => t.trim()).filter((t) => t !== '')
+      check(
+        MAIN_COLUMNS.length === theirs.length,
+        `Основные сведения: колонок столько же (${theirs.length})`,
+        `у нас ${MAIN_COLUMNS.length}`,
+      )
+      const wrong = theirs
+        .map((their, i) => ({ i, their, ours: MAIN_COLUMNS[i]?.title }))
+        .filter((p) => headerKey(p.ours ?? '') !== headerKey(p.their))
+      check(
+        wrong.length === 0,
+        'Основные сведения: все сорок шесть заголовков сходятся',
+        wrong.map((w) => `#${w.i + 1} «${w.their}» ≠ «${w.ours ?? '—'}»`).join(' | '),
+      )
+    }
+
     checked += 1
     const read = readSpreadsheet(new Uint8Array(readFileSync(osnovnye)))
     if ('error' in read) {
@@ -695,6 +725,104 @@ function forecastKeys() {
   check(source[0]!.baseUuid === null, 'исходные записи прогноз не трогает', String(source[0]!.baseUuid))
 }
 
+/**
+ * Половозрастная группа: три наши схлопываются в одну, а одна требует пола.
+ */
+function ageGroups() {
+  console.log('\nОсновные сведения: половозрастная группа против реестра\n')
+
+  check(fgiasAgeGroup('bull') === FGIAS_AGE_GROUP.bull, 'бык-производитель → Бык')
+  check(fgiasAgeGroup('heifer') === FGIAS_AGE_GROUP.heifer, 'тёлка → Телка')
+
+  /*
+   * Первотёлка, вторая и третья лактации — для реестра все просто
+   * «Корова». Различение по лактациям наше и уезжает своим шаблоном.
+   */
+  check(
+    fgiasAgeGroup('firstCalf') === FGIAS_AGE_GROUP.cow &&
+      fgiasAgeGroup('cow2') === FGIAS_AGE_GROUP.cow &&
+      fgiasAgeGroup('cow3') === FGIAS_AGE_GROUP.cow,
+    'первотёлка, 2 лакт. и 3+ лакт. — все три в «Корову»',
+  )
+
+  check(fgiasAgeGroup('calf', 'male') === FGIAS_AGE_GROUP.bullCalf, 'телёнок-самец → Бычок')
+  check(fgiasAgeGroup('calf', 'female') === FGIAS_AGE_GROUP.heifer, 'телёнок-самка → Телка')
+  /*
+   * У реестра есть значение «Не определено», и подставлять его здесь
+   * было бы ложью: оно значит «посмотрели и не поняли», а мы
+   * не посмотрели.
+   */
+  check(fgiasAgeGroup('calf', null) === undefined, 'телёнок без пола не раскладывается наугад')
+  check(fgiasAgeGroup(null) === undefined, 'пустая группа не раскладывается')
+
+  const groups = new Set(Object.values(FGIAS_AGE_GROUP))
+  check(groups.size === 4, 'четыре различных ключа реестра, а не шесть', String(groups.size))
+}
+
+/**
+ * Сборка «Основных сведений»: длина строки, порядок и два режима.
+ */
+function mainSheet() {
+  console.log('\nОсновные сведения: сборка строки\n')
+
+  const animal = {
+    identNumber: 'RU0000000070028',
+    accountingId: '1a421c44-36d2-41c3-881e-38bf83c4f756',
+    name: 'Зорька',
+    birthDate: '2021-03-15T00:00:00.000Z',
+    sex: 'female',
+    ageGroup: 'cow2',
+    ageGroupDate: '2024-03-15T00:00:00.000Z',
+    bloodPercent: 87.5,
+    breedUuid: '1bd6b3f1-648a-453b-8529-f2907442d487',
+    owner: { name: 'ООО «Пример»', inn: '3924003136', kpp: '392401001' },
+  }
+
+  const built = buildMain([animal])
+  check(built.rows.length === 1, 'строка собралась')
+
+  const row = built.rows[0]!
+  check(
+    row.length === MAIN_COLUMNS.length,
+    `в строке ${MAIN_COLUMNS.length} значений — ровно по числу колонок`,
+    String(row.length),
+  )
+
+  const at = (title: string) => row[MAIN_COLUMNS.findIndex((c) => c.title === title)]
+  check(at('Идентификатор учётной системы') === animal.accountingId, 'наш ключ стоит первым')
+  check(at('Базовый номер ФГИАС ПР') === '', 'базовый номер пуст — его выдаёт реестр')
+  check(at('УНЖ (Уникальный номер животного)') === 'RU0000000070028', 'УНЖ на месте')
+  check(at('Половозрастная группа') === FGIAS_AGE_GROUP.cow, 'корова 2 лакт. → Корова')
+  check(at('Дата рождения') === '2021-03-15', 'дата рождения в виде ГГГГ-ММ-ДД', String(at('Дата рождения')))
+  check(at('Кровность, %') === 87.5, 'кровность числом, а не строкой', String(at('Кровность, %')))
+  check(at('ИНН собственника') === '3924003136', 'ИНН собственника подставлен')
+  check(at('Дата импорта') === '', 'то, чего книга не ведёт, уходит пустым')
+
+  /*
+   * По умолчанию уезжает всё: придержать строку здесь значит не получить
+   * по ней номер, то есть заморозить животное во всей выгрузке навсегда.
+   */
+  console.log('\nОсновные сведения: два режима\n')
+
+  const thin = { identNumber: 'RU-БЕЗ-КЛИЧКИ', accountingId: 'k', ageGroup: 'cow2' }
+  const loose = buildMain([thin])
+  check(loose.rows.length === 1, 'без клички строка всё равно уезжает — режим по умолчанию')
+  check(loose.held.length === 0, 'и ничего не придержано')
+
+  const strict = buildMain([thin], { strict: true })
+  check(strict.rows.length === 0, 'в строгом режиме — придержана')
+  check(strict.held[0]?.why === 'Кличка', 'и причина названа заголовком колонки', String(strict.held[0]?.why))
+
+  /* Заполненность считается по колонкам — это и есть отчёт до отправки. */
+  check(built.filled.get('Кличка') === 1, 'заполненность колонки посчитана')
+  check(built.filled.get('Дата импорта') === 0, 'незаполненная колонка честно нулевая')
+
+  check(
+    MAIN_ESSENTIAL.every((t) => MAIN_COLUMNS.some((c) => c.title === t)),
+    'все существенные поля есть среди колонок — опечатка в названии не пройдёт',
+  )
+}
+
 /* ------------------------------------------------------------------ */
 
 columns()
@@ -702,6 +830,8 @@ values()
 lactations()
 pedigree()
 summary()
+ageGroups()
+mainSheet()
 templates()
 roundtrip()
 forecastKeys()
