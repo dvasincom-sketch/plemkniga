@@ -13,6 +13,7 @@ import {
   type Dataset,
 } from '@/lib/import-format'
 import { parseBoolean, parseDate, parseNumber } from '@/lib/import-values'
+import { ISAG_LOCI, isagField } from '@/lib/isag'
 import { fgiasTemplateOf } from '@/lib/fgias-export'
 import { duplicateIdents, isMangledNumber, isServiceRow, parseSex } from '@/lib/import-rows'
 import { IDENT_FIELD_LABEL, IDENT_VALUES_SQL, identCore } from '@/lib/animal-id'
@@ -696,49 +697,7 @@ async function importAnimals(
    * Пять тысяч строк — это пять тысяч запросов «найди породу по названию»,
    * и разбор файла упёрся бы не в разбор, а в справочник.
    */
-  /*
-   * Справочники грузятся по списку колонок, а не поимённо.
-   *
-   * Здесь стояло `header.includes('breed')` и один запрос к породам —
-   * порода была единственным справочным видом. С появлением линии, масти
-   * и назначения перечислять их тут значило бы писать одно и то же четыре
-   * раза и на пятый разойтись: колонка есть, а справочник к ней забыли
-   * загрузить, и вся колонка молча уходит в «не нашлись».
-   *
-   * Теперь список коллекций собирается из самого набора: какие справочные
-   * колонки в файле есть, те справочники и читаются.
-   */
-  const wanted = [
-    ...new Set(
-      cols
-        .filter((c) => c.kind === 'dictionary' && c.collection && header.includes(c.key))
-        .map((c) => c.collection as string),
-    ),
-  ]
-
-  const dictionaries = new Map<string, Map<string, number>>()
-  await Promise.all(
-    wanted.map(async (slug) => {
-      const res = await payload.find({
-        collection: slug as never,
-        limit: 0,
-        pagination: false,
-        depth: 0,
-        overrideAccess: true,
-      })
-      const map = new Map<string, number>()
-      for (const d of res.docs as unknown as { id: number; name: string; fgiasUuid?: string | null }[]) {
-        map.set(norm(d.name), d.id)
-        /*
-         * Ключ реестра ложится в ту же карту: в файлах ФГИАС значение
-         * записано ключом, а не словом. Столкнуться приведённое название
-         * и uuid не могут ни при каких условиях.
-         */
-        if (d.fgiasUuid) map.set(norm(d.fgiasUuid), d.id)
-      }
-      dictionaries.set(slug, map)
-    }),
-  )
+  const dictionaries = await loadDictionaries(payload, ds, header)
 
   const [herdList] = await Promise.all([
     header.includes('herd')
@@ -1158,15 +1117,121 @@ async function importAnimals(
 /* ------------------------------------------------------------------ */
 
 /**
- * Выставки: строки дописываются в массив карточки, а не создают записи.
+ * Справочники под колонки набора — один запрос на коллекцию.
+ *
+ * ## Почему по списку колонок, а не поимённо
+ *
+ * Здесь стояло `header.includes('breed')` и один запрос к породам —
+ * порода была единственным справочным видом. С появлением линии, масти
+ * и назначения перечислять их значило бы писать одно и то же четыре
+ * раза и на пятый разойтись: колонка есть, а справочник к ней забыли
+ * загрузить, и вся колонка молча уходит в «не нашлись».
+ *
+ * ## Почему не на строку
+ *
+ * Пять тысяч строк — это пять тысяч запросов «найди породу по названию»,
+ * и разбор файла упёрся бы не в разбор, а в справочник.
+ *
+ * ## Почему функцией
+ *
+ * Разбор карточек и разбор массивов задают один и тот же вопрос,
+ * и второй писался бы копией. Копия разошлась бы на первой правке —
+ * например, когда в карту лёг ключ реестра рядом с названием.
+ */
+async function loadDictionaries(
+  payload: Awaited<ReturnType<typeof getClient>>,
+  ds: Dataset,
+  header: string[],
+): Promise<Map<string, Map<string, number>>> {
+  const wanted = [
+    ...new Set(
+      columnsOf(ds)
+        .filter((c) => c.kind === 'dictionary' && c.collection && header.includes(c.key))
+        .map((c) => c.collection as string),
+    ),
+  ]
+
+  const dictionaries = new Map<string, Map<string, number>>()
+  await Promise.all(
+    wanted.map(async (slug) => {
+      const res = await payload.find({
+        collection: slug as never,
+        limit: 0,
+        pagination: false,
+        depth: 0,
+        overrideAccess: true,
+      })
+      const map = new Map<string, number>()
+      for (const d of res.docs as unknown as { id: number; name: string; fgiasUuid?: string | null }[]) {
+        map.set(norm(d.name), d.id)
+        /*
+         * Ключ реестра ложится в ту же карту: в файлах ФГИАС значение
+         * записано ключом, а не словом. Столкнуться приведённое название
+         * и uuid не могут ни при каких условиях.
+         */
+        if (d.fgiasUuid) map.set(norm(d.fgiasUuid), d.id)
+      }
+      dictionaries.set(slug, map)
+    }),
+  )
+
+  return dictionaries
+}
+
+/** Приведение названия к сравнимому виду: регистр, пробелы, «ё». */
+const norm2 = (v: unknown) =>
+  String(v ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .replace(/\s+/g, ' ')
+
+/** Непустая строка или `undefined` — пустые поля в массив не пишутся. */
+const str = (v: unknown) => (String(v ?? '').trim() ? String(v).trim() : undefined)
+
+/**
+ * Что именно дописывается в массив карточки.
+ *
+ * Заведено описанием, а не вторым разбором. Выставки и ДНК-тесты лежат
+ * массивами внутри животного, и путь к ним один и тот же: прочитать
+ * стадо, сгруппировать строки по животному, дописать и записать массив
+ * целиком. Различаются они только именем поля, обязательными колонками
+ * и ключом повтора — то есть ровно тем, что здесь и перечислено.
+ *
+ * Копия этого разбора под ДНК разошлась бы с оригиналом на первой же
+ * правке: в ней сто шестьдесят строк, из которых на сам предмет
+ * приходится десять.
+ */
+type ArraySpec = {
+  /** Поле-массив в карточке животного. */
+  field: string
+  /** Как называется одна запись — идёт в причины отказа. */
+  what: string
+  /** Ключ повтора внутри животного. */
+  keyOf: (r: Record<string, unknown>) => string
+  /**
+   * Собрать запись из строки файла.
+   *
+   * Возвращает `{ error }`, если строке не хватает того, без чего
+   * запись бессмысленна. Что именно бессмысленно — свойство предмета,
+   * а не разбора: у выставки это название, у теста — дата.
+   */
+  build: (
+    get: (key: string) => string | undefined,
+    ctx: { orgByName: Map<string, number>; dicts: Map<string, Map<string, number>> },
+  ) => { row: Record<string, unknown> } | { error: string }
+}
+
+/**
+ * Массивы в карточке: строки дописываются, а не создают записи.
  *
  * ## Почему отдельный разбор
  *
  * Отёлы, осеменения и дойки — свои коллекции, и `importEvents` создаёт
- * в них строки. Выставки живут массивом внутри животного (решение №264:
- * их читают только в карточке, и коллекция дала бы вторую таблицу
- * и правила доступа ради данных, которые всегда запрашиваются вместе
- * с животным).
+ * в них строки. Выставки и ДНК-тесты живут массивами внутри животного
+ * (решение №264: их читают только в карточке, и коллекция дала бы
+ * вторую таблицу и правила доступа ради данных, которые всегда
+ * запрашиваются вместе с животным).
  *
  * Разница видна только здесь: вместо `create` нужен `update`, дописывающий
  * в массив. Для человека и для распознавания шапки это такой же файл
@@ -1174,9 +1239,9 @@ async function importAnimals(
  *
  * ## Повторная загрузка не задваивает
  *
- * Ключ повтора — животное, дата и название. Хозяйство перезаливает файл
+ * Ключ повтора свой у каждого набора. Хозяйство перезаливает файл
  * чаще, чем кажется: поправило одну строку и отправило целиком. Без
- * ключа второй заход удвоил бы все выставки, и заметить это можно было бы
+ * ключа второй заход удвоил бы все записи, и заметить это можно было бы
  * только в карточке глазами.
  *
  * Сравнение по приведённому названию (регистр, пробелы, «ё»), потому что
@@ -1190,13 +1255,97 @@ async function importAnimals(
  * одного и того же массива, причём вторая запись перетирала бы первую:
  * массив пишется целиком.
  */
-async function importShows(
+/**
+ * Описания наборов, которые дописываются в массив карточки.
+ *
+ * ## Ключ повтора у каждого свой, и это не мелочь
+ *
+ * У выставки — дата и название: одно мероприятие в один день. У теста —
+ * дата и номер сертификата: лаборатория может выдать в один день
+ * два разных исследования одному животному, и считать их повтором
+ * значило бы потерять половину генетики.
+ *
+ * Когда номера сертификата нет, в ключ идёт тип теста: два теста разных
+ * типов в один день — обычное дело, а два одинаковых без номеров —
+ * почти наверняка повторная заливка.
+ */
+const ARRAY_SPECS: Record<string, ArraySpec> = {
+  shows: {
+    field: 'shows',
+    what: 'такая выставка',
+    keyOf: (r) => `${String(r.date ?? '').slice(0, 10)}|${norm2(r.title)}`,
+    build: (get) => {
+      const date = parseDate(get('date'))
+      if (!date.value) return { error: date.problem ?? 'не разобрана дата мероприятия' }
+
+      const title = str(get('title'))
+      if (!title) return { error: 'не указано название мероприятия' }
+
+      return {
+        row: {
+          date: date.value,
+          title,
+          place: str(get('place')),
+          awards: str(get('awards')),
+          prize: str(get('prize')),
+        },
+      }
+    },
+  },
+
+  dnaTests: {
+    field: 'dnaTests',
+    what: 'такой тест',
+    keyOf: (r) =>
+      `${String(r.date ?? '').slice(0, 10)}|${norm2(r.certificateNumber) || `тип:${r.type ?? ''}`}`,
+    build: (get, { orgByName, dicts }) => {
+      const date = parseDate(get('date'))
+      if (!date.value) return { error: date.problem ?? 'не разобрана дата исследования' }
+
+      /*
+       * Лаборатория ищется среди заведённых организаций и не заводится.
+       * Не нашлась — поле остаётся пустым, а сама строка принимается:
+       * тест без названия лаборатории остаётся тестом, а вот двойник
+       * лаборатории в книге — это два разных ИНН в реестре.
+       */
+      const labName = str(get('laboratory'))
+      const lab = labName ? orgByName.get(norm2(labName)) : undefined
+
+      const type = str(get('type'))
+      const typeId = type ? dicts.get('dna-test-types')?.get(norm(type)) : undefined
+
+      const cert = parseDate(get('certificateDate'))
+      const snp = parseNumber(get('snpCount'))
+
+      const loci: Record<string, string | undefined> = {}
+      for (const l of ISAG_LOCI) loci[isagField(l)] = str(get(isagField(l)))
+
+      return {
+        row: {
+          date: date.value,
+          ...(typeId ? { type: typeId } : {}),
+          ...(lab ? { laboratory: lab } : {}),
+          verdict: str(get('verdict')),
+          authMethod: str(get('authMethod')),
+          certificateNumber: str(get('certificateNumber')),
+          certificateDate: cert.value,
+          snpCount: snp.value,
+          result: str(get('result')),
+          ...loci,
+        },
+      }
+    },
+  },
+}
+
+async function importArray(
   payload: Awaited<ReturnType<typeof getClient>>,
   user: Actor,
   orgId: number,
   ds: Dataset,
   rows: Row[],
   header: string[],
+  spec: ArraySpec,
 ) {
   const body = rows.slice(1)
 
@@ -1212,7 +1361,7 @@ async function importShows(
    * с той же причиной, что у прочих событий.
    */
   let mine: AnimalIndex = { byIdent: new Map(), byUuid: new Map(), byBaseUuid: new Map() }
-  const showsOf = new Map<number, unknown[]>()
+  const hadOf = new Map<number, unknown[]>()
   if (wanted.size) {
     const { docs } = await payload.find({
       collection: 'animals',
@@ -1223,20 +1372,45 @@ async function importShows(
     })
     mine = indexAnimals(docs as never)
     /*
-     * Уже записанные выставки нужны для проверки на повтор, и берутся
+     * Уже записанные строки нужны для проверки на повтор, и берутся
      * они тем же запросом: второй заход в базу за тем же стадом стоил бы
      * ровно столько же, сколько первый.
      */
-    for (const a of docs) showsOf.set(a.id as number, Array.isArray(a.shows) ? a.shows : [])
+    for (const a of docs) {
+      const had = (a as unknown as Record<string, unknown>)[spec.field]
+      hadOf.set(a.id as number, Array.isArray(had) ? had : [])
+    }
   }
 
-  /** Ключ повтора: дата плюс приведённое название. */
-  const showKey = (date: unknown, title: unknown) =>
-    `${String(date ?? '').slice(0, 10)}|${String(title ?? '')
-      .trim()
-      .toLowerCase()
-      .replace(/ё/g, 'е')
-      .replace(/\s+/g, ' ')}`
+  /*
+   * Справочники и организации — по одному запросу на файл и только
+   * если набор их спрашивает.
+   *
+   * Организации ищутся по названию и **не заводятся**: организация,
+   * созданная из строки файла, плодит двойников при каждой опечатке,
+   * а лаборатория с двойником — это два разных ИНН в реестре.
+   * Не нашлась — поле остаётся пустым, и название попадает
+   * в «не нашлись в справочниках».
+   */
+  const needsOrgs = columnsOf(ds).some((c) => c.key === 'laboratory')
+  const orgByName = new Map<string, number>()
+  if (needsOrgs) {
+    const { docs } = await payload.find({
+      collection: 'organizations',
+      limit: 0,
+      pagination: false,
+      depth: 0,
+      overrideAccess: true,
+    })
+    for (const o of docs) {
+      const name = norm2((o as { name?: string }).name)
+      if (name && !orgByName.has(name)) orgByName.set(name, o.id as number)
+      const short = norm2((o as { shortName?: string }).shortName)
+      if (short && !orgByName.has(short)) orgByName.set(short, o.id as number)
+    }
+  }
+
+  const dicts = await loadDictionaries(payload, ds, header)
 
   const issues: { row: number; ident?: string; reason: string }[] = []
   const perAnimal = new Map<number, { add: Record<string, unknown>[]; had: unknown[] }>()
@@ -1260,41 +1434,27 @@ async function importShows(
       return
     }
 
-    const date = parseDate(get('date'))
-    if (!date.value) {
+    const built = spec.build(get, { orgByName, dicts })
+    if ('error' in built) {
       skipped += 1
-      issues.push({ row: line, ident, reason: date.problem ?? 'не разобрана дата мероприятия' })
+      issues.push({ row: line, ident, reason: built.error })
       return
     }
 
-    const title = (get('title') ?? '').trim()
-    if (!title) {
-      skipped += 1
-      issues.push({ row: line, ident, reason: 'не указано название мероприятия' })
-      return
-    }
+    const bucket = perAnimal.get(animal.id) ?? { add: [], had: hadOf.get(animal.id) ?? [] }
 
-    const bucket = perAnimal.get(animal.id) ?? { add: [], had: showsOf.get(animal.id) ?? [] }
-
-    const key = showKey(date.value, title)
+    const key = spec.keyOf(built.row)
     const already =
-      bucket.had.some(
-        (s) => showKey((s as Record<string, unknown>).date, (s as Record<string, unknown>).title) === key,
-      ) || bucket.add.some((s) => showKey(s.date, s.title) === key)
+      bucket.had.some((s) => spec.keyOf(s as Record<string, unknown>) === key) ||
+      bucket.add.some((s) => spec.keyOf(s) === key)
 
     if (already) {
       skipped += 1
-      issues.push({ row: line, ident, reason: 'такая выставка уже записана' })
+      issues.push({ row: line, ident, reason: `${spec.what} уже записан(а)` })
       return
     }
 
-    bucket.add.push({
-      date: date.value,
-      title,
-      place: (get('place') ?? '').trim() || undefined,
-      awards: (get('awards') ?? '').trim() || undefined,
-      prize: (get('prize') ?? '').trim() || undefined,
-    })
+    bucket.add.push(built.row)
     perAnimal.set(animal.id, bucket)
   })
 
@@ -1316,7 +1476,7 @@ async function importShows(
          * с исходником.
          */
         context: { skipJournal: true },
-        data: { shows: [...bucket.had, ...bucket.add] } as never,
+        data: { [spec.field]: [...bucket.had, ...bucket.add] } as never,
       })
       created += bucket.add.length
       touched.push(animalId)
@@ -1324,7 +1484,7 @@ async function importShows(
       skipped += bucket.add.length
       issues.push({
         row: 0,
-        reason: `не удалось записать выставки животного: ${e instanceof Error ? e.message : e}`,
+        reason: `не удалось записать ${spec.what} животного: ${e instanceof Error ? e.message : e}`,
       })
     }
   }
@@ -1939,8 +2099,8 @@ export async function importDataAction(
           parsed.header,
           String(formData.get('updateVerified') || '') === '1',
         )
-      : ds.key === 'shows'
-        ? await importShows(payload, actor, orgId, ds, parsed.rows, parsed.header)
+      : ARRAY_SPECS[ds.key]
+        ? await importArray(payload, actor, orgId, ds, parsed.rows, parsed.header, ARRAY_SPECS[ds.key]!)
         : await importEvents(payload, actor, orgId, ds, parsed.rows, parsed.header)
 
   /*

@@ -1988,6 +1988,37 @@ function inputPath() {
     'поля, заведённые под шаблоны реестра, принимаются загрузкой животных',
     gone.join(', '),
   )
+
+  /*
+   * ДНК-тест — самый полный из двадцати шаблонов: двадцать пять колонок
+   * из двадцати семи. Двенадцать из них — локусы ISAG, и каждый должен
+   * приниматься своей колонкой: склеить их в одну строку «генотип»
+   * значило бы просить человека сделать руками то, что потом придётся
+   * разбирать обратно.
+   */
+  const dna = DATASETS.find((d) => d.key === 'dnaTests')
+  check(!!dna, 'протокол лаборатории заведён набором загрузки')
+  if (!dna) return
+
+  const dnaColumns = new Set(dna.groups.flatMap((g) => g.columns).map((c) => c.key))
+
+  const needDna = [
+    'date',
+    'laboratory',
+    'certificateNumber',
+    'certificateDate',
+    'snpCount',
+    'verdict',
+    'authMethod',
+    ...ISAG_LOCI.map((l) => isagField(l)),
+  ]
+
+  const lost = needDna.filter((k) => !dnaColumns.has(k))
+  check(
+    lost.length === 0,
+    'все двадцать пять выгружаемых полей теста принимаются загрузкой',
+    lost.join(', '),
+  )
 }
 
 /**
