@@ -115,6 +115,10 @@ export interface Config {
     'dna-test-types': DnaTestType;
     'haplotype-types': HaplotypeType;
     'health-event-types': HealthEventType;
+    countries: Country;
+    regions: Region;
+    districts: District;
+    'breed-types': BreedType;
     technicians: Technician;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
@@ -171,6 +175,10 @@ export interface Config {
     'dna-test-types': DnaTestTypesSelect<false> | DnaTestTypesSelect<true>;
     'haplotype-types': HaplotypeTypesSelect<false> | HaplotypeTypesSelect<true>;
     'health-event-types': HealthEventTypesSelect<false> | HealthEventTypesSelect<true>;
+    countries: CountriesSelect<false> | CountriesSelect<true>;
+    regions: RegionsSelect<false> | RegionsSelect<true>;
+    districts: DistrictsSelect<false> | DistrictsSelect<true>;
+    'breed-types': BreedTypesSelect<false> | BreedTypesSelect<true>;
     technicians: TechniciansSelect<false> | TechniciansSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
@@ -379,6 +387,7 @@ export interface Animal {
   grade?: ('eliteRecord' | 'elite' | 'first' | 'second' | 'outOfClass') | null;
   birthDate?: string | null;
   breed?: (number | null) | Breed;
+  breedType?: (number | null) | BreedType;
   bloodPercent?: number | null;
   improvers?: {
     breed1?: (number | null) | Breed;
@@ -389,6 +398,8 @@ export interface Animal {
   coatColor?: (number | null) | CoatColor;
   bloodGroup?: (number | null) | BloodGroup;
   purpose?: (number | null) | AnimalPurpose;
+  breedDate?: string | null;
+  purposeDate?: string | null;
   owner: number | Organization;
   herd?: (number | null) | Herd;
   author?: (number | null) | User;
@@ -403,6 +414,22 @@ export interface Animal {
   trustCheckedAt?: string | null;
   publicVisible?: boolean | null;
   publicDetails?: boolean | null;
+  /**
+   * Требуется шаблоном «Основные сведения» ФГИАС ПР
+   */
+  birthPlace?: {
+    country?: (number | null) | Country;
+    region?: (number | null) | Region;
+    district?: (number | null) | District;
+    /**
+     * Если оно заведено в книге — реквизиты возьмутся отсюда
+     */
+    farm?: (number | null) | Organization;
+    /**
+     * Когда хозяйства нет в книге: чужое, зарубежное или закрытое. Заполняется, только если связь выше пуста
+     */
+    farmName?: string | null;
+  };
   photo?: (number | null) | Media;
   notes?: string | null;
   forSale?: boolean | null;
@@ -620,6 +647,10 @@ export interface Animal {
    */
   registrationBasis?: ('origin' | 'productivity') | null;
   breedingClass?: (number | null) | BreedingClass;
+  /**
+   * Рождение, пересадка эмбриона, импорт
+   */
+  receiptMethod?: (number | null) | ReproductionMethod;
   father?: (number | null) | Animal;
   mother?: (number | null) | Animal;
   line?: (number | null) | Line;
@@ -774,6 +805,33 @@ export interface Breed {
   createdAt: string;
 }
 /**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "breed-types".
+ */
+export interface BreedType {
+  id: number;
+  /**
+   * Короткое обозначение или числовой код из «Селэкс»
+   */
+  code: string;
+  name: string;
+  /**
+   * Чем меньше, тем выше в списках
+   */
+  sortOrder?: number | null;
+  description?: string | null;
+  /**
+   * UUID той же записи в государственном реестре. Заполняется сверкой
+   */
+  fgiasUuid?: string | null;
+  /**
+   * Снимите галочку, чтобы скрыть из выпадающих списков
+   */
+  isActive?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * Соответствует полю «NMAST» в ИАС «Селэкс»
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -838,6 +896,87 @@ export interface BloodGroup {
  * via the `definition` "animal-purposes".
  */
 export interface AnimalPurpose {
+  id: number;
+  /**
+   * Короткое обозначение или числовой код из «Селэкс»
+   */
+  code: string;
+  name: string;
+  /**
+   * Чем меньше, тем выше в списках
+   */
+  sortOrder?: number | null;
+  description?: string | null;
+  /**
+   * UUID той же записи в государственном реестре. Заполняется сверкой
+   */
+  fgiasUuid?: string | null;
+  /**
+   * Снимите галочку, чтобы скрыть из выпадающих списков
+   */
+  isActive?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "countries".
+ */
+export interface Country {
+  id: number;
+  /**
+   * Короткое обозначение или числовой код из «Селэкс»
+   */
+  code: string;
+  name: string;
+  /**
+   * Чем меньше, тем выше в списках
+   */
+  sortOrder?: number | null;
+  description?: string | null;
+  /**
+   * UUID той же записи в государственном реестре. Заполняется сверкой
+   */
+  fgiasUuid?: string | null;
+  /**
+   * Снимите галочку, чтобы скрыть из выпадающих списков
+   */
+  isActive?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "regions".
+ */
+export interface Region {
+  id: number;
+  /**
+   * Короткое обозначение или числовой код из «Селэкс»
+   */
+  code: string;
+  name: string;
+  /**
+   * Чем меньше, тем выше в списках
+   */
+  sortOrder?: number | null;
+  description?: string | null;
+  /**
+   * UUID той же записи в государственном реестре. Заполняется сверкой
+   */
+  fgiasUuid?: string | null;
+  /**
+   * Снимите галочку, чтобы скрыть из выпадающих списков
+   */
+  isActive?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "districts".
+ */
+export interface District {
   id: number;
   /**
    * Короткое обозначение или числовой код из «Селэкс»
@@ -942,6 +1081,35 @@ export interface BreedingCategory {
  * via the `definition` "breeding-classes".
  */
 export interface BreedingClass {
+  id: number;
+  /**
+   * Короткое обозначение или числовой код из «Селэкс»
+   */
+  code: string;
+  name: string;
+  /**
+   * Чем меньше, тем выше в списках
+   */
+  sortOrder?: number | null;
+  description?: string | null;
+  /**
+   * UUID той же записи в государственном реестре. Заполняется сверкой
+   */
+  fgiasUuid?: string | null;
+  /**
+   * Снимите галочку, чтобы скрыть из выпадающих списков
+   */
+  isActive?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Соответствует полю «NRIP» в ИАС «Селэкс»
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "reproduction-methods".
+ */
+export interface ReproductionMethod {
   id: number;
   /**
    * Короткое обозначение или числовой код из «Селэкс»
@@ -1167,35 +1335,6 @@ export interface Insemination {
  * via the `definition` "semen-types".
  */
 export interface SemenType {
-  id: number;
-  /**
-   * Короткое обозначение или числовой код из «Селэкс»
-   */
-  code: string;
-  name: string;
-  /**
-   * Чем меньше, тем выше в списках
-   */
-  sortOrder?: number | null;
-  description?: string | null;
-  /**
-   * UUID той же записи в государственном реестре. Заполняется сверкой
-   */
-  fgiasUuid?: string | null;
-  /**
-   * Снимите галочку, чтобы скрыть из выпадающих списков
-   */
-  isActive?: boolean | null;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * Соответствует полю «NRIP» в ИАС «Селэкс»
- *
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "reproduction-methods".
- */
-export interface ReproductionMethod {
   id: number;
   /**
    * Короткое обозначение или числовой код из «Селэкс»
@@ -2451,6 +2590,22 @@ export interface PayloadLockedDocument {
         value: number | HealthEventType;
       } | null)
     | ({
+        relationTo: 'countries';
+        value: number | Country;
+      } | null)
+    | ({
+        relationTo: 'regions';
+        value: number | Region;
+      } | null)
+    | ({
+        relationTo: 'districts';
+        value: number | District;
+      } | null)
+    | ({
+        relationTo: 'breed-types';
+        value: number | BreedType;
+      } | null)
+    | ({
         relationTo: 'technicians';
         value: number | Technician;
       } | null);
@@ -2615,6 +2770,7 @@ export interface AnimalsSelect<T extends boolean = true> {
   grade?: T;
   birthDate?: T;
   breed?: T;
+  breedType?: T;
   bloodPercent?: T;
   improvers?:
     | T
@@ -2627,6 +2783,8 @@ export interface AnimalsSelect<T extends boolean = true> {
   coatColor?: T;
   bloodGroup?: T;
   purpose?: T;
+  breedDate?: T;
+  purposeDate?: T;
   owner?: T;
   herd?: T;
   author?: T;
@@ -2635,6 +2793,15 @@ export interface AnimalsSelect<T extends boolean = true> {
   trustCheckedAt?: T;
   publicVisible?: T;
   publicDetails?: T;
+  birthPlace?:
+    | T
+    | {
+        country?: T;
+        region?: T;
+        district?: T;
+        farm?: T;
+        farmName?: T;
+      };
   photo?: T;
   notes?: T;
   forSale?: T;
@@ -2860,6 +3027,7 @@ export interface AnimalsSelect<T extends boolean = true> {
   category?: T;
   registrationBasis?: T;
   breedingClass?: T;
+  receiptMethod?: T;
   father?: T;
   mother?: T;
   line?: T;
@@ -3851,6 +4019,62 @@ export interface HealthEventTypesSelect<T extends boolean = true> {
   fgiasUuid?: T;
   isActive?: T;
   affectsProductivity?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "countries_select".
+ */
+export interface CountriesSelect<T extends boolean = true> {
+  code?: T;
+  name?: T;
+  sortOrder?: T;
+  description?: T;
+  fgiasUuid?: T;
+  isActive?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "regions_select".
+ */
+export interface RegionsSelect<T extends boolean = true> {
+  code?: T;
+  name?: T;
+  sortOrder?: T;
+  description?: T;
+  fgiasUuid?: T;
+  isActive?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "districts_select".
+ */
+export interface DistrictsSelect<T extends boolean = true> {
+  code?: T;
+  name?: T;
+  sortOrder?: T;
+  description?: T;
+  fgiasUuid?: T;
+  isActive?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "breed-types_select".
+ */
+export interface BreedTypesSelect<T extends boolean = true> {
+  code?: T;
+  name?: T;
+  sortOrder?: T;
+  description?: T;
+  fgiasUuid?: T;
+  isActive?: T;
   updatedAt?: T;
   createdAt?: T;
 }

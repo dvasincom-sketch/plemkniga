@@ -38,15 +38,14 @@ import { fgiasDate, fgiasFloat, type FgiasColumn, type Held } from '@/lib/fgias-
  *
  * ## Чего мы не заполняем и почему
  *
- * Страна, регион и район — колонки с uuid из реестров `countries`,
- * `regions`, `districts`. Взять их можно только запросом наружу, а выгрузка
- * обязана работать без сети: хозяйство собирает файл там, где стоит
- * компьютер, а не там, где есть интернет. Разовое проставление этих
- * значений — отдельная работа, и она названа в отчёте, а не спрятана
- * в пустой ячейке.
+ * Реквизиты продавца и всё импортное — дата, страна-экспортёр, импортные
+ * номер и кличка. Книга их не ведёт, и заводить пять полей в карточке
+ * каждой российской коровы ради десяти импортных дороже, чем польза.
  *
- * Реквизиты продавца, даты импорта и хозяйство при рождении книга
- * не ведёт вовсе. Пустая колонка здесь — честный ответ.
+ * Страна, регион и район рождения теперь заполняются — но только у тех
+ * животных, кому их проставили: списки загружаются однажды
+ * (`npm run sync:fgias-geo`), а вот проставить район каждому животному
+ * может только хозяйство.
  */
 
 /* ------------------------------------------------------------------ */
@@ -209,9 +208,23 @@ export type MainAnimal = {
   inventoryNumber?: string | null
   /** Ключи реестра из наших справочников — уже развёрнутые. */
   breedUuid?: string | null
+  breedTypeUuid?: string | null
+  breedDate?: string | null
   lineUuid?: string | null
   coatColorUuid?: string | null
   purposeUuid?: string | null
+  purposeDate?: string | null
+  receiptMethodUuid?: string | null
+  /** Место рождения — ключи реестра и реквизиты хозяйства. */
+  birthCountryUuid?: string | null
+  birthRegionUuid?: string | null
+  birthDistrictUuid?: string | null
+  birthFarm?: {
+    name?: string | null
+    inn?: string | null
+    kpp?: string | null
+    ogrn?: string | null
+  } | null
   owner?: {
     name?: string | null
     inn?: string | null
@@ -275,26 +288,26 @@ export function buildMain(
       group ?? '',
       fgiasDate(a.ageGroupDate) ?? '',
       s(a.purposeUuid),
-      '', // Дата определения назначения — книга не хранит
-      '', // Тип породы — отдельный справочник, пары у нас нет
+      fgiasDate(a.purposeDate) ?? '',
+      s(a.breedTypeUuid),
       s(a.breedUuid),
-      '', // Дата определения породы — книга не хранит
+      fgiasDate(a.breedDate) ?? '',
       blood ?? '',
       '', // Дата мечения УНСМ
       s(a.inventoryNumber),
       '', // Дата мечения технологическим номером
       s(a.name),
       fgiasDate(a.birthDate) ?? '',
-      '', // Страна рождения
-      '', // Регион рождения
-      '', // Район рождения
-      '', // Наименование хозяйства при рождении
-      '', // ИНН хозяйства при рождении
-      '', // КПП хозяйства при рождении
-      '', // ОГРН хозяйства при рождении
+      s(a.birthCountryUuid),
+      s(a.birthRegionUuid),
+      s(a.birthDistrictUuid),
+      s(a.birthFarm?.name),
+      s(a.birthFarm?.inn),
+      s(a.birthFarm?.kpp),
+      s(a.birthFarm?.ogrn),
       '', // Базовый идентификатор отца — придёт обратным файлом
       '', // Базовый идентификатор матери
-      '', // Способ получения — поля на животном нет
+      s(a.receiptMethodUuid),
       s(a.lineUuid),
       s(a.coatColorUuid),
     ]

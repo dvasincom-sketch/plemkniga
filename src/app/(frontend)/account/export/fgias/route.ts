@@ -235,15 +235,41 @@ export async function GET(request: Request) {
       return out
     }
 
-    const [breeds, lines, colors, purposes, org] = await Promise.all([
-      keyMap('breeds'),
-      keyMap('lines'),
-      keyMap('coat-colors'),
-      keyMap('animal-purposes'),
-      payload
-        .findByID({ collection: 'organizations', id: orgId, depth: 0, overrideAccess: true })
-        .catch(() => null),
-    ])
+    const [breeds, breedTypes, lines, colors, purposes, methods, geo, orgs, org] =
+      await Promise.all([
+        keyMap('breeds'),
+        keyMap('breed-types'),
+        keyMap('lines'),
+        keyMap('coat-colors'),
+        keyMap('animal-purposes'),
+        keyMap('reproduction-methods'),
+        /*
+         * Территория — три справочника в одной карте: страна, регион
+         * и район не пересекаются по идентификаторам, потому что это
+         * разные коллекции, и класть их порознь значило бы завести три
+         * почти одинаковых обращения ради одного и того же вопроса
+         * «какой у этой записи ключ реестра».
+         */
+        Promise.all([keyMap('countries'), keyMap('regions'), keyMap('districts')]).then(
+          ([c, rg, d]) => ({ countries: c, regions: rg, districts: d }),
+        ),
+        /*
+         * Все организации, а не только своя: хозяйство при рождении —
+         * чужое почти всегда, ради того поле и заведено.
+         */
+        payload
+          .find({
+            collection: 'organizations',
+            limit: 0,
+            pagination: false,
+            depth: 0,
+            overrideAccess: true,
+          })
+          .then((res) => new Map((res.docs as unknown as Row[]).map((o) => [o.id as number, o]))),
+        payload
+          .findByID({ collection: 'organizations', id: orgId, depth: 0, overrideAccess: true })
+          .catch(() => null),
+      ])
 
     /*
      * Через `unknown`: у организации есть свой тип, и приводить его
@@ -259,6 +285,8 @@ export async function GET(request: Request) {
     const rows: MainAnimal[] = herd.map((a) => {
       const fgias = (a.fgias as Row | undefined) ?? {}
       const alt = (a.altIds as Row | undefined) ?? {}
+      const birth = (a.birthPlace as Row | undefined) ?? {}
+      const birthFarm = orgs.get(rel(birth.farm) ?? -1)
       return {
         identNumber: String(a.identNumber ?? ''),
         accountingId: txt(a.uuid),
@@ -273,9 +301,32 @@ export async function GET(request: Request) {
         bloodPercent: typeof a.bloodPercent === 'number' ? a.bloodPercent : null,
         inventoryNumber: txt(alt.inventoryNumber),
         breedUuid: breeds.get(rel(a.breed) ?? -1) ?? null,
+        breedTypeUuid: breedTypes.get(rel(a.breedType) ?? -1) ?? null,
+        breedDate: txt(a.breedDate),
         lineUuid: lines.get(rel(a.line) ?? -1) ?? null,
         coatColorUuid: colors.get(rel(a.coatColor) ?? -1) ?? null,
         purposeUuid: purposes.get(rel(a.purpose) ?? -1) ?? null,
+        purposeDate: txt(a.purposeDate),
+        receiptMethodUuid: methods.get(rel(a.receiptMethod) ?? -1) ?? null,
+        birthCountryUuid: geo.countries.get(rel(birth.country) ?? -1) ?? null,
+        birthRegionUuid: geo.regions.get(rel(birth.region) ?? -1) ?? null,
+        birthDistrictUuid: geo.districts.get(rel(birth.district) ?? -1) ?? null,
+        /*
+         * Реквизиты хозяйства рождения берутся из связи, а названием
+         * подменяются, только если связи нет. ИНН и КПП при этом
+         * не выдумываются: у хозяйства, которого нет в книге, их
+         * взять неоткуда, и пустая ячейка честнее любой подстановки.
+         */
+        birthFarm: birthFarm
+          ? {
+              name: txt(birthFarm.name),
+              inn: txt(birthFarm.inn),
+              kpp: txt(birthFarm.kpp),
+              ogrn: txt(birthFarm.ogrn),
+            }
+          : txt(birth.farmName)
+            ? { name: txt(birth.farmName) }
+            : null,
         owner,
       }
     })

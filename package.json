@@ -43,6 +43,7 @@
     "audit:gate": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/audit-gate.ts",
     "archive:purge": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/archive-purge.ts",
     "sync:fgias-nsi": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/sync-fgias-nsi.ts",
+    "sync:fgias-geo": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/sync-fgias-geo.ts",
     "export:fgias": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/export-fgias.ts",
     "import:fgias-return": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/import-fgias-return.ts",
     "check:fgias-export": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-fgias-export.ts",
