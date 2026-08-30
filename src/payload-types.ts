@@ -596,6 +596,22 @@ export interface Animal {
         id?: string | null;
       }[]
     | null;
+  /**
+   * Шаблон ФГИАС ПР «Участие в выставках и соревнованиях»
+   */
+  shows?:
+    | {
+        date: string;
+        title: string;
+        place?: string | null;
+        awards?: string | null;
+        /**
+         * Как записано в документах: сумма, кубок, приз
+         */
+        prize?: string | null;
+        id?: string | null;
+      }[]
+    | null;
   category?: (number | null) | BreedingCategory;
   /**
    * ТЗ, п. 1.5. Печатается в свидетельстве: «Племенная книга, категория II: внесено по продуктивности»
@@ -2739,6 +2755,16 @@ export interface AnimalsSelect<T extends boolean = true> {
         fatKg?: T;
         proteinKg?: T;
         endDate?: T;
+        id?: T;
+      };
+  shows?:
+    | T
+    | {
+        date?: T;
+        title?: T;
+        place?: T;
+        awards?: T;
+        prize?: T;
         id?: T;
       };
   category?: T;
