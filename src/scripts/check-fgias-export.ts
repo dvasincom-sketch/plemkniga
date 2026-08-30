@@ -15,6 +15,8 @@ import {
   fgiasDate,
   fgiasInt,
   holdSummary,
+  idOrigin,
+  pedigreeGaps,
   type ExportAnimal,
   type PedigreeSource,
 } from '@/lib/fgias-export'
@@ -329,6 +331,58 @@ function pedigree() {
     { id: 2, identNumber: 'RU-КРУГ-2', baseUuid: 'u-2', fatherId: 1, motherId: null },
   ])
   check(loop.rows.length === 2, 'обе строки собрались, а не зациклились', `строк ${loop.rows.length}`)
+
+  /*
+   * Разбор пробелов по видам номера. Утверждения написаны по живому
+   * прогону: он показал 1597 связей, у всех предок без номера реестра,
+   * и в примерах шли HOUSA — американские быки, которых хозяйство сдать
+   * в «Основных сведениях» не может. Общий счётчик это прятал.
+   */
+  console.log('\nРодословная: чей предок — своё, чужое, внутрихозяйственное\n')
+
+  check(idOrigin('rf') === 'ours', 'национальный номер — свой')
+  check(idOrigin('rus') === 'ours', 'международный XXRUS — тоже свой')
+  check(idOrigin('usa') === 'foreign', 'HOUSA — чужой')
+  check(idOrigin('icar') === 'foreign', 'ICAR — чужой')
+  check(idOrigin('internal') === 'internal', 'внутрихозяйственный — свой третий случай')
+  /*
+   * Пустой формат уходит во «внутрихозяйственные», а не в «свои».
+   * Выбор в сторону осторожности: записать животное с неизвестным видом
+   * номера в «сдадим сами» значит пообещать работу, которая может
+   * не получиться.
+   */
+  check(idOrigin(null) === 'internal', 'без вида номера — не «свой», а «непонятно чей»')
+
+  const mixed: PedigreeSource[] = [
+    { id: 1, identNumber: 'RU-ТЁЛКА', idFormat: 'rf', fatherId: 2, motherId: 3 },
+    { id: 2, identNumber: 'HOUSA13599440', idFormat: 'usa', fatherId: null, motherId: null },
+    { id: 3, identNumber: 'RU-МАТЬ', idFormat: 'rf', fatherId: 4, motherId: null },
+    { id: 4, identNumber: 'ДЕД-БЕЗ-НОМЕРА', idFormat: 'internal', fatherId: null, motherId: null },
+    /* Ссылка на животное вне выборки — при выгрузке одного хозяйства обычное дело. */
+    { id: 5, identNumber: 'RU-СИРОТА', idFormat: 'rf', fatherId: 999, motherId: null },
+  ]
+
+  const gaps = pedigreeGaps(mixed)
+  check(gaps.links === 3, 'связей внутри выборки три', String(gaps.links))
+  check(gaps.dangling === 1, 'ссылка на родителя вне выборки посчитана отдельно', String(gaps.dangling))
+  check(gaps.noKey.ours === 1, 'своих без номера — один', String(gaps.noKey.ours))
+  check(gaps.noKey.foreign === 1, 'иностранных без номера — один', String(gaps.noKey.foreign))
+  check(gaps.noKey.internal === 1, 'внутрихозяйственных — один', String(gaps.noKey.internal))
+
+  /*
+   * И обратное: предок с номером реестра в пробелы не попадает вовсе.
+   * Без этого утверждения разбор считал бы всех подряд и был бы просто
+   * переписью связей.
+   */
+  const registered = pedigreeGaps([
+    { id: 1, identNumber: 'RU-ТЁЛКА', idFormat: 'rf', fatherId: 2, motherId: null },
+    { id: 2, identNumber: 'RU-ОТЕЦ', idFormat: 'rf', baseUuid: 'u-2', fatherId: null, motherId: null },
+  ])
+  check(
+    registered.links === 1 && registered.noKey.ours === 0,
+    'предок с номером реестра в пробелы не попадает',
+    JSON.stringify(registered.noKey),
+  )
 }
 
 /* ------------------------------------------------------------------ */
