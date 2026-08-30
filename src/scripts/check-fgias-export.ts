@@ -19,8 +19,10 @@ import {
   PEDIGREE_NESTS,
   SHOW_COLUMNS,
   WEIGHING_COLUMNS,
+  DNA_COLUMNS,
   buildLactations,
   buildPedigree,
+  buildDna,
   buildShows,
   buildWeighings,
   chooseSignums,
@@ -43,6 +45,7 @@ import {
   MAIN_COLUMNS,
   MAIN_ESSENTIAL,
 } from '@/lib/fgias-main'
+import { ISAG_LOCI, authMethodUuid, isagField, VERDICT_UUID } from '@/lib/isag'
 
 /**
  * Что уедет во ФГИАС ПР, а что придержано и почему.
@@ -531,6 +534,11 @@ function templates() {
       file: 'КРС_Живая_масса_v1.5_2.6.0.xlsx',
       titles: WEIGHING_COLUMNS.map((c) => c.title),
       label: 'Живая масса',
+    },
+    {
+      file: 'КРС_Достоверность_происхождения_v1.1.xlsx',
+      titles: DNA_COLUMNS.map((c) => c.title),
+      label: 'Достоверность происхождения',
     },
     {
       file: 'КРС_Родословная_v1.1_2.6.0.xlsx',
@@ -1210,6 +1218,117 @@ function weighings() {
   )
 }
 
+/**
+ * Достоверность происхождения: панель ISAG и пустая «Проба».
+ */
+function dna() {
+  console.log('\nДостоверность происхождения: что уезжает\n')
+
+  const loci: Record<string, string> = {}
+  for (const l of ISAG_LOCI) loci[l] = '121/133'
+
+  const base = {
+    identNumber: 'RU0000000070028',
+    accountingId: '1a421c44-36d2-41c3-881e-38bf83c4f756',
+    baseUuid: '60b5cc43-7b0a-416d-920b-6782c2192fcf',
+    bloodGroup: 'A1',
+  }
+  const test = {
+    date: '2025-04-10T00:00:00.000Z',
+    labName: 'ООО «Лаборатория»',
+    labInn: '3924003136',
+    labKpp: '392401001',
+    certificateNumber: 'ГС-2025-0417',
+    certificateDate: '2025-04-20T00:00:00.000Z',
+    methodUuid: '2c0c54cd-54e6-4903-8425-65d05d88d020',
+    authMethodUuid: authMethodUuid('byOM'),
+    verdictUuid: VERDICT_UUID.confirmed,
+    snpCount: 100_000,
+    loci,
+  }
+
+  const ok = buildDna([{ ...base, dnaTests: [test] }])
+  check(ok.rows.length === 1, 'полный тест уезжает')
+  const row = ok.rows[0]!
+  check(row.length === 27, 'в строке двадцать семь значений', String(row.length))
+
+  const at = (title: string) => row[DNA_COLUMNS.findIndex((c) => c.title === title)]
+  check(at('Лаборатория ИНН') === '3924003136', 'ИНН лаборатории берётся из организации')
+  check(at('Номер генетического сертификата') === 'ГС-2025-0417', 'номер сертификата на месте')
+  check(at('Группа крови') === 'A1', 'группа крови берётся у животного, а не у теста')
+
+  /*
+   * «Проба» уходит пустой всегда, и это утверждение, а не недоделка:
+   * справочник, на который ссылается колонка, оказался списком болезней
+   * и генов и на вопрос «какую пробу брали» не отвечает. Заполнить
+   * догадкой хуже, чем оставить пустой.
+   */
+  check(at('Проба') === '', '«Проба» уходит пустой — справочник реестра на этот вопрос не отвечает')
+
+  /*
+   * Порядок локусов — из шаблона: BM1818, BM1824, BM2113, ETH3, ETH10,
+   * ETH225. Внутри ETH числа идут 3, 10, 225, то есть и не по возрастанию
+   * строки. Перестановка сдвинула бы генотип на соседний локус.
+   */
+  /*
+   * Имя поля даёт имя колонки, и это утверждение стоит здесь после
+   * настоящего прокола: поля назывались `isagBM1818`, Payload превратил
+   * их в `isag_b_m1818` — подчёркивание перед каждой заглавной, — а
+   * миграция руками создала `isag_bm1818`. drizzle-kit увидел
+   * расхождение и предложил свести все двенадцать локусов в одну колонку.
+   * Согласие на любую строку склеило бы генотип и потеряло одиннадцать.
+   *
+   * Правило простое: после `isag` ровно одна заглавная. Две подряд —
+   * лишний разделитель посреди названия локуса.
+   */
+  for (const l of ISAG_LOCI) {
+    const field = isagField(l)
+    const column = field.replace(/([A-Z])/g, (m) => `_${m.toLowerCase()}`)
+    check(
+      column === `isag_${l.toLowerCase()}`,
+      `поле локуса ${l} даёт колонку isag_${l.toLowerCase()}`,
+      `${field} → ${column}`,
+    )
+  }
+
+  const firstLocus = DNA_COLUMNS.findIndex((c) => c.title === 'BM1818')
+  check(
+    DNA_COLUMNS.slice(firstLocus).map((c) => c.title).join(',') === ISAG_LOCI.join(','),
+    'двенадцать локусов идут в порядке шаблона',
+    DNA_COLUMNS.slice(firstLocus).map((c) => c.title).join(','),
+  )
+
+  /* Дата и вывод обязательны, всё прочее — нет. */
+  const noDate = buildDna([{ ...base, dnaTests: [{ ...test, date: null }] }])
+  check(
+    noDate.rows.length === 0 && noDate.held[0]?.why === 'Дата проведения исследования',
+    'без даты исследования придержано',
+  )
+  const noVerdict = buildDna([{ ...base, dnaTests: [{ ...test, verdictUuid: null }] }])
+  check(
+    noVerdict.rows.length === 0 && noVerdict.held[0]?.why === 'Результат подтверждения',
+    'без вывода придержано',
+  )
+
+  /*
+   * Тест без генотипа уезжает: панель ISAG заполняют не всегда — есть
+   * тесты по SNP. Придержать такую строку значило бы не отдать
+   * подтверждённое происхождение из-за отсутствия того, чего не делали.
+   */
+  const noLoci = buildDna([{ ...base, dnaTests: [{ ...test, loci: null }] }])
+  check(noLoci.rows.length === 1, 'тест без генотипа ISAG всё равно уезжает')
+
+  /*
+   * Наше «не определено» ложится в «не исследовано» реестра, а не
+   * в «не подтверждено»: второе означает, что происхождение опровергнуто,
+   * и это совсем другое утверждение.
+   */
+  check(
+    VERDICT_UUID.inconclusive !== VERDICT_UUID.excluded,
+    '«не определено» и «исключено» — разные значения реестра',
+  )
+}
+
 /* ------------------------------------------------------------------ */
 
 columns()
@@ -1217,6 +1336,7 @@ values()
 lactations()
 shows()
 weighings()
+dna()
 pedigree()
 summary()
 ageGroups()

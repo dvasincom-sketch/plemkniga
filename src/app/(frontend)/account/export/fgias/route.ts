@@ -5,16 +5,19 @@ import {
   buildLactations,
   buildPedigree,
   buildShows,
+  buildDna,
   buildWeighings,
   type Built,
   type ExportAnimal,
   type PedigreeSource,
   type ShowAnimal,
+  type DnaAnimal,
   type WeighingRow,
 } from '@/lib/fgias-export'
 import { buildMain, type MainAnimal } from '@/lib/fgias-main'
 import { fgiasExport } from '@/lib/fgias-exports'
 import { weighingSignUuid } from '@/lib/weighing'
+import { ISAG_LOCI, authMethodUuid, isagField, VERDICT_UUID } from '@/lib/isag'
 
 /**
  * Выгрузка в шаблоны ФГИАС ПР — из кабинета, кнопкой.
@@ -102,6 +105,58 @@ export async function GET(request: Request) {
       idFormat: txt(a.idFormat),
     }))
     built = buildPedigree(rows)
+  } else if (spec.key === 'dna') {
+    /*
+     * Тесты лежат массивом внутри животного, а лаборатория, метод
+     * и группа крови — связями. Все три справочника читаются по разу
+     * на выгрузку и раскладываются картами: полторы тысячи животных
+     * против трёх запросов.
+     */
+    const [orgs, methods, bloodGroups] = await Promise.all([
+      payload
+        .find({ collection: 'organizations', limit: 0, pagination: false, depth: 0, overrideAccess: true })
+        .then((res) => new Map((res.docs as unknown as Row[]).map((o) => [o.id as number, o]))),
+      payload
+        .find({ collection: 'dna-test-types', limit: 0, pagination: false, depth: 0, overrideAccess: true })
+        .then((res) => new Map((res.docs as unknown as Row[]).map((d) => [d.id as number, txt(d.fgiasUuid)]))),
+      payload
+        .find({ collection: 'blood-groups', limit: 0, pagination: false, depth: 0, overrideAccess: true })
+        .then((res) => new Map((res.docs as unknown as Row[]).map((d) => [d.id as number, txt(d.name)]))),
+    ])
+
+    const rows: DnaAnimal[] = herd.map((a) => {
+      const tests = Array.isArray(a.dnaTests) ? (a.dnaTests as Row[]) : []
+      return {
+        identNumber: String(a.identNumber ?? ''),
+        accountingId: txt(a.uuid),
+        baseUuid: txt((a.fgias as Row | undefined)?.baseUuid),
+        /*
+         * Группа крови — свойство животного, а не теста: реестр спрашивает
+         * её в этом шаблоне, но копия в каждом тесте разошлась бы
+         * с оригиналом на первой же правке.
+         */
+        bloodGroup: bloodGroups.get(rel(a.bloodGroup) ?? -1) ?? null,
+        dnaTests: tests.map((t) => {
+          const lab = orgs.get(rel(t.laboratory) ?? -1)
+          const loci: Record<string, string | null> = {}
+          for (const l of ISAG_LOCI) loci[l] = txt(t[isagField(l)])
+          return {
+            date: txt(t.date),
+            labName: lab ? txt(lab.name) : null,
+            labInn: lab ? txt(lab.inn) : null,
+            labKpp: lab ? txt(lab.kpp) : null,
+            certificateNumber: txt(t.certificateNumber),
+            certificateDate: txt(t.certificateDate),
+            methodUuid: methods.get(rel(t.type) ?? -1) ?? null,
+            authMethodUuid: authMethodUuid(txt(t.authMethod)) ?? null,
+            verdictUuid: VERDICT_UUID[String(t.verdict ?? '')] ?? null,
+            snpCount: typeof t.snpCount === 'number' ? t.snpCount : null,
+            loci,
+          }
+        }),
+      }
+    })
+    built = buildDna(rows)
   } else if (spec.key === 'weighings') {
     /*
      * Взвешивания лежат своей коллекцией, а не массивом на животном,

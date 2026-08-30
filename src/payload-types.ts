@@ -666,6 +666,58 @@ export interface Animal {
          */
         verdict?: ('confirmed' | 'excluded' | 'inconclusive') | null;
         result?: string | null;
+        certificateNumber?: string | null;
+        certificateDate?: string | null;
+        snpCount?: number | null;
+        authMethod?: ('byOM' | 'byO' | 'byM' | 'none') | null;
+        /**
+         * Пара аллелей, как в протоколе: 121/133
+         */
+        isagBm1818?: string | null;
+        /**
+         * Пара аллелей, как в протоколе: 121/133
+         */
+        isagBm1824?: string | null;
+        /**
+         * Пара аллелей, как в протоколе: 121/133
+         */
+        isagBm2113?: string | null;
+        /**
+         * Пара аллелей, как в протоколе: 121/133
+         */
+        isagEth3?: string | null;
+        /**
+         * Пара аллелей, как в протоколе: 121/133
+         */
+        isagEth10?: string | null;
+        /**
+         * Пара аллелей, как в протоколе: 121/133
+         */
+        isagEth225?: string | null;
+        /**
+         * Пара аллелей, как в протоколе: 121/133
+         */
+        isagInra023?: string | null;
+        /**
+         * Пара аллелей, как в протоколе: 121/133
+         */
+        isagSps115?: string | null;
+        /**
+         * Пара аллелей, как в протоколе: 121/133
+         */
+        isagTgla53?: string | null;
+        /**
+         * Пара аллелей, как в протоколе: 121/133
+         */
+        isagTgla122?: string | null;
+        /**
+         * Пара аллелей, как в протоколе: 121/133
+         */
+        isagTgla126?: string | null;
+        /**
+         * Пара аллелей, как в протоколе: 121/133
+         */
+        isagTgla227?: string | null;
         file?: (number | null) | Media;
         id?: string | null;
       }[]
@@ -2850,6 +2902,22 @@ export interface AnimalsSelect<T extends boolean = true> {
         laboratory?: T;
         verdict?: T;
         result?: T;
+        certificateNumber?: T;
+        certificateDate?: T;
+        snpCount?: T;
+        authMethod?: T;
+        isagBm1818?: T;
+        isagBm1824?: T;
+        isagBm2113?: T;
+        isagEth3?: T;
+        isagEth10?: T;
+        isagEth225?: T;
+        isagInra023?: T;
+        isagSps115?: T;
+        isagTgla53?: T;
+        isagTgla122?: T;
+        isagTgla126?: T;
+        isagTgla227?: T;
         file?: T;
         id?: T;
       };

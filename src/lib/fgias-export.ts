@@ -58,6 +58,8 @@
  * дороже всего стоят на живых.
  */
 
+import { ISAG_LOCI as ISAG_ORDER } from '@/lib/isag'
+
 /* ------------------------------------------------------------------ */
 /*  Колонки шаблонов                                                    */
 /* ------------------------------------------------------------------ */
@@ -356,6 +358,171 @@ export function buildWeighings(animals: WeighingRow[]): Built {
   }
 
   return { columns: WEIGHING_COLUMNS, rows, held, rounded: 0 }
+}
+
+/**
+ * Двадцать семь колонок шаблона «КРС_Достоверность_происхождения_v1.1».
+ *
+ * Последние двенадцать — панель ISAG в порядке шаблона: BM1818, BM1824,
+ * BM2113, затем ETH3, ETH10, ETH225. Внутри ETH числа идут 3, 10, 225,
+ * то есть и не по возрастанию строки. Переписывать «как ровнее» нельзя:
+ * перестановка сдвинула бы генотип на соседний локус.
+ */
+export const DNA_COLUMNS: FgiasColumn[] = [
+  { title: 'Базовый номер ФГИАС ПР', type: 'uuid', width: 38 },
+  { title: 'Идентификатор ФГИАС ПР', type: 'uuid', width: 38 },
+  { title: 'Идентификатор учётной системы', type: 'string', width: 38 },
+  { title: 'Лаборатория наименование организации', type: 'string', width: 30 },
+  { title: 'Лаборатория ИНН', type: 'string', width: 14 },
+  { title: 'Лаборатория КПП', type: 'string', width: 12 },
+  { title: 'Дата проведения исследования', type: 'date', width: 14 },
+  { title: 'Номер генетического сертификата', type: 'string', width: 20 },
+  { title: 'Дата выдачи генетического сертификата', type: 'date', width: 14 },
+  { title: 'Проба', type: 'uuid', width: 38 },
+  { title: 'Метод исследований', type: 'uuid', width: 38 },
+  { title: 'Способ подтверждения происхождения', type: 'uuid', width: 38 },
+  { title: 'Результат подтверждения', type: 'uuid', width: 38 },
+  { title: 'Количество SNP-маркеров', type: 'int' },
+  { title: 'Группа крови', type: 'string', width: 16 },
+  { title: 'BM1818', type: 'string', width: 12 },
+  { title: 'BM1824', type: 'string', width: 12 },
+  { title: 'BM2113', type: 'string', width: 12 },
+  { title: 'ETH3', type: 'string', width: 12 },
+  { title: 'ETH10', type: 'string', width: 12 },
+  { title: 'ETH225', type: 'string', width: 12 },
+  { title: 'INRA023', type: 'string', width: 12 },
+  { title: 'SPS115', type: 'string', width: 12 },
+  { title: 'TGLA53', type: 'string', width: 12 },
+  { title: 'TGLA122', type: 'string', width: 12 },
+  { title: 'TGLA126', type: 'string', width: 12 },
+  { title: 'TGLA227', type: 'string', width: 12 },
+]
+
+export type DnaTest = {
+  date?: string | null
+  labName?: string | null
+  labInn?: string | null
+  labKpp?: string | null
+  certificateNumber?: string | null
+  certificateDate?: string | null
+  /** Ключ реестра метода исследования — подставляет вызывающий. */
+  methodUuid?: string | null
+  authMethodUuid?: string | null
+  verdictUuid?: string | null
+  snpCount?: number | null
+  /** Пары аллелей по локусам ISAG, ключ — имя локуса. */
+  loci?: Record<string, string | null | undefined> | null
+}
+
+export type DnaAnimal = {
+  identNumber: string
+  accountingId?: string | null
+  baseUuid?: string | null
+  /** Группа крови — свойство животного, а не теста. */
+  bloodGroup?: string | null
+  dnaTests?: DnaTest[] | null
+}
+
+/**
+ * Достоверность происхождения — по строке на тест.
+ *
+ * ## Что обязательно
+ *
+ * Дата исследования и результат подтверждения. Всё прочее уходит пустым,
+ * если не заполнено, и это не послабление: тест, у которого нет номера
+ * сертификата, — обычный тест, а не испорченная запись. Локусы пусты
+ * у тех тестов, которые делали по SNP, а не по микросателлитам, —
+ * и наоборот.
+ *
+ * ## «Проба» уходит пустой всегда
+ *
+ * В шаблоне колонка связана со справочником «Объект исследования»,
+ * а тот оказался списком из семидесяти трёх болезней и генов: HH1, CVM,
+ * BLAD, миостатин. На вопрос «какую пробу брали» он не отвечает, и что
+ * реестр ждёт в этой колонке, из справочника не следует.
+ *
+ * Пустая колонка честна; заполненная догадкой — нет. Если реестр
+ * откажет, он назовёт колонку, и тогда мы узнаем ответ от него,
+ * а не выдумаем.
+ *
+ * ## Группа крови берётся у животного
+ *
+ * Реестр спрашивает её в этом шаблоне, но это свойство животного,
+ * а не теста. Копия в каждом тесте разошлась бы с оригиналом на первой
+ * же правке.
+ */
+export function buildDna(animals: DnaAnimal[]): Built {
+  const rows: (string | number)[][] = []
+  const held: Held[] = []
+
+  const txt = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : '')
+
+  for (const a of animals) {
+    const list = (a.dnaTests ?? []).filter(Boolean)
+    if (list.length === 0) continue
+
+    if (!a.baseUuid) {
+      held.push({
+        identNumber: a.identNumber,
+        what: `тестов: ${list.length}`,
+        why: 'Базовый номер ФГИАС ПР',
+      })
+      continue
+    }
+
+    if (!a.accountingId) {
+      held.push({
+        identNumber: a.identNumber,
+        what: `тестов: ${list.length}`,
+        why: 'Идентификатор учётной системы',
+      })
+      continue
+    }
+
+    for (const t of list) {
+      const date = fgiasDate(t.date)
+      const verdict = txt(t.verdictUuid)
+
+      const missing = !date
+        ? 'Дата проведения исследования'
+        : !verdict
+          ? 'Результат подтверждения'
+          : null
+
+      if (missing) {
+        held.push({
+          identNumber: a.identNumber,
+          what: `тест ${t.date ?? '?'}`,
+          why: missing,
+        })
+        continue
+      }
+
+      const snp = fgiasInt(t.snpCount)
+
+      rows.push([
+        a.baseUuid,
+        '',
+        a.accountingId,
+        txt(t.labName),
+        txt(t.labInn),
+        txt(t.labKpp),
+        date!,
+        txt(t.certificateNumber),
+        fgiasDate(t.certificateDate) ?? '',
+        /* «Проба» — см. разбор выше: справочник не отвечает на этот вопрос. */
+        '',
+        txt(t.methodUuid),
+        txt(t.authMethodUuid),
+        verdict,
+        snp.value ?? '',
+        txt(a.bloodGroup),
+        ...ISAG_ORDER.map((l) => txt(t.loci?.[l])),
+      ])
+    }
+  }
+
+  return { columns: DNA_COLUMNS, rows, held, rounded: 0 }
 }
 
 /**
