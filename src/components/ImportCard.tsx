@@ -148,28 +148,48 @@ export function ImportCard({ datasets }: { datasets: (Choice & { hint: string })
                  файла значит выбирать вслепую.
               */}
               {/*
-                 `div`, а не `label`, и это не вкусовщина. `Select` у нас
-                 свой: триггер — кнопка, варианты — кнопки рядом. Клик
-                 по варианту внутри метки браузер переадресует на её элемент
-                 управления, то есть на тот же триггер, и он открывает список
-                 обратно сразу после того, как выбор его закрыл. Со стороны
-                 это выглядит как «список не закрывается».
-              */}
-              <div className="block text-[14px]">
-                <span className="mb-1.5 block text-ink-700">Что загружаем</span>
-                <input type="hidden" name="kind" value={kind} />
-                <Select
-                  name="kindPicker"
-                  options={datasets.map((d) => ({ value: d.value, label: d.label }))}
-                  defaultValue={kind}
-                  placeholder=""
-                  onLight
-                  onChange={setKind}
-                  ariaLabel="Что загружаем"
-                />
-              </div>
+                 Выбора «что загружаем» здесь больше нет.
 
-              {current && <p className="text-[13px] leading-snug text-ink-500">{current.hint}</p>}
+                 Он стоял первым полем формы, и человек ошибался в нём чаще,
+                 чем в самом файле: выгрузка из доильного зала уходила
+                 в «Животные», файл отёлов — в «Осеменения». Ошибка стоила
+                 дорого и обнаруживалась не сразу: набор решает, какие
+                 колонки искать, поэтому файл отвергался словами «не найдены
+                 обязательные колонки», и человек шёл править заголовки,
+                 которые были в полном порядке.
+
+                 Между тем ответ лежит в самом файле, и это чтение,
+                 а не догадка: шапка отёлов и шапка доек не похожи ни одной
+                 колонкой, кроме номера животного.
+
+                 Выбор возвращается ниже — но только когда система честно
+                 не смогла определить набор сама. Тогда он и нужен.
+              */}
+              {state.needsKind ? (
+                <div className="block text-[14px]">
+                  <span className="mb-1.5 block text-ink-700">
+                    Не удалось определить, что в файле, — выберите сами
+                  </span>
+                  <input type="hidden" name="kind" value={kind} />
+                  <Select
+                    name="kindPicker"
+                    options={datasets.map((d) => ({ value: d.value, label: d.label }))}
+                    defaultValue={kind}
+                    placeholder=""
+                    onLight
+                    onChange={setKind}
+                    ariaLabel="Что загружаем"
+                  />
+                  {current && (
+                    <p className="mt-1.5 text-[13px] leading-snug text-ink-500">{current.hint}</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-[13px] leading-snug text-ink-500">
+                  Что в файле — животные, отёлы, осеменения или дойки, — система определит
+                  по заголовкам сама и скажет, что определила. Если не сможет, спросит.
+                </p>
+              )}
 
               <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-ink-300 px-4 py-3 text-sm text-ink-700 hover:border-brand-400">
                 {/*
@@ -222,6 +242,25 @@ export function ImportCard({ datasets }: { datasets: (Choice & { hint: string })
                  он читает числом и теряет ведущий ноль ещё до того, как
                  человек начнёт заполнять.
               */}
+              {/*
+                 У скачивания образца выбор остался, и он тут на месте:
+                 образцов четыре, и какой нужен — знает только человек.
+                 Это ровно обратный случай тому, что убрано выше: там ответ
+                 был в файле, здесь файла ещё нет.
+              */}
+              <div className="text-[14px]">
+                <span className="mb-1.5 block text-ink-700">Образец для заполнения</span>
+                <Select
+                  name="templateKind"
+                  options={datasets.map((d) => ({ value: d.value, label: d.label }))}
+                  defaultValue={kind}
+                  placeholder=""
+                  onLight
+                  onChange={setKind}
+                  ariaLabel="Для какого набора нужен образец"
+                />
+              </div>
+
               <p className="text-xs leading-relaxed text-ink-500">
                 Скачать шаблон:{' '}
                 <a
@@ -339,6 +378,18 @@ export function ImportCard({ datasets }: { datasets: (Choice & { hint: string })
                     {state.dataset ? `${state.dataset}: ` : ''}создано {state.created}
                     {state.updated ? `, обновлено ${state.updated}` : ''}, пропущено {state.skipped}
                   </p>
+
+                  {/*
+                     Чем грузили — сказано вслух, потому что человек этого
+                     больше не выбирает. Если система поняла файл иначе,
+                     чем он, узнать об этом надо здесь, а не через месяц
+                     по недостающим карточкам.
+                  */}
+                  {state.detected && (
+                    <p className="mt-1 leading-snug">
+                      Вид данных определён по заголовкам: «{state.detected}».
+                    </p>
+                  )}
 
                   {/*
                      Опознанный шаблон реестра называется и при удачной

@@ -4,7 +4,14 @@ import { revalidatePath } from 'next/cache'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { decodeText, parseCsv, type TextEncodingName } from '@/lib/csv'
 import { detectTableKind, readSpreadsheet } from '@/lib/xlsx'
-import { columnsOf, datasetByKey, matchHeader, normalizeHeader, type Dataset } from '@/lib/import-format'
+import {
+  columnsOf,
+  datasetByKey,
+  detectDataset,
+  matchHeader,
+  normalizeHeader,
+  type Dataset,
+} from '@/lib/import-format'
 import { parseDate, parseNumber } from '@/lib/import-values'
 import { fgiasTemplateOf } from '@/lib/fgias-export'
 import { duplicateIdents, isMangledNumber, isServiceRow, parseSex } from '@/lib/import-rows'
@@ -43,6 +50,16 @@ export type ImportState = {
    * из сорока шести», и вопросов не остаётся.
    */
   fgiasTemplate?: string
+  /**
+   * Набор определить не удалось — форме надо показать выбор.
+   *
+   * Отдельным признаком, а не догадкой по тексту ошибки: сообщение
+   * пишут для человека и переписывают, когда оно плохо читается,
+   * а форма не должна ломаться от правки формулировки.
+   */
+  needsKind?: boolean
+  /** Набор, определённый по шапке, — чтобы сказать, чем грузили. */
+  detected?: string
   /** Значения, которых не нашлось в справочниках, — порода и стадо. */
   unresolved?: string[]
   /**
@@ -1341,8 +1358,15 @@ export async function importDataAction(
       : (user.organization as number | undefined)
   if (!orgId) return { error: 'У пользователя не заполнена организация' }
 
-  const ds = datasetByKey(String(formData.get('kind') || 'animals'))
-  if (!ds) return { error: 'Неизвестный вид данных' }
+  /*
+   * Вид данных берётся из формы, только если человек его назвал сам.
+   * Обычно он этого не делает — набор определяется по шапке ниже,
+   * когда файл уже прочитан. Раньше выбор стоял первым полем формы
+   * и был обязательным, и ошибались в нём чаще, чем в самом файле.
+   */
+  const chosen = String(formData.get('kind') || '')
+  const picked = chosen ? datasetByKey(chosen) : undefined
+  if (chosen && !picked) return { error: 'Неизвестный вид данных' }
 
   const file = formData.get('file')
   if (!(file instanceof File) || file.size === 0) return { error: 'Выберите файл' }
@@ -1376,7 +1400,13 @@ export async function importDataAction(
 
   const read = decoded ? { rows: parseCsv(decoded.text) } : readSpreadsheet(bytes)
 
-  if ('error' in read) return { error: read.error, dataset: ds.label }
+  /*
+   * Набор здесь ещё неизвестен — его определяют по шапке, а шапку
+   * из нечитаемого файла не взять. Поэтому отказ без названия набора:
+   * подставить сюда «Животные» значило бы сказать, что мы пытались
+   * прочесть файл животных, чего мы не знаем.
+   */
+  if ('error' in read) return { error: read.error, dataset: picked?.label }
 
   const sheet =
     'sheet' in read
@@ -1390,6 +1420,45 @@ export async function importDataAction(
    */
   const encoding = decoded && decoded.encoding !== 'utf-8' ? decoded.encoding : undefined
 
+  /*
+   * Набор определяется по шапке — и только если человек не назвал его сам.
+   * Названный человеком выбор старше распознавания: он видел файл,
+   * а мы видели заголовки.
+   */
+  const guess = picked ? null : detectDataset((read.rows[0] ?? []).map((h) => String(h ?? '')))
+
+  if (guess && guess.kind === 'unclear') {
+    /*
+     * Отказ, а не выбор наугад. Ошибиться молча здесь означало бы завести
+     * отёлы животными; поэтому система признаётся, что не поняла,
+     * и показывает выбор — тот самый, что убран из формы за ненадобностью
+     * в остальных случаях.
+     */
+    const near = guess.candidates
+      .map((c) => `«${c.dataset.label}» (${c.matched} колонок)`)
+      .join(', ')
+    return {
+      error: near
+        ? `Не удалось определить, что в файле: подходят и ${near}. Выберите вид данных сами.`
+        : 'Не удалось определить, что в файле: ни один набор колонок не узнан. ' +
+          'Проверьте, что шапка стоит первой строкой, и выберите вид данных сами.',
+      needsKind: true,
+      unknownColumns: (read.rows[0] ?? []).map((h) => String(h ?? '')).filter(Boolean).slice(0, 20),
+      sheet,
+      encoding,
+    }
+  }
+
+  const ds = picked ?? (guess && guess.kind === 'sure' ? guess.dataset : undefined)
+  if (!ds) return { error: 'Неизвестный вид данных' }
+
+  /*
+   * Определённый набор называется в ответе. Не «для порядка»: человек
+   * больше ничего не выбирал, и если система поняла файл иначе, чем он,
+   * узнать об этом надо здесь, а не через месяц по недостающим карточкам.
+   */
+  const detected = guess && guess.kind === 'sure' ? ds.label : undefined
+
   const parsed = readTable(read.rows, ds)
   if ('error' in parsed) {
     return {
@@ -1397,6 +1466,7 @@ export async function importDataAction(
       unknownColumns: parsed.unknownColumns,
       fgiasTemplate: parsed.fgiasTemplate,
       dataset: ds.label,
+      detected,
       sheet,
       encoding,
     }
@@ -1540,6 +1610,7 @@ export async function importDataAction(
   return {
     ok: true,
     dataset: ds.label,
+    detected,
     created: res.created,
     updated: res.updated,
     skipped: res.skipped,

@@ -1,7 +1,14 @@
 import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { readSpreadsheet, toXlsx } from '@/lib/xlsx'
-import { columnsOf, datasetByKey, matchHeader } from '@/lib/import-format'
+import {
+  DATASETS,
+  columnsOf,
+  datasetByKey,
+  detectDataset,
+  matchHeader,
+  templateRowsOf,
+} from '@/lib/import-format'
 import {
   columnAt,
   findHeader,
@@ -937,6 +944,69 @@ function fgiasImport() {
   check(fgiasTemplateOf(ours) === null, 'наш образец шаблоном ФГИАС не объявляется', String(fgiasTemplateOf(ours)))
 }
 
+/**
+ * Распознавание набора по шапке — и отказ там, где шапка не решает.
+ *
+ * ## Почему это проверка, а не «и так видно»
+ *
+ * Выбор «что загружаем» убран из формы: ответ лежит в файле, и человек
+ * ошибался в этом поле чаще, чем в самом файле. Но раз система теперь
+ * решает сама, она обязана решать верно — и признаваться, когда не может.
+ *
+ * Худший исход здесь не «не распознал», а «распознал уверенно и неверно»:
+ * файл отёлов, залитый как животные, заводит тысячу карточек-призраков.
+ * Поэтому утверждения написаны в обе стороны.
+ */
+function datasetDetection() {
+  console.log('\nРаспознавание набора по шапке\n')
+
+  /* Свои образцы обязаны узнаваться все и без сомнений. */
+  for (const ds of DATASETS) {
+    const g = detectDataset(templateRowsOf(ds).headers)
+    check(
+      g.kind === 'sure' && g.dataset.key === ds.key,
+      `образец «${ds.label}» узнаётся сам собой`,
+      g.kind === 'sure' ? g.dataset.label : 'неясно',
+    )
+  }
+
+  /*
+   * Шаблон ФГИАС «Основные сведения» — это животные, и распознаться он
+   * должен без подсказки: ради этого всё и делалось.
+   */
+  const main = join('data/shablony-fgias', 'КРС_Основные_сведения_v.2.1_2.6.0.xlsx')
+  if (existsSync(main)) {
+    const r = readSpreadsheet(new Uint8Array(readFileSync(main)))
+    if (!('error' in r)) {
+      const g = detectDataset((r.rows[0] ?? []).map((t) => t.trim()).filter(Boolean))
+      check(
+        g.kind === 'sure' && g.dataset.key === 'animals',
+        'шаблон ФГИАС «Основные сведения» узнаётся как «Животные»',
+        g.kind === 'sure' ? g.dataset.label : 'неясно',
+      )
+    }
+  }
+
+  /*
+   * И обратная сторона: то, чего мы не понимаем, объявляется непонятым.
+   * Пустая шапка и шапка из чужих слов не должны давать уверенного
+   * ответа — иначе первый же файл не про скот уедет в «Животные».
+   */
+  const empty = detectDataset([])
+  check(empty.kind === 'unclear', 'пустая шапка — «неясно», а не «Животные» по умолчанию')
+
+  const nonsense = detectDataset(['Наименование', 'Количество', 'Цена', 'Сумма'])
+  check(nonsense.kind === 'unclear', 'накладная не объявляется набором книги')
+
+  /*
+   * Один только номер животного не решает ничего: он есть во всех
+   * четырёх наборах. Файл из одной такой колонки обязан вызвать вопрос,
+   * а не выбор.
+   */
+  const bare = detectDataset(['Инд.№'])
+  check(bare.kind === 'unclear', 'один номер животного набора не определяет', JSON.stringify(bare.kind))
+}
+
 /* ------------------------------------------------------------------ */
 
 columns()
@@ -947,6 +1017,7 @@ summary()
 ageGroups()
 mainSheet()
 fgiasImport()
+datasetDetection()
 templates()
 roundtrip()
 forecastKeys()
