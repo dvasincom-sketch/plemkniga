@@ -2,6 +2,7 @@ import 'dotenv/config'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { biggestHerd } from '@/lib/biggest-herd'
+import { maskUri, resolveDatabase } from '@/lib/db-url'
 import { WEIGHING_SIGNS } from '@/lib/weighing'
 import { ISAG_LOCI, isagField } from '@/lib/isag'
 
@@ -34,6 +35,10 @@ import { ISAG_LOCI, isagField } from '@/lib/isag'
  *   npm run seed:fgias -- --drop — убрать
  *   npm run seed:fgias -- --org 12
  *
+ * В удалённую базу — только с подтверждением, см. `isLocalDatabase` ниже:
+ *
+ *   DATABASE_URI="postgresql://…" SEED_CONFIRM=1 npm run seed:fgias
+ *
  * ## Почему не на всё стадо
  *
  * Двадцати животных хватает, чтобы увидеть каждый раздел и каждый вид
@@ -59,7 +64,54 @@ const monthsAgo = (n: number): string => {
   return d.toISOString().slice(0, 10)
 }
 
+/**
+ * Предохранитель: в удалённую базу выдумка не поедет без слова вслух.
+ *
+ * ## Почему он здесь появился
+ *
+ * Этот сид не стирает ничего — тем он и отличается от `npm run seed`,
+ * у которого предохранитель стоит с тех пор, как его запуск однажды
+ * уничтожил данные на проде. Но он делает другое и по-своему скверное:
+ * дописывает выдуманные записи к настоящим животным настоящего
+ * хозяйства.
+ *
+ * Стереть можно восстановить из копии. Смешать выдумку с настоящими
+ * данными нельзя «откатить»: часть пометок сотрут при первой же правке
+ * руками, и через месяц никто не скажет, какие взвешивания наши.
+ *
+ * ## Почему по признаку «не локальная», а не по `NODE_ENV`
+ *
+ * `NODE_ENV` описывает, как собрано приложение, а не куда смотрит база.
+ * Скрипт запускают со своей машины с прод-строкой в переменной — ровно
+ * так, как в документации запускают миграции, — и `NODE_ENV` там
+ * остаётся `development`. Спрашивать надо про базу, а спрашивает
+ * `NODE_ENV` про сборку.
+ *
+ * Локальная база узнаётся по хосту. Всё остальное считается чужим,
+ * включая базы коллег: писать выдумку в чужую книгу без спроса не лучше,
+ * чем в прод.
+ */
+const isLocalDatabase = (uri: string): boolean =>
+  /@(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(uri) || !/@/.test(uri)
+
 async function main() {
+  const db = resolveDatabase()
+  const local = isLocalDatabase(db.uri ?? '')
+
+  console.log(`\nБаза: ${maskUri(db.uri ?? '')}`)
+
+  if (!local && process.env.SEED_CONFIRM !== '1') {
+    console.error(
+      '\nЭто не локальная база, а сид пишет в неё демонстрационные записи —\n' +
+        'взвешивания, выставки и реквизиты ДНК-теста настоящим животным.\n\n' +
+        'Стереть лишнее можно (--drop), но не всё: ДНК-подробности дописаны\n' +
+        'к чужим записям, и отличить их от внесённых руками потом нельзя.\n\n' +
+        'Если это осознанно — тем же запуском с подтверждением:\n' +
+        '  SEED_CONFIRM=1 npm run seed:fgias\n',
+    )
+    process.exit(1)
+  }
+
   const payload = await getPayload({ config })
 
   const orgId = arg('org') ? Number(arg('org')) : await biggestHerd(payload)
