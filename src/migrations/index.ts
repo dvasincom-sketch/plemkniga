@@ -4,6 +4,7 @@ import * as migration_20260830_230000_weighings from './20260830_230000_weighing
 import * as migration_20260831_090000_dna_isag from './20260831_090000_dna_isag';
 import * as migration_20260831_120000_birth_place from './20260831_120000_birth_place';
 import * as migration_20260901_090000_gradings_and_calving_event from './20260901_090000_gradings_and_calving_event';
+import * as migration_20260901_150000_exterior_scales_and_semen_stock from './20260901_150000_exterior_scales_and_semen_stock';
 import * as migration_20260814_195548 from './20260814_195548';
 import * as migration_20260815_061539 from './20260815_061539';
 import * as migration_20260815_075706 from './20260815_075706';
@@ -359,5 +360,10 @@ export const migrations = [
     up: migration_20260901_090000_gradings_and_calving_event.up,
     down: migration_20260901_090000_gradings_and_calving_event.down,
     name: '20260901_090000_gradings_and_calving_event',
+  },
+  {
+    up: migration_20260901_150000_exterior_scales_and_semen_stock.up,
+    down: migration_20260901_150000_exterior_scales_and_semen_stock.down,
+    name: '20260901_150000_exterior_scales_and_semen_stock',
   },
 ];

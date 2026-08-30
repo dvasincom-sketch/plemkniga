@@ -1736,6 +1736,467 @@ export function buildIpc(animals: IpcAnimal[]): Built {
 }
 
 /**
+ * Сводная оценка по стобалльной шкале — три шаблона на одну запись.
+ *
+ * ## Один осмотр, три формы
+ *
+ * Реестр разложил сводную оценку по трём шаблонам: корова, бык,
+ * молодняк. Наборы у них разные, шкалы у двух совпадают, у третьего
+ * своя. В книге это одна запись об осмотре: бонитёр приезжает и ставит
+ * всё, что положено этому животному по возрасту и полу.
+ *
+ * ## Наборы расходятся ровно на одном поле
+ *
+ * У коровы реестр спрашивает качество вымени, у быка — заднюю часть
+ * туловища: вымени у него нет, и оценивают то, что он передаёт дочерям.
+ * Остальные четыре — пара к паре, хотя названы по-разному: «выраженность
+ * молочного типа» у коровы и «молочные признаки» у быка это одно и то же,
+ * а «общий вид и развитие» и «общий вид» отличаются только словом.
+ *
+ * Списки заголовков и полей идут парами по той же причине, что
+ * у линейной оценки: разведи их — и оценка ног уедет в колонку вымени
+ * молча, потому что оба числа лежат в шкале 50–100.
+ */
+export const TYPE_TRAITS: { title: string; key: string }[] = [
+  { title: 'Объем туловища', key: 'bodyVolume' },
+  { title: 'Выраженность молочного типа', key: 'dairyCharacter' },
+  { title: 'Качество ног', key: 'legQuality' },
+  { title: 'Качество вымени', key: 'udderQuality' },
+  { title: 'Общий вид и развитие', key: 'generalView' },
+]
+
+export const BULL_TRAITS: { title: string; key: string }[] = [
+  { title: 'Общий вид', key: 'generalView' },
+  { title: 'Объём туловища', key: 'bodyVolume' },
+  { title: 'Молочные признаки', key: 'dairyCharacter' },
+  { title: 'Задняя часть туловища', key: 'rearBody' },
+  { title: 'Качество ног', key: 'legQuality' },
+]
+
+/**
+ * Экстерьер молодняка. Шкалы короткие и разные: у общего вида
+ * и конечностей 1–3, у туловища 1–4. Границы стоят при каждом признаке,
+ * а не общей парой чисел, — иначе «4» в общем виде уехало бы как
+ * допустимое.
+ */
+export const YOUNG_TRAITS: { title: string; key: string; max: number }[] = [
+  { title: 'Общий вид', key: 'youngGeneral', max: 3 },
+  {
+    title: 'Голова и шея, грудь, холка, спина, поясница, средняя часть туловища, зад',
+    key: 'youngBody',
+    max: 4,
+  },
+  { title: 'Конечности и копыта', key: 'youngLegs', max: 3 },
+]
+
+/** Шкала сводной оценки, объявленная контрактом шаблонов. */
+export const SCORE_MIN = 50
+export const SCORE_MAX = 100
+
+/** Общая голова трёх шаблонов сводной оценки. */
+const scoreHead = (withLactation: boolean): FgiasColumn[] => [
+  { title: 'Базовый номер ФГИАС ПР', type: 'uuid', width: 38 },
+  { title: 'Идентификатор строки ФГИАС ПР', type: 'uuid', width: 38 },
+  { title: 'Идентификатор учётной системы', type: 'string', width: 38 },
+  { title: 'Дата оценки', type: 'date', width: 14 },
+  ...(withLactation ? [{ title: 'Номер отела', type: 'int' as const }] : []),
+  { title: 'Наименование организации-оценщика', type: 'string', width: 30 },
+  { title: 'Страна регистрации организации-оценщика', type: 'uuid', width: 38 },
+  { title: 'ИНН организации-оценщика', type: 'string', width: 14 },
+  { title: 'КПП организации-оценщика', type: 'string', width: 12 },
+]
+
+export const TYPE_COLUMNS: FgiasColumn[] = [
+  ...scoreHead(true),
+  ...TYPE_TRAITS.map((t) => ({ title: t.title, type: 'int' as const })),
+]
+
+export const BULL_COLUMNS: FgiasColumn[] = [
+  ...scoreHead(false),
+  ...BULL_TRAITS.map((t) => ({ title: t.title, type: 'int' as const })),
+]
+
+export const YOUNG_COLUMNS: FgiasColumn[] = [
+  ...scoreHead(false),
+  ...YOUNG_TRAITS.map((t) => ({ title: t.title, type: 'int' as const })),
+]
+
+export type ScoreAssessor = {
+  name?: string | null
+  inn?: string | null
+  kpp?: string | null
+  countryUuid?: string | null
+}
+
+export type ScoreSheet = {
+  date?: string | null
+  lactation?: number | null
+  assessor?: ScoreAssessor | null
+  traits?: Record<string, number | null | undefined> | null
+}
+
+export type ScoreAnimal = {
+  identNumber: string
+  accountingId?: string | null
+  baseUuid?: string | null
+  /** Пол: у быка свой набор признаков и нет номера отёла. */
+  sex?: string | null
+  scores?: ScoreSheet[] | null
+}
+
+/**
+ * Сводная оценка — общий сборщик трёх шаблонов.
+ *
+ * ## Что обязательно
+ *
+ * Дата и хотя бы один признак в своей шкале. Осмотр, в котором
+ * не заполнено ничего, — дата и подпись без содержания.
+ *
+ * ## Значение вне шкалы придерживается
+ *
+ * Не прижимается к краю. Сорок девять баллов там, где шкала начинается
+ * с пятидесяти, означают, что в поле попало что-то другое: балл
+ * по линейной шкале, опечатка, чужой формат. Обрезать его до пятидесяти
+ * значило бы выдать чужое измерение за своё — то же правило, что
+ * в линейной оценке.
+ *
+ * ## Пол решает, какой шаблон собирается
+ *
+ * Бык в коровий файл не попадает и наоборот. Это не строгость ради
+ * строгости: у быка нет номера отёла и нет вымени, и его оценка,
+ * уехавшая коровьим шаблоном, была бы принята — с пустым выменем
+ * и чужим набором колонок.
+ */
+function buildScores(
+  animals: ScoreAnimal[],
+  opts: {
+    columns: FgiasColumn[]
+    traits: { title: string; key: string; max?: number }[]
+    withLactation: boolean
+    min: number
+    /** Кого берём: `male` — быки, `female` — коровы и тёлки. */
+    sex: 'male' | 'female'
+    what: string
+  },
+): Built {
+  const rows: (string | number)[][] = []
+  const held: Held[] = []
+
+  const txt = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : '')
+
+  for (const a of animals) {
+    const mine = opts.sex === 'male' ? a.sex === 'male' : a.sex !== 'male'
+    if (!mine) continue
+
+    const list = (a.scores ?? []).filter(Boolean)
+    if (list.length === 0) continue
+
+    if (!a.baseUuid || !a.accountingId) {
+      held.push({
+        identNumber: a.identNumber,
+        what: `${opts.what}: ${list.length}`,
+        why: a.baseUuid ? 'Идентификатор учётной системы' : 'Базовый номер ФГИАС ПР',
+      })
+      continue
+    }
+
+    for (const s of list) {
+      const date = fgiasDate(s.date)
+      if (!date) {
+        held.push({ identNumber: a.identNumber, what: opts.what, why: 'Дата оценки' })
+        continue
+      }
+
+      const values = opts.traits.map((t) => {
+        const n = fgiasInt(s.traits?.[t.key]).value
+        if (n === undefined) return ''
+        return n >= opts.min && n <= (t.max ?? SCORE_MAX) ? n : ''
+      })
+
+      if (values.every((v) => v === '')) {
+        held.push({
+          identNumber: a.identNumber,
+          what: `${opts.what} ${date}`,
+          why: 'Ни одной оценки в своей шкале',
+        })
+        continue
+      }
+
+      const lact = fgiasInt(s.lactation)
+
+      rows.push([
+        a.baseUuid,
+        '',
+        a.accountingId,
+        date,
+        ...(opts.withLactation ? [lact.value ?? ''] : []),
+        txt(s.assessor?.name),
+        txt(s.assessor?.countryUuid),
+        txt(s.assessor?.inn),
+        txt(s.assessor?.kpp),
+        ...values,
+      ])
+    }
+  }
+
+  return { columns: opts.columns, rows, held, rounded: 0 }
+}
+
+/** Корова: оценка типа телосложения — четырнадцать колонок. */
+export const buildTypeScores = (animals: ScoreAnimal[]): Built =>
+  buildScores(animals, {
+    columns: TYPE_COLUMNS,
+    traits: TYPE_TRAITS,
+    withLactation: true,
+    min: SCORE_MIN,
+    sex: 'female',
+    what: 'оценок типа телосложения',
+  })
+
+/** Бык: комплексная оценка экстерьера — тринадцать колонок. */
+export const buildBullScores = (animals: ScoreAnimal[]): Built =>
+  buildScores(animals, {
+    columns: BULL_COLUMNS,
+    traits: BULL_TRAITS,
+    withLactation: false,
+    min: SCORE_MIN,
+    sex: 'male',
+    what: 'комплексных оценок',
+  })
+
+/** Экстерьер молодняка (самки) — одиннадцать колонок, шкалы 1–3 и 1–4. */
+export const buildYoungScores = (animals: ScoreAnimal[]): Built =>
+  buildScores(animals, {
+    columns: YOUNG_COLUMNS,
+    traits: YOUNG_TRAITS,
+    withLactation: false,
+    min: 1,
+    sex: 'female',
+    what: 'оценок молодняка',
+  })
+
+/**
+ * Десять колонок шаблона «КРС_Наличие_спермопродукции_v1.2».
+ *
+ * «КПП собственника» здесь снова с переносом строки внутри ячейки,
+ * как у лаборатории в контрольном доении, и снова сохранён дословно.
+ */
+export const SEMEN_COLUMNS: FgiasColumn[] = [
+  { title: 'Базовый номер ФГИАС ПР', type: 'uuid', width: 38 },
+  { title: 'Идентификатор строки ФГИАС ПР', type: 'uuid', width: 38 },
+  { title: 'Идентификатор учётной системы', type: 'string', width: 38 },
+  { title: 'Дата обновления', type: 'date', width: 14 },
+  { title: 'Семенной код', type: 'string', width: 18 },
+  { title: 'Статус наличия', type: 'string', width: 12 },
+  { title: 'Наименование собственника', type: 'string', width: 34 },
+  { title: 'ИНН собственника', type: 'string', width: 14 },
+  { title: 'КПП собственника \n(при наличии)', type: 'string', width: 12 },
+  { title: 'ОГРНИП собственника (обязательно для ИП)', type: 'string', width: 18 },
+]
+
+export type SemenAnimal = {
+  identNumber: string
+  accountingId?: string | null
+  baseUuid?: string | null
+  sex?: string | null
+  code?: string | null
+  available?: boolean | null
+  updatedAt?: string | null
+  owner?: { name?: string | null; inn?: string | null; kpp?: string | null; ogrn?: string | null } | null
+}
+
+/**
+ * Наличие спермопродукции — по строке на быка.
+ *
+ * ## Что обязательно
+ *
+ * Семенной код и дата обновления. Код — то, чем семя названо в каталоге
+ * и на соломинке; без него строка не отвечает на вопрос, чего именно
+ * есть в наличии. Дата отвечает на второй вопрос: на какой день верно
+ * «есть». Утверждение о складе без даты протухает молча — «семя есть»
+ * годичной давности хуже пустоты, потому что выглядит как ответ.
+ *
+ * ## «Нет в наличии» — это тоже ответ
+ *
+ * Строка с `FALSE` уезжает наравне с `TRUE`. Реестр спрашивает статус,
+ * а не наличие: «семени больше нет» — сведение, которого он ждёт,
+ * и молчание вместо него означало бы, что семя всё ещё есть.
+ *
+ * ## ОГРНИП только у предпринимателя
+ *
+ * Контракт требует его при двенадцатизначном ИНН и не хочет при
+ * десятизначном. Проверяется длиной ИНН, а не отдельным признаком:
+ * длина и есть то, чем предприниматель отличается от организации
+ * в этом номере.
+ */
+export function buildSemen(animals: SemenAnimal[]): Built {
+  const rows: (string | number)[][] = []
+  const held: Held[] = []
+
+  const txt = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : '')
+
+  for (const a of animals) {
+    /* Спермопродукция бывает только у быка — у коровы её не спрашивают. */
+    if (a.sex !== 'male') continue
+
+    const code = txt(a.code)
+    const date = fgiasDate(a.updatedAt)
+
+    /* Быка, о складе которого ничего не заведено, не придерживаем. */
+    if (!code && !date && a.available === null) continue
+    if (!code && !date && a.available === undefined) continue
+
+    if (!a.baseUuid || !a.accountingId) {
+      held.push({
+        identNumber: a.identNumber,
+        what: 'наличие спермопродукции',
+        why: a.baseUuid ? 'Идентификатор учётной системы' : 'Базовый номер ФГИАС ПР',
+      })
+      continue
+    }
+
+    const missing = !code ? 'Семенной код' : !date ? 'Дата обновления' : null
+    if (missing) {
+      held.push({ identNumber: a.identNumber, what: 'наличие спермопродукции', why: missing })
+      continue
+    }
+
+    const inn = txt(a.owner?.inn)
+
+    rows.push([
+      a.baseUuid,
+      '',
+      a.accountingId,
+      date!,
+      code,
+      a.available ? 'TRUE' : 'FALSE',
+      txt(a.owner?.name),
+      inn,
+      /* КПП не бывает у предпринимателя — контракт запрещает его при ИНН из двенадцати цифр. */
+      inn.length === 12 ? '' : txt(a.owner?.kpp),
+      inn.length === 12 ? txt(a.owner?.ogrn) : '',
+    ])
+  }
+
+  return { columns: SEMEN_COLUMNS, rows, held, rounded: 0 }
+}
+
+/**
+ * Восемь колонок шаблона «подтверждение_владения_2.0».
+ *
+ * Единственный шаблон из двадцати, где «Идентификатора учётной системы»
+ * нет вовсе — как и в родословной. Животное названо только номером
+ * реестра, и сдать эти сведения можно лишь после регистрации.
+ */
+export const OWNERSHIP_COLUMNS: FgiasColumn[] = [
+  { title: 'Базовый номер ФГИАС ПР', type: 'uuid', width: 38 },
+  { title: 'Событие, Тип поступления', type: 'uuid', width: 38 },
+  { title: 'Событие, Дата поступления', type: 'date', width: 14 },
+  { title: 'Страна регистрации собственника', type: 'uuid', width: 38 },
+  { title: 'Наименование собственника', type: 'string', width: 34 },
+  { title: 'ИНН собственника', type: 'string', width: 14 },
+  { title: 'КПП собственника', type: 'string', width: 12 },
+  { title: 'ОГРН/ОГРНИП собственника', type: 'string', width: 18 },
+]
+
+export type OwnershipAnimal = {
+  identNumber: string
+  baseUuid?: string | null
+  /** Тип поступления ключом реестра — подставляет вызывающий. */
+  arrivalUuid?: string | null
+  arrivalDate?: string | null
+  owner?: {
+    name?: string | null
+    inn?: string | null
+    kpp?: string | null
+    ogrn?: string | null
+    countryUuid?: string | null
+  } | null
+}
+
+/**
+ * Подтверждение владения — по строке на животное.
+ *
+ * ## Что это вообще за отчёт
+ *
+ * Не история движений, как можно решить по названию, а одно
+ * утверждение: кто владеет животным сегодня и как оно к нему попало.
+ * Реестру нужно связать животное с собственником; путь, которым оно
+ * прошло через три хозяйства, его здесь не интересует.
+ *
+ * ## Как узнаётся тип поступления
+ *
+ * Двумя способами, и оба — записи, а не догадки. Если есть перемещение
+ * к нынешнему владельцу, тип берётся из него: продажа — «Покупка»,
+ * поступление извне — «Импорт». Если перемещений нет, но хозяйство
+ * рождения совпадает с владельцем, это «Рождение», и дата поступления —
+ * дата рождения.
+ *
+ * ## Почему «нет записей» не читается как «родилось здесь»
+ *
+ * Соблазн: раз животное наше и никуда не приезжало, значит родилось
+ * у нас. Соблазн неверен. Хозяйство, перенёсшее историю из прежней
+ * системы учёта, не имеет перемещений вовсе — и все его покупные коровы
+ * уехали бы в реестр как рождённые здесь. Это ложь государству
+ * о происхождении, и делается она молча.
+ *
+ * Поэтому такая строка придерживается с причиной «Неизвестно, как
+ * животное поступило». Причина действенная: заполнить место рождения
+ * или записать перемещение — обе работы понятны и по силам хозяйству.
+ */
+export function buildOwnership(animals: OwnershipAnimal[]): Built {
+  const rows: (string | number)[][] = []
+  const held: Held[] = []
+
+  const txt = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : '')
+
+  for (const a of animals) {
+    if (!a.baseUuid) {
+      held.push({
+        identNumber: a.identNumber,
+        what: 'подтверждение владения',
+        why: 'Базовый номер ФГИАС ПР',
+      })
+      continue
+    }
+
+    const arrival = txt(a.arrivalUuid)
+    const date = fgiasDate(a.arrivalDate)
+
+    if (!arrival || !date) {
+      held.push({
+        identNumber: a.identNumber,
+        what: 'подтверждение владения',
+        why: 'Неизвестно, как животное поступило',
+      })
+      continue
+    }
+
+    if (!txt(a.owner?.name)) {
+      held.push({
+        identNumber: a.identNumber,
+        what: 'подтверждение владения',
+        why: 'Наименование собственника',
+      })
+      continue
+    }
+
+    rows.push([
+      a.baseUuid,
+      arrival,
+      date,
+      txt(a.owner?.countryUuid),
+      txt(a.owner?.name),
+      txt(a.owner?.inn),
+      txt(a.owner?.kpp),
+      txt(a.owner?.ogrn),
+    ])
+  }
+
+  return { columns: OWNERSHIP_COLUMNS, rows, held, rounded: 0 }
+}
+
+/**
  * Справочник «Признаки молочной продуктивности» (`sp_signums`).
  *
  * Две записи, обе прочитаны из открытого реестра 30 августа 2026 года.

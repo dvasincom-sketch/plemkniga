@@ -34,8 +34,23 @@ import {
   LINEAR_MIN,
   LINEAR_MAX,
   IPC_COLUMNS,
+  TYPE_COLUMNS,
+  BULL_COLUMNS,
+  YOUNG_COLUMNS,
+  SEMEN_COLUMNS,
+  OWNERSHIP_COLUMNS,
+  TYPE_TRAITS,
+  BULL_TRAITS,
+  YOUNG_TRAITS,
+  SCORE_MIN,
+  SCORE_MAX,
   buildLinear,
   buildIpc,
+  buildTypeScores,
+  buildBullScores,
+  buildYoungScores,
+  buildSemen,
+  buildOwnership,
   buildInseminations,
   buildMilkTests,
   buildCalvingCalves,
@@ -70,6 +85,7 @@ import {
 } from '@/lib/fgias-main'
 import { ISAG_LOCI, authMethodUuid, isagField, VERDICT_UUID } from '@/lib/isag'
 import { COMPLEX_GRADE_UUID } from '@/lib/grading'
+import { ARRIVAL_TYPES, arrivalTypeOf } from '@/lib/movements'
 import { FGIAS_EXPORTS } from '@/lib/fgias-exports'
 import { FGIAS_TEMPLATES } from '@/lib/fgias-templates'
 import { birthTypeOf, birthTypeUuid, calvingEaseUuid, calvingEventUuid } from '@/lib/calving'
@@ -635,6 +651,36 @@ function templates() {
       file: 'КРС_Индекс_племенной_ценности_v1.2_2.6.0.xlsx',
       titles: IPC_COLUMNS.map((c) => c.title),
       label: 'Индекс племенной ценности',
+    },
+    {
+      file: 'КРС_Корова_Молочное_Оценка_типа_телосложения_v1.2_2.6.0.xlsx',
+      titles: TYPE_COLUMNS.map((c) => c.title),
+      label: 'Корова: оценка типа телосложения',
+    },
+    {
+      file: 'КРС_Бык_Молочный_Комплексная_оценка_экстерьера_v1.1_2.6.0.xlsx',
+      titles: BULL_COLUMNS.map((c) => c.title),
+      label: 'Бык: комплексная оценка экстерьера',
+    },
+    {
+      file: 'КРС_Молочное_самки_оценка_экстерьера_молодняка_v1.1_2.6.0.xlsx',
+      titles: YOUNG_COLUMNS.map((c) => c.title),
+      label: 'Экстерьер молодняка (самки)',
+    },
+    {
+      file: 'КРС_Наличие_спермопродукции_v1.2_2.6.0.xlsx',
+      titles: SEMEN_COLUMNS.map((c) => c.title),
+      label: 'Наличие спермопродукции',
+    },
+    {
+      /*
+       * Имя файла у этого шаблона выбивается из ряда: без приставки
+       * «КРС_» и с версией через подчёркивание. Списано как есть —
+       * искать его «как у всех» значило бы не найти.
+       */
+      file: 'подтверждение_владения_2.0_1.xlsx',
+      titles: OWNERSHIP_COLUMNS.map((c) => c.title),
+      label: 'Подтверждение владения',
     },
   ]
 
@@ -1628,6 +1674,235 @@ function ipc() {
 }
 
 /**
+ * Сводная оценка: три шаблона, три набора, отбор по полу.
+ */
+function scores() {
+  console.log('\nСводная оценка 50–100: что уезжает\n')
+
+  const base = {
+    accountingId: '1a421c44-36d2-41c3-881e-38bf83c4f756',
+    baseUuid: '60b5cc43-7b0a-416d-920b-6782c2192fcf',
+    assessor: {
+      name: 'ООО «Ставропольский фермер»',
+      inn: '1234567890',
+      kpp: '123456789',
+      countryUuid: 'b425442a-d055-43e1-9931-1d3b6d5592cd',
+    },
+  }
+
+  const all: Record<string, number> = {
+    generalView: 82,
+    bodyVolume: 79,
+    dairyCharacter: 85,
+    legQuality: 77,
+    udderQuality: 88,
+    rearBody: 81,
+    youngGeneral: 2,
+    youngBody: 3,
+    youngLegs: 2,
+  }
+
+  const cow = {
+    identNumber: 'RU0000000070028',
+    ...base,
+    sex: 'female',
+    scores: [{ date: '2026-04-10T00:00:00.000Z', lactation: 2, assessor: base.assessor, traits: all }],
+  }
+  const bull = { ...cow, identNumber: 'RU0000000070029', sex: 'male' }
+
+  /* --- Корова: оценка типа телосложения --- */
+
+  const t = buildTypeScores([cow, bull])
+  check(t.rows.length === 1, 'бык в коровий шаблон не попадает', String(t.rows.length))
+  check(t.rows[0]!.length === 14, 'в строке четырнадцать значений', String(t.rows[0]!.length))
+  check(t.rows[0]![4] === 2, 'номер отёла на своём месте', String(t.rows[0]![4]))
+  const tAt = (title: string) => TYPE_COLUMNS.findIndex((c) => c.title === title)
+  check(t.rows[0]![tAt('Качество вымени')] === 88, 'качество вымени попало в свою колонку')
+  check(t.rows[0]![tAt('Качество ног')] === 77, 'а качество ног — в свою')
+
+  /* --- Бык: другой набор и нет номера отёла --- */
+
+  const b = buildBullScores([cow, bull])
+  check(b.rows.length === 1, 'корова в бычий шаблон не попадает', String(b.rows.length))
+  check(b.rows[0]!.length === 13, 'в строке тринадцать значений — без номера отёла', String(b.rows[0]!.length))
+  const bAt = (title: string) => BULL_COLUMNS.findIndex((c) => c.title === title)
+  /*
+   * У быка вместо вымени — задняя часть туловища. Перепутать их
+   * особенно легко: оба числа лежат в одной шкале, и реестр примет
+   * любое.
+   */
+  check(b.rows[0]![bAt('Задняя часть туловища')] === 81, 'у быка вместо вымени — задняя часть')
+  check(
+    !BULL_COLUMNS.some((c) => c.title.includes('вымени')),
+    'и колонки про вымя в бычьем шаблоне нет вовсе',
+  )
+  check(
+    BULL_TRAITS.length === 5 && TYPE_TRAITS.length === 5,
+    'наборов по пять признаков в обоих',
+  )
+
+  /* --- Молодняк: свои короткие шкалы --- */
+
+  const y = buildYoungScores([cow])
+  check(y.rows.length === 1, 'оценка молодняка уезжает')
+  check(y.rows[0]!.length === 11, 'в строке одиннадцать значений', String(y.rows[0]!.length))
+  check(YOUNG_TRAITS.length === 3, 'признаков три', String(YOUNG_TRAITS.length))
+  /*
+   * Шкалы разные внутри одного шаблона: у общего вида 1–3, у туловища
+   * 1–4. Общая пара границ пропустила бы четвёрку в общий вид.
+   */
+  const four = buildYoungScores([
+    { ...cow, scores: [{ ...cow.scores[0]!, traits: { ...all, youngGeneral: 4 } }] },
+  ])
+  const yAt = (title: string) => YOUNG_COLUMNS.findIndex((c) => c.title === title)
+  check(four.rows[0]![yAt('Общий вид')] === '', 'четвёрка в шкалу 1–3 не проходит')
+  check(four.rows[0]![yAt('Конечности и копыта')] === 2, 'а соседний признак остаётся на месте')
+
+  /* --- Общие правила --- */
+
+  const outside = buildTypeScores([
+    { ...cow, scores: [{ ...cow.scores[0]!, traits: { ...all, legQuality: 49 } }] },
+  ])
+  check(
+    outside.rows[0]![tAt('Качество ног')] === '',
+    'значение ниже пятидесяти не прижимается к краю шкалы',
+  )
+  check(SCORE_MIN === 50 && SCORE_MAX === 100, 'шкала взята из контракта шаблонов')
+
+  const empty = buildTypeScores([{ ...cow, scores: [{ ...cow.scores[0]!, traits: {} }] }])
+  check(
+    empty.rows.length === 0 && empty.held[0]?.why === 'Ни одной оценки в своей шкале',
+    'пустой осмотр придержан и причина названа',
+    String(empty.held[0]?.why),
+  )
+}
+
+/**
+ * Спермопродукция: «нет» — тоже ответ, ОГРНИП по длине ИНН.
+ */
+function semen() {
+  console.log('\nНаличие спермопродукции: что уезжает\n')
+
+  const bull = {
+    identNumber: 'RU0000000070029',
+    accountingId: '1a421c44-36d2-41c3-881e-38bf83c4f756',
+    baseUuid: '60b5cc43-7b0a-416d-920b-6782c2192fcf',
+    sex: 'male',
+    code: 'HOL-4821',
+    available: true,
+    updatedAt: '2026-08-01T00:00:00.000Z',
+    owner: {
+      name: 'ООО «Ромашка»',
+      inn: '3924003136',
+      kpp: '392401001',
+      ogrn: '1023900000000',
+    },
+  }
+
+  const ok = buildSemen([bull])
+  check(ok.rows.length === 1, 'бык с семенем уезжает')
+  check(ok.rows[0]!.length === 10, 'в строке десять значений', String(ok.rows[0]!.length))
+  check(ok.rows[0]![5] === 'TRUE', 'статус наличия словом, как в примере шаблона')
+
+  /*
+   * «Нет в наличии» — сведение, а не пустота. Реестр спрашивает статус,
+   * и молчание он прочтёт как «семя всё ещё есть».
+   */
+  const gone = buildSemen([{ ...bull, available: false }])
+  check(gone.rows.length === 1 && gone.rows[0]![5] === 'FALSE', '«нет в наличии» уезжает наравне с «есть»')
+
+  /* Корову о спермопродукции не спрашивают. */
+  const cow = buildSemen([{ ...bull, sex: 'female' }])
+  check(cow.rows.length === 0 && cow.held.length === 0, 'корова в этот шаблон не попадает')
+
+  /* Бык, о складе которого ничего не заведено, не придерживается. */
+  const unknown = buildSemen([
+    { ...bull, code: null, updatedAt: null, available: null },
+  ])
+  check(unknown.rows.length === 0 && unknown.held.length === 0, 'бык без сведений о складе не придержан')
+
+  /* А заведённый наполовину — придерживается с причиной. */
+  const noDate = buildSemen([{ ...bull, updatedAt: null }])
+  check(
+    noDate.rows.length === 0 && noDate.held[0]?.why === 'Дата обновления',
+    'без даты обновления придержано и причина названа',
+    String(noDate.held[0]?.why),
+  )
+
+  /*
+   * ИНН из двенадцати цифр — предприниматель: КПП у него не бывает,
+   * ОГРНИП обязателен. Различается длиной, потому что длина и есть
+   * то, чем ИП отличается от организации в этом номере.
+   */
+  const ip = buildSemen([
+    {
+      ...bull,
+      owner: { name: 'ИП Иванов', inn: '392400313600', kpp: '392401001', ogrn: '318774600123456' },
+    },
+  ])
+  check(ip.rows[0]![8] === '', 'у предпринимателя КПП не уезжает')
+  check(ip.rows[0]![9] === '318774600123456', 'зато уезжает ОГРНИП')
+  check(ok.rows[0]![9] === '', 'а у организации — наоборот, ОГРНИП пуст')
+}
+
+/**
+ * Подтверждение владения: тип поступления из записи, а не из молчания.
+ */
+function ownership() {
+  console.log('\nПодтверждение владения: что уезжает\n')
+
+  const owner = {
+    name: 'ЗАО «Назаровское»',
+    inn: '2456000123',
+    kpp: '245601001',
+    ogrn: '1022401589000',
+    countryUuid: 'b425442a-d055-43e1-9931-1d3b6d5592cd',
+  }
+  const base = { identNumber: 'RU0000000070028', baseUuid: '60b5cc43-7b0a-416d-920b-6782c2192fcf' }
+
+  const ok = buildOwnership([
+    { ...base, arrivalUuid: ARRIVAL_TYPES.birth, arrivalDate: '2023-03-01T00:00:00.000Z', owner },
+  ])
+  check(ok.rows.length === 1, 'животное с известным поступлением уезжает')
+  check(ok.rows[0]!.length === 8, 'в строке восемь значений', String(ok.rows[0]!.length))
+  /*
+   * Единственный шаблон, кроме родословной, где нашего ключа нет вовсе:
+   * животное названо только номером реестра.
+   */
+  check(
+    !OWNERSHIP_COLUMNS.some((c) => c.title.includes('учётной системы')),
+    'нашего ключа в шаблоне нет — только номер реестра',
+  )
+
+  /*
+   * Молчание не читается как «родилось здесь». У хозяйства, перенёсшего
+   * историю, перемещений нет вовсе, и покупные коровы уехали бы
+   * в реестр рождёнными тут — ложь государству, сказанная молча.
+   */
+  const silent = buildOwnership([{ ...base, arrivalUuid: null, arrivalDate: null, owner }])
+  check(
+    silent.rows.length === 0 && silent.held[0]?.why === 'Неизвестно, как животное поступило',
+    'без записи о поступлении придержано, а не объявлено рождением',
+    String(silent.held[0]?.why),
+  )
+
+  /* Три типа поступления — три разных ключа. */
+  check(
+    arrivalTypeOf('sale') === ARRIVAL_TYPES.purchase &&
+      arrivalTypeOf('import') === ARRIVAL_TYPES.import,
+    'продажа — покупка, поступление извне — импорт',
+  )
+  /*
+   * Аренда и перевод владельца не меняют, выбраковка и падёж —
+   * это выбытие. Ни тем ни другим в справочнике поступлений места нет.
+   */
+  check(
+    ['lease', 'transfer', 'cull', 'death'].every((k) => arrivalTypeOf(k) === undefined),
+    'аренда, перевод, выбраковка и падёж поступлением не считаются',
+  )
+}
+
+/**
  * Опись и кнопки говорят об одном и том же.
  *
  * ## Почему это стоит проверять
@@ -2079,6 +2354,9 @@ calves()
 derived()
 linear()
 ipc()
+scores()
+semen()
+ownership()
 shopWindow()
 dna()
 pedigree()

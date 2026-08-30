@@ -817,6 +817,56 @@ export default async function AnimalPage({
       : []
 
   /*
+   * Сводная оценка последнего осмотра — из записи, а не из карточки.
+   *
+   * Линейные признаки лежат в карточке снимком (`linearScore`), а сводные
+   * оценки — только в записи об осмотре. Заводить им второй снимок
+   * значило бы добавить девять колонок животному ради одного блока;
+   * один запрос дешевле и не расходится с источником.
+   */
+  const scoreSheet =
+    tab === 'evaluation' && maySee('evaluation')
+      ? ((
+          await payload.find({
+            collection: 'animal-exteriors',
+            where: { animal: { equals: animal.id }, isCurrent: { equals: true } },
+            sort: '-assessedAt',
+            limit: 1,
+            depth: 0,
+            overrideAccess: true,
+          })
+        ).docs[0] ?? null)
+      : null
+
+  const scoreRaw = (scoreSheet ?? {}) as Record<string, unknown>
+
+  /*
+   * Наборы у коровы и быка разные: у быка нет вымени, и вместо его
+   * качества оценивают заднюю часть туловища. Показываем то, что
+   * относится к этому животному, а не всё подряд с прочерками.
+   */
+  const SCORE_FIELDS: { key: string; label: string; bull?: boolean; cow?: boolean }[] = [
+    { key: 'generalView', label: 'Общий вид и развитие' },
+    { key: 'bodyVolume', label: 'Объём туловища' },
+    { key: 'dairyCharacter', label: 'Выраженность молочного типа' },
+    { key: 'legQuality', label: 'Качество ног' },
+    { key: 'udderQuality', label: 'Качество вымени', cow: true },
+    { key: 'rearBody', label: 'Задняя часть туловища', bull: true },
+  ]
+
+  const scoreRows = SCORE_FIELDS.filter((f) => (isBull ? !f.cow : !f.bull)).filter(
+    (f) => typeof scoreRaw[f.key] === 'number',
+  )
+
+  const YOUNG_FIELDS: { key: string; label: string; max: number }[] = [
+    { key: 'youngGeneral', label: 'Общий вид', max: 3 },
+    { key: 'youngBody', label: 'Голова, шея, туловище, зад', max: 4 },
+    { key: 'youngLegs', label: 'Конечности и копыта', max: 3 },
+  ]
+
+  const youngRows = YOUNG_FIELDS.filter((f) => typeof scoreRaw[f.key] === 'number')
+
+  /*
    * Бонитировки — история комплексного класса.
    *
    * Область `evaluation`, а не `production`: класс — вывод о племенной
@@ -1767,6 +1817,49 @@ export default async function AnimalPage({
                       trait: t,
                     }))}
                   />
+                </Collapsible>
+              )}
+
+              {/*
+                 Сводная оценка — сразу за линейной, потому что это тот же
+                 осмотр. Показывается только заполненное: шкала 50–100
+                 и шкалы молодняка не бывают у одного животного разом,
+                 а прочерк в таблице читается как потеря данных.
+              */}
+              {(scoreRows.length > 0 || youngRows.length > 0) && (
+                <Collapsible
+                  title="Сводная оценка"
+                  note={
+                    (scoreSheet?.assessedAt ? `Осмотр от ${dateRu(scoreSheet.assessedAt)}. ` : '') +
+                    (scoreRows.length > 0
+                      ? 'Шкала 50–100: не пересчёт линейных признаков, а другое измерение — там «какое животное», здесь «насколько хорошо»'
+                      : 'Экстерьер молодняка по коротким шкалам: тёлку до первого отёла не меряют ни линейно, ни по сотне')
+                  }
+                >
+                  <table className="metric-table min-w-[380px]">
+                    <thead>
+                      <tr>
+                        <th>Признак</th>
+                        <th>Балл</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {scoreRows.map((f) => (
+                        <tr key={f.key}>
+                          <td>{f.label}</td>
+                          <td className="tabular-nums">{String(scoreRaw[f.key])} из 100</td>
+                        </tr>
+                      ))}
+                      {youngRows.map((f) => (
+                        <tr key={f.key}>
+                          <td>{f.label}</td>
+                          <td className="tabular-nums">
+                            {String(scoreRaw[f.key])} из {f.max}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </Collapsible>
               )}
 

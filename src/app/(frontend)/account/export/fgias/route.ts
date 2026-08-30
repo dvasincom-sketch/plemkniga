@@ -16,7 +16,15 @@ import {
   buildService,
   buildLinear,
   buildIpc,
+  buildTypeScores,
+  buildBullScores,
+  buildYoungScores,
+  buildSemen,
+  buildOwnership,
   LINEAR_TRAITS,
+  TYPE_TRAITS,
+  BULL_TRAITS,
+  YOUNG_TRAITS,
   type Built,
   type ExportAnimal,
   type PedigreeSource,
@@ -31,7 +39,11 @@ import {
   type CalvingCalvesAnimal,
   type LinearAnimal,
   type IpcAnimal,
+  type ScoreAnimal,
+  type SemenAnimal,
+  type OwnershipAnimal,
 } from '@/lib/fgias-export'
+import { arrivalTypeOf, ARRIVAL_TYPES } from '@/lib/movements'
 import { buildMain, type MainAnimal } from '@/lib/fgias-main'
 import { fgiasExport } from '@/lib/fgias-exports'
 import { weighingSignUuid } from '@/lib/weighing'
@@ -150,6 +162,25 @@ export async function GET(request: Request) {
     return map
   }
 
+  /**
+   * Ключ страны из загруженного справочника.
+   *
+   * Не константой: страна одна и та же, а ключ у реестра свой и меняется
+   * вместе с версией справочника. Справочник грузится однажды
+   * (`npm run sync:fgias-geo`); если его нет, колонка уйдёт пустой —
+   * и это видно в файле, в отличие от подставленного наугад ключа.
+   */
+  const countryUuid = async (code: string): Promise<string | null> =>
+    payload
+      .find({
+        collection: 'countries',
+        where: { code: { equals: code } },
+        limit: 1,
+        depth: 0,
+        overrideAccess: true,
+      })
+      .then((res) => txt((res.docs as unknown as Row[])[0]?.fgiasUuid))
+
   /** Отёлы животного в том виде, в каком их читают производные таблицы. */
   const pointsOf = (rows: Row[] | undefined): CalvingPoint[] =>
     (rows ?? [])
@@ -267,15 +298,7 @@ export async function GET(request: Request) {
       payload
         .find({ collection: 'organizations', limit: 0, pagination: false, depth: 0, overrideAccess: true })
         .then((res) => new Map((res.docs as unknown as Row[]).map((o) => [o.id as number, o]))),
-      payload
-        .find({
-          collection: 'countries',
-          where: { code: { equals: RUSSIA_CODE } },
-          limit: 1,
-          depth: 0,
-          overrideAccess: true,
-        })
-        .then((res) => txt((res.docs as unknown as Row[])[0]?.fgiasUuid)),
+      countryUuid(RUSSIA_CODE),
       collect('gradings'),
     ])
 
@@ -552,6 +575,147 @@ export async function GET(request: Request) {
       evaluationDate: txt(a.evaluationDate),
     }))
     built = buildIpc(rows)
+  } else if (
+    spec.key === 'typeScore' ||
+    spec.key === 'bullScore' ||
+    spec.key === 'youngScore'
+  ) {
+    /*
+     * Три шаблона из одной записи об осмотре: у реестра они разложены
+     * по полу и возрасту, у нас это одна строка с разными заполненными
+     * блоками. Отбор по полу делает сборщик — здесь просто отдаётся всё,
+     * что есть.
+     */
+    const [byAnimal, orgs, russia] = await Promise.all([
+      collect('animal-exteriors'),
+      payload
+        .find({ collection: 'organizations', limit: 0, pagination: false, depth: 0, overrideAccess: true })
+        .then((res) => new Map((res.docs as unknown as Row[]).map((o) => [o.id as number, o]))),
+      countryUuid(RUSSIA_CODE),
+    ])
+
+    const traits =
+      spec.key === 'typeScore' ? TYPE_TRAITS : spec.key === 'bullScore' ? BULL_TRAITS : YOUNG_TRAITS
+
+    const rows: ScoreAnimal[] = herd.map((a) => ({
+      identNumber: String(a.identNumber ?? ''),
+      accountingId: txt(a.uuid),
+      baseUuid: txt((a.fgias as Row | undefined)?.baseUuid),
+      sex: txt(a.sex),
+      scores: (byAnimal.get(a.id as number) ?? []).map((s) => {
+        const org = orgs.get(rel(s.assessorOrg) ?? -1)
+        const inn = org ? txt(org.inn) : null
+        const values: Record<string, number | null> = {}
+        for (const t of traits) {
+          values[t.key] = typeof s[t.key] === 'number' ? (s[t.key] as number) : null
+        }
+        return {
+          date: txt(s.assessedAt),
+          lactation: typeof s.lactation === 'number' ? s.lactation : null,
+          assessor: org
+            ? {
+                name: txt(org.name),
+                inn,
+                kpp: txt(org.kpp),
+                /* ИНН выдаёт Россия — организация с ИНН в ней и зарегистрирована. */
+                countryUuid: inn ? russia : null,
+              }
+            : null,
+          traits: values,
+        }
+      }),
+    }))
+
+    built =
+      spec.key === 'typeScore'
+        ? buildTypeScores(rows)
+        : spec.key === 'bullScore'
+          ? buildBullScores(rows)
+          : buildYoungScores(rows)
+  } else if (spec.key === 'semen') {
+    /*
+     * Собственник семени может не совпадать с владельцем быка, поэтому
+     * читаются все организации, а не только своя.
+     */
+    const orgs = await payload
+      .find({ collection: 'organizations', limit: 0, pagination: false, depth: 0, overrideAccess: true })
+      .then((res) => new Map((res.docs as unknown as Row[]).map((o) => [o.id as number, o])))
+
+    const rows: SemenAnimal[] = herd.map((a) => {
+      const semen = (a.semen as Row | undefined) ?? {}
+      const stock = (semen.stock as Row | undefined) ?? {}
+      const org = orgs.get(rel(stock.owner) ?? -1)
+      return {
+        identNumber: String(a.identNumber ?? ''),
+        accountingId: txt(a.uuid),
+        baseUuid: txt((a.fgias as Row | undefined)?.baseUuid),
+        sex: txt(a.sex),
+        code: txt(stock.code),
+        available: typeof stock.available === 'boolean' ? stock.available : null,
+        updatedAt: txt(stock.updatedAt),
+        owner: org
+          ? { name: txt(org.name), inn: txt(org.inn), kpp: txt(org.kpp), ogrn: txt(org.ogrn) }
+          : null,
+      }
+    })
+    built = buildSemen(rows)
+  } else if (spec.key === 'ownership') {
+    /*
+     * Тип поступления берётся из перемещения к нынешнему владельцу,
+     * а если перемещений нет — из места рождения. «Записей нет, значит
+     * родилось здесь» — вывод неверный и молчаливый: у хозяйства,
+     * перенёсшего историю, перемещений нет вовсе, и покупные коровы
+     * уехали бы в реестр рождёнными тут.
+     */
+    const [byAnimal, org, russia] = await Promise.all([
+      collect('movements'),
+      payload
+        .findByID({ collection: 'organizations', id: orgId, depth: 0, overrideAccess: true })
+        .catch(() => null),
+      countryUuid(RUSSIA_CODE),
+    ])
+
+    const o = (org ?? null) as unknown as Record<string, unknown> | null
+    const inn = o ? txt(o.inn) : null
+    const owner = o
+      ? {
+          name: txt(o.name),
+          inn,
+          kpp: txt(o.kpp),
+          ogrn: txt(o.ogrn),
+          countryUuid: inn ? russia : null,
+        }
+      : null
+
+    const rows: OwnershipAnimal[] = herd.map((a) => {
+      /* Последнее перемещение к нам по дате — им животное и поступило. */
+      const arrivals = (byAnimal.get(a.id as number) ?? [])
+        .filter((m) => rel(m.to) === orgId && arrivalTypeOf(txt(m.kind)))
+        .sort((x, y) => String(txt(x.date) ?? '').localeCompare(String(txt(y.date) ?? '')))
+      const last = arrivals[arrivals.length - 1]
+
+      if (last) {
+        return {
+          identNumber: String(a.identNumber ?? ''),
+          baseUuid: txt((a.fgias as Row | undefined)?.baseUuid),
+          arrivalUuid: arrivalTypeOf(txt(last.kind)) ?? null,
+          arrivalDate: txt(last.date),
+          owner,
+        }
+      }
+
+      const birth = (a.birthPlace as Row | undefined) ?? {}
+      const bornHere = rel(birth.farm) === orgId
+
+      return {
+        identNumber: String(a.identNumber ?? ''),
+        baseUuid: txt((a.fgias as Row | undefined)?.baseUuid),
+        arrivalUuid: bornHere ? ARRIVAL_TYPES.birth : null,
+        arrivalDate: bornHere ? txt(a.birthDate) : null,
+        owner,
+      }
+    })
+    built = buildOwnership(rows)
   } else if (spec.key === 'shows') {
     const rows: ShowAnimal[] = herd.map((a) => ({
       identNumber: String(a.identNumber ?? ''),

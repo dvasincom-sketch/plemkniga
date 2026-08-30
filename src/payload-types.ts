@@ -506,6 +506,24 @@ export interface Animal {
       r?: number | null;
     };
     inseminations?: number | null;
+    /**
+     * Про склад, а не про качество: есть ли семя и чьё оно
+     */
+    stock?: {
+      /**
+       * Как семя обозначено в каталоге и на соломинке
+       */
+      code?: string | null;
+      available?: boolean | null;
+      /**
+       * На какой день верно «есть» или «нет»
+       */
+      updatedAt?: string | null;
+      /**
+       * Может не совпадать с владельцем быка: он стоит на племпредприятии, а семя разошлось по дистрибьюторам
+       */
+      owner?: (number | null) | Organization;
+    };
   };
   health?: {
     reliabilityLevel?: number | null;
@@ -1616,6 +1634,24 @@ export interface AnimalExterior {
   bodyComposite?: number | null;
   udderComposite?: number | null;
   legsComposite?: number | null;
+  generalView?: number | null;
+  bodyVolume?: number | null;
+  /**
+   * У быка реестр зовёт это «молочными признаками»
+   */
+  dairyCharacter?: number | null;
+  legQuality?: number | null;
+  /**
+   * Только у коровы
+   */
+  udderQuality?: number | null;
+  /**
+   * Только у быка — вместо вымени, которого у него нет
+   */
+  rearBody?: number | null;
+  youngGeneral?: number | null;
+  youngBody?: number | null;
+  youngLegs?: number | null;
   note?: string | null;
   updatedAt: string;
   createdAt: string;
@@ -2924,6 +2960,14 @@ export interface AnimalsSelect<T extends boolean = true> {
               r?: T;
             };
         inseminations?: T;
+        stock?:
+          | T
+          | {
+              code?: T;
+              available?: T;
+              updatedAt?: T;
+              owner?: T;
+            };
       };
   health?:
     | T
@@ -3340,6 +3384,15 @@ export interface AnimalExteriorsSelect<T extends boolean = true> {
   bodyComposite?: T;
   udderComposite?: T;
   legsComposite?: T;
+  generalView?: T;
+  bodyVolume?: T;
+  dairyCharacter?: T;
+  legQuality?: T;
+  udderQuality?: T;
+  rearBody?: T;
+  youngGeneral?: T;
+  youngBody?: T;
+  youngLegs?: T;
   note?: T;
   updatedAt?: T;
   createdAt?: T;
