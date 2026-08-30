@@ -22,6 +22,18 @@ import {
   DNA_COLUMNS,
   GRADE_COLUMNS,
   CALVING_COLUMNS,
+  INSEMINATION_COLUMNS,
+  MILK_TEST_COLUMNS,
+  CALVING_CALVES_COLUMNS,
+  INTERVAL_COLUMNS,
+  SERVICE_COLUMNS,
+  SERVICE_MIN,
+  SERVICE_MAX,
+  buildInseminations,
+  buildMilkTests,
+  buildCalvingCalves,
+  buildIntervals,
+  buildService,
   buildLactations,
   buildPedigree,
   buildDna,
@@ -51,6 +63,8 @@ import {
 } from '@/lib/fgias-main'
 import { ISAG_LOCI, authMethodUuid, isagField, VERDICT_UUID } from '@/lib/isag'
 import { COMPLEX_GRADE_UUID } from '@/lib/grading'
+import { FGIAS_EXPORTS } from '@/lib/fgias-exports'
+import { FGIAS_TEMPLATES } from '@/lib/fgias-templates'
 import { birthTypeOf, birthTypeUuid, calvingEaseUuid, calvingEventUuid } from '@/lib/calving'
 
 /**
@@ -563,10 +577,41 @@ function templates() {
       label: 'Комплексный класс',
     },
     {
-      /* А здесь он вовсе первый — единственный такой шаблон из двадцати. */
+      /* А здесь он вовсе первый — и такой шаблон не один: см. осеменение. */
       file: 'КРС_Отел_Аборт_Запуск_v1.3_2.6.0.xlsx',
       titles: CALVING_COLUMNS.map((c) => c.title),
       label: 'Отёл / Аборт / Запуск',
+    },
+    {
+      file: 'КРС_Осеменение_v1.2_2.6.0.xlsx',
+      titles: INSEMINATION_COLUMNS.map((c) => c.title),
+      label: 'Осеменение',
+    },
+    {
+      /*
+       * «КПП лаборатории (при наличии)» записан в шаблоне с переносом
+       * строки внутри ячейки. Сверка идёт по приведённому виду
+       * (`headerKey` схлопывает пробелы), поэтому у нас он в одну
+       * строку — и именно это здесь и проверяется.
+       */
+      file: 'КРС_Контрольное__доение_v1.2_2.6.0.xlsx',
+      titles: MILK_TEST_COLUMNS.map((c) => c.title),
+      label: 'Контрольное доение',
+    },
+    {
+      file: 'КРС_Молочность_по_отелу_v1.0_2.6.0.xlsx',
+      titles: CALVING_CALVES_COLUMNS.map((c) => c.title),
+      label: 'Молочность по отёлу',
+    },
+    {
+      file: 'КРС_Межотельный_период_v1.1_2.6.0.xlsx',
+      titles: INTERVAL_COLUMNS.map((c) => c.title),
+      label: 'Межотельный период',
+    },
+    {
+      file: 'КРС_Сервис_период_молочное_направление_v1.1_2.6.0.xlsx',
+      titles: SERVICE_COLUMNS.map((c) => c.title),
+      label: 'Сервис-период',
     },
   ]
 
@@ -1448,6 +1493,332 @@ function calvings() {
 }
 
 /**
+ * Опись и кнопки говорят об одном и том же.
+ *
+ * ## Почему это стоит проверять
+ *
+ * Опись двадцати шаблонов живёт на витрине и отвечает на вопрос «что
+ * книга умеет отдать». Список кнопок живёт в кабинете и отвечает
+ * на вопрос «что она отдаёт». Разойтись им негде, кроме как разойтись:
+ * и однажды они разошлись — опись звала готовыми пять шаблонов,
+ * у которых кнопки не было вовсе, и хозяйство читало обещание,
+ * а нажать было нечего.
+ *
+ * ## Проверяется в одну сторону
+ *
+ * Шаблон, названный в описи собираемым, обязан иметь кнопку. Обратное
+ * не требуется: кнопка у шаблона, который заполняется частично, —
+ * это нормально и даже полезно, файл покажет пробелы лучше любого
+ * описания.
+ *
+ * Признак «собирается» — упоминание команды выгрузки в тексте описи.
+ * Не отдельное поле: поле пришлось бы поддерживать, а текст читает
+ * человек, и расходиться ему с кнопкой нельзя тем более.
+ */
+function shopWindow() {
+  console.log('\nОпись против кнопок в кабинете\n')
+
+  const buttons = new Set(FGIAS_EXPORTS.map((e) => e.label))
+  const promised = FGIAS_TEMPLATES.filter((t) => t.gap.includes('export:fgias'))
+
+  check(promised.length > 0, 'опись объявляет собираемые шаблоны', `их ${promised.length}`)
+
+  for (const t of promised) {
+    check(buttons.has(t.name), `«${t.name}»: обещан описью — есть кнопка`)
+  }
+
+  /*
+   * И наоборот: у кнопки должно быть имя, под которым шаблон известен
+   * реестру и описи. Кнопка «Осеменения» при шаблоне «Осеменение»
+   * не сломает выгрузку, но заставит человека гадать, тот ли это файл.
+   */
+  const known = new Set(FGIAS_TEMPLATES.map((t) => t.name))
+  for (const e of FGIAS_EXPORTS) {
+    check(known.has(e.label), `кнопка «${e.label}»: названа так же, как в описи`)
+  }
+}
+
+/**
+ * Осеменения: бык номером реестра, номер попытки считается.
+ */
+function inseminations() {
+  console.log('\nОсеменение: что уезжает\n')
+
+  const base = {
+    identNumber: 'RU0000000070028',
+    accountingId: '1a421c44-36d2-41c3-881e-38bf83c4f756',
+    baseUuid: '60b5cc43-7b0a-416d-920b-6782c2192fcf',
+  }
+  const bull = 'aa11bb22-cc33-dd44-ee55-ff6677889900'
+  const full = {
+    date: '2026-01-20T00:00:00.000Z',
+    bullBaseUuid: bull,
+    methodUuid: '410b2fdf-a460-4d5f-9fa7-a984a6359082',
+    lactationNumber: 2,
+    attemptNumber: null,
+    fruitful: true,
+    pregnancyCheckDate: '2026-03-01T00:00:00.000Z',
+  }
+
+  const ok = buildInseminations([{ ...base, inseminations: [full] }])
+  check(ok.rows.length === 1, 'полное осеменение уезжает')
+  const row = ok.rows[0]!
+  check(row.length === 10, 'в строке десять значений', String(row.length))
+  check(row[0] === base.accountingId, 'наш ключ первым')
+  check(row[6] === bull, 'бык — базовым номером реестра')
+  check(row[8] === 'TRUE', 'плодотворность словом, как в примере шаблона', String(row[8]))
+
+  /*
+   * Без быка строка не уезжает, и причина названа своя. Иначе в отчёте
+   * «Базовый номер ФГИАС ПР» означал бы и «не зарегистрирована корова»,
+   * и «не зарегистрирован бык» — а делать с этим надо разное.
+   */
+  const noBull = buildInseminations([
+    { ...base, inseminations: [{ ...full, bullBaseUuid: null }] },
+  ])
+  check(
+    noBull.rows.length === 0 && noBull.held[0]?.why === 'Базовый номер быка',
+    'без быка придержано, и причина отличается от причины коровы',
+    String(noBull.held[0]?.why),
+  )
+
+  /* Номер попытки считается по датам внутри лактации, если его не вели. */
+  const three = buildInseminations([
+    {
+      ...base,
+      inseminations: [
+        { ...full, date: '2026-03-05T00:00:00.000Z' },
+        { ...full, date: '2026-01-20T00:00:00.000Z' },
+        { ...full, date: '2026-02-10T00:00:00.000Z' },
+      ],
+    },
+  ])
+  check(three.rows.length === 3, 'три попытки уезжают тремя строками')
+  check(
+    three.rows.map((r) => r[4]).join(',') === '1,2,3',
+    'номера идут по датам, а не по порядку в выборке',
+    three.rows.map((r) => r[4]).join(','),
+  )
+  check(three.rows[0]![3] === '2026-01-20', 'и первой стоит самая ранняя', String(three.rows[0]![3]))
+
+  /* Своя нумерация хозяйства уважается. */
+  const own = buildInseminations([
+    { ...base, inseminations: [{ ...full, attemptNumber: 7 }] },
+  ])
+  check(own.rows[0]![4] === 7, 'заполненная кратность берётся как есть', String(own.rows[0]![4]))
+
+  /*
+   * «Ожидает проверки» уходит пустым, а не ложью. Осеменение, которое
+   * ещё не проверяли, — не яловое.
+   */
+  const unchecked = buildInseminations([
+    { ...base, inseminations: [{ ...full, fruitful: undefined }] },
+  ])
+  check(unchecked.rows[0]![8] === '', 'непроверенное осеменение не объявляется яловым')
+  const empty = buildInseminations([{ ...base, inseminations: [{ ...full, fruitful: false }] }])
+  check(empty.rows[0]![8] === 'FALSE', 'а яловое — объявляется')
+}
+
+/**
+ * Контрольные дойки: день лактации считается из отёла.
+ */
+function milkTests() {
+  console.log('\nКонтрольное доение: что уезжает\n')
+
+  const base = {
+    identNumber: 'RU0000000070028',
+    accountingId: '1a421c44-36d2-41c3-881e-38bf83c4f756',
+    baseUuid: '60b5cc43-7b0a-416d-920b-6782c2192fcf',
+    calvings: [{ number: 2, date: '2026-01-01T00:00:00.000Z' }],
+  }
+  const full = {
+    date: '2026-02-15T00:00:00.000Z',
+    number: null,
+    dailyYield: 28.4,
+    fatPercent: 3.92,
+    proteinPercent: 3.31,
+    somaticCells: 145,
+    lactationNumber: 2,
+    lab: { name: 'АО «Агроплем»', inn: '3924003136', kpp: '392401001' },
+  }
+
+  const ok = buildMilkTests([{ ...base, milkTests: [full] }])
+  check(ok.rows.length === 1, 'полная дойка уезжает')
+  const row = ok.rows[0]!
+  check(row.length === 15, 'в строке пятнадцать значений', String(row.length))
+  check(row[5] === '', 'номер пробы уходит пустым: книга его не ведёт')
+  check(row[7] === '3924003136', 'ИНН лаборатории берётся из организации')
+  /*
+   * 1 января плюс сорок пять дней — 15 февраля. Считается разностью
+   * дат, а не приблизительно по месяцам.
+   */
+  check(row[9] === 45, 'день лактации посчитан от даты отёла', String(row[9]))
+  check(row[10] === 28.4, 'удой не округляется', String(row[10]))
+
+  /* Без отёла с таким номером день лактации пуст, а дойка уезжает. */
+  const noCalving = buildMilkTests([{ ...base, calvings: [], milkTests: [full] }])
+  check(noCalving.rows.length === 1, 'без отёла дойка всё равно уезжает')
+  check(noCalving.rows[0]![9] === '', 'а день лактации уходит пустым', String(noCalving.rows[0]![9]))
+
+  /*
+   * Дойка раньше отёла даёт отрицательный день. В файл он не идёт:
+   * «−12» реестру ничего не скажет, а проверка данных о такой записи
+   * скажет и так.
+   */
+  const before = buildMilkTests([
+    { ...base, milkTests: [{ ...full, date: '2025-12-20T00:00:00.000Z' }] },
+  ])
+  check(before.rows[0]![9] === '', 'отрицательный день лактации не уезжает')
+
+  /* Без удоя строки нет: это то единственное, ради чего дойку сдают. */
+  const noYield = buildMilkTests([{ ...base, milkTests: [{ ...full, dailyYield: null }] }])
+  check(
+    noYield.rows.length === 0 && noYield.held[0]?.why === 'Суточный удой',
+    'без удоя придержано и причина названа',
+    String(noYield.held[0]?.why),
+  )
+}
+
+/**
+ * Молочность по отёлу: телята через точку с запятой.
+ */
+function calves() {
+  console.log('\nМолочность по отёлу: что уезжает\n')
+
+  const base = {
+    identNumber: 'RU0000000070028',
+    accountingId: '1a421c44-36d2-41c3-881e-38bf83c4f756',
+    baseUuid: '60b5cc43-7b0a-416d-920b-6782c2192fcf',
+  }
+  const calf1 = 'aaaaaaaa-1111-2222-3333-444444444444'
+  const calf2 = 'bbbbbbbb-1111-2222-3333-444444444444'
+
+  const ok = buildCalvingCalves([
+    {
+      ...base,
+      calvings: [{ number: 3, date: '2026-01-01T00:00:00.000Z', calfBaseUuids: [calf1, calf2] }],
+    },
+  ])
+  check(ok.rows.length === 1, 'отёл с приплодом уезжает')
+  check(ok.rows[0]!.length === 6, 'в строке шесть значений', String(ok.rows[0]!.length))
+  /*
+   * Единственное место во всей выгрузке, где ячейка содержит список.
+   * Разделитель — точка с запятой, так велит контракт шаблона.
+   */
+  check(ok.rows[0]![5] === `${calf1};${calf2}`, 'двойня — через точку с запятой')
+
+  /* Телёнок без номера реестра выпадает, а не уезжает пустой строкой. */
+  const half = buildCalvingCalves([
+    {
+      ...base,
+      calvings: [{ number: 3, date: '2026-01-01T00:00:00.000Z', calfBaseUuids: [calf1, null] }],
+    },
+  ])
+  check(half.rows[0]![5] === calf1, 'незарегистрированный телёнок не даёт пустого места в списке')
+
+  /* Отёл без приплода не уезжает вовсе: кроме телёнка в строке ничего нет. */
+  const none = buildCalvingCalves([
+    { ...base, calvings: [{ number: 3, date: '2026-01-01T00:00:00.000Z', calfBaseUuids: [] }] },
+  ])
+  check(
+    none.rows.length === 0 && none.held[0]?.why === 'Базовый номер телёнка',
+    'отёл без связанного приплода придержан и причина названа',
+    String(none.held[0]?.why),
+  )
+}
+
+/**
+ * Межотельный период и сервис-период — то, что считается, а не хранится.
+ */
+function derived() {
+  console.log('\nМежотельный период и сервис-период: что считается\n')
+
+  const base = {
+    identNumber: 'RU0000000070028',
+    accountingId: '1a421c44-36d2-41c3-881e-38bf83c4f756',
+    baseUuid: '60b5cc43-7b0a-416d-920b-6782c2192fcf',
+  }
+  const calvings = [
+    { number: 1, date: '2024-01-01T00:00:00.000Z' },
+    { number: 2, date: '2025-01-01T00:00:00.000Z' },
+    { number: 3, date: '2026-01-01T00:00:00.000Z' },
+  ]
+
+  const iv = buildIntervals([{ ...base, calvings }])
+  check(iv.rows.length === 2, 'три отёла дают два периода', String(iv.rows.length))
+  check(iv.rows[0]![3] === 2, 'номер — позднейшего из двух отёлов', String(iv.rows[0]![3]))
+  check(iv.rows[0]![4] === 366, '2024 год високосный — 366 дней', String(iv.rows[0]![4]))
+  check(iv.rows[1]![4] === 365, 'а 2025 обычный — 365', String(iv.rows[1]![4]))
+
+  /* У первого отёла периода нет по определению, и это не пробел. */
+  const one = buildIntervals([{ ...base, calvings: [calvings[0]!] }])
+  check(
+    one.rows.length === 0 && one.held.length === 0,
+    'один отёл не даёт ни строки, ни придержанной записи',
+  )
+
+  /* Отёлы задом наперёд — ошибка ввода, а не отрицательный период. */
+  const backwards = buildIntervals([
+    {
+      ...base,
+      calvings: [
+        { number: 1, date: '2026-01-01T00:00:00.000Z' },
+        { number: 2, date: '2026-01-01T00:00:00.000Z' },
+      ],
+    },
+  ])
+  check(backwards.rows.length === 0 && backwards.held.length === 1, 'нулевой период придержан')
+
+  /* --- Сервис-период --- */
+
+  const sp = buildService([
+    {
+      ...base,
+      calvings,
+      /* Плодотворное — последнее перед следующим отёлом. */
+      inseminationDates: [
+        '2024-02-20T00:00:00.000Z',
+        '2024-03-21T00:00:00.000Z',
+        '2025-04-01T00:00:00.000Z',
+      ],
+    },
+  ])
+  check(sp.rows.length === 2, 'два сервис-периода на три отёла', String(sp.rows.length))
+  check(sp.rows[0]![3] === 1, 'номер — лактации, которая шла, а не следующей', String(sp.rows[0]![3]))
+  check(sp.rows[0]![4] === 80, 'от 1 января до 21 марта 2024 года — 80 дней', String(sp.rows[0]![4]))
+
+  /* Без осеменения между отёлами считать не из чего. */
+  const noAi = buildService([{ ...base, calvings, inseminationDates: [] }])
+  check(
+    noAi.rows.length === 0 && noAi.held[0]?.why === 'Нет осеменения между отёлами',
+    'без осеменений придержано и причина названа',
+    String(noAi.held[0]?.why),
+  )
+
+  /*
+   * Границы контракта соблюдаются, а не подгоняются: восемьсот дней —
+   * это пропущенный отёл или ошибка в датах, и обрезать их до 775
+   * значило бы отправить придуманное число.
+   */
+  const tooLong = buildService([
+    {
+      ...base,
+      calvings: [
+        { number: 1, date: '2023-01-01T00:00:00.000Z' },
+        { number: 2, date: '2026-01-01T00:00:00.000Z' },
+      ],
+      inseminationDates: ['2025-06-01T00:00:00.000Z'],
+    },
+  ])
+  check(
+    tooLong.rows.length === 0 && tooLong.held[0]?.why.includes(String(SERVICE_MAX)),
+    'сервис-период вне границ придержан, а не прижат к краю',
+    String(tooLong.held[0]?.why),
+  )
+  check(SERVICE_MIN === 10 && SERVICE_MAX === 775, 'границы взяты из контракта шаблона')
+}
+
+/**
  * Достоверность происхождения: панель ISAG и пустая «Проба».
  */
 function dna() {
@@ -1567,6 +1938,11 @@ shows()
 weighings()
 grades()
 calvings()
+inseminations()
+milkTests()
+calves()
+derived()
+shopWindow()
 dna()
 pedigree()
 summary()

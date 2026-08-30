@@ -9,6 +9,11 @@ import {
   buildWeighings,
   buildGrades,
   buildCalvings,
+  buildInseminations,
+  buildMilkTests,
+  buildCalvingCalves,
+  buildIntervals,
+  buildService,
   type Built,
   type ExportAnimal,
   type PedigreeSource,
@@ -17,6 +22,10 @@ import {
   type WeighingRow,
   type GradingAnimal,
   type CalvingAnimal,
+  type CalvingPoint,
+  type InseminationAnimal,
+  type MilkTestAnimal,
+  type CalvingCalvesAnimal,
 } from '@/lib/fgias-export'
 import { buildMain, type MainAnimal } from '@/lib/fgias-main'
 import { fgiasExport } from '@/lib/fgias-exports'
@@ -99,6 +108,58 @@ export async function GET(request: Request) {
     typeof v === 'number' ? v : v && typeof v === 'object' ? ((v as { id?: number }).id ?? null) : null
   const txt = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v : null)
 
+  /*
+   * Записи, привязанные к животным стада, — одним запросом на коллекцию
+   * и страницами по тому же правилу, что и само стадо.
+   *
+   * Заведено общим, потому что так их читают шесть шаблонов из
+   * тринадцати. Пока каждый читал по-своему, один и тот же цикл стоял
+   * в ручке трижды, и сортировка по `id` в нём держалась на памяти
+   * того, кто копировал.
+   */
+  const ids = herd.map((a) => a.id as number)
+
+  const collect = async (collection: string): Promise<Map<number, Row[]>> => {
+    const map = new Map<number, Row[]>()
+    if (ids.length === 0) return map
+
+    for (let page = 1; ; page++) {
+      const res = await payload.find({
+        collection: collection as never,
+        where: { animal: { in: ids } },
+        limit: 500,
+        page,
+        sort: 'id',
+        depth: 0,
+        overrideAccess: true,
+      })
+      for (const d of res.docs as unknown as Row[]) {
+        const id = rel(d.animal)
+        if (id === null) continue
+        const list = map.get(id) ?? []
+        list.push(d)
+        map.set(id, list)
+      }
+      if (!res.hasNextPage) break
+    }
+    return map
+  }
+
+  /** Отёлы животного в том виде, в каком их читают производные таблицы. */
+  const pointsOf = (rows: Row[] | undefined): CalvingPoint[] =>
+    (rows ?? [])
+      /*
+       * Аборты и запуски в межотельный период не входят: это события
+       * внутри лактации, а не её начало. Считать по ним значило бы
+       * назвать межотельным периодом промежуток, в котором отёла
+       * не было вовсе.
+       */
+      .filter((c) => !c.eventType || c.eventType === 'calving')
+      .map((c) => ({
+        number: typeof c.number === 'number' ? c.number : null,
+        date: txt(c.date),
+      }))
+
   let built: Built
 
   if (spec.key === 'pedigree') {
@@ -170,37 +231,18 @@ export async function GET(request: Request) {
      * Один запрос на всё стадо: по строке на животное было бы полторы
      * тысячи запросов ради одной таблицы.
      */
-    const byAnimal = new Map<number, WeighingRow['weighings']>()
-    for (let page = 1; ; page++) {
-      const res = await payload.find({
-        collection: 'weighings',
-        where: { animal: { in: herd.map((a) => a.id as number) } },
-        limit: 500,
-        page,
-        sort: 'id',
-        depth: 0,
-        overrideAccess: true,
-      })
-      for (const w of res.docs as unknown as Row[]) {
-        const id = rel(w.animal)
-        if (id === null) continue
-        const list = byAnimal.get(id) ?? []
-        list.push({
-          date: txt(w.date),
-          weight: typeof w.weight === 'number' ? w.weight : null,
-          signUuid: weighingSignUuid(txt(w.sign)) ?? null,
-          lactationNumber: typeof w.lactationNumber === 'number' ? w.lactationNumber : null,
-        })
-        byAnimal.set(id, list)
-      }
-      if (!res.hasNextPage) break
-    }
+    const byAnimal = await collect('weighings')
 
     const rows: WeighingRow[] = herd.map((a) => ({
       identNumber: String(a.identNumber ?? ''),
       accountingId: txt(a.uuid),
       baseUuid: txt((a.fgias as Row | undefined)?.baseUuid),
-      weighings: byAnimal.get(a.id as number) ?? [],
+      weighings: (byAnimal.get(a.id as number) ?? []).map((w) => ({
+        date: txt(w.date),
+        weight: typeof w.weight === 'number' ? w.weight : null,
+        signUuid: weighingSignUuid(txt(w.sign)) ?? null,
+        lactationNumber: typeof w.lactationNumber === 'number' ? w.lactationNumber : null,
+      })),
     }))
     built = buildWeighings(rows)
   } else if (spec.key === 'grades') {
@@ -229,29 +271,7 @@ export async function GET(request: Request) {
           overrideAccess: true,
         })
         .then((res) => txt((res.docs as unknown as Row[])[0]?.fgiasUuid)),
-      (async () => {
-        const map = new Map<number, Row[]>()
-        for (let page = 1; ; page++) {
-          const res = await payload.find({
-            collection: 'gradings',
-            where: { animal: { in: herd.map((a) => a.id as number) } },
-            limit: 500,
-            page,
-            sort: 'id',
-            depth: 0,
-            overrideAccess: true,
-          })
-          for (const g of res.docs as unknown as Row[]) {
-            const id = rel(g.animal)
-            if (id === null) continue
-            const list = map.get(id) ?? []
-            list.push(g)
-            map.set(id, list)
-          }
-          if (!res.hasNextPage) break
-        }
-        return map
-      })(),
+      collect('gradings'),
     ])
 
     const rows: GradingAnimal[] = herd.map((a) => ({
@@ -284,47 +304,197 @@ export async function GET(request: Request) {
      * по числам приплода. Второе не догадка: сумма плодов и есть то,
      * что спрашивает колонка, и «один» при одном телёнке верно всегда.
      */
-    const byAnimal = new Map<number, CalvingAnimal['calvings']>()
-    for (let page = 1; ; page++) {
-      const res = await payload.find({
-        collection: 'calvings',
-        where: { animal: { in: herd.map((a) => a.id as number) } },
-        limit: 500,
-        page,
-        sort: 'id',
-        depth: 0,
-        overrideAccess: true,
-      })
-      for (const c of res.docs as unknown as Row[]) {
-        const id = rel(c.animal)
-        if (id === null) continue
-        const num = (v: unknown) => (typeof v === 'number' ? v : null)
+    const byAnimal = await collect('calvings')
+    const num = (v: unknown) => (typeof v === 'number' ? v : null)
+
+    const rows: CalvingAnimal[] = herd.map((a) => ({
+      identNumber: String(a.identNumber ?? ''),
+      accountingId: txt(a.uuid),
+      baseUuid: txt((a.fgias as Row | undefined)?.baseUuid),
+      calvings: (byAnimal.get(a.id as number) ?? []).map((c) => {
         const counts = {
           liveHeifers: num(c.liveHeifers),
           liveBulls: num(c.liveBulls),
           stillborn: num(c.stillborn),
         }
-        const list = byAnimal.get(id) ?? []
-        list.push({
+        return {
           date: txt(c.date),
           eventUuid: calvingEventUuid(txt(c.eventType) ?? 'calving') ?? null,
           birthTypeUuid: birthTypeUuid(txt(c.result) ?? birthTypeOf(counts)) ?? null,
           easeUuid: calvingEaseUuid(txt(c.ease)) ?? null,
           number: num(c.number),
           ...counts,
-        })
-        byAnimal.set(id, list)
+        }
+      }),
+    }))
+    built = buildCalvings(rows)
+  } else if (spec.key === 'inseminations') {
+    /*
+     * Быки читаются отдельным запросом, а не из стада: семя чаще всего
+     * привозное, и производитель почти никогда не принадлежит хозяйству.
+     * Ищутся ровно те, кого назвали осеменения, — по всей книге.
+     */
+    const byAnimal = await collect('inseminations')
+
+    const bullIds = new Set<number>()
+    for (const list of byAnimal.values()) {
+      for (const i of list) {
+        const b = rel(i.bull)
+        if (b !== null) bullIds.add(b)
       }
-      if (!res.hasNextPage) break
     }
 
-    const rows: CalvingAnimal[] = herd.map((a) => ({
+    const [bulls, methods] = await Promise.all([
+      bullIds.size
+        ? payload
+            .find({
+              collection: 'animals',
+              where: { id: { in: [...bullIds] } },
+              limit: 0,
+              pagination: false,
+              depth: 0,
+              overrideAccess: true,
+            })
+            .then(
+              (res) =>
+                new Map(
+                  (res.docs as unknown as Row[]).map((b) => [
+                    b.id as number,
+                    txt((b.fgias as Row | undefined)?.baseUuid),
+                  ]),
+                ),
+            )
+        : Promise.resolve(new Map<number, string | null>()),
+      payload
+        .find({
+          collection: 'reproduction-methods',
+          limit: 0,
+          pagination: false,
+          depth: 0,
+          overrideAccess: true,
+        })
+        .then((res) => new Map((res.docs as unknown as Row[]).map((m) => [m.id as number, m]))),
+    ])
+
+    /*
+     * Плодотворность реестр ждёт булевой, а у нас это справочник
+     * из четырёх строк. «Стельная» — да, «Яловая» и «Выкидыш» — нет,
+     * «Ожидает проверки» — пусто. Последнее не то же самое, что «нет»:
+     * записать неплодотворность осеменению, которое ещё не проверяли,
+     * значило бы объявить яловой корову, о которой мы ничего не знаем.
+     *
+     * Различаются по коду справочника, а не по названию: название
+     * хозяйство вправе переписать под себя, код — ключ строки.
+     */
+    const results = await payload
+      .find({
+        collection: 'insemination-results',
+        limit: 0,
+        pagination: false,
+        depth: 0,
+        overrideAccess: true,
+      })
+      .then((res) => new Map((res.docs as unknown as Row[]).map((r) => [r.id as number, txt(r.code)])))
+
+    const fruitfulOf = (code: string | null): boolean | undefined =>
+      code === '1' ? true : code === '2' || code === '3' ? false : undefined
+
+    const rows: InseminationAnimal[] = herd.map((a) => ({
       identNumber: String(a.identNumber ?? ''),
       accountingId: txt(a.uuid),
       baseUuid: txt((a.fgias as Row | undefined)?.baseUuid),
-      calvings: byAnimal.get(a.id as number) ?? [],
+      inseminations: (byAnimal.get(a.id as number) ?? []).map((i) => ({
+        date: txt(i.date),
+        bullBaseUuid: bulls.get(rel(i.bull) ?? -1) ?? null,
+        methodUuid: txt(methods.get(rel(i.method) ?? -1)?.fgiasUuid),
+        lactationNumber: typeof i.lactationNumber === 'number' ? i.lactationNumber : null,
+        attemptNumber: typeof i.attemptNumber === 'number' ? i.attemptNumber : null,
+        fruitful: fruitfulOf(results.get(rel(i.result) ?? -1) ?? null),
+        pregnancyCheckDate: txt(i.pregnancyCheckDate),
+      })),
     }))
-    built = buildCalvings(rows)
+    built = buildInseminations(rows)
+  } else if (spec.key === 'milkTests') {
+    const [byAnimal, calvingsOf, orgs] = await Promise.all([
+      collect('milk-tests'),
+      collect('calvings'),
+      payload
+        .find({ collection: 'organizations', limit: 0, pagination: false, depth: 0, overrideAccess: true })
+        .then((res) => new Map((res.docs as unknown as Row[]).map((o) => [o.id as number, o]))),
+    ])
+
+    const rows: MilkTestAnimal[] = herd.map((a) => ({
+      identNumber: String(a.identNumber ?? ''),
+      accountingId: txt(a.uuid),
+      baseUuid: txt((a.fgias as Row | undefined)?.baseUuid),
+      /* Отёлы нужны не сами по себе, а ради дня лактации. */
+      calvings: pointsOf(calvingsOf.get(a.id as number)),
+      milkTests: (byAnimal.get(a.id as number) ?? []).map((t) => {
+        const lab = orgs.get(rel(t.laboratory) ?? -1)
+        return {
+          date: txt(t.date),
+          number: null,
+          dailyYield: typeof t.dailyYield === 'number' ? t.dailyYield : null,
+          fatPercent: typeof t.fatPercent === 'number' ? t.fatPercent : null,
+          proteinPercent: typeof t.proteinPercent === 'number' ? t.proteinPercent : null,
+          somaticCells: typeof t.somaticCells === 'number' ? t.somaticCells : null,
+          lactationNumber: typeof t.lactationNumber === 'number' ? t.lactationNumber : null,
+          lab: lab ? { name: txt(lab.name), inn: txt(lab.inn), kpp: txt(lab.kpp) } : null,
+        }
+      }),
+    }))
+    built = buildMilkTests(rows)
+  } else if (spec.key === 'calves') {
+    const calvingsOf = await collect('calvings')
+
+    /*
+     * Базовые номера телят берутся из стада: телёнок, полученный
+     * в хозяйстве, в нём и заведён. Тот, кого продали и чья карточка
+     * уехала к покупателю, номера здесь не получит — и строка будет
+     * придержана с названной причиной, а не уйдёт с пустым телёнком.
+     */
+    const baseOf = new Map<number, string | null>(
+      herd.map((a) => [a.id as number, txt((a.fgias as Row | undefined)?.baseUuid)]),
+    )
+
+    const rows: CalvingCalvesAnimal[] = herd.map((a) => ({
+      identNumber: String(a.identNumber ?? ''),
+      accountingId: txt(a.uuid),
+      baseUuid: txt((a.fgias as Row | undefined)?.baseUuid),
+      calvings: (calvingsOf.get(a.id as number) ?? [])
+        .filter((c) => !c.eventType || c.eventType === 'calving')
+        .map((c) => ({
+          number: typeof c.number === 'number' ? c.number : null,
+          date: txt(c.date),
+          calfBaseUuids: (Array.isArray(c.calves) ? c.calves : []).map(
+            (v) => baseOf.get(rel(v) ?? -1) ?? null,
+          ),
+        })),
+    }))
+    built = buildCalvingCalves(rows)
+  } else if (spec.key === 'intervals' || spec.key === 'service') {
+    const calvingsOf = await collect('calvings')
+
+    const base = herd.map((a) => ({
+      identNumber: String(a.identNumber ?? ''),
+      accountingId: txt(a.uuid),
+      baseUuid: txt((a.fgias as Row | undefined)?.baseUuid),
+      calvings: pointsOf(calvingsOf.get(a.id as number)),
+    }))
+
+    if (spec.key === 'intervals') {
+      built = buildIntervals(base)
+    } else {
+      const inseminationsOf = await collect('inseminations')
+      built = buildService(
+        base.map((a, i) => ({
+          ...a,
+          inseminationDates: (inseminationsOf.get(herd[i]!.id as number) ?? []).map((x) =>
+            txt(x.date),
+          ),
+        })),
+      )
+    }
   } else if (spec.key === 'shows') {
     const rows: ShowAnimal[] = herd.map((a) => ({
       identNumber: String(a.identNumber ?? ''),

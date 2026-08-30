@@ -798,6 +798,677 @@ export function buildDna(animals: DnaAnimal[]): Built {
 }
 
 /**
+ * Разница в днях между двумя датами вида `ГГГГ-ММ-ДД`.
+ *
+ * Считается через `Date.UTC` от разобранных чисел, а не через
+ * `new Date(строка)`: второе читает строку по часовому поясу машины,
+ * и межотельный период на сервере западнее Гринвича вышел бы на день
+ * короче, чем у зоотехника. Разбор тот же, что у `fgiasDate`,
+ * и по той же причине.
+ */
+const daysBetween = (from: string, to: string): number | undefined => {
+  const a = /^(\d{4})-(\d{2})-(\d{2})/.exec(from)
+  const b = /^(\d{4})-(\d{2})-(\d{2})/.exec(to)
+  if (!a || !b) return undefined
+  const ms =
+    Date.UTC(Number(b[1]), Number(b[2]) - 1, Number(b[3])) -
+    Date.UTC(Number(a[1]), Number(a[2]) - 1, Number(a[3]))
+  return Math.round(ms / 86_400_000)
+}
+
+/**
+ * Десять колонок шаблона «КРС_Осеменение_v1.2».
+ *
+ * Наш ключ первым, как в «Отёле», — из двадцати шаблонов таких два.
+ */
+export const INSEMINATION_COLUMNS: FgiasColumn[] = [
+  { title: 'Идентификатор учётной системы', type: 'string', width: 38 },
+  { title: 'Базовый номер ФГИАС ПР', type: 'uuid', width: 38 },
+  { title: 'Идентификатор ФГИАС ПР', type: 'uuid', width: 38 },
+  { title: 'Дата осеменения', type: 'date', width: 14 },
+  { title: 'Номер осеменения', type: 'int' },
+  { title: 'Номер лактации', type: 'int' },
+  { title: 'Бык-осеменитель', type: 'uuid', width: 38 },
+  { title: 'Метод осеменения', type: 'uuid', width: 38 },
+  { title: 'Плодотворность', type: 'string', width: 12 },
+  { title: 'Дата подтверждения стельности', type: 'date', width: 14 },
+]
+
+export type Insemination = {
+  date?: string | null
+  /** Базовый номер быка в реестре — подставляет вызывающий. */
+  bullBaseUuid?: string | null
+  methodUuid?: string | null
+  lactationNumber?: number | null
+  attemptNumber?: number | null
+  /** `true` — стельная, `false` — яловая, `undefined` — ещё не проверяли. */
+  fruitful?: boolean | null
+  pregnancyCheckDate?: string | null
+}
+
+export type InseminationAnimal = {
+  identNumber: string
+  accountingId?: string | null
+  baseUuid?: string | null
+  inseminations?: Insemination[] | null
+}
+
+/**
+ * Осеменения — по строке на попытку.
+ *
+ * ## Бык нужен номером реестра, и это главное препятствие
+ *
+ * Колонка «Бык-осеменитель» ждёт базовый номер ФГИАС ПР быка, а не его
+ * кличку и не номер со свидетельства. То есть осеменение нельзя сдать,
+ * пока бык не зарегистрирован — ровно та же стена, что у родословной.
+ *
+ * Разница в том, что здесь она преодолима силами хозяйства: быки
+ * привозного семени в книге заведены карточками, и базовые номера
+ * приходят им тем же обратным файлом, что и коровам. Поэтому строка
+ * придерживается с отдельной причиной — «Базовый номер быка», — чтобы
+ * в отчёте было видно, чего именно не хватает: своей регистрации
+ * или регистрации производителя.
+ *
+ * ## Номер осеменения считается, если его не вели
+ *
+ * Реестр ждёт порядковый номер попытки внутри лактации. У нас это поле
+ * необязательное и заполнено не везде. Считать его по датам можно точно:
+ * попытки внутри одной лактации упорядочены во времени, и третья
+ * по счёту — она и есть третья. Своя нумерация хозяйства при этом
+ * уважается: если `attemptNumber` заполнен, берётся он.
+ *
+ * ## Плодотворность может уйти пустой
+ *
+ * «Стельная» — да, «Яловая» и «Выкидыш» — нет, «Ожидает проверки» —
+ * пусто. Последнее не то же самое, что «нет»: осеменение, которое ещё
+ * не проверяли, ничем не хуже прочих, и записать ему «неплодотворно»
+ * значило бы объявить яловой корову, о которой мы пока ничего не знаем.
+ */
+export function buildInseminations(animals: InseminationAnimal[]): Built {
+  const rows: (string | number)[][] = []
+  const held: Held[] = []
+
+  const txt = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : '')
+
+  for (const a of animals) {
+    const list = (a.inseminations ?? []).filter(Boolean)
+    if (list.length === 0) continue
+
+    if (!a.baseUuid) {
+      held.push({
+        identNumber: a.identNumber,
+        what: `осеменений: ${list.length}`,
+        why: 'Базовый номер ФГИАС ПР',
+      })
+      continue
+    }
+
+    if (!a.accountingId) {
+      held.push({
+        identNumber: a.identNumber,
+        what: `осеменений: ${list.length}`,
+        why: 'Идентификатор учётной системы',
+      })
+      continue
+    }
+
+    /*
+     * Счётчик попыток внутри лактации. Порядок берётся из дат, поэтому
+     * список сортируется здесь, а не полагается на порядок выборки:
+     * из базы записи приходят по `id`, а заводят их задним числом.
+     */
+    const sorted = [...list].sort((x, y) =>
+      String(fgiasDate(x.date) ?? '').localeCompare(String(fgiasDate(y.date) ?? '')),
+    )
+    const seen = new Map<number, number>()
+
+    for (const i of sorted) {
+      const date = fgiasDate(i.date)
+      const bull = txt(i.bullBaseUuid)
+
+      const missing = !date ? 'Дата осеменения' : !bull ? 'Базовый номер быка' : null
+      if (missing) {
+        held.push({
+          identNumber: a.identNumber,
+          what: `осеменение ${i.date ?? '?'}`,
+          why: missing,
+        })
+        continue
+      }
+
+      const lact = fgiasInt(i.lactationNumber)
+      const key = lact.value ?? 0
+      const nth = (seen.get(key) ?? 0) + 1
+      seen.set(key, nth)
+
+      const attempt = fgiasInt(i.attemptNumber)
+
+      rows.push([
+        a.accountingId,
+        a.baseUuid,
+        '',
+        date!,
+        attempt.value ?? nth,
+        lact.value ?? '',
+        bull,
+        txt(i.methodUuid),
+        /*
+         * Реестр объявил колонку булевой, а в примере написал `TRUE`.
+         * Пишем словом, как в примере: числа 1 и 0 в булевой колонке
+         * читаются двояко, а пустая ячейка означает «не проверяли».
+         */
+        i.fruitful === true ? 'TRUE' : i.fruitful === false ? 'FALSE' : '',
+        fgiasDate(i.pregnancyCheckDate) ?? '',
+      ])
+    }
+  }
+
+  return { columns: INSEMINATION_COLUMNS, rows, held, rounded: 0 }
+}
+
+/**
+ * Пятнадцать колонок шаблона «КРС_Контрольное__доение_v1.2».
+ *
+ * Вторая снова «Идентификатор **строки** ФГИАС ПР», как у выставок.
+ *
+ * А «КПП лаборатории» записан в шаблоне с переносом строки внутри
+ * ячейки, и перенос сохранён здесь дословно. Соблазн выписать заголовок
+ * в одну строку велик — узнаванию перенос не мешает, `headerKey` его
+ * схлопывает, — но сверка с настоящим файлом идёт строгим сравнением,
+ * и это правильно: заголовок мы не приводим к удобному виду, а списываем.
+ * Реестр узнаёт колонку по нему, и решать за реестр, что перенос лишний,
+ * значит однажды решить так же про слово.
+ */
+export const MILK_TEST_COLUMNS: FgiasColumn[] = [
+  { title: 'Базовый номер ФГИАС ПР', type: 'uuid', width: 38 },
+  { title: 'Идентификатор строки ФГИАС ПР', type: 'uuid', width: 38 },
+  { title: 'Идентификатор учётной системы', type: 'string', width: 38 },
+  { title: 'Номер контрольного доения', type: 'int' },
+  { title: 'Дата проведения контрольного доения', type: 'date', width: 14 },
+  { title: 'Номер пробы', type: 'string', width: 16 },
+  { title: 'Наименование лаборатории', type: 'string', width: 30 },
+  { title: 'ИНН лаборатории', type: 'string', width: 14 },
+  { title: 'КПП лаборатории \n(при наличии)', type: 'string', width: 12 },
+  { title: 'День лактации', type: 'int' },
+  { title: 'Суточный удой, (кг)', type: 'float', width: 14 },
+  { title: 'Жир, (%)', type: 'float', width: 10 },
+  { title: 'Белок, (%)', type: 'float', width: 10 },
+  { title: 'Количество соматических клеток', type: 'int' },
+  { title: 'Номер лактации', type: 'int' },
+]
+
+export type MilkTest = {
+  date?: string | null
+  number?: number | null
+  dailyYield?: number | null
+  fatPercent?: number | null
+  proteinPercent?: number | null
+  somaticCells?: number | null
+  lactationNumber?: number | null
+  lab?: { name?: string | null; inn?: string | null; kpp?: string | null } | null
+}
+
+/** Отёл в том виде, в каком его читают сборщики производных таблиц. */
+export type CalvingPoint = {
+  number?: number | null
+  date?: string | null
+}
+
+export type MilkTestAnimal = {
+  identNumber: string
+  accountingId?: string | null
+  baseUuid?: string | null
+  milkTests?: MilkTest[] | null
+  /** Отёлы животного — из них считается день лактации. */
+  calvings?: CalvingPoint[] | null
+}
+
+/**
+ * Контрольные дойки — по строке на замер.
+ *
+ * ## День лактации считается, а не хранится
+ *
+ * Это разница в днях между дойкой и отёлом той лактации, к которой она
+ * относится. Хранить его значило бы завести второй ответ на вопрос,
+ * у которого уже есть первый, — и однажды они разойдутся: дату отёла
+ * правят, а посчитанный день лактации останется прежним.
+ *
+ * Отёл ищется по номеру лактации замера. Если номера нет или отёла
+ * с таким номером в книге не заведено, колонка уходит пустой — но сама
+ * дойка уезжает: удой, жир и белок реестру нужны и без дня лактации.
+ *
+ * Отрицательный день не пишется вовсе. Он означает дойку раньше отёла,
+ * то есть ошибку в данных, и отправлять её в реестр числом «−12» хуже,
+ * чем не отправлять: проверка данных о ней и так скажет.
+ *
+ * ## Номер пробы уходит пустым
+ *
+ * Книга его не ведёт. Это номер пробирки в лаборатории, и появляется
+ * он в лабораторной выгрузке, которую хозяйство загружает к нам, —
+ * но колонки под него у нас нет, и заводить её ради одного шаблона
+ * рано: сперва надо увидеть, приходит ли он в присылаемых файлах.
+ */
+export function buildMilkTests(animals: MilkTestAnimal[]): Built {
+  const rows: (string | number)[][] = []
+  const held: Held[] = []
+  let rounded = 0
+
+  const txt = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : '')
+
+  for (const a of animals) {
+    const list = (a.milkTests ?? []).filter(Boolean)
+    if (list.length === 0) continue
+
+    if (!a.baseUuid) {
+      held.push({
+        identNumber: a.identNumber,
+        what: `доек: ${list.length}`,
+        why: 'Базовый номер ФГИАС ПР',
+      })
+      continue
+    }
+
+    if (!a.accountingId) {
+      held.push({
+        identNumber: a.identNumber,
+        what: `доек: ${list.length}`,
+        why: 'Идентификатор учётной системы',
+      })
+      continue
+    }
+
+    const calvingOf = new Map<number, string>()
+    for (const c of a.calvings ?? []) {
+      const n = fgiasInt(c.number).value
+      const d = fgiasDate(c.date)
+      if (n !== undefined && d) calvingOf.set(n, d)
+    }
+
+    const sorted = [...list].sort((x, y) =>
+      String(fgiasDate(x.date) ?? '').localeCompare(String(fgiasDate(y.date) ?? '')),
+    )
+    const seen = new Map<number, number>()
+
+    for (const t of sorted) {
+      const date = fgiasDate(t.date)
+      const yield_ = fgiasFloat(t.dailyYield)
+
+      const missing = !date
+        ? 'Дата проведения контрольного доения'
+        : yield_ === undefined
+          ? 'Суточный удой'
+          : null
+
+      if (missing) {
+        held.push({
+          identNumber: a.identNumber,
+          what: `дойка ${t.date ?? '?'}`,
+          why: missing,
+        })
+        continue
+      }
+
+      const lact = fgiasInt(t.lactationNumber)
+      const key = lact.value ?? 0
+      const nth = (seen.get(key) ?? 0) + 1
+      seen.set(key, nth)
+
+      const start = lact.value === undefined ? undefined : calvingOf.get(lact.value)
+      const day = start ? daysBetween(start, date!) : undefined
+
+      const cells = fgiasInt(t.somaticCells)
+      if (cells.rounded) rounded += 1
+
+      const own = fgiasInt(t.number)
+
+      rows.push([
+        a.baseUuid,
+        '',
+        a.accountingId,
+        own.value ?? nth,
+        date!,
+        /* Номер пробы книга не ведёт — см. разбор выше. */
+        '',
+        txt(t.lab?.name),
+        txt(t.lab?.inn),
+        txt(t.lab?.kpp),
+        day !== undefined && day >= 0 ? day : '',
+        yield_!,
+        fgiasFloat(t.fatPercent) ?? '',
+        fgiasFloat(t.proteinPercent) ?? '',
+        cells.value ?? '',
+        lact.value ?? '',
+      ])
+    }
+  }
+
+  return { columns: MILK_TEST_COLUMNS, rows, held, rounded }
+}
+
+/**
+ * Шесть колонок шаблона «КРС_Молочность_по_отелу_v1.0».
+ *
+ * Несмотря на название, молока здесь нет вовсе: таблица связывает отёл
+ * с полученными телятами. Реестр называет её так, потому что молочность
+ * коровы мясного направления меряют по приплоду, — а книга ведёт
+ * молочное, и для неё это просто связь «отёл → телята».
+ */
+export const CALVING_CALVES_COLUMNS: FgiasColumn[] = [
+  { title: 'Базовый номер ФГИАС ПР', type: 'uuid', width: 38 },
+  { title: 'Идентификатор строки ФГИАС ПР', type: 'uuid', width: 38 },
+  { title: 'Идентификатор учётной системы', type: 'string', width: 38 },
+  { title: 'Номер отела', type: 'int' },
+  { title: 'Дата определения', type: 'date', width: 14 },
+  { title: 'Идентификатор теленка', type: 'string', width: 44 },
+]
+
+export type CalvingCalves = {
+  number?: number | null
+  date?: string | null
+  /** Базовые номера телят в реестре — подставляет вызывающий. */
+  calfBaseUuids?: (string | null | undefined)[] | null
+}
+
+export type CalvingCalvesAnimal = {
+  identNumber: string
+  accountingId?: string | null
+  baseUuid?: string | null
+  calvings?: CalvingCalves[] | null
+}
+
+/**
+ * Молочность по отёлу — связь отёла с приплодом.
+ *
+ * ## Несколько телят в одной ячейке
+ *
+ * Реестр ждёт их номера через точку с запятой в одной ячейке — так
+ * написано в контракте шаблона. Это единственное место во всей выгрузке,
+ * где ячейка содержит список, и разбирать её обратно придётся тем же
+ * разделителем.
+ *
+ * ## Строка без телят не уезжает
+ *
+ * Отёл без связанного приплода — это вся строка целиком: кроме номера
+ * телёнка, в ней нет ничего, чего реестр не знает из «Отёла». Отправить
+ * её пустой значило бы сдать отчёт ни о чём.
+ *
+ * Придержано будет почти всё: на две тысячи отёлов приплод связан
+ * у четырёх. Это не поломка выгрузки, а состояние книги, и отчёт
+ * называет его прямо.
+ */
+export function buildCalvingCalves(animals: CalvingCalvesAnimal[]): Built {
+  const rows: (string | number)[][] = []
+  const held: Held[] = []
+
+  for (const a of animals) {
+    const list = (a.calvings ?? []).filter(Boolean)
+    if (list.length === 0) continue
+
+    if (!a.baseUuid) {
+      held.push({
+        identNumber: a.identNumber,
+        what: `отёлов: ${list.length}`,
+        why: 'Базовый номер ФГИАС ПР',
+      })
+      continue
+    }
+
+    if (!a.accountingId) {
+      held.push({
+        identNumber: a.identNumber,
+        what: `отёлов: ${list.length}`,
+        why: 'Идентификатор учётной системы',
+      })
+      continue
+    }
+
+    for (const c of list) {
+      const date = fgiasDate(c.date)
+      const number = fgiasInt(c.number)
+      const calves = (c.calfBaseUuids ?? []).filter(
+        (v): v is string => typeof v === 'string' && v.trim() !== '',
+      )
+
+      const missing = !date
+        ? 'Дата определения'
+        : number.value === undefined
+          ? 'Номер отела'
+          : calves.length === 0
+            ? 'Базовый номер телёнка'
+            : null
+
+      if (missing) {
+        held.push({
+          identNumber: a.identNumber,
+          what: `отёл ${c.number ?? c.date ?? '?'}`,
+          why: missing,
+        })
+        continue
+      }
+
+      rows.push([
+        a.baseUuid,
+        '',
+        a.accountingId,
+        number.value!,
+        date!,
+        /* Несколько телят — через точку с запятой, так велит контракт. */
+        calves.join(';'),
+      ])
+    }
+  }
+
+  return { columns: CALVING_CALVES_COLUMNS, rows, held, rounded: 0 }
+}
+
+/**
+ * Пять колонок шаблона «КРС_Межотельный_период_v1.1».
+ */
+export const INTERVAL_COLUMNS: FgiasColumn[] = [
+  { title: 'Базовый номер ФГИАС ПР', type: 'uuid', width: 38 },
+  { title: 'Идентификатор ФГИАС ПР', type: 'uuid', width: 38 },
+  { title: 'Идентификатор учётной системы', type: 'string', width: 38 },
+  { title: 'Номер отела', type: 'int' },
+  { title: 'Межотельный период, дни', type: 'int' },
+]
+
+export type IntervalAnimal = {
+  identNumber: string
+  accountingId?: string | null
+  baseUuid?: string | null
+  calvings?: CalvingPoint[] | null
+}
+
+/**
+ * Межотельный период — считается, а не хранится.
+ *
+ * ## Почему в книге такого поля нет и не будет
+ *
+ * Это разница между датами двух соседних отёлов. Хранить её значило бы
+ * завести второй ответ на вопрос, у которого уже есть первый: правку
+ * даты отёла пришлось бы разносить по всем производным, и однажды
+ * не разнесли бы.
+ *
+ * Реестру она нужна отдельной таблицей — значит, книга обязана уметь
+ * её посчитать и отдать, а не хранить.
+ *
+ * ## Номер — позднейшего из двух отёлов
+ *
+ * Период «до отёла номер три» естественнее, чем «после отёла номер
+ * два»: так его и спрашивают у зоотехника, и так он ложится рядом
+ * с номером лактации в остальных таблицах.
+ *
+ * У первого отёла периода нет по определению — до него отёлов
+ * не было. Строка не заводится вовсе и в придержанные не попадает:
+ * это не пробел в данных, а свойство первого отёла.
+ *
+ * ## Отрицательный и нулевой не уезжают
+ *
+ * Контракт требует целое от нуля. Ноль означал бы два отёла в один
+ * день, отрицательное — что второй раньше первого; и то и другое —
+ * ошибка ввода, о которой скажет проверка данных, а не выгрузка.
+ */
+export function buildIntervals(animals: IntervalAnimal[]): Built {
+  const rows: (string | number)[][] = []
+  const held: Held[] = []
+
+  for (const a of animals) {
+    const points = (a.calvings ?? [])
+      .map((c) => ({ number: fgiasInt(c.number).value, date: fgiasDate(c.date) }))
+      .filter((c): c is { number: number; date: string } => c.number !== undefined && !!c.date)
+      .sort((x, y) => x.date.localeCompare(y.date))
+
+    if (points.length < 2) continue
+
+    if (!a.baseUuid || !a.accountingId) {
+      held.push({
+        identNumber: a.identNumber,
+        what: `межотельных периодов: ${points.length - 1}`,
+        why: a.baseUuid ? 'Идентификатор учётной системы' : 'Базовый номер ФГИАС ПР',
+      })
+      continue
+    }
+
+    for (let i = 1; i < points.length; i++) {
+      const days = daysBetween(points[i - 1]!.date, points[i]!.date)
+      if (days === undefined || days <= 0) {
+        held.push({
+          identNumber: a.identNumber,
+          what: `период до отёла № ${points[i]!.number}`,
+          why: 'Даты отёлов идут не по порядку',
+        })
+        continue
+      }
+
+      rows.push([a.baseUuid, '', a.accountingId, points[i]!.number, days])
+    }
+  }
+
+  return { columns: INTERVAL_COLUMNS, rows, held, rounded: 0 }
+}
+
+/**
+ * Пять колонок шаблона «КРС_Сервис_период_молочное_направление_v1.1».
+ */
+export const SERVICE_COLUMNS: FgiasColumn[] = [
+  { title: 'Базовый номер ФГИАС ПР', type: 'uuid', width: 38 },
+  { title: 'Идентификатор ФГИАС ПР', type: 'uuid', width: 38 },
+  { title: 'Идентификатор учётной системы', type: 'string', width: 38 },
+  { title: 'Номер лактации', type: 'int' },
+  { title: 'Сервис-период, дни', type: 'int' },
+]
+
+/** Границы, объявленные контрактом шаблона. */
+export const SERVICE_MIN = 10
+export const SERVICE_MAX = 775
+
+export type ServiceAnimal = {
+  identNumber: string
+  accountingId?: string | null
+  baseUuid?: string | null
+  calvings?: CalvingPoint[] | null
+  /** Даты осеменений — из них ищется то, от которого пошла стельность. */
+  inseminationDates?: (string | null | undefined)[] | null
+}
+
+/**
+ * Сервис-период — от отёла до плодотворного осеменения.
+ *
+ * ## Почему из осеменений, а не из межотельного периода
+ *
+ * Считать его как «межотельный минус двести восемьдесят пять» было бы
+ * проще и почти всегда близко к правде. Но это производная
+ * от производной: ошиблись бы там, где стельность вышла короче или
+ * длиннее обычного, — то есть ровно на тех коровах, ради которых
+ * показатель и смотрят.
+ *
+ * Поэтому берётся настоящая дата: последнее осеменение перед следующим
+ * отёлом. Оно и есть плодотворное — то, после которого корова
+ * не осеменялась, потому что стала стельной.
+ *
+ * ## Только там, где следующий отёл уже случился
+ *
+ * Пока корова не отелилась второй раз, сервис-период первой лактации
+ * не определён: осеменения были, но которое из них плодотворное, ещё
+ * неизвестно. Контракт говорит о том же с другой стороны — при номере
+ * последнего отёла, равном единице, колонка не заполняется.
+ *
+ * ## Границы контракта соблюдаются, а не подгоняются
+ *
+ * Реестр требует от десяти до семисот семидесяти пяти дней. Значение
+ * вне этих границ придерживается с названной причиной, а не
+ * прижимается к краю: сервис-период в восемьсот дней — это либо
+ * пропущенный отёл, либо ошибка в датах, и обрезать его до 775 значило
+ * бы отправить в реестр придуманное число вместо честного отказа.
+ */
+export function buildService(animals: ServiceAnimal[]): Built {
+  const rows: (string | number)[][] = []
+  const held: Held[] = []
+
+  for (const a of animals) {
+    const points = (a.calvings ?? [])
+      .map((c) => ({ number: fgiasInt(c.number).value, date: fgiasDate(c.date) }))
+      .filter((c): c is { number: number; date: string } => c.number !== undefined && !!c.date)
+      .sort((x, y) => x.date.localeCompare(y.date))
+
+    if (points.length < 2) continue
+
+    if (!a.baseUuid || !a.accountingId) {
+      held.push({
+        identNumber: a.identNumber,
+        what: `сервис-периодов: ${points.length - 1}`,
+        why: a.baseUuid ? 'Идентификатор учётной системы' : 'Базовый номер ФГИАС ПР',
+      })
+      continue
+    }
+
+    const dates = (a.inseminationDates ?? [])
+      .map((d) => fgiasDate(d))
+      .filter((d): d is string => !!d)
+      .sort((x, y) => x.localeCompare(y))
+
+    for (let i = 1; i < points.length; i++) {
+      const from = points[i - 1]!
+      const to = points[i]!
+
+      /* Плодотворное — последнее осеменение строго между двумя отёлами. */
+      const between = dates.filter((d) => d > from.date && d < to.date)
+      const fruitful = between[between.length - 1]
+
+      if (!fruitful) {
+        held.push({
+          identNumber: a.identNumber,
+          what: `лактация № ${from.number}`,
+          why: 'Нет осеменения между отёлами',
+        })
+        continue
+      }
+
+      const days = daysBetween(from.date, fruitful)
+      if (days === undefined || days < SERVICE_MIN || days > SERVICE_MAX) {
+        held.push({
+          identNumber: a.identNumber,
+          what: `лактация № ${from.number}`,
+          why: `Сервис-период вне границ ${SERVICE_MIN}–${SERVICE_MAX} дней`,
+        })
+        continue
+      }
+
+      /*
+       * Номер лактации — той, что закончилась этим сервис-периодом,
+       * то есть более раннего отёла. Реестр называет колонку «Номер
+       * лактации», а не «Номер отёла», как в межотельном периоде,
+       * и это не описка: сервис-период принадлежит лактации, которая
+       * шла, а межотельный период — промежутку между двумя.
+       */
+      rows.push([a.baseUuid, '', a.accountingId, from.number, days])
+    }
+  }
+
+  return { columns: SERVICE_COLUMNS, rows, held, rounded: 0 }
+}
+
+/**
  * Справочник «Признаки молочной продуктивности» (`sp_signums`).
  *
  * Две записи, обе прочитаны из открытого реестра 30 августа 2026 года.
