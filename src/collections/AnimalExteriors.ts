@@ -1,8 +1,8 @@
 import type { CollectionConfig } from 'payload'
-import { stampOwnerOrg } from '@/access/guards'
+import { requireOwnAnimal, stampOwnerOrg } from '@/access/guards'
 import { ownerOrgField } from '@/collections/shared'
 import { EXTERIOR_COMPOSITES, EXTERIOR_TRAITS } from '@/lib/dictionaries'
-import { animalScopedReadFor, isAdmin } from '@/access'
+import { animalScopedMutate, animalScopedReadFor, isAdmin, isAuthenticated } from '@/access'
 import { applyExteriorSnapshot } from '@/lib/evaluation-snapshot'
 import { relId } from '@/lib/visibility'
 
@@ -49,10 +49,30 @@ export const AnimalExteriors: CollectionConfig = {
     defaultColumns: ['animal', 'assessedAt', 'assessor', 'udderComposite', 'isCurrent'],
     group: 'Племенная книга',
   },
+  /**
+   * ## Осмотр записывает хозяйство, а не только Ассоциация
+   *
+   * Стояло `create: isAdmin` — писать вправе была одна Ассоциация.
+   * Для этой коллекции это неверно с самого начала и стало заметно,
+   * когда под три шаблона реестра сюда добавились девять полей:
+   * заполнить их оказалось некому, и четыре кнопки выгрузки из двадцати
+   * обещали файлы, которые всегда будут пустыми.
+   *
+   * Ошибка шла от соседней таблицы. В `animal-evaluations` лежит оценка
+   * племенной ценности — расчёт по модели, и делает его расчётный центр;
+   * туда хозяйству писать действительно нечего. Здесь наоборот: это
+   * промер живого животного, который делает приезжий бонитёр,
+   * а записывает зоотехник со своей ведомости. Правило скопировали,
+   * не заметив, что предмет другой.
+   *
+   * Порядок теперь тот же, что у взвешиваний и бонитировок: заводит
+   * любой вошедший, но хук пускает только к своим животным, а роль
+   * «наблюдатель» не пускает вовсе.
+   */
   access: {
     read: animalScopedReadFor('evaluation'),
-    create: isAdmin,
-    update: isAdmin,
+    create: isAuthenticated,
+    update: animalScopedMutate,
     delete: isAdmin,
   },
 
@@ -280,6 +300,15 @@ export const AnimalExteriors: CollectionConfig = {
 
   hooks: {
     beforeChange: [
+      /*
+       * Проверка «животное своё» стоит первой и до всего прочего:
+       * правило `create` у Payload видит только пользователя, а не
+       * содержимое будущей записи, и без хука любой вошедший завёл бы
+       * оценку чужой корове через API. Тот же порядок, что у отёлов,
+       * доек и взвешиваний — правило пускает к операции, хук решает,
+       * что именно записать.
+       */
+      requireOwnAnimal,
       stampOwnerOrg,
       async ({ data, req, operation, originalDoc }) => {
         if (!data?.isCurrent) return data

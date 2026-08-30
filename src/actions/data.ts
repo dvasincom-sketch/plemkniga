@@ -1464,7 +1464,9 @@ async function importEvents(
           ? 'weighings'
           : ds.key === 'gradings'
             ? 'gradings'
-            : 'milk-tests'
+            : ds.key === 'exteriors'
+              ? 'animal-exteriors'
+              : 'milk-tests'
 
   /* --- Заслон от повторной заливки того же файла --- */
 
@@ -1509,7 +1511,8 @@ async function importEvents(
         typeof d.animal === 'object' && d.animal
           ? (d.animal as { id: number }).id
           : (d.animal as number)
-      const date = d.date as string | undefined
+      /* У оценок экстерьера дата зовётся `assessedAt` — заслон от дублей общий. */
+      const date = (d.date ?? d.assessedAt) as string | undefined
       if (!aid || !date) continue
       seen.add(
         keyOf(aid, date, ds.key === 'milkTests' ? (d.dailyYield as number | null) : null),
@@ -1581,6 +1584,18 @@ async function importEvents(
     }
 
     const data: Record<string, unknown> = { animal: animal.id, date }
+
+    /*
+     * У оценок экстерьера поле даты зовётся `assessedAt`, а не `date`.
+     * Переименование стоит здесь, а не в наборе колонок: в файле шапка
+     * называется «Дата оценки», и разбор ищет её тем же путём, что
+     * у прочих наборов, — заводить второе имя ради одной коллекции
+     * значило бы развести общую дорогу на две.
+     */
+    if (ds.key === 'exteriors') {
+      data.assessedAt = date
+      delete data.date
+    }
 
     for (const col of cols) {
       if (['animal', 'date', 'bull'].includes(col.key)) continue
