@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { readSpreadsheet, toXlsx } from '@/lib/xlsx'
+import { columnsOf, datasetByKey, matchHeader } from '@/lib/import-format'
 import {
   columnAt,
   findHeader,
@@ -823,6 +824,89 @@ function mainSheet() {
   )
 }
 
+/**
+ * Загрузка шаблонов ФГИАС: сколько колонок книга узнаёт.
+ *
+ * ## Зачем это здесь
+ *
+ * У хозяйства уже лежат файлы, заполненные по шаблонам реестра, — оно
+ * сдаёт их каждый месяц. Загрузить их к нам как есть быстрее, чем
+ * перекладывать в наш формат, и разговор с хозяйством начинается
+ * с честного числа: сколько колонок мы принимаем сегодня.
+ *
+ * Число печатается, а не проверяется на равенство: оно должно расти,
+ * и утверждение «ровно одиннадцать» пришлось бы править при каждом
+ * улучшении. Проверяется другое — что не стало хуже и что двух колонок
+ * с одним назначением не появилось.
+ */
+function fgiasImport() {
+  console.log('\nЗагрузка шаблонов ФГИАС: что книга узнаёт в чужой шапке\n')
+
+  const DIR = 'data/shablony-fgias'
+  const file = join(DIR, 'КРС_Основные_сведения_v.2.1_2.6.0.xlsx')
+  const ds = datasetByKey('animals')
+
+  if (!ds) {
+    check(false, 'набор «Животные» найден')
+    return
+  }
+
+  /*
+   * Два заголовка, ведущих в одно поле, — молчаливая перезапись: какой
+   * победит, решает их порядок в файле. Так «Импортное наименование/
+   * кличка» однажды затирало русскую кличку иностранной.
+   *
+   * Проверяется весь набор, а не только шапка ФГИАС: столкнуться могут
+   * любые два синонима.
+   */
+  const seen = new Map<string, string>()
+  const clashes: string[] = []
+  for (const c of columnsOf(ds)) {
+    for (const a of [c.title, ...c.aliases]) {
+      const k = headerKey(a)
+      const had = seen.get(k)
+      if (had && had !== c.key) clashes.push(`«${a}» → ${had} и ${c.key}`)
+      seen.set(k, c.key)
+    }
+  }
+  check(clashes.length === 0, 'ни один заголовок не ведёт в два разных поля', clashes.join('; '))
+
+  if (!existsSync(file)) {
+    console.log(`  ⚠ Шаблона нет в ${DIR} — сколько колонок узнаётся, проверить нечем.`)
+    return
+  }
+
+  const read = readSpreadsheet(new Uint8Array(readFileSync(file)))
+  if ('error' in read) {
+    check(false, 'шаблон «Основные сведения» прочитан', read.error)
+    return
+  }
+
+  const raw = (read.rows[0] ?? []).map((h) => h.trim()).filter(Boolean)
+  const { header } = matchHeader(raw, ds)
+  const known = header.filter((h) => h !== '')
+
+  console.log(`  Узнаётся ${known.length} колонок из ${raw.length}: ${known.join(', ')}`)
+
+  /*
+   * Порог, а не точное число: пусть растёт. Падение ниже порога значит,
+   * что чей-то синоним увели, — и это надо заметить прогоном, а не
+   * жалобой хозяйства.
+   *
+   * Порог сперва был написан одиннадцатью — по первому замеру, сделанному
+   * до того, как из набора убрали столкновение «Импортное
+   * наименование/кличка» с «Кличкой». После починки узнаваемых стало
+   * десять, и проверка упала. Неверным было ожидание: одиннадцатая
+   * колонка была не колонкой, а двумя заголовками в одном поле.
+   */
+  check(known.length >= 10, 'узнаётся не меньше десяти колонок', String(known.length))
+  check(new Set(known).size === known.length, 'и ни одна колонка не занята дважды', known.join(', '))
+
+  for (const must of ['identNumber', 'fgias.baseUuid', 'fgias.unsm', 'ageGroup']) {
+    check(known.includes(must), `узнаётся «${must}»`)
+  }
+}
+
 /* ------------------------------------------------------------------ */
 
 columns()
@@ -832,6 +916,7 @@ pedigree()
 summary()
 ageGroups()
 mainSheet()
+fgiasImport()
 templates()
 roundtrip()
 forecastKeys()
