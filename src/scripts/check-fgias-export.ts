@@ -18,9 +18,11 @@ import {
   PEDIGREE_COLUMNS,
   PEDIGREE_NESTS,
   SHOW_COLUMNS,
+  WEIGHING_COLUMNS,
   buildLactations,
   buildPedigree,
   buildShows,
+  buildWeighings,
   chooseSignums,
   fgiasDate,
   fgiasTemplateOf,
@@ -524,6 +526,11 @@ function templates() {
       file: 'КРС_Участие_в_выставках_и_соревнованиях_v1.1_2.6.0.xlsx',
       titles: SHOW_COLUMNS.map((c) => c.title),
       label: 'Выставки',
+    },
+    {
+      file: 'КРС_Живая_масса_v1.5_2.6.0.xlsx',
+      titles: WEIGHING_COLUMNS.map((c) => c.title),
+      label: 'Живая масса',
     },
     {
       file: 'КРС_Родословная_v1.1_2.6.0.xlsx',
@@ -1128,12 +1135,71 @@ function shows() {
   check(none.rows.length === 0 && none.held.length === 0, 'животное без выставок не придержано')
 }
 
+/**
+ * Живая масса: привязка обязательна, масса не округляется.
+ */
+function weighings() {
+  console.log('\nЖивая масса: что уезжает\n')
+
+  const base = {
+    identNumber: 'RU0000000070028',
+    accountingId: '1a421c44-36d2-41c3-881e-38bf83c4f756',
+    baseUuid: '60b5cc43-7b0a-416d-920b-6782c2192fcf',
+  }
+  const full = {
+    date: '2026-06-01T00:00:00.000Z',
+    weight: 520.5,
+    signUuid: '0e02446c-f349-44ea-ae99-f124e4ecf57f',
+    lactationNumber: 2,
+  }
+
+  const ok = buildWeighings([{ ...base, weighings: [full] }])
+  check(ok.rows.length === 1, 'полное взвешивание уезжает')
+  const row = ok.rows[0]!
+  check(row.length === 7, 'в строке семь значений', String(row.length))
+  check(row[3] === '2026-06-01', 'дата в виде ГГГГ-ММ-ДД', String(row[3]))
+  /*
+   * Единственное число во всей выгрузке, которое уезжает как есть:
+   * контракт объявил массу `float`, а не `int`, — округлять нечего.
+   */
+  check(row[4] === 520.5, 'масса не округляется', String(row[4]))
+  check(row[5] === full.signUuid, 'привязка ключом реестра')
+
+  /* Без привязки строка не уезжает: 800 при продаже и 800 при выбытии — разное. */
+  const noSign = buildWeighings([{ ...base, weighings: [{ ...full, signUuid: null }] }])
+  check(
+    noSign.rows.length === 0 && noSign.held[0]?.why === 'Привязка',
+    'без привязки придержано и причина названа',
+    String(noSign.held[0]?.why),
+  )
+
+  /* А без номера лактации — уезжает: тёлку взвешивают до первого отёла. */
+  const noLact = buildWeighings([{ ...base, weighings: [{ ...full, lactationNumber: null }] }])
+  check(noLact.rows.length === 1, 'без номера лактации взвешивание всё равно уезжает')
+  check(noLact.rows[0]![6] === '', 'и номер уходит пустым, а не нулём', String(noLact.rows[0]![6]))
+
+  /*
+   * Ноль килограммов — заведомая ошибка ввода, но не наша забота:
+   * проверка на положительность стоит в коллекции. Здесь важно другое —
+   * что ноль не считается пустотой и не придерживается молча.
+   */
+  const zero = buildWeighings([{ ...base, weighings: [{ ...full, weight: 0 }] }])
+  check(zero.rows.length === 1, 'ноль — это значение, а не пустота')
+
+  const noKey = buildWeighings([{ ...base, baseUuid: null, weighings: [full] }])
+  check(
+    noKey.rows.length === 0 && noKey.held.length === 1,
+    'без номера реестра придержано одно животное, а не каждое взвешивание',
+  )
+}
+
 /* ------------------------------------------------------------------ */
 
 columns()
 values()
 lactations()
 shows()
+weighings()
 pedigree()
 summary()
 ageGroups()

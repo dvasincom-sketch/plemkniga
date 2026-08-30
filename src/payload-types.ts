@@ -75,6 +75,7 @@ export interface Config {
     calvings: Calving;
     inseminations: Insemination;
     'milk-tests': MilkTest;
+    weighings: Weighing;
     'health-events': HealthEvent;
     'animal-evaluations': AnimalEvaluation;
     'animal-exteriors': AnimalExterior;
@@ -130,6 +131,7 @@ export interface Config {
     calvings: CalvingsSelect<false> | CalvingsSelect<true>;
     inseminations: InseminationsSelect<false> | InseminationsSelect<true>;
     'milk-tests': MilkTestsSelect<false> | MilkTestsSelect<true>;
+    weighings: WeighingsSelect<false> | WeighingsSelect<true>;
     'health-events': HealthEventsSelect<false> | HealthEventsSelect<true>;
     'animal-evaluations': AnimalEvaluationsSelect<false> | AnimalEvaluationsSelect<true>;
     'animal-exteriors': AnimalExteriorsSelect<false> | AnimalExteriorsSelect<true>;
@@ -1232,6 +1234,34 @@ export interface MilkTest {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "weighings".
+ */
+export interface Weighing {
+  id: number;
+  /**
+   * Проставляется автоматически, нужен для доступа прежнего владельца
+   */
+  ownerOrg?: (number | null) | Organization;
+  animal: number | Animal;
+  date: string;
+  /**
+   * Положительное число, до двух знаков после запятой
+   */
+  weight: number;
+  /**
+   * Зачем взвешивали. Реестр требует его ключом: без признака число ничего не значит — 800 кг при продаже и 800 при выбытии говорят о разном
+   */
+  sign?: ('birth' | 'age' | 'firstInsemination' | 'averageLactation' | 'highestLactation' | 'sale' | 'disposal') | null;
+  /**
+   * Только для самок при наличии лактации
+   */
+  lactationNumber?: number | null;
+  note?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "health-events".
  */
 export interface HealthEvent {
@@ -1353,6 +1383,10 @@ export interface AnimalExterior {
    */
   lactation?: number | null;
   assessor?: (number | null) | Technician;
+  /**
+   * Кто отвечает за оценку. ФГИАС ПР требует её наименование, ИНН и КПП
+   */
+  assessorOrg?: (number | null) | Organization;
   isCurrent?: boolean | null;
   height?: number | null;
   chestWidth?: number | null;
@@ -2205,6 +2239,10 @@ export interface PayloadLockedDocument {
         value: number | MilkTest;
       } | null)
     | ({
+        relationTo: 'weighings';
+        value: number | Weighing;
+      } | null)
+    | ({
         relationTo: 'health-events';
         value: number | HealthEvent;
       } | null)
@@ -2909,6 +2947,21 @@ export interface MilkTestsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "weighings_select".
+ */
+export interface WeighingsSelect<T extends boolean = true> {
+  ownerOrg?: T;
+  animal?: T;
+  date?: T;
+  weight?: T;
+  sign?: T;
+  lactationNumber?: T;
+  note?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "health-events_select".
  */
 export interface HealthEventsSelect<T extends boolean = true> {
@@ -2978,6 +3031,7 @@ export interface AnimalExteriorsSelect<T extends boolean = true> {
   assessedAt?: T;
   lactation?: T;
   assessor?: T;
+  assessorOrg?: T;
   isCurrent?: T;
   height?: T;
   chestWidth?: T;

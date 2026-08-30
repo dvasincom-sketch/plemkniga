@@ -10,9 +10,12 @@ import {
   addCalvingAction,
   addInseminationAction,
   addMilkTestAction,
+  addShowAction,
+  addWeighingAction,
   type RecordState,
 } from '@/actions/reproduction'
 import { addEventAction, type EventFormState } from '@/actions/events'
+import { WEIGHING_SIGNS } from '@/lib/weighing'
 
 /**
  * Запись события — от события к животному, а не наоборот.
@@ -74,15 +77,35 @@ const DISPOSAL_STATES: Choice[] = [
   { value: 'dead', label: 'Пало' },
 ]
 
-type Kind = 'calving' | 'insemination' | 'milkTest' | 'dryOff' | 'move' | 'disposal'
+type Kind =
+  | 'calving'
+  | 'insemination'
+  | 'milkTest'
+  | 'weighing'
+  | 'dryOff'
+  | 'move'
+  | 'disposal'
+  | 'show'
 
 const TILES: { key: Kind; label: string; hint: string }[] = [
   { key: 'calving', label: 'Отёл', hint: 'Номер отёла посчитается сам' },
   { key: 'insemination', label: 'Осеменение', hint: 'Бык, техник, кратность' },
   { key: 'milkTest', label: 'Контрольная дойка', hint: 'Удой, жир, белок, соматика' },
+  /*
+   * Взвешивание стоит сразу за дойкой: это ежемесячная отчётность,
+   * то есть по частоте они соседи. Порядок плиток — порядок того,
+   * как часто нажимают, а не алфавит.
+   */
+  { key: 'weighing', label: 'Взвешивание', hint: 'Живая масса и признак' },
   { key: 'dryOff', label: 'Запуск', hint: 'Конец лактации' },
   { key: 'move', label: 'Перемещение', hint: 'Смена стада внутри хозяйства' },
   { key: 'disposal', label: 'Выбытие', hint: 'Продажа, выбраковка, падёж' },
+  /*
+   * Выставка последней: её записывают несколько раз в год, а не в месяц.
+   * Но записывают руками почти всегда — файла с выставками у хозяйства
+   * обычно нет, поэтому без плитки эти данные не появились бы вовсе.
+   */
+  { key: 'show', label: 'Выставка', hint: 'Мероприятие, награды, выигрыш' },
 ]
 
 const today = () => new Date().toISOString().slice(0, 10)
@@ -256,6 +279,10 @@ export function RecordEvent({
       return <InseminationForm {...common} technicians={technicians} />
     case 'milkTest':
       return <MilkTestForm {...common} />
+    case 'weighing':
+      return <WeighingForm {...common} />
+    case 'show':
+      return <ShowForm {...common} />
     default:
       return (
         <SimpleEventForm
@@ -420,6 +447,118 @@ function MilkTestForm({ date, setDate, onBack, onRepeat }: FormProps) {
         </Field>
         <Field label="Соматические клетки, тыс./мл">
           <input name="somaticCells" inputMode="decimal" className="field field-on-light" />
+        </Field>
+      </FormShell>
+    </form>
+  )
+}
+
+/* --------------------------- Взвешивание -------------------------- */
+
+/**
+ * Живая масса.
+ *
+ * Признак не выбран по умолчанию намеренно: «при рождении» и «при продаже»
+ * одинаково вероятны, и подставить один за человека значит записать
+ * неправду в поле, от которого зависит смысл числа. Пустой признак
+ * честнее — выгрузка такую строку придержит и назовёт причину.
+ *
+ * Номер лактации не спрашивается: он считается из числа отёлов, как
+ * у дойки. Спросить его значило бы завести второй ответ на вопрос,
+ * у которого уже есть первый.
+ */
+function WeighingForm({ date, setDate, onBack, onRepeat }: FormProps) {
+  const [state, formAction, pending] = useActionState<RecordState, FormData>(addWeighingAction, {})
+  const [sign, setSign] = useState('')
+
+  return (
+    <form
+      action={(fd) => {
+        keepDate(fd, setDate)
+        formAction(fd)
+      }}
+    >
+      <FormShell
+        title="Взвешивание"
+        hint="Признак важнее, чем кажется: 800 кг при продаже и 800 при выбытии говорят о разном, и без него реестр строку не примет."
+        pending={pending}
+        state={state}
+        onBack={onBack}
+        onRepeat={onRepeat}
+      >
+        <AnimalPicker name="animal" label="Животное" required />
+        <Field label="Дата взвешивания">
+          <DateField name="date" defaultValue={date} required max={today()} />
+        </Field>
+        <Field label="Живая масса, кг">
+          <input name="weight" inputMode="decimal" required className="field field-on-light" />
+        </Field>
+        <SelectField label="Признак взвешивания">
+          <input type="hidden" name="sign" value={sign} />
+          <Select
+            name="signPicker"
+            options={WEIGHING_SIGNS.map((w) => ({ value: w.value, label: w.label }))}
+            defaultValue={sign}
+            placeholder="Не выбран"
+            onLight
+            onChange={setSign}
+            ariaLabel="Признак взвешивания"
+          />
+        </SelectField>
+        <Field label="Примечание">
+          <input name="note" className="field field-on-light" />
+        </Field>
+      </FormShell>
+    </form>
+  )
+}
+
+/* ----------------------------- Выставка --------------------------- */
+
+/**
+ * Участие в выставке или соревновании.
+ *
+ * Обязательны дата и название: мероприятие без даты неотличимо от другого
+ * такого же, а без названия — вообще не запись о выставке. Место, награды
+ * и выигрыш пусты у того, кто участвовал и ничего не взял, и это правда,
+ * а не пробел.
+ *
+ * Выигрыш строкой, а не числом: там пишут и «120 000 руб.»,
+ * и «племенной телёнок», и «кубок».
+ */
+function ShowForm({ date, setDate, onBack, onRepeat }: FormProps) {
+  const [state, formAction, pending] = useActionState<RecordState, FormData>(addShowAction, {})
+
+  return (
+    <form
+      action={(fd) => {
+        keepDate(fd, setDate)
+        formAction(fd)
+      }}
+    >
+      <FormShell
+        title="Выставка"
+        hint="Записывается в карточку животного, рядом с оценками: выставка — это суждение о животном, а не событие стада."
+        pending={pending}
+        state={state}
+        onBack={onBack}
+        onRepeat={onRepeat}
+      >
+        <AnimalPicker name="animal" label="Животное" required />
+        <Field label="Дата мероприятия">
+          <DateField name="date" defaultValue={date} required />
+        </Field>
+        <Field label="Название мероприятия">
+          <input name="title" required className="field field-on-light" placeholder="Агроферма-2026" />
+        </Field>
+        <Field label="Место проведения">
+          <input name="place" className="field field-on-light" placeholder="Москва, ВДНХ" />
+        </Field>
+        <Field label="Полученные награды">
+          <input name="awards" className="field field-on-light" placeholder="Диплом I степени" />
+        </Field>
+        <Field label="Выигрыш">
+          <input name="prize" className="field field-on-light" placeholder="120 000 руб. или кубок" />
         </Field>
       </FormShell>
     </form>

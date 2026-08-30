@@ -31,6 +31,7 @@
  */
 
 import { AGE_GROUPS, STATES } from '@/lib/dictionaries'
+import { WEIGHING_SIGNS } from '@/lib/weighing'
 import { CALVING_EASE, CALVING_RESULTS } from '@/collections/Calvings'
 
 export type ColumnKind =
@@ -663,7 +664,13 @@ const MILK_TESTS: ImportColumn[] = [
   },
 ]
 
-export type DatasetKey = 'animals' | 'calvings' | 'inseminations' | 'milkTests' | 'shows'
+export type DatasetKey =
+  | 'animals'
+  | 'calvings'
+  | 'inseminations'
+  | 'milkTests'
+  | 'shows'
+  | 'weighings'
 
 export type Dataset = {
   key: DatasetKey
@@ -729,6 +736,53 @@ const SHOWS: ImportColumn[] = [
     what: 'Как записано в документах: сумма, кубок, приз.',
     example: '120 000 руб.',
     note: 'Текстом, а не числом: призом чаще бывает не сумма.',
+  },
+]
+
+/*
+ * Живая масса — ежемесячная отчётность, и загрузкой она приходит чаще
+ * прочего: взвешивают всё стадо разом, ведомостью из весов.
+ *
+ * Привязка обязательной колонкой не объявлена, хотя реестр без неё строку
+ * не примет. Причина в том, где эта строгость дешевле: не принять
+ * взвешивание в книгу значит потерять факт, а выгрузка и так придержит
+ * такую строку и назовёт причину. Данные к себе принимаем щедро,
+ * государству отдаём строго.
+ */
+const WEIGHINGS: ImportColumn[] = [
+  animalRef('Номер животного, которое взвешивали.'),
+  {
+    key: 'date',
+    title: 'Дата взвешивания',
+    aliases: ['дата', 'дата взвешивания'],
+    kind: 'date',
+    required: true,
+    what: 'Когда взвешивали. Не может быть раньше даты рождения.',
+    example: '2026-06-01',
+  },
+  {
+    key: 'weight',
+    title: 'Живая масса',
+    aliases: ['масса', 'вес', 'живая масса, кг'],
+    kind: 'number',
+    required: true,
+    what: 'Килограммы, положительное число.',
+    example: '520,5',
+  },
+  enumColumn({
+    key: 'sign',
+    title: 'Привязка',
+    aliases: ['признак взвешивания', 'признак'],
+    what: 'Зачем взвешивали.',
+    options: WEIGHING_SIGNS.map((w) => ({ value: w.value, label: w.label })),
+  }),
+  {
+    key: 'lactationNumber',
+    title: 'Номер лактации взвешивания',
+    aliases: ['номер лактации', 'лактация'],
+    kind: 'number',
+    what: 'Только для самок при наличии лактации.',
+    example: '2',
   },
 ]
 
@@ -816,6 +870,21 @@ export const DATASETS: Dataset[] = [
           'Строка — одно участие. Животное ищется по индивидуальному номеру ' +
           'и должно уже быть в книге.',
         columns: SHOWS,
+      },
+    ],
+  },
+  {
+    key: 'weighings',
+    label: 'Живая масса',
+    hint: 'Добавляет взвешивания существующим животным',
+    submissionKind: 'productivity',
+    groups: [
+      {
+        key: 'weighing',
+        label: 'Взвешивание',
+        intro:
+          'Строка — одно взвешивание. Животное ищется по номеру и должно уже быть в книге.',
+        columns: WEIGHINGS,
       },
     ],
   },

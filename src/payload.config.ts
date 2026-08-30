@@ -20,6 +20,7 @@ import { PendingColumns } from '@/collections/PendingColumns'
 import { Media } from '@/collections/Media'
 import { Inseminations } from '@/collections/Inseminations'
 import { MilkTests } from '@/collections/MilkTests'
+import { Weighings } from '@/collections/Weighings'
 import { HealthEvents } from '@/collections/HealthEvents'
 import { Calvings } from '@/collections/Calvings'
 import { DataSubmissions } from '@/collections/DataSubmissions'
@@ -77,6 +78,7 @@ export default buildConfig({
     Calvings,
     Inseminations,
     MilkTests,
+    Weighings,
     HealthEvents,
     AnimalEvaluations,
     AnimalExteriors,

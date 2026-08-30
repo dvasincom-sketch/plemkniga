@@ -264,3 +264,158 @@ export async function addMilkTestAction(
     return { error: e instanceof Error ? e.message : 'Не удалось записать дойку' }
   }
 }
+
+/* ------------------------------------------------------------------ */
+
+/**
+ * Взвешивание.
+ *
+ * ## Почему здесь, рядом с дойкой
+ *
+ * По форме это одно и то же событие: животное, дата, число. Держать его
+ * в другом файле значило бы развести два одинаковых пути и на третьем
+ * шаге разойтись в мелочах — какую дату считать будущей, что делать
+ * с номером лактации.
+ *
+ * ## Номер лактации считается, а не спрашивается
+ *
+ * Ровно как у дойки: он выводится из числа отёлов и потому не может
+ * разойтись с ними. Спросить его у человека значило бы завести второй
+ * ответ на вопрос, у которого уже есть первый.
+ *
+ * Для тёлки он выйдет нулевым, и это правильно: контракт реестра помечает
+ * его «только для самок при наличии лактации», а взвешивают и молодняк.
+ *
+ * ## Признак не подставляется по умолчанию
+ *
+ * У дойки есть разумное умолчание — источник «собственник». У признака
+ * взвешивания его нет: «при рождении» и «при продаже» одинаково вероятны,
+ * и выбрать за человека значит записать неправду в поле, от которого
+ * зависит смысл числа. Пустой признак честнее: выгрузка такую строку
+ * придержит и назовёт причину.
+ */
+export async function addWeighingAction(
+  _prev: RecordState,
+  formData: FormData,
+): Promise<RecordState> {
+  const ctx = await guard(formData)
+  if ('error' in ctx) return { error: ctx.error }
+  const { user, payload, animalId } = ctx
+
+  const date = iso(formData, 'date')
+  if (!date) return { error: 'Дата взвешивания обязательна' }
+  if (new Date(date).getTime() > Date.now()) {
+    return { error: 'Дата взвешивания не может быть в будущем' }
+  }
+
+  const weight = num(formData, 'weight')
+  if (weight === null) return { error: 'Живая масса обязательна' }
+  if (weight <= 0) return { error: 'Живая масса должна быть больше нуля' }
+
+  const lactationNumber = await calvingCount(payload, animalId)
+  const sign = String(formData.get('sign') || '').trim()
+
+  try {
+    await payload.create({
+      collection: 'weighings',
+      overrideAccess: true,
+      user,
+      data: {
+        animal: animalId,
+        date,
+        weight,
+        ...(sign ? { sign } : {}),
+        ...(lactationNumber ? { lactationNumber } : {}),
+        note: String(formData.get('note') || '').trim() || undefined,
+      } as never,
+    })
+
+    revalidatePath(`/animals/${animalId}`)
+    revalidatePath('/account')
+
+    return { message: 'Взвешивание записано' }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Не удалось записать взвешивание' }
+  }
+}
+
+/**
+ * Выставка.
+ *
+ * ## Почему запись идёт обновлением, а не созданием
+ *
+ * Выставки лежат массивом внутри животного (решение №264), поэтому новая
+ * дописывается к прежним. Массив пишется целиком: прочитать, добавить,
+ * записать — иначе запись затрёт всё, что было.
+ *
+ * ## Повтор не заводится дважды
+ *
+ * Тот же ключ, что при загрузке файлом: дата плюс приведённое название.
+ * Человек, записавший выставку и не увидевший её в списке сразу,
+ * нажимает «Записать» второй раз — и без этой проверки получил бы
+ * две одинаковые строки.
+ */
+export async function addShowAction(
+  _prev: RecordState,
+  formData: FormData,
+): Promise<RecordState> {
+  const ctx = await guard(formData)
+  if ('error' in ctx) return { error: ctx.error }
+  const { user, payload, animalId } = ctx
+
+  const date = iso(formData, 'date')
+  if (!date) return { error: 'Дата мероприятия обязательна' }
+
+  const title = String(formData.get('title') || '').trim()
+  if (!title) return { error: 'Название мероприятия обязательно' }
+
+  const key = (d: unknown, t: unknown) =>
+    `${String(d ?? '').slice(0, 10)}|${String(t ?? '')
+      .trim()
+      .toLowerCase()
+      .replace(/ё/g, 'е')
+      .replace(/\s+/g, ' ')}`
+
+  try {
+    const animal = await payload.findByID({
+      collection: 'animals',
+      id: animalId,
+      depth: 0,
+      overrideAccess: true,
+    })
+
+    const had = Array.isArray((animal as { shows?: unknown[] }).shows)
+      ? ((animal as { shows: Record<string, unknown>[] }).shows ?? [])
+      : []
+
+    if (had.some((s) => key(s.date, s.title) === key(date, title))) {
+      return { error: 'Такая выставка у этого животного уже записана' }
+    }
+
+    await payload.update({
+      collection: 'animals',
+      id: animalId,
+      overrideAccess: true,
+      user,
+      data: {
+        shows: [
+          ...had,
+          {
+            date,
+            title,
+            place: String(formData.get('place') || '').trim() || undefined,
+            awards: String(formData.get('awards') || '').trim() || undefined,
+            prize: String(formData.get('prize') || '').trim() || undefined,
+          },
+        ],
+      } as never,
+    })
+
+    revalidatePath(`/animals/${animalId}`)
+    revalidatePath('/account')
+
+    return { message: 'Выставка записана' }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Не удалось записать выставку' }
+  }
+}

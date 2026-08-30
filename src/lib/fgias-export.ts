@@ -242,6 +242,123 @@ export function buildShows(animals: ShowAnimal[]): Built {
 }
 
 /**
+ * Семь колонок шаблона «КРС_Живая_масса_v1.5».
+ *
+ * Вторая здесь снова «Идентификатор ФГИАС ПР», без слова «строки», —
+ * как в «Лактации» и в отличие от выставок. Списано с файла.
+ */
+export const WEIGHING_COLUMNS: FgiasColumn[] = [
+  { title: 'Базовый номер ФГИАС ПР', type: 'uuid', width: 38 },
+  { title: 'Идентификатор ФГИАС ПР', type: 'uuid', width: 38 },
+  { title: 'Идентификатор учётной системы', type: 'string', width: 38 },
+  { title: 'Дата взвешивания', type: 'date', width: 14 },
+  { title: 'Живая масса', type: 'float', width: 12 },
+  { title: 'Привязка', type: 'uuid', width: 38 },
+  { title: 'Номер лактации взвешивания', type: 'int' },
+]
+
+export type Weighing = {
+  date?: string | null
+  weight?: number | null
+  /** Ключ реестра из справочника признаков — подставляет вызывающий. */
+  signUuid?: string | null
+  lactationNumber?: number | null
+}
+
+export type WeighingRow = {
+  identNumber: string
+  accountingId?: string | null
+  baseUuid?: string | null
+  weighings?: Weighing[] | null
+}
+
+/**
+ * Живая масса — по строке на взвешивание.
+ *
+ * ## Что обязательно
+ *
+ * Дата, масса и привязка. Первые две очевидны, третья — нет, и она важнее
+ * прочих: восемьсот килограммов при продаже и восемьсот при выбытии
+ * говорят о разном, и без признака число не значит ничего. Реестр требует
+ * его ключом справочника, поэтому взвешивание без признака придерживается,
+ * а не уезжает с пустой ячейкой.
+ *
+ * Номер лактации необязателен: контракт помечает его «только для самок
+ * при наличии лактации», а тёлку взвешивают до первого отёла.
+ *
+ * ## Масса не округляется
+ *
+ * Контракт объявил её `float` с двумя знаками, и это единственное число
+ * во всей выгрузке, которое уезжает как есть. У лактаций удой объявлен
+ * целым, и там округление неизбежно и объявлено; здесь округлять нечего.
+ */
+export function buildWeighings(animals: WeighingRow[]): Built {
+  const rows: (string | number)[][] = []
+  const held: Held[] = []
+
+  for (const a of animals) {
+    const list = (a.weighings ?? []).filter(Boolean)
+    if (list.length === 0) continue
+
+    if (!a.baseUuid) {
+      held.push({
+        identNumber: a.identNumber,
+        what: `взвешиваний: ${list.length}`,
+        why: 'Базовый номер ФГИАС ПР',
+      })
+      continue
+    }
+
+    if (!a.accountingId) {
+      held.push({
+        identNumber: a.identNumber,
+        what: `взвешиваний: ${list.length}`,
+        why: 'Идентификатор учётной системы',
+      })
+      continue
+    }
+
+    for (const w of list) {
+      const date = fgiasDate(w.date)
+      const weight = fgiasFloat(w.weight)
+      const sign = typeof w.signUuid === 'string' && w.signUuid.trim() ? w.signUuid.trim() : ''
+
+      const missing = !date
+        ? 'Дата взвешивания'
+        : weight === undefined
+          ? 'Живая масса'
+          : !sign
+            ? 'Привязка'
+            : null
+
+      if (missing) {
+        held.push({
+          identNumber: a.identNumber,
+          what: `взвешивание ${w.date ?? '?'}`,
+          why: missing,
+        })
+        continue
+      }
+
+      const lact = fgiasInt(w.lactationNumber)
+
+      rows.push([
+        a.baseUuid,
+        '',
+        a.accountingId,
+        date!,
+        weight!,
+        sign,
+        /* Номер лактации необязателен: тёлку взвешивают до первого отёла. */
+        lact.value ?? '',
+      ])
+    }
+  }
+
+  return { columns: WEIGHING_COLUMNS, rows, held, rounded: 0 }
+}
+
+/**
  * Справочник «Признаки молочной продуктивности» (`sp_signums`).
  *
  * Две записи, обе прочитаны из открытого реестра 30 августа 2026 года.

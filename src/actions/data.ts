@@ -1397,8 +1397,20 @@ async function importEvents(
     }
   }
 
+  /*
+   * Соответствие набора и коллекции. Взвешивания добавлены сюда, а
+   * не отдельной веткой разбора: по форме это то же событие, что дойка, —
+   * животное, дата, число, — и общий путь избавляет от второй копии
+   * правил про своих животных, дубли и пакет загрузки.
+   */
   const collection =
-    ds.key === 'calvings' ? 'calvings' : ds.key === 'inseminations' ? 'inseminations' : 'milk-tests'
+    ds.key === 'calvings'
+      ? 'calvings'
+      : ds.key === 'inseminations'
+        ? 'inseminations'
+        : ds.key === 'weighings'
+          ? 'weighings'
+          : 'milk-tests'
 
   /* --- Заслон от повторной заливки того же файла --- */
 
@@ -1417,7 +1429,13 @@ async function importEvents(
    */
   const seen = new Set<string>()
   const dayOf = (iso: string) => iso.slice(0, 10)
-  const keyOf = (animalId: number, iso: string, extra?: number | null) =>
+  /*
+   * `extra` принимает и число, и строку: у доек это удой, у взвешиваний
+   * признак. Различитель тут по смыслу один — «что ещё отличает две
+   * записи одного дня», — и заводить под него два ключа значило бы
+   * развести один вопрос на две дороги.
+   */
+  const keyOf = (animalId: number, iso: string, extra?: number | string | null) =>
     `${animalId}|${dayOf(iso)}${extra === null || extra === undefined ? '' : `|${extra}`}`
 
   const existingIds = indexedIds(mine)
@@ -1567,10 +1585,23 @@ async function importEvents(
       data.source = 'import'
     }
 
+    /*
+     * Ключ дубля. У доек к паре «животное + день» добавляется удой:
+     * за сутки доят несколько раз, и два замера в один день — норма.
+     *
+     * У взвешиваний добавляется признак: одно животное в один день
+     * взвешивают дважды с разной привязкой — «при продаже» и «на возраст»
+     * могут совпасть по дате, и считать их дублем значило бы потерять
+     * одну из двух записей, которых реестр ждёт обеих.
+     */
     const key = keyOf(
       animal.id,
       date,
-      ds.key === 'milkTests' ? ((data.dailyYield as number | undefined) ?? null) : null,
+      ds.key === 'milkTests'
+        ? ((data.dailyYield as number | undefined) ?? null)
+        : ds.key === 'weighings'
+          ? ((data.sign as string | undefined) ?? null)
+          : null,
     )
     if (seen.has(key)) {
       skip(

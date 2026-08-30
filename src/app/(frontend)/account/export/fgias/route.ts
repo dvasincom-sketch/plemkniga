@@ -5,13 +5,16 @@ import {
   buildLactations,
   buildPedigree,
   buildShows,
+  buildWeighings,
   type Built,
   type ExportAnimal,
   type PedigreeSource,
   type ShowAnimal,
+  type WeighingRow,
 } from '@/lib/fgias-export'
 import { buildMain, type MainAnimal } from '@/lib/fgias-main'
 import { fgiasExport } from '@/lib/fgias-exports'
+import { weighingSignUuid } from '@/lib/weighing'
 
 /**
  * Выгрузка в шаблоны ФГИАС ПР — из кабинета, кнопкой.
@@ -99,6 +102,46 @@ export async function GET(request: Request) {
       idFormat: txt(a.idFormat),
     }))
     built = buildPedigree(rows)
+  } else if (spec.key === 'weighings') {
+    /*
+     * Взвешивания лежат своей коллекцией, а не массивом на животном,
+     * поэтому читаются отдельным запросом и раскладываются по животным.
+     * Один запрос на всё стадо: по строке на животное было бы полторы
+     * тысячи запросов ради одной таблицы.
+     */
+    const byAnimal = new Map<number, WeighingRow['weighings']>()
+    for (let page = 1; ; page++) {
+      const res = await payload.find({
+        collection: 'weighings',
+        where: { animal: { in: herd.map((a) => a.id as number) } },
+        limit: 500,
+        page,
+        sort: 'id',
+        depth: 0,
+        overrideAccess: true,
+      })
+      for (const w of res.docs as unknown as Row[]) {
+        const id = rel(w.animal)
+        if (id === null) continue
+        const list = byAnimal.get(id) ?? []
+        list.push({
+          date: txt(w.date),
+          weight: typeof w.weight === 'number' ? w.weight : null,
+          signUuid: weighingSignUuid(txt(w.sign)) ?? null,
+          lactationNumber: typeof w.lactationNumber === 'number' ? w.lactationNumber : null,
+        })
+        byAnimal.set(id, list)
+      }
+      if (!res.hasNextPage) break
+    }
+
+    const rows: WeighingRow[] = herd.map((a) => ({
+      identNumber: String(a.identNumber ?? ''),
+      accountingId: txt(a.uuid),
+      baseUuid: txt((a.fgias as Row | undefined)?.baseUuid),
+      weighings: byAnimal.get(a.id as number) ?? [],
+    }))
+    built = buildWeighings(rows)
   } else if (spec.key === 'shows') {
     const rows: ShowAnimal[] = herd.map((a) => ({
       identNumber: String(a.identNumber ?? ''),

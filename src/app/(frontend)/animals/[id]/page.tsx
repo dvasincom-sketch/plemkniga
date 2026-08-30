@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { BullProofBlock, BullStatusNote } from '@/components/BullProof'
 import { bullProof } from '@/lib/bull-proof'
+import { weighingSignLabel } from '@/lib/weighing'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { ExteriorChart, LinearScoreChart } from '@/components/ExteriorChart'
@@ -768,6 +769,33 @@ export default async function AnimalPage({
       : null
 
   const afcOwn = firstCalving ? afcMonths(animal.birthDate, firstCalving.date) : null
+
+  /*
+   * Взвешивания — своей коллекцией, а не массивом на животном: их десятки
+   * (ежемесячно за пять лет — шестьдесят), и спрашивают о них не только
+   * в карточке.
+   *
+   * Читаются здесь же, где прочие числа вкладки «Оценка», и по тому же
+   * правилу видимости `production`: живая масса такой же показатель
+   * продуктивности, как удой, и открывается тем же точечным доступом.
+   *
+   * Потолок в сто строк — не экономия, а признание того, что тысячу
+   * взвешиваний в таблице никто не прочтёт. Свежие первыми: у массы
+   * спрашивают «сколько сейчас», а не «с чего начинали».
+   */
+  const weighings =
+    tab === 'evaluation' && maySee('production')
+      ? (
+          await payload.find({
+            collection: 'weighings',
+            where: { animal: { equals: animal.id } },
+            sort: '-date',
+            limit: 100,
+            depth: 0,
+            overrideAccess: true,
+          })
+        ).docs
+      : []
 
   /*
    * На чём стоит оценка коровы — то же, что у быка «55 дочерей
@@ -1785,6 +1813,56 @@ export default async function AnimalPage({
                 </div>
               </Collapsible>
             </section>
+            )}
+
+            {/*
+               Живая масса — между фенотипом и выставками.
+
+               Это ежемесячная отчётность, и смотрят её чаще выставок,
+               но реже лактаций: место посередине отражает частоту вопроса,
+               а не алфавит.
+
+               Показывается всем, включая быков: их взвешивают наравне
+               с коровами, в отличие от лактаций.
+            */}
+            {weighings.length > 0 && (
+              <section className="mt-6">
+                <Collapsible
+                  title="Живая масса"
+                  note="Взвешивания с признаком: без него число не значит ничего — 800 кг при продаже и 800 при выбытии говорят о разном"
+                >
+                  <div className="overflow-x-auto">
+                    <table className="metric-table min-w-[620px]">
+                      <thead>
+                        <tr>
+                          <th>Дата</th>
+                          <th>Масса, кг</th>
+                          <th>Признак</th>
+                          <th>№ лакт.</th>
+                          <th>Примечание</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {weighings.map((w) => (
+                          <tr key={w.id}>
+                            <td className="whitespace-nowrap">{dateRu(w.date)}</td>
+                            <td className="tabular-nums">{w.weight ?? '—'}</td>
+                            {/*
+                               Название признака, а не код: в базе лежит
+                               `birth`, а зоотехник ждёт «При рождении».
+                               Ключ реестра не показывается вовсе — он нужен
+                               выгрузке, а не человеку.
+                            */}
+                            <td>{weighingSignLabel(w.sign) || '—'}</td>
+                            <td className="tabular-nums">{w.lactationNumber ?? '—'}</td>
+                            <td>{w.note || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Collapsible>
+              </section>
             )}
 
             {/*
