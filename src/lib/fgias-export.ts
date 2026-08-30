@@ -131,6 +131,117 @@ export const PEDIGREE_COLUMNS: FgiasColumn[] = [
 ]
 
 /**
+ * Восемь колонок шаблона «КРС_Участие_в_выставках_и_соревнованиях_v1.1».
+ *
+ * Обратите внимание на вторую: здесь она называется «Идентификатор
+ * **строки** ФГИАС ПР», а не «Идентификатор ФГИАС ПР», как в «Лактации».
+ * Реестр называет одно и то же по-разному от шаблона к шаблону, и это
+ * не мелочь: заголовок — единственное, по чему он узнаёт колонку.
+ * Списано с файла, а не приведено к общему виду.
+ */
+export const SHOW_COLUMNS: FgiasColumn[] = [
+  { title: 'Базовый номер ФГИАС ПР', type: 'uuid', width: 38 },
+  { title: 'Идентификатор строки ФГИАС ПР', type: 'uuid', width: 38 },
+  { title: 'Идентификатор учётной системы', type: 'string', width: 38 },
+  { title: 'Дата мероприятия', type: 'date', width: 14 },
+  { title: 'Название мероприятия', type: 'string', width: 32 },
+  { title: 'Место проведения', type: 'string', width: 28 },
+  { title: 'Сведения о полученных наградах', type: 'string', width: 32 },
+  { title: 'Выигрыш', type: 'string', width: 20 },
+]
+
+export type Show = {
+  date?: string | null
+  title?: string | null
+  place?: string | null
+  awards?: string | null
+  prize?: string | null
+}
+
+export type ShowAnimal = {
+  identNumber: string
+  accountingId?: string | null
+  baseUuid?: string | null
+  shows?: Show[] | null
+}
+
+/**
+ * Выставки — по строке на мероприятие.
+ *
+ * ## Что здесь обязательно
+ *
+ * Дата и название. Мероприятие без даты неотличимо от другого такого же,
+ * а без названия — это вообще не запись о выставке. Место, награды
+ * и выигрыш уходят пустыми, если их не заполнили: приз бывает не у всех
+ * участников, и пустая ячейка здесь говорит правду, а не скрывает пробел.
+ *
+ * Это отличается от «Лактации», где обязательным считается всё
+ * (решение №239), и отличается не по вкусу: там лист контракта
+ * не помечает необязательным ни одной колонки, а здесь смысл колонок
+ * сам отвечает за себя — «Выигрыш» у животного, ничего не выигравшего,
+ * пуст по факту, а не по недосмотру.
+ */
+export function buildShows(animals: ShowAnimal[]): Built {
+  const rows: (string | number)[][] = []
+  const held: Held[] = []
+
+  for (const a of animals) {
+    const list = (a.shows ?? []).filter(Boolean)
+    if (list.length === 0) continue
+
+    if (!a.baseUuid) {
+      held.push({
+        identNumber: a.identNumber,
+        what: `выставок: ${list.length}`,
+        why: 'Базовый номер ФГИАС ПР',
+      })
+      continue
+    }
+
+    if (!a.accountingId) {
+      held.push({
+        identNumber: a.identNumber,
+        what: `выставок: ${list.length}`,
+        why: 'Идентификатор учётной системы',
+      })
+      continue
+    }
+
+    for (const show of list) {
+      const date = fgiasDate(show.date)
+      const title = typeof show.title === 'string' && show.title.trim() ? show.title.trim() : ''
+
+      const missing = !date ? 'Дата мероприятия' : !title ? 'Название мероприятия' : null
+      if (missing) {
+        held.push({
+          identNumber: a.identNumber,
+          what: `выставка ${show.title ?? show.date ?? '?'}`,
+          why: missing,
+        })
+        continue
+      }
+
+      const txt = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : '')
+
+      rows.push([
+        a.baseUuid,
+        /* Идентификатор строки у новой записи пуст — как и в «Лактации». */
+        '',
+        a.accountingId,
+        /* `date` проверен цепочкой `missing` выше — компилятор её не следит. */
+        date!,
+        title,
+        txt(show.place),
+        txt(show.awards),
+        txt(show.prize),
+      ])
+    }
+  }
+
+  return { columns: SHOW_COLUMNS, rows, held, rounded: 0 }
+}
+
+/**
  * Справочник «Признаки молочной продуктивности» (`sp_signums`).
  *
  * Две записи, обе прочитаны из открытого реестра 30 августа 2026 года.

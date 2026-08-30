@@ -163,6 +163,81 @@ const norm = (v: string) => v.trim().toLowerCase()
 const identKey = (v: string) => v.replace(/[^0-9a-zA-Zа-яА-Я]/g, '').toUpperCase()
 
 /**
+ * Указатель на животное, как он приходит в файле.
+ *
+ * ## Зачем три ключа вместо одного
+ *
+ * В шаблонах ФГИАС, кроме «Основных сведений», индивидуального номера
+ * нет: животное названо либо нашим ключом учётной системы, либо базовым
+ * номером реестра. Файл выставок или лактаций, скачанный из реестра,
+ * без такого поиска не привязать ни к одной карточке — привязывать
+ * не по чему.
+ *
+ * ## Как различаются
+ *
+ * По виду значения, а не по названию колонки: колонка одна, а прийти
+ * в неё может любой из трёх. Uuid отличается от индивидуального номера
+ * настолько, что спутать их нельзя: тридцать шесть знаков, четыре дефиса
+ * в известных местах.
+ *
+ * Различить между собой наш ключ и базовый номер по виду невозможно —
+ * оба uuid. Поэтому ищутся оба, по очереди: сначала наш (он есть
+ * у каждого животного), потом номер реестра. Совпасть они не могут:
+ * наш выдаёт `randomUUID()`, реестр — свой генератор, и вероятность
+ * столкновения тут не отличается от вероятности столкновения любых двух
+ * uuid.
+ */
+const isUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v.trim())
+
+/**
+ * Карты поиска животного по всем трём ключам сразу.
+ *
+ * Строится одним проходом по стаду: три карты дешевле трёх запросов
+ * на каждую строку файла.
+ */
+type AnimalIndex = {
+  byIdent: Map<string, { id: number; sex?: string | null }>
+  byUuid: Map<string, { id: number; sex?: string | null }>
+  byBaseUuid: Map<string, { id: number; sex?: string | null }>
+}
+
+const indexAnimals = (
+  docs: { id: number; identNumber?: string | null; uuid?: string | null; sex?: string | null; fgias?: { baseUuid?: string | null } | null }[],
+): AnimalIndex => {
+  const idx: AnimalIndex = { byIdent: new Map(), byUuid: new Map(), byBaseUuid: new Map() }
+  for (const a of docs) {
+    const ref = { id: a.id, sex: a.sex }
+    if (a.identNumber) idx.byIdent.set(identKey(a.identNumber), ref)
+    if (a.uuid) idx.byUuid.set(a.uuid.trim().toLowerCase(), ref)
+    const base = a.fgias?.baseUuid
+    if (base) idx.byBaseUuid.set(base.trim().toLowerCase(), ref)
+  }
+  return idx
+}
+
+/**
+ * Идентификаторы всех проиндексированных животных, по одному разу.
+ *
+ * Одно животное лежит в трёх картах сразу, поэтому простое объединение
+ * значений дало бы каждое трижды — и запрос `id in (…)` вырос бы втрое
+ * без всякой пользы.
+ */
+const indexedIds = (idx: AnimalIndex): number[] => [
+  ...new Set([...idx.byIdent.values(), ...idx.byUuid.values(), ...idx.byBaseUuid.values()].map((a) => a.id)),
+]
+
+/** Найти животное по тому, что написано в колонке. */
+const findAnimal = (idx: AnimalIndex, raw: string) => {
+  const v = raw.trim()
+  if (!v) return undefined
+  if (isUuid(v)) {
+    const k = v.toLowerCase()
+    return idx.byUuid.get(k) ?? idx.byBaseUuid.get(k)
+  }
+  return idx.byIdent.get(identKey(v))
+}
+
+/**
  * Действующее лицо загрузки: кто грузит и от чьего имени.
  *
  * Организация здесь обязательна — её спрашивают хуки коллекций событий.
@@ -1020,6 +1095,207 @@ async function importAnimals(
 /* ------------------------------------------------------------------ */
 
 /**
+ * Выставки: строки дописываются в массив карточки, а не создают записи.
+ *
+ * ## Почему отдельный разбор
+ *
+ * Отёлы, осеменения и дойки — свои коллекции, и `importEvents` создаёт
+ * в них строки. Выставки живут массивом внутри животного (решение №264:
+ * их читают только в карточке, и коллекция дала бы вторую таблицу
+ * и правила доступа ради данных, которые всегда запрашиваются вместе
+ * с животным).
+ *
+ * Разница видна только здесь: вместо `create` нужен `update`, дописывающий
+ * в массив. Для человека и для распознавания шапки это такой же файл
+ * про события, как остальные.
+ *
+ * ## Повторная загрузка не задваивает
+ *
+ * Ключ повтора — животное, дата и название. Хозяйство перезаливает файл
+ * чаще, чем кажется: поправило одну строку и отправило целиком. Без
+ * ключа второй заход удвоил бы все выставки, и заметить это можно было бы
+ * только в карточке глазами.
+ *
+ * Сравнение по приведённому названию (регистр, пробелы, «ё»), потому что
+ * «Агроферма-2026» и «АГРОФЕРМА 2026» — одно мероприятие. Это тот же
+ * довод, по которому справочника мероприятий у нас нет.
+ *
+ * ## Запись по животному, а не по строке
+ *
+ * Строки группируются по животному, и на каждое идёт один `update`.
+ * Иначе корова с тремя выставками означала бы три чтения и три записи
+ * одного и того же массива, причём вторая запись перетирала бы первую:
+ * массив пишется целиком.
+ */
+async function importShows(
+  payload: Awaited<ReturnType<typeof getClient>>,
+  user: Actor,
+  orgId: number,
+  ds: Dataset,
+  rows: Row[],
+  header: string[],
+) {
+  const body = rows.slice(1)
+
+  const wanted = new Set<string>()
+  for (const row of body) {
+    const v = readerFor(header, row)('animal')
+    if (v) wanted.add(identKey(v))
+  }
+
+  /*
+   * Свои животные — одним запросом на весь файл. Чужие не ищутся вовсе:
+   * выставку чужому животному дописать нельзя, и строка отклоняется
+   * с той же причиной, что у прочих событий.
+   */
+  let mine: AnimalIndex = { byIdent: new Map(), byUuid: new Map(), byBaseUuid: new Map() }
+  const showsOf = new Map<number, unknown[]>()
+  if (wanted.size) {
+    const { docs } = await payload.find({
+      collection: 'animals',
+      where: { owner: { equals: orgId } },
+      limit: 20_000,
+      depth: 0,
+      overrideAccess: true,
+    })
+    mine = indexAnimals(docs as never)
+    /*
+     * Уже записанные выставки нужны для проверки на повтор, и берутся
+     * они тем же запросом: второй заход в базу за тем же стадом стоил бы
+     * ровно столько же, сколько первый.
+     */
+    for (const a of docs) showsOf.set(a.id as number, Array.isArray(a.shows) ? a.shows : [])
+  }
+
+  /** Ключ повтора: дата плюс приведённое название. */
+  const showKey = (date: unknown, title: unknown) =>
+    `${String(date ?? '').slice(0, 10)}|${String(title ?? '')
+      .trim()
+      .toLowerCase()
+      .replace(/ё/g, 'е')
+      .replace(/\s+/g, ' ')}`
+
+  const issues: { row: number; ident?: string; reason: string }[] = []
+  const perAnimal = new Map<number, { add: Record<string, unknown>[]; had: unknown[] }>()
+  let skipped = 0
+
+  body.forEach((row, i) => {
+    const line = i + 2
+    const get = readerFor(header, row)
+
+    const ident = get('animal')
+    if (!ident) {
+      skipped += 1
+      issues.push({ row: line, reason: 'не указан номер животного' })
+      return
+    }
+
+    const animal = findAnimal(mine, ident)
+    if (!animal) {
+      skipped += 1
+      issues.push({ row: line, ident, reason: 'животного нет в вашем стаде' })
+      return
+    }
+
+    const date = parseDate(get('date'))
+    if (!date.value) {
+      skipped += 1
+      issues.push({ row: line, ident, reason: date.problem ?? 'не разобрана дата мероприятия' })
+      return
+    }
+
+    const title = (get('title') ?? '').trim()
+    if (!title) {
+      skipped += 1
+      issues.push({ row: line, ident, reason: 'не указано название мероприятия' })
+      return
+    }
+
+    const bucket = perAnimal.get(animal.id) ?? { add: [], had: showsOf.get(animal.id) ?? [] }
+
+    const key = showKey(date.value, title)
+    const already =
+      bucket.had.some(
+        (s) => showKey((s as Record<string, unknown>).date, (s as Record<string, unknown>).title) === key,
+      ) || bucket.add.some((s) => showKey(s.date, s.title) === key)
+
+    if (already) {
+      skipped += 1
+      issues.push({ row: line, ident, reason: 'такая выставка уже записана' })
+      return
+    }
+
+    bucket.add.push({
+      date: date.value,
+      title,
+      place: (get('place') ?? '').trim() || undefined,
+      awards: (get('awards') ?? '').trim() || undefined,
+      prize: (get('prize') ?? '').trim() || undefined,
+    })
+    perAnimal.set(animal.id, bucket)
+  })
+
+  let created = 0
+  const touched: number[] = []
+
+  for (const [animalId, bucket] of perAnimal) {
+    if (bucket.add.length === 0) continue
+    try {
+      await payload.update({
+        collection: 'animals',
+        id: animalId,
+        overrideAccess: false,
+        user,
+        /*
+         * Журнал правок пропускается: файл на сотню выставок дал бы
+         * сотню записей о правке массива и утопил бы в них те несколько,
+         * что внесены руками. След у загрузки свой — пакет данных
+         * с исходником.
+         */
+        context: { skipJournal: true },
+        data: { shows: [...bucket.had, ...bucket.add] } as never,
+      })
+      created += bucket.add.length
+      touched.push(animalId)
+    } catch (e) {
+      skipped += bucket.add.length
+      issues.push({
+        row: 0,
+        reason: `не удалось записать выставки животного: ${e instanceof Error ? e.message : e}`,
+      })
+    }
+  }
+
+  /*
+   * Состав ответа повторяет `importEvents` до поля: он собирается
+   * в одном месте выше по потоку, и набор, отдающий меньше остальных,
+   * пришлось бы обкладывать проверками на каждом обращении.
+   *
+   * Пустые списки здесь — правда о выставках, а не заглушки. Служебных
+   * строк («итого», «зоотехник») в таком файле не бывает: строка без
+   * номера животного отклоняется раньше. Знака Ассоциации выставки
+   * не снимают: они ничего не утверждают о самом животном, только
+   * о том, где оно побывало.
+   */
+  return {
+    created,
+    updated: 0,
+    skipped,
+    dataset: ds.label,
+    issues,
+    touched,
+    unresolved: [] as string[],
+    identMatches: [] as IdentMatch[],
+    unverified: [] as { ident: string; fields: string[] }[],
+    valueIssues: [] as { row: number; ident?: string; columnTitle: string; reason: string }[],
+    valueProblems: 0,
+    serviceRows: [] as number[],
+  }
+}
+
+/* ------------------------------------------------------------------ */
+
+/**
  * Загрузка событий устроена иначе, чем загрузка животных, и разница
  * не техническая.
  *
@@ -1051,7 +1327,17 @@ async function importEvents(
     if (v) wanted.add(identKey(v))
   }
 
-  const mine = new Map<string, { id: number; sex?: string | null }>()
+  /*
+   * Стадо индексируется по трём ключам сразу: индивидуальному номеру,
+   * нашему ключу учётной системы и базовому номеру реестра. Какой
+   * из трёх стоит в файле, решает сам файл — в шаблонах ФГИАС
+   * индивидуального номера нет вовсе.
+   *
+   * Фильтр `wanted` здесь убран: он экономил память на карте, но требовал
+   * знать вид ключа до чтения строк. Стадо и так читается целиком
+   * одним запросом, и три карты на нём стоят миллисекунды.
+   */
+  let mine: AnimalIndex = { byIdent: new Map(), byUuid: new Map(), byBaseUuid: new Map() }
   if (wanted.size) {
     const { docs } = await payload.find({
       collection: 'animals',
@@ -1060,10 +1346,7 @@ async function importEvents(
       depth: 0,
       overrideAccess: true,
     })
-    for (const a of docs) {
-      const k = identKey(a.identNumber)
-      if (wanted.has(k)) mine.set(k, { id: a.id as number, sex: a.sex })
-    }
+    mine = indexAnimals(docs as never)
   }
 
   /* --- Быки: ищутся по всей книге, семя чаще всего привозное --- */
@@ -1094,7 +1377,7 @@ async function importEvents(
 
   const nextCalving = new Map<number, number>()
   if (ds.key === 'calvings' || ds.key === 'inseminations' || ds.key === 'milkTests') {
-    const ids = [...mine.values()].map((a) => a.id)
+    const ids = indexedIds(mine)
     if (ids.length) {
       const { docs } = await payload.find({
         collection: 'calvings',
@@ -1137,7 +1420,7 @@ async function importEvents(
   const keyOf = (animalId: number, iso: string, extra?: number | null) =>
     `${animalId}|${dayOf(iso)}${extra === null || extra === undefined ? '' : `|${extra}`}`
 
-  const existingIds = [...mine.values()].map((a) => a.id)
+  const existingIds = indexedIds(mine)
   if (existingIds.length) {
     const { docs } = await payload
       .find({
@@ -1197,7 +1480,7 @@ async function importEvents(
       continue
     }
 
-    const animal = mine.get(identKey(rawIdent))
+    const animal = findAnimal(mine, rawIdent)
     if (!animal) {
       skip(line, 'Животного с таким номером нет в вашем стаде', rawIdent)
       continue
@@ -1527,7 +1810,9 @@ export async function importDataAction(
           parsed.header,
           String(formData.get('updateVerified') || '') === '1',
         )
-      : await importEvents(payload, actor, orgId, ds, parsed.rows, parsed.header)
+      : ds.key === 'shows'
+        ? await importShows(payload, actor, orgId, ds, parsed.rows, parsed.header)
+        : await importEvents(payload, actor, orgId, ds, parsed.rows, parsed.header)
 
   /*
    * Пакет загрузки — не бюрократия, а условие доверия к данным.

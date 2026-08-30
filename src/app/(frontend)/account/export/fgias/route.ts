@@ -4,9 +4,11 @@ import { toXlsx } from '@/lib/xlsx'
 import {
   buildLactations,
   buildPedigree,
+  buildShows,
   type Built,
   type ExportAnimal,
   type PedigreeSource,
+  type ShowAnimal,
 } from '@/lib/fgias-export'
 import { buildMain, type MainAnimal } from '@/lib/fgias-main'
 import { fgiasExport } from '@/lib/fgias-exports'
@@ -97,6 +99,14 @@ export async function GET(request: Request) {
       idFormat: txt(a.idFormat),
     }))
     built = buildPedigree(rows)
+  } else if (spec.key === 'shows') {
+    const rows: ShowAnimal[] = herd.map((a) => ({
+      identNumber: String(a.identNumber ?? ''),
+      accountingId: txt(a.uuid),
+      baseUuid: txt((a.fgias as Row | undefined)?.baseUuid),
+      shows: Array.isArray(a.shows) ? (a.shows as never[]) : [],
+    }))
+    built = buildShows(rows)
   } else if (spec.key === 'lactations') {
     const rows: ExportAnimal[] = herd.map((a) => ({
       identNumber: String(a.identNumber ?? ''),

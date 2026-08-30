@@ -17,8 +17,10 @@ import {
   MILK_SIGNUM,
   PEDIGREE_COLUMNS,
   PEDIGREE_NESTS,
+  SHOW_COLUMNS,
   buildLactations,
   buildPedigree,
+  buildShows,
   chooseSignums,
   fgiasDate,
   fgiasTemplateOf,
@@ -513,6 +515,17 @@ function templates() {
       label: 'Лактация',
     },
     {
+      /*
+       * У выставок вторая колонка называется «Идентификатор **строки**
+       * ФГИАС ПР», а не «Идентификатор ФГИАС ПР», как в «Лактации».
+       * Реестр называет одно и то же по-разному от шаблона к шаблону,
+       * и поймать это может только сверка с настоящим файлом.
+       */
+      file: 'КРС_Участие_в_выставках_и_соревнованиях_v1.1_2.6.0.xlsx',
+      titles: SHOW_COLUMNS.map((c) => c.title),
+      label: 'Выставки',
+    },
+    {
       file: 'КРС_Родословная_v1.1_2.6.0.xlsx',
       titles: PEDIGREE_COLUMNS.map((c) => c.title),
       label: 'Родословная',
@@ -1005,6 +1018,114 @@ function datasetDetection() {
    */
   const bare = detectDataset(['Инд.№'])
   check(bare.kind === 'unclear', 'один номер животного набора не определяет', JSON.stringify(bare.kind))
+
+  /*
+   * Шаблоны реестра, которые книга умеет принимать, обязаны узнаваться
+   * все. Список записан целиком, а не «сколько-нибудь»: узнавание тут
+   * не украшение, а условие того, что файл вообще загрузится — без него
+   * человека спросят «что в файле», а он не знает, чем наши наборы
+   * отличаются от шаблонов реестра.
+   */
+  const templates: [string, string][] = [
+    ['КРС_Основные_сведения_v.2.1_2.6.0.xlsx', 'Животные'],
+    ['КРС_Участие_в_выставках_и_соревнованиях_v1.1_2.6.0.xlsx', 'Выставки'],
+    ['КРС_Осеменение_v1.2_2.6.0.xlsx', 'Осеменения'],
+    ['КРС_Контрольное__доение_v1.2_2.6.0.xlsx', 'Контрольные дойки'],
+    ['КРС_Отел_Аборт_Запуск_v1.3_2.6.0.xlsx', 'Отёлы'],
+  ]
+
+  for (const [file, label] of templates) {
+    const path = join('data/shablony-fgias', file)
+    if (!existsSync(path)) continue
+    const r = readSpreadsheet(new Uint8Array(readFileSync(path)))
+    if ('error' in r) continue
+    const g = detectDataset((r.rows[0] ?? []).map((t) => t.trim()).filter(Boolean))
+    check(
+      g.kind === 'sure' && g.dataset.label === label,
+      `шаблон реестра «${file.slice(4, 30)}…» узнаётся как «${label}»`,
+      g.kind === 'sure' ? g.dataset.label : 'неясно',
+    )
+  }
+
+  /*
+   * И обратное, столь же обязательное: «Лактация» не узнаётся ни одним
+   * набором — и не должна. Лактации лежат массивом внутри животного,
+   * загрузки по лактациям у книги нет. Узнать шаблон и не суметь его
+   * принять хуже, чем честно не узнать: человек получил бы обещание
+   * загрузки там, где её не существует.
+   */
+  const lact = join('data/shablony-fgias', 'КРС_Лактация_молочная_продуктивность_v.1.4_2.6.0.xlsx')
+  if (existsSync(lact)) {
+    const r = readSpreadsheet(new Uint8Array(readFileSync(lact)))
+    if (!('error' in r)) {
+      const g = detectDataset((r.rows[0] ?? []).map((t) => t.trim()).filter(Boolean))
+      check(
+        g.kind === 'unclear',
+        'шаблон «Лактация» не узнаётся — загрузки по лактациям у книги нет',
+        g.kind === 'sure' ? g.dataset.label : 'неясно',
+      )
+    }
+  }
+}
+
+/**
+ * Выставки: что уезжает и что придерживается.
+ *
+ * Правило обязательности здесь мягче, чем в «Лактации», и это осознанно:
+ * «Выигрыш» у животного, ничего не выигравшего, пуст по факту,
+ * а не по недосмотру.
+ */
+function shows() {
+  console.log('\nВыставки: что уезжает\n')
+
+  const full = {
+    date: '2026-06-12T00:00:00.000Z',
+    title: 'Агроферма-2026',
+    place: 'Москва, ВДНХ',
+    awards: 'Диплом I степени',
+    prize: '120 000 руб.',
+  }
+
+  const base = {
+    identNumber: 'RU0000000070028',
+    accountingId: '1a421c44-36d2-41c3-881e-38bf83c4f756',
+    baseUuid: '60b5cc43-7b0a-416d-920b-6782c2192fcf',
+  }
+
+  const ok = buildShows([{ ...base, shows: [full] }])
+  check(ok.rows.length === 1, 'полная запись уезжает')
+  const row = ok.rows[0]!
+  check(row.length === 8, 'в строке восемь значений', String(row.length))
+  check(row[1] === '', 'идентификатор строки у новой записи пуст')
+  check(row[3] === '2026-06-12', 'дата в виде ГГГГ-ММ-ДД', String(row[3]))
+  check(row[4] === 'Агроферма-2026', 'название на месте')
+
+  /* Пустые награды и приз — не повод придерживать строку. */
+  const bare = buildShows([{ ...base, shows: [{ date: full.date, title: full.title }] }])
+  check(bare.rows.length === 1, 'без наград и приза строка всё равно уезжает')
+  check(bare.rows[0]![7] === '', 'выигрыш уходит пустым, а не прочерком')
+
+  /* А дата и название — повод: без них запись ничего не значит. */
+  const noDate = buildShows([{ ...base, shows: [{ title: full.title }] }])
+  check(noDate.rows.length === 0 && noDate.held[0]?.why === 'Дата мероприятия', 'без даты придержана')
+
+  const noTitle = buildShows([{ ...base, shows: [{ date: full.date }] }])
+  check(
+    noTitle.rows.length === 0 && noTitle.held[0]?.why === 'Название мероприятия',
+    'без названия придержана',
+  )
+
+  const noKey = buildShows([{ ...base, baseUuid: null, shows: [full] }])
+  check(noKey.rows.length === 0, 'без номера реестра не уезжает ничего')
+  check(
+    noKey.held.length === 1,
+    'придержано одно животное, а не каждая его выставка',
+    `записей ${noKey.held.length}`,
+  )
+
+  /* Животное без выставок в отчёт не попадает вовсе — их не бывает у большинства. */
+  const none = buildShows([{ ...base, shows: [] }])
+  check(none.rows.length === 0 && none.held.length === 0, 'животное без выставок не придержано')
 }
 
 /* ------------------------------------------------------------------ */
@@ -1012,6 +1133,7 @@ function datasetDetection() {
 columns()
 values()
 lactations()
+shows()
 pedigree()
 summary()
 ageGroups()

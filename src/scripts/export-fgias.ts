@@ -7,12 +7,14 @@ import { toXlsx } from '@/lib/xlsx'
 import {
   buildLactations,
   buildPedigree,
+  buildShows,
   holdSummary,
   pedigreeGaps,
   withForecastKeys,
   type Built,
   type ExportAnimal,
   type PedigreeSource,
+  type ShowAnimal,
 } from '@/lib/fgias-export'
 import { MAIN_ESSENTIAL, buildMain, type MainAnimal, type MainBuilt } from '@/lib/fgias-main'
 
@@ -546,6 +548,33 @@ async function main() {
   }
 
   write('КРС_Родословная.xlsx', ped, 'Пример')
+
+  /* ---------------------------- Выставки ---------------------------- */
+
+  const forShows: ShowAnimal[] = herd.map((a) => ({
+    identNumber: String(a.identNumber ?? ''),
+    accountingId: text(a.uuid),
+    baseUuid: text((a.fgias as Row | undefined)?.baseUuid),
+    shows: Array.isArray(a.shows) ? (a.shows as never[]) : [],
+  }))
+
+  const withShows = forShows.filter((a) => (a.shows ?? []).length > 0)
+  const shows = buildShows(forShows)
+
+  report('Участие в выставках и соревнованиях', shows, withShows.length)
+
+  if (withShows.length === 0) {
+    /*
+     * Ноль выставок — не поломка и даже не пробел: у большинства животных
+     * их не бывает по жизни. Сказать это надо, иначе пустой файл рядом
+     * с непустыми читается как отказ.
+     */
+    console.log('\n  Выставок в книге нет ни у одного животного — файл уедет с одной шапкой.')
+  } else if (withBase === 0) {
+    forecast('Выставки', buildShows(withForecastKeys(forShows)))
+  }
+
+  write('КРС_Участие_в_выставках.xlsx', shows, 'Пример')
 
   /* ------------------------------------------------------------------ */
 
