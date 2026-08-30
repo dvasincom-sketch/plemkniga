@@ -585,10 +585,51 @@ async function importAnimals(
    * Пять тысяч строк — это пять тысяч запросов «найди породу по названию»,
    * и разбор файла упёрся бы не в разбор, а в справочник.
    */
-  const [breedList, herdList] = await Promise.all([
-    header.includes('breed')
-      ? payload.find({ collection: 'breeds', limit: 500, depth: 0, overrideAccess: true })
-      : Promise.resolve({ docs: [] as { id: number; name: string }[] }),
+  /*
+   * Справочники грузятся по списку колонок, а не поимённо.
+   *
+   * Здесь стояло `header.includes('breed')` и один запрос к породам —
+   * порода была единственным справочным видом. С появлением линии, масти
+   * и назначения перечислять их тут значило бы писать одно и то же четыре
+   * раза и на пятый разойтись: колонка есть, а справочник к ней забыли
+   * загрузить, и вся колонка молча уходит в «не нашлись».
+   *
+   * Теперь список коллекций собирается из самого набора: какие справочные
+   * колонки в файле есть, те справочники и читаются.
+   */
+  const wanted = [
+    ...new Set(
+      cols
+        .filter((c) => c.kind === 'dictionary' && c.collection && header.includes(c.key))
+        .map((c) => c.collection as string),
+    ),
+  ]
+
+  const dictionaries = new Map<string, Map<string, number>>()
+  await Promise.all(
+    wanted.map(async (slug) => {
+      const res = await payload.find({
+        collection: slug as never,
+        limit: 0,
+        pagination: false,
+        depth: 0,
+        overrideAccess: true,
+      })
+      const map = new Map<string, number>()
+      for (const d of res.docs as unknown as { id: number; name: string; fgiasUuid?: string | null }[]) {
+        map.set(norm(d.name), d.id)
+        /*
+         * Ключ реестра ложится в ту же карту: в файлах ФГИАС значение
+         * записано ключом, а не словом. Столкнуться приведённое название
+         * и uuid не могут ни при каких условиях.
+         */
+        if (d.fgiasUuid) map.set(norm(d.fgiasUuid), d.id)
+      }
+      dictionaries.set(slug, map)
+    }),
+  )
+
+  const [herdList] = await Promise.all([
     header.includes('herd')
       ? payload.find({
           collection: 'herds',
@@ -623,10 +664,6 @@ async function importAnimals(
    * поисков подряд в каждой ветке разбора — и первого же дня, когда
    * кто-нибудь добавит третий способ назвать породу, их станет три.
    */
-  const breeds = new Map(breedList.docs.map((b) => [norm(b.name), b.id as number]))
-  for (const b of breedList.docs as { id: number; fgiasUuid?: string | null }[]) {
-    if (b.fgiasUuid) breeds.set(norm(b.fgiasUuid), b.id)
-  }
   const herds = new Map(herdList.docs.map((h) => [norm(h.name), h.id as number]))
   const unresolved = new Set<string>()
 
@@ -763,18 +800,24 @@ async function importAnimals(
           assign(data, col.key, dt.value)
           break
         }
-        case 'breed': {
-          const id = breeds.get(norm(raw))
+        case 'dictionary': {
+          const id = dictionaries.get(col.collection ?? '')?.get(norm(raw))
           if (id) assign(data, col.key, id)
           /*
            * Неразобранный ключ реестра называется ключом, а не «породой
            * такой-то». Строка «порода «1bd6b3f1-648a-…»» в протоколе
            * приёмки читается как опечатка в названии, тогда как чинится
            * она совсем иначе — сверкой справочников, а не правкой файла.
+           *
+           * Название колонки берётся из неё самой: писать «порода» там,
+           * где разбирается масть, — верный способ отправить человека
+           * чинить не то.
            */
           else if (/^[0-9a-f-]{36}$/i.test(raw.trim())) {
-            unresolved.add(`порода по ключу ФГИАС «${raw}» — проставьте его сверкой справочников`)
-          } else unresolved.add(`порода «${raw}»`)
+            unresolved.add(
+              `${col.title.toLowerCase()} по ключу ФГИАС «${raw}» — проставьте его сверкой справочников`,
+            )
+          } else unresolved.add(`${col.title.toLowerCase()} «${raw}»`)
           break
         }
         case 'herd': {

@@ -13,7 +13,7 @@ import { farmTodo } from '@/lib/todo'
 import { AnimalTable } from '@/components/AnimalTable'
 import { Pagination } from '@/components/Pagination'
 import { ProfileForm } from '@/components/ProfileForm'
-import { VisibilityForm } from '@/components/VisibilityForm'
+import { HerdVisibilityForm } from '@/components/HerdVisibilityForm'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { denyAssociation } from '@/lib/association'
 import { viewerOf, type Viewer } from '@/lib/visibility'
@@ -1574,22 +1574,25 @@ async function DocumentsTab({ orgId, sp }: { orgId?: number; sp: DocSearchParams
 
 /* ------------------------------------------------------------------ */
 
-async function VisibilityFormWrapper({ orgId }: { orgId?: number }) {
-  const payload = await getClient()
+/**
+ * Видимость стада в кабинете.
+ *
+ * Здесь стояла обёртка, которая читала **первое попавшееся животное**
+ * хозяйства и выдавала его флажки за состояние стада. На стаде, где
+ * половина записей открыта, а половина закрыта, переключатель показывал
+ * случайное из двух — и человек, ничего не трогая, а просто нажав
+ * «Сохранить», переворачивал видимость всему хозяйству.
+ *
+ * Ошибка вылезла наружу, когда `VisibilityForm` переехал на одно животное
+ * и перестал принимать эти пропсы: сборка встала. Но неправильной обёртка
+ * была и до того — просто молча.
+ *
+ * Теперь у кабинета своя форма, и она читается как действие, а не как
+ * состояние: у стада состояния нет. Обращения к базе ей не нужно вовсе.
+ */
+function VisibilityFormWrapper({ orgId }: { orgId?: number }) {
   if (!orgId) return null
-  const sample = await payload.find({
-    collection: 'animals',
-    where: { owner: { equals: orgId } },
-    limit: 1,
-    overrideAccess: true,
-  })
-  const first = sample.docs[0]
-  return (
-    <VisibilityForm
-      defaultVisible={Boolean(first?.publicVisible)}
-      defaultDetails={Boolean(first?.publicDetails)}
-    />
-  )
+  return <HerdVisibilityForm />
 }
 
 /*

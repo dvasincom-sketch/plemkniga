@@ -8,6 +8,7 @@ import { DataNav } from '@/components/DataNav'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { ImportCard } from '@/components/ImportCard'
 import { ExportCard } from '@/components/ExportCard'
+import { FgiasExportCard } from '@/components/FgiasExportCard'
 import { IntegrationChannels } from '@/components/IntegrationChannels'
 import { ColumnReference } from '@/components/ColumnReference'
 import { getCurrentUser } from '@/lib/payload'
@@ -93,6 +94,7 @@ export default async function ImportPage() {
               datasets={DATASETS.map((d) => ({ value: d.key, label: d.label, hint: d.hint }))}
             />
             <ExportCard />
+            <FgiasExportCard />
           </div>
 
           {/* --------------------- Что понимает система --------------------- */}
