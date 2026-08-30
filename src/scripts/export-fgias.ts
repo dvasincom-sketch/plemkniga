@@ -9,6 +9,7 @@ import {
   buildPedigree,
   holdSummary,
   pedigreeGaps,
+  withForecastKeys,
   type Built,
   type ExportAnimal,
   type PedigreeSource,
@@ -138,6 +139,36 @@ const report = (label: string, built: Built, total: number) => {
   }
 }
 
+/**
+ * Прогноз: что уехало бы, будь номера реестра у всех.
+ *
+ * Печатается только пока номеров нет — когда они появятся, обычный отчёт
+ * скажет то же самое и по-настоящему, а два похожих блока рядом путали бы.
+ *
+ * Смысл в том, чтобы дать хозяйству работу на время ожидания обратного
+ * файла. Без прогноза отчёт говорит «придержано всё» и умалчивает,
+ * что у сотни лактаций вдобавок не заполнен белок, — а узнать это лучше
+ * сейчас, чем после того, как номера придут.
+ */
+const forecast = (label: string, built: Built) => {
+  console.log(`\n  Если номера придут завтра — уедет строк: ${built.rows.length}`)
+
+  const summary = holdSummary(built.held)
+  if (summary.length === 0) {
+    console.log(`  Больше в «${label}» ничего не мешает: дело только за номерами.`)
+    return
+  }
+
+  console.log('  И вот это останется недозаполненным — этим можно заняться сейчас:')
+  for (const s of summary) {
+    const examples = built.held
+      .filter((h) => h.why === s.why)
+      .slice(0, 3)
+      .map((h) => h.identNumber)
+    console.log(`    ${String(s.count).padStart(6)}  ${s.why}   напр.: ${examples.join(', ')}`)
+  }
+}
+
 const write = (name: string, built: Built, sheet: string) => {
   const buf = toXlsx(
     built.columns.map((c) => ({
@@ -233,6 +264,17 @@ async function main() {
     )
   }
 
+  /*
+   * Прогноз собирается из тех же животных с подставленным ключом
+   * и никогда не попадает в файл: ниже пишется `lact`, не `lactAhead`.
+   */
+  if (withBase === 0) {
+    forecast(
+      'Лактации',
+      buildLactations(withForecastKeys(forLactations), { signum: SIGNUM }),
+    )
+  }
+
   write('КРС_Лактация_молочная_продуктивность.xlsx', lact, 'Пример')
 
   /* --------------------------- Родословная -------------------------- */
@@ -268,10 +310,26 @@ async function main() {
     )
   }
 
-  console.log(`  Из них предков без номера реестра: ${noKey}`)
-  console.log(`    ${String(gaps.noKey.ours).padStart(6)}  с российским номером`)
-  console.log(`    ${String(gaps.noKey.foreign).padStart(6)}  с иностранным (HOUSA, HOCAN, HODEU, ICAR)`)
-  console.log(`    ${String(gaps.noKey.internal).padStart(6)}  с внутрихозяйственным или без вида номера`)
+  /*
+   * Различных предков — рядом со связями и вперёд по важности.
+   * Один бык стоит в родословной у сорока дочерей: связей сорок,
+   * а узнать его номер надо один раз. По этому числу и решают,
+   * браться руками или ждать ответа реестра.
+   */
+  const animalsNoKey =
+    gaps.noKeyAnimals.ours + gaps.noKeyAnimals.foreign + gaps.noKeyAnimals.internal
+
+  console.log(
+    `  Из них предков без номера реестра: ${animalsNoKey} различных (${noKey} связей)`,
+  )
+  const line = (label: string, origin: 'ours' | 'foreign' | 'internal') =>
+    console.log(
+      `    ${String(gaps.noKeyAnimals[origin]).padStart(5)} различных` +
+        ` (${String(gaps.noKey[origin]).padStart(5)} связей)  ${label}`,
+    )
+  line('с российским номером', 'ours')
+  line('с иностранным (HOUSA, HOCAN, HODEU, ICAR)', 'foreign')
+  line('с внутрихозяйственным или без вида номера', 'internal')
 
   if (withBase === 0) {
     /*
@@ -314,6 +372,10 @@ async function main() {
       '  Внутрихозяйственные — у них нет внешнего имени вовсе, и реестру\n' +
         '  предъявить нечего. Сначала им нужен настоящий номер.',
     )
+  }
+
+  if (withBase === 0) {
+    forecast('Родословную', buildPedigree(withForecastKeys(forPedigree)))
   }
 
   write('КРС_Родословная.xlsx', ped, 'Пример')

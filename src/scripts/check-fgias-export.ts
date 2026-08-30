@@ -14,9 +14,11 @@ import {
   chooseSignums,
   fgiasDate,
   fgiasInt,
+  FORECAST_KEY,
   holdSummary,
   idOrigin,
   pedigreeGaps,
+  withForecastKeys,
   type ExportAnimal,
   type PedigreeSource,
 } from '@/lib/fgias-export'
@@ -383,6 +385,26 @@ function pedigree() {
     'предок с номером реестра в пробелы не попадает',
     JSON.stringify(registered.noKey),
   )
+
+  /*
+   * Различные предки против связей — то, ради чего счётчик заведён.
+   * Один бык на трёх дочерях даёт три связи и одну работу; отчёт,
+   * считающий только связи, завысил бы объём втрое.
+   */
+  console.log('\nРодословная: один бык на трёх дочерях — три связи, одна работа\n')
+
+  const popular = pedigreeGaps([
+    { id: 1, identNumber: 'HOUSA13599440', idFormat: 'usa', fatherId: null, motherId: null },
+    { id: 2, identNumber: 'RU-ДОЧЬ-1', idFormat: 'rf', fatherId: 1, motherId: null },
+    { id: 3, identNumber: 'RU-ДОЧЬ-2', idFormat: 'rf', fatherId: 1, motherId: null },
+    { id: 4, identNumber: 'RU-ДОЧЬ-3', idFormat: 'rf', fatherId: 1, motherId: null },
+  ])
+  check(popular.noKey.foreign === 3, 'связей с быком три', String(popular.noKey.foreign))
+  check(
+    popular.noKeyAnimals.foreign === 1,
+    'а различный предок один — номер узнавать один раз',
+    String(popular.noKeyAnimals.foreign),
+  )
 }
 
 /* ------------------------------------------------------------------ */
@@ -597,6 +619,44 @@ function roundtrip() {
   check(row[9] === '3.85', 'жир не потерял дробную часть', String(row[9]))
 }
 
+/**
+ * Прогноз «а если номера придут завтра».
+ *
+ * Два утверждения. Первое: подстановка ключа снимает именно ту причину,
+ * а прочие проверки остаются настоящими — иначе прогноз обещал бы больше,
+ * чем будет. Второе: подставленный ключ невозможно принять за настоящий,
+ * потому что тихий правдоподобный заполнитель здесь был бы ровно тем,
+ * против чего написана вся эта выгрузка.
+ */
+function forecastKeys() {
+  console.log('\nПрогноз: подставленный ключ снимает одну причину и не притворяется uuid\n')
+
+  check(!/^[0-9a-f-]{36}$/.test(FORECAST_KEY), 'заполнитель не похож на uuid', FORECAST_KEY)
+  check(FORECAST_KEY.includes('НЕ-ДЛЯ-ФАЙЛА'), 'и говорит о себе прямо')
+
+  const held = buildLactations([cow({ baseUuid: null })])
+  check(held.rows.length === 0, 'без номера не уезжает ничего')
+
+  const ahead = buildLactations(withForecastKeys([cow({ baseUuid: null })]))
+  check(ahead.rows.length === 1, 'с подставленным — уезжает', `строк ${ahead.rows.length}`)
+
+  /*
+   * И главное: прогноз не прощает остального. Лактация без белка
+   * придержана и с ключом — иначе он обещал бы работающую выгрузку там,
+   * где её не будет.
+   */
+  const broken = buildLactations(
+    withForecastKeys([cow({ baseUuid: null, lactations: [{ ...FULL, proteinKg: null }] })]),
+  )
+  check(broken.rows.length === 0, 'но незаполненный белок он не прощает')
+  check(broken.held[0]?.why === 'Белок, кг', 'и называет поле', String(broken.held[0]?.why))
+
+  /* Исходные записи прогноз не портит: подставляется копия. */
+  const source = [cow({ baseUuid: null })]
+  withForecastKeys(source)
+  check(source[0]!.baseUuid === null, 'исходные записи прогноз не трогает', String(source[0]!.baseUuid))
+}
+
 /* ------------------------------------------------------------------ */
 
 columns()
@@ -606,6 +666,7 @@ pedigree()
 summary()
 templates()
 roundtrip()
+forecastKeys()
 
 console.log('')
 if (failures) {
