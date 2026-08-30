@@ -1382,7 +1382,7 @@ export interface DataSubmission {
       | {
           row?: number | null;
           ident?: string | null;
-          column?: string | null;
+          columnTitle?: string | null;
           reason?: string | null;
           id?: string | null;
         }[]
@@ -2963,7 +2963,7 @@ export interface DataSubmissionsSelect<T extends boolean = true> {
           | {
               row?: T;
               ident?: T;
-              column?: T;
+              columnTitle?: T;
               reason?: T;
               id?: T;
             };

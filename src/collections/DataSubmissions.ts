@@ -187,7 +187,7 @@ export const DataSubmissions: CollectionConfig = {
               fields: [
                 { name: 'row', type: 'number', label: 'Строка файла' },
                 { name: 'ident', type: 'text', label: 'Индивидуальный номер' },
-                { name: 'column', type: 'text', label: 'Колонка' },
+                { name: 'columnTitle', type: 'text', label: 'Колонка' },
               ],
             },
             { name: 'reason', type: 'text', label: 'Что не так' },

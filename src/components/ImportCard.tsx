@@ -396,9 +396,9 @@ export function ImportCard({ datasets }: { datasets: (Choice & { hint: string })
                       </p>
                       <ul className="mt-1 space-y-0.5">
                         {state.valueIssues.slice(0, 5).map((v, i) => (
-                          <li key={`${v.row}-${v.column}-${i}`} className="leading-snug">
+                          <li key={`${v.row}-${v.columnTitle}-${i}`} className="leading-snug">
                             строка {v.row}
-                            {v.ident ? ` (${v.ident})` : ''}, «{v.column}» — {v.reason}
+                            {v.ident ? ` (${v.ident})` : ''}, «{v.columnTitle}» — {v.reason}
                           </li>
                         ))}
                       </ul>

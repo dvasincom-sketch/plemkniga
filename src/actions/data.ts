@@ -62,7 +62,7 @@ export type ImportState = {
    * через месяц по пустой колонке в карточках. Отвергнутый файл человек
    * перезальёт; про молча потерянную ячейку он не узнает вовсе.
    */
-  valueIssues?: { row: number; ident?: string; column: string; reason: string }[]
+  valueIssues?: { row: number; ident?: string; columnTitle: string; reason: string }[]
   /** Сколько таких ячеек всего: список показывает первые пятьдесят. */
   valueProblems?: number
   /**
@@ -630,11 +630,11 @@ async function importAnimals(
    * вся колонка написана не так, даст пять тысяч одинаковых заметок,
    * и протокол из пяти тысяч строк не читает никто.
    */
-  const valueIssues: { row: number; ident?: string; column: string; reason: string }[] = []
+  const valueIssues: { row: number; ident?: string; columnTitle: string; reason: string }[] = []
   let valueProblems = 0
-  const note = (line: number, column: string, reason: string, ident?: string) => {
+  const note = (line: number, columnTitle: string, reason: string, ident?: string) => {
     valueProblems++
-    if (valueIssues.length < 50) valueIssues.push({ row: line, ident, column, reason })
+    if (valueIssues.length < 50) valueIssues.push({ row: line, ident, columnTitle, reason })
   }
 
   /*
@@ -1067,11 +1067,11 @@ async function importEvents(
   const dateTitle = cols.find((c) => c.key === 'date')?.title ?? 'Дата'
 
   /* То же, что у животных: непонятая ячейка — не непринятая строка. */
-  const valueIssues: { row: number; ident?: string; column: string; reason: string }[] = []
+  const valueIssues: { row: number; ident?: string; columnTitle: string; reason: string }[] = []
   let valueProblems = 0
-  const note = (line: number, column: string, reason: string, ident?: string) => {
+  const note = (line: number, columnTitle: string, reason: string, ident?: string) => {
     valueProblems++
-    if (valueIssues.length < 50) valueIssues.push({ row: line, ident, column, reason })
+    if (valueIssues.length < 50) valueIssues.push({ row: line, ident, columnTitle, reason })
   }
 
   for (const [i, row] of body.entries()) {

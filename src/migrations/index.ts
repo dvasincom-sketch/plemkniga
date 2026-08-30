@@ -49,7 +49,8 @@ import * as migration_20260828_180000_calving_roles from './20260828_180000_calv
 import * as migration_20260829_090000_pending_columns from './20260829_090000_pending_columns'
 import * as migration_20260827_120000_check_runs from './20260827_120000_check_runs';
 import * as migration_20260830_090000_lab_name from './20260830_090000_lab_name'
-import * as migration_20260830_120000_age_group_source from './20260830_120000_age_group_source';
+import * as migration_20260830_120000_age_group_source from './20260830_120000_age_group_source'
+import * as migration_20260830_150000_submission_value_issues from './20260830_150000_submission_value_issues';
 
 export const migrations = [
   {
@@ -311,5 +312,10 @@ export const migrations = [
     up: migration_20260830_120000_age_group_source.up,
     down: migration_20260830_120000_age_group_source.down,
     name: '20260830_120000_age_group_source',
+  },
+  {
+    up: migration_20260830_150000_submission_value_issues.up,
+    down: migration_20260830_150000_submission_value_issues.down,
+    name: '20260830_150000_submission_value_issues',
   },
 ];
