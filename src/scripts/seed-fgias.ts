@@ -53,6 +53,16 @@ import { ISAG_LOCI, isagField } from '@/lib/isag'
 const DROP = process.argv.includes('--drop')
 const NOTE = 'демонстрационная запись'
 
+/**
+ * Приставка семенного кода у демонстрационных записей.
+ *
+ * У склада спермопродукции нет поля для примечания, а пометка нужна:
+ * иначе выдуманный код не отличить от настоящего. Код виден и в карточке,
+ * и в файле выгрузки — то есть пометка стоит там же, где данные,
+ * и прочитает её тот, кто на них смотрит.
+ */
+const DEMO_CODE = 'ДЕМО-'
+
 const arg = (name: string): string | undefined => {
   const i = process.argv.indexOf(`--${name}`)
   return i === -1 ? undefined : process.argv[i + 1]
@@ -252,10 +262,42 @@ async function main() {
       await payload.delete({ collection: 'gradings', id: g.id, overrideAccess: true })
     }
 
+    /*
+     * Склад спермопродукции узнаётся по приставке кода — единственной
+     * пометке, которая у него есть. Настоящую запись это не тронет:
+     * «ДЕМО-» в начале семенного кода никто не пишет.
+     */
+    const { docs: withStock } = await payload.find({
+      collection: 'animals',
+      where: { owner: { equals: orgId }, sex: { equals: 'male' } },
+      limit: 0,
+      pagination: false,
+      depth: 0,
+      overrideAccess: true,
+    })
+
+    let stocks = 0
+    for (const b of withStock) {
+      const semen = (b as { semen?: { stock?: { code?: string } } }).semen
+      if (!semen?.stock?.code?.startsWith(DEMO_CODE)) continue
+      await payload.update({
+        collection: 'animals',
+        id: b.id,
+        overrideAccess: true,
+        context: { skipJournal: true },
+        data: {
+          semen: { ...semen, stock: { code: null, available: null, updatedAt: null, owner: null } },
+        } as never,
+      })
+      stocks += 1
+    }
+
     console.log(
       `Убрано: взвешиваний ${doomed.docs.length}, выставок ${cleaned}, ` +
-        `бонитировок ${doomedGrades.docs.length}`,
+        `бонитировок ${doomedGrades.docs.length}, записей о семени ${stocks}`,
     )
+    console.log('Сводные оценки не убираются: они дописаны к настоящим осмотрам,')
+    console.log('и отличить наши баллы от выставленных бонитёром уже нельзя.')
     console.log('ДНК-подробности не убираются: они дописаны к настоящим тестам,')
     console.log('и отличить наши поля от внесённых руками уже нельзя.\n')
     process.exit(0)
@@ -283,6 +325,7 @@ async function main() {
   let shows = 0
   let dna = 0
   let gradings = 0
+  let scores = 0
 
   for (const [i, a] of herd.entries()) {
     /* ------------------------- Взвешивания ------------------------- */
@@ -454,15 +497,105 @@ async function main() {
       })
       gradings += 1
     }
+
+    /* --------------------- Сводная оценка 50–100 -------------------- */
+
+    /*
+     * Дописывается к действующей оценке экстерьера, а не заводится
+     * новая: осмотр — утверждение бонитёра, и сочинять его целиком
+     * значило бы придумать факт. Животным без оценки ничего
+     * не добавляется — тот же порядок, что у подробностей ДНК-теста.
+     */
+    const { docs: sheets } = await payload.find({
+      collection: 'animal-exteriors',
+      where: { animal: { equals: a.id }, isCurrent: { equals: true } },
+      limit: 1,
+      depth: 0,
+      overrideAccess: true,
+    })
+
+    const sheet = sheets[0] as unknown as Record<string, unknown> | undefined
+    if (sheet && typeof sheet.generalView !== 'number') {
+      const male = (a as { sex?: string }).sex === 'male'
+      await payload.update({
+        collection: 'animal-exteriors',
+        id: sheet.id as number,
+        overrideAccess: true,
+        data: {
+          /* Баллы правдоподобные и разные: одинаковые выглядят опечаткой. */
+          generalView: 78 + (i % 9),
+          bodyVolume: 76 + ((i * 3) % 11),
+          dairyCharacter: 80 + ((i * 5) % 8),
+          legQuality: 74 + ((i * 7) % 13),
+          /* У быка вымени нет — вместо него задняя часть туловища. */
+          ...(male ? { rearBody: 79 + (i % 10) } : { udderQuality: 82 + (i % 7) }),
+          note: [sheet.note, NOTE].filter(Boolean).join(' · '),
+        } as never,
+      })
+      scores += 1
+    }
+  }
+
+  /* ------------------- Наличие спермопродукции -------------------- */
+
+  /*
+   * Быки берутся отдельным запросом, а не из тех двадцати: в выборке
+   * по `id` их может не оказаться вовсе, и раздел карточки быка остался
+   * бы пустым — ровно та беда, ради которой этот сид и написан.
+   *
+   * Помечено приставкой в семенном коде, а не примечанием: поля
+   * для примечания у склада нет, а код виден в карточке и в файле
+   * выгрузки. Его же ищет `--drop`.
+   */
+  const { docs: bulls } = await payload.find({
+    collection: 'animals',
+    where: { owner: { equals: orgId }, sex: { equals: 'male' }, archived: { not_equals: true } },
+    limit: 5,
+    sort: 'id',
+    depth: 0,
+    overrideAccess: true,
+  })
+
+  let semen = 0
+  for (const [i, b] of bulls.entries()) {
+    const stock = ((b as { semen?: { stock?: { code?: string } } }).semen?.stock ?? {}) as {
+      code?: string
+    }
+    if (stock.code) continue
+
+    await payload.update({
+      collection: 'animals',
+      id: b.id,
+      overrideAccess: true,
+      context: { skipJournal: true },
+      data: {
+        semen: {
+          ...((b as { semen?: object }).semen ?? {}),
+          stock: {
+            code: `${DEMO_CODE}${1000 + i}`,
+            /*
+             * У одного из пяти семени нет. Иначе не видно, что «нет
+             * в наличии» — такой же ответ, как «есть», и что реестру
+             * он тоже нужен.
+             */
+            available: i % 5 !== 4,
+            updatedAt: `${monthsAgo(1)}T00:00:00.000Z`,
+            owner: orgId,
+          },
+        },
+      } as never,
+    })
+    semen += 1
   }
 
   console.log(
     `Заведено: взвешиваний ${weighings}, выставок ${shows}, ` +
-      `ДНК-подробностей ${dna}, бонитировок ${gradings}`,
+      `ДНК-подробностей ${dna}, бонитировок ${gradings}, ` +
+      `сводных оценок ${scores}, записей о семени ${semen}`,
   )
   console.log('\nВсё помечено словами «демонстрационная запись»: взвешивания')
   console.log('и бонитировки — в примечании, выставки — в месте проведения,')
-  console.log('ДНК — в результате теста.')
+  console.log(`ДНК и сводные оценки — в примечании записи, семя — кодом «${DEMO_CODE}…».`)
   console.log('Убрать: npm run seed:fgias -- --drop\n')
 
   process.exit(0)
