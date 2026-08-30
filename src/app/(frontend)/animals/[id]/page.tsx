@@ -25,7 +25,8 @@ import { CertificateSection } from '@/components/CertificateSection'
 import { certificateReadiness } from '@/lib/certification'
 import { ClosedAnimal } from '@/components/ClosedAnimal'
 import { AccessRequestForm } from '@/components/AccessRequestForm'
-import { RecordBar } from '@/components/RecordBar'
+import { RecordPanel } from '@/components/RecordPanel'
+import { VisibilityForm } from '@/components/VisibilityForm'
 import { ArchiveBlock } from '@/components/ArchiveBlock'
 import { ARCHIVE_RETENTION_DAYS } from '@/lib/archive-retention'
 import { resolveShare } from '@/lib/share-links'
@@ -303,11 +304,20 @@ export default async function AnimalPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ tab?: string; share?: string }>
+  searchParams: Promise<{ tab?: string; share?: string; manage?: string }>
 }) {
   const { id } = await params
-  const { tab: tabParam, share: shareParam } = await searchParams
+  const { tab: tabParam, share: shareParam, manage: manageParam } = await searchParams
   const tab: TabKey = TABS.some((t) => t.key === tabParam) ? (tabParam as TabKey) : 'evaluation'
+
+  /*
+   * Что раскрыто в управлении записью — из адреса, а не из памяти
+   * страницы. На такое состояние можно сослаться, и работает оно
+   * без единой строки на клиенте: тем же способом, каким на карточке
+   * переключаются разделы.
+   */
+  const manage: 'visibility' | 'archive' | null =
+    manageParam === 'visibility' || manageParam === 'archive' ? manageParam : null
 
   const user = await getCurrentUser()
   const viewer = viewerOf(user)
@@ -1129,39 +1139,77 @@ export default async function AnimalPage({
                почему он не видит подробностей.
             */}
             <TrustBadge level={animal.trustLevel} onDark={onDark} />
+          </div>
 
-            {/*
-               Управление записью — в правом верхнем углу шапки, рядом
-               с датой обновления, счётчиком просмотров и знаком
-               достоверности. Всё это уже про запись, а не про животное,
-               и половина видна только владельцу. Панель раскрывается
-               поверх содержимого и ничего не сдвигает: разбор
-               в `RecordBar`.
-            */}
-            {isMine && (
-              <RecordBar
+          {/*
+             Третья колонка шапки — управление своей записью.
+
+             Шапка отвечает на три вопроса подряд: кто это животное,
+             что известно о записи, что я могу с ней сделать. Первые два
+             видны всем, третий только владельцу — и это не нарушение
+             единого каркаса, а его продолжение: колонка либо есть, либо
+             её нет, а две первые не съезжают. Разбор — `RecordPanel`.
+          */}
+          {isMine && (
+            <RecordPanel
+              animalId={animal.id as number}
+              publicVisible={Boolean(animal.publicVisible)}
+              publicDetails={Boolean(animal.publicDetails)}
+              archived={Boolean(animal.archived)}
+              open={manage}
+              onDark={onDark}
+            />
+          )}
+        </section>
+
+
+        {/*
+           Управление записью раскрывается здесь: полной шириной, между
+           шапкой и меню разделов, и только когда его позвали адресом.
+           Формы длинные — переключатели с пояснениями, причина архивации,
+           список зависимых записей, — и в узкой колонке им не поместиться.
+           Постоянного места они при этом не занимают: закрытая карточка
+           выглядит ровно так же, как у чужого.
+        */}
+        {isMine && manage && (
+          <section className="card mt-6">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+              <h2 className="panel-heading !mb-0">
+                {manage === 'visibility'
+                  ? 'Видимость записи в книге'
+                  : animal.archived
+                    ? 'Возврат записи из архива'
+                    : 'Убрать запись из книги'}
+              </h2>
+              <Link
+                href={`/animals/${id}`}
+                scroll={false}
+                className="text-[13px] text-ink-500 underline underline-offset-4 hover:text-forest-500"
+              >
+                закрыть
+              </Link>
+            </div>
+
+            {manage === 'visibility' ? (
+              <VisibilityForm
                 animalId={animal.id as number}
                 publicVisible={Boolean(animal.publicVisible)}
                 publicDetails={Boolean(animal.publicDetails)}
-                archived={Boolean(animal.archived)}
-                onDark={onDark}
-                archive={
-                  archiveFacts ? (
-                    <ArchiveBlock
-                      animalId={animal.id as number}
-                      archived={Boolean(animal.archived)}
-                      archivedAt={animal.archivedAt ? String(animal.archivedAt) : null}
-                      archiveReason={animal.archiveReason ?? null}
-                      dependents={archiveFacts.dependents}
-                      blockers={archiveFacts.blockers}
-                    />
-                  ) : null
-                }
               />
+            ) : (
+              archiveFacts && (
+                <ArchiveBlock
+                  animalId={animal.id as number}
+                  archived={Boolean(animal.archived)}
+                  archivedAt={animal.archivedAt ? String(animal.archivedAt) : null}
+                  archiveReason={animal.archiveReason ?? null}
+                  dependents={archiveFacts.dependents}
+                  blockers={archiveFacts.blockers}
+                />
+              )
             )}
-          </div>
-        </section>
-
+          </section>
+        )}
 
         {/* ------------------------------ Вкладки ---------------------------- */}
         <p className="mb-3 mt-8 text-[12px] uppercase tracking-[0.09em] text-ink-500">
