@@ -25,7 +25,7 @@ import { CertificateSection } from '@/components/CertificateSection'
 import { certificateReadiness } from '@/lib/certification'
 import { ClosedAnimal } from '@/components/ClosedAnimal'
 import { AccessRequestForm } from '@/components/AccessRequestForm'
-import { AnimalVisibility } from '@/components/AnimalVisibility'
+import { RecordBar } from '@/components/RecordBar'
 import { ArchiveBlock } from '@/components/ArchiveBlock'
 import { ARCHIVE_RETENTION_DAYS } from '@/lib/archive-retention'
 import { resolveShare } from '@/lib/share-links'
@@ -1114,9 +1114,37 @@ export default async function AnimalPage({
               </p>
             )}
 
+            {/*
+               Знака публичности здесь нет намеренно.
+               
+               Первая редакция ставила его рядом с достоверностью — и тем
+               нарушала правило, ради которого полоса и заводилась: шапку
+               видят все, и меняться в зависимости от смотрящего она
+               не должна. Вдобавок состояние оказывалось написано дважды
+               в одном экране, в двух сантиметрах друг от друга.
+               
+               Состояние теперь живёт там же, где управление: в полосе
+               владельца над меню разделов. Чужому по-прежнему отвечает
+               плашка «Доступ закрыт владельцем» — она о другом, о том,
+               почему он не видит подробностей.
+            */}
             <TrustBadge level={animal.trustLevel} onDark={onDark} />
           </div>
         </section>
+
+        {/*
+           Полоса владельца стоит между шапкой и меню разделов и не зависит
+           от вкладки: настройки относятся ко всей записи, а лежали внизу
+           одной из вкладок — переключишься, и они исчезли. Разбор —
+           в `RecordBar`.
+        */}
+        {isMine && (
+          <RecordBar
+            animalId={animal.id as number}
+            publicVisible={Boolean(animal.publicVisible)}
+            publicDetails={Boolean(animal.publicDetails)}
+          />
+        )}
 
         {/* ------------------------------ Вкладки ---------------------------- */}
         <p className="mb-3 mt-8 text-[12px] uppercase tracking-[0.09em] text-ink-500">
@@ -1872,16 +1900,6 @@ export default async function AnimalPage({
             </div>
           </section>
         )}
-        {/* Публичность записи — на вкладке общих данных: там же лежат
-            остальные свойства самой записи, а не её измерений */}
-        {isMine && tab === 'general' && (
-          <AnimalVisibility
-            animalId={animal.id as number}
-            publicVisible={Boolean(animal.publicVisible)}
-            publicDetails={Boolean(animal.publicDetails)}
-          />
-        )}
-
         {/* Архив стоит последним блоком вкладки: убрать запись — не то,
             что предлагают раньше, чем показали саму запись */}
         {isMine && tab === 'general' && archiveFacts && (
