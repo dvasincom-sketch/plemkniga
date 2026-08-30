@@ -14,6 +14,9 @@ import {
   buildCalvingCalves,
   buildIntervals,
   buildService,
+  buildLinear,
+  buildIpc,
+  LINEAR_TRAITS,
   type Built,
   type ExportAnimal,
   type PedigreeSource,
@@ -26,6 +29,8 @@ import {
   type InseminationAnimal,
   type MilkTestAnimal,
   type CalvingCalvesAnimal,
+  type LinearAnimal,
+  type IpcAnimal,
 } from '@/lib/fgias-export'
 import { buildMain, type MainAnimal } from '@/lib/fgias-main'
 import { fgiasExport } from '@/lib/fgias-exports'
@@ -495,6 +500,58 @@ export async function GET(request: Request) {
         })),
       )
     }
+  } else if (spec.key === 'linear') {
+    /*
+     * Оценки экстерьера лежат своей коллекцией с историей: уезжают все,
+     * а не только действующая. Реестр ждёт осмотры по датам, и прошлый
+     * год для него такая же запись, как нынешний.
+     */
+    const [byAnimal, orgs] = await Promise.all([
+      collect('animal-exteriors'),
+      payload
+        .find({ collection: 'organizations', limit: 0, pagination: false, depth: 0, overrideAccess: true })
+        .then((res) => new Map((res.docs as unknown as Row[]).map((o) => [o.id as number, o]))),
+    ])
+
+    const rows: LinearAnimal[] = herd.map((a) => ({
+      identNumber: String(a.identNumber ?? ''),
+      accountingId: txt(a.uuid),
+      baseUuid: txt((a.fgias as Row | undefined)?.baseUuid),
+      scores: (byAnimal.get(a.id as number) ?? []).map((s) => {
+        const org = orgs.get(rel(s.assessorOrg) ?? -1)
+        /*
+         * Признаки собираются по тому же списку, из которого сделаны
+         * заголовки: иначе колонка и значение однажды разъедутся,
+         * и «угол копыта» уедет в «глубину вымени» молча.
+         */
+        const traits: Record<string, number | null> = {}
+        for (const t of LINEAR_TRAITS) {
+          if (!t.key) continue
+          traits[t.key] = typeof s[t.key] === 'number' ? (s[t.key] as number) : null
+        }
+        return {
+          date: txt(s.assessedAt),
+          lactation: typeof s.lactation === 'number' ? s.lactation : null,
+          assessor: org ? { name: txt(org.name), inn: txt(org.inn), kpp: txt(org.kpp) } : null,
+          traits,
+        }
+      }),
+    }))
+    built = buildLinear(rows)
+  } else if (spec.key === 'ipc') {
+    /*
+     * Индекс лежит снимком в карточке — истории здесь не нужно:
+     * реестр спрашивает действующее значение и день, когда его
+     * получили, а не ряд пересчётов.
+     */
+    const rows: IpcAnimal[] = herd.map((a) => ({
+      identNumber: String(a.identNumber ?? ''),
+      accountingId: txt(a.uuid),
+      baseUuid: txt((a.fgias as Row | undefined)?.baseUuid),
+      ipc: typeof a.ipc === 'number' ? a.ipc : null,
+      evaluationDate: txt(a.evaluationDate),
+    }))
+    built = buildIpc(rows)
   } else if (spec.key === 'shows') {
     const rows: ShowAnimal[] = herd.map((a) => ({
       identNumber: String(a.identNumber ?? ''),

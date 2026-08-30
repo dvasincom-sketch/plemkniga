@@ -29,6 +29,13 @@ import {
   SERVICE_COLUMNS,
   SERVICE_MIN,
   SERVICE_MAX,
+  LINEAR_COLUMNS,
+  LINEAR_TRAITS,
+  LINEAR_MIN,
+  LINEAR_MAX,
+  IPC_COLUMNS,
+  buildLinear,
+  buildIpc,
   buildInseminations,
   buildMilkTests,
   buildCalvingCalves,
@@ -612,6 +619,22 @@ function templates() {
       file: 'КРС_Сервис_период_молочное_направление_v1.1_2.6.0.xlsx',
       titles: SERVICE_COLUMNS.map((c) => c.title),
       label: 'Сервис-период',
+    },
+    {
+      file: 'КРС_Корова_Линейная_оценка_v1.0_2.6.0.xlsx',
+      titles: LINEAR_COLUMNS.map((c) => c.title),
+      label: 'Корова: линейная оценка',
+    },
+    {
+      /*
+       * У индекса шапка лежит на листе «Пример», а «Контракт» устроен
+       * иначе, чем у прочих: не шапкой, а таблицей описаний, где
+       * колонки перечислены строками. Читается первый лист — он же
+       * и есть форма загрузки.
+       */
+      file: 'КРС_Индекс_племенной_ценности_v1.2_2.6.0.xlsx',
+      titles: IPC_COLUMNS.map((c) => c.title),
+      label: 'Индекс племенной ценности',
     },
   ]
 
@@ -1493,6 +1516,118 @@ function calvings() {
 }
 
 /**
+ * Линейная оценка: шкала, порядок признаков и два пробела реестра.
+ */
+function linear() {
+  console.log('\nЛинейная оценка: что уезжает\n')
+
+  const base = {
+    identNumber: 'RU0000000070028',
+    accountingId: '1a421c44-36d2-41c3-881e-38bf83c4f756',
+    baseUuid: '60b5cc43-7b0a-416d-920b-6782c2192fcf',
+  }
+
+  const traits: Record<string, number> = {}
+  for (const t of LINEAR_TRAITS) if (t.key) traits[t.key] = 5
+
+  const full = {
+    date: '2026-04-10T00:00:00.000Z',
+    lactation: 2,
+    assessor: { name: 'ООО «Ставропольский фермер»', inn: '1234567890', kpp: '123456789' },
+    traits,
+  }
+
+  const ok = buildLinear([{ ...base, scores: [full] }])
+  check(ok.rows.length === 1, 'полная оценка уезжает')
+  const row = ok.rows[0]!
+  check(row.length === 26, 'в строке двадцать шесть значений', String(row.length))
+  check(row[4] === 2, 'номер отёла числом', String(row[4]))
+  check(row[6] === '1234567890', 'ИНН оценщика берётся из организации')
+
+  /*
+   * Заголовки и значения идут из одного списка, и здесь это проверяется
+   * поимённо: колонка «Угол копыта» должна получить именно угол копыта.
+   * Разведённые списки дали бы молчаливый сдвиг — реестр примет число
+   * от одного до девяти в любой колонке.
+   */
+  const shifted = { ...traits, hoofAngle: 7, udderDepth: 3 }
+  const named = buildLinear([{ ...base, scores: [{ ...full, traits: shifted }] }]).rows[0]!
+  const at = (title: string) => LINEAR_COLUMNS.findIndex((c) => c.title === title)
+  check(named[at('Угол копыта')] === 7, 'угол копыта попал в свою колонку')
+  check(named[at('Глубина вымени')] === 3, 'а глубина вымени — в свою')
+
+  /*
+   * Два признака реестра книга не меряет. Колонки пусты, а не заполнены
+   * соседним похожим: ширина задней части вымени — не высота его
+   * прикрепления, и по экстерьеру выбирают быка.
+   */
+  check(
+    row[at('Ширина задней части вымени')] === '' &&
+      row[at('Выраженность скакательного сустава')] === '',
+    'два признака, которых книга не меряет, уходят пустыми',
+  )
+  check(
+    LINEAR_TRAITS.filter((t) => !t.key).length === 2,
+    'и таких признаков ровно два',
+    String(LINEAR_TRAITS.filter((t) => !t.key).length),
+  )
+  check(LINEAR_TRAITS.length === 18, 'всего признаков восемнадцать', String(LINEAR_TRAITS.length))
+
+  /* Значение вне шкалы не прижимается к краю, а выпадает. */
+  const outside = buildLinear([
+    { ...base, scores: [{ ...full, traits: { ...traits, height: 87 } }] },
+  ]).rows[0]!
+  check(outside[at('Рост')] === '', 'балл по чужой шкале не обрезается до девятки')
+  check(LINEAR_MIN === 1 && LINEAR_MAX === 9, 'шкала взята из контракта шаблона')
+
+  /* Осмотр без единого признака — дата и подпись без содержания. */
+  const empty = buildLinear([{ ...base, scores: [{ ...full, traits: {} }] }])
+  check(
+    empty.rows.length === 0 && empty.held[0]?.why === 'Ни одного признака в шкале 1–9',
+    'пустой осмотр придержан и причина названа',
+    String(empty.held[0]?.why),
+  )
+}
+
+/**
+ * Индекс племенной ценности: строкой и с датой.
+ */
+function ipc() {
+  console.log('\nИндекс племенной ценности: что уезжает\n')
+
+  const base = {
+    identNumber: 'RU0000000070028',
+    accountingId: '1a421c44-36d2-41c3-881e-38bf83c4f756',
+    baseUuid: '60b5cc43-7b0a-416d-920b-6782c2192fcf',
+  }
+
+  const ok = buildIpc([{ ...base, ipc: 112.5, evaluationDate: '2026-05-01T00:00:00.000Z' }])
+  check(ok.rows.length === 1, 'животное с индексом уезжает')
+  check(ok.rows[0]!.length === 5, 'в строке пять значений', String(ok.rows[0]!.length))
+  /*
+   * Колонка объявлена текстовой, и в примере реестра стоит «11» —
+   * число, записанное строкой. Так и уходит: реестр принимает результат
+   * как он есть и не берётся судить о методике.
+   */
+  check(ok.rows[0]![4] === '112.5', 'индекс уходит строкой, а не числом', String(ok.rows[0]![4]))
+
+  /* Без даты расчёта — не отличить от прошлогоднего. */
+  const noDate = buildIpc([{ ...base, ipc: 112.5, evaluationDate: null }])
+  check(
+    noDate.rows.length === 0 && noDate.held[0]?.why === 'Дата расчёта',
+    'без даты расчёта придержано и причина названа',
+    String(noDate.held[0]?.why),
+  )
+
+  /* Животное без индекса не придерживается: оценивают не всех. */
+  const none = buildIpc([{ ...base, ipc: null, evaluationDate: null }])
+  check(
+    none.rows.length === 0 && none.held.length === 0,
+    'неоценённое животное не попадает в придержанные',
+  )
+}
+
+/**
  * Опись и кнопки говорят об одном и том же.
  *
  * ## Почему это стоит проверять
@@ -1942,6 +2077,8 @@ inseminations()
 milkTests()
 calves()
 derived()
+linear()
+ipc()
 shopWindow()
 dna()
 pedigree()

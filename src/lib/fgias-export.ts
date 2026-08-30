@@ -1469,6 +1469,273 @@ export function buildService(animals: ServiceAnimal[]): Built {
 }
 
 /**
+ * Восемнадцать линейных признаков шаблона «КРС_Корова_Линейная_оценка».
+ *
+ * ## Один список на заголовки и на значения
+ *
+ * Заголовки колонок и поля, из которых берутся числа, стоят парами
+ * в одном месте. Разведи их на два списка — и однажды кто-нибудь
+ * вставит колонку в один, забыв про другой: файл уедет с правильной
+ * шапкой, а «угол копыта» окажется в колонке «глубина вымени».
+ * Ошибка при этом молчаливая: реестр примет числа от одного до девяти
+ * куда угодно.
+ *
+ * ## Порядок взят из шаблона и не алфавитный
+ *
+ * Он и не тематический: центральная связка стоит второй, а глубина
+ * вымени пятнадцатой, хотя обе про вымя. Переписывать «как ровнее»
+ * нельзя по той же причине, что у панели ISAG.
+ *
+ * ## Два признака реестра книга не меряет
+ *
+ * «Ширина задней части вымени» и «Выраженность скакательного сустава»
+ * в нашей шкале не заведены. Колонки уходят пустыми, а не заполняются
+ * соседним похожим признаком: ширина задней части вымени — не то же
+ * самое, что высота его прикрепления, и подставить одно вместо другого
+ * значило бы соврать про экстерьер, а по экстерьеру выбирают быка.
+ *
+ * ## Два наших признака реестр не спрашивает
+ *
+ * «Ориентация передних ног» и «Гармоничность движения» в шаблоне
+ * отсутствуют. Книга их ведёт и продолжит: это не лишние данные,
+ * а данные, которые государству пока не нужны.
+ */
+export const LINEAR_TRAITS: { title: string; key: string | null }[] = [
+  /* Реестр зовёт его «Тип животного», книга — «Тип телосложения». */
+  { title: 'Тип животного', key: 'bodyType' },
+  { title: 'Центральная связка (глубина доли)', key: 'centralLigament' },
+  { title: 'Ширина таза', key: 'rumpWidth' },
+  { title: 'Ширина задней части вымени', key: null },
+  { title: 'Выраженность скакательного сустава', key: null },
+  /* «Высота задней части вымени» — это прикрепление задних долей. */
+  { title: 'Высота задней части вымени', key: 'rearUdder' },
+  { title: 'Длина сосков (передних)', key: 'teatLength' },
+  { title: 'Крепость телосложения или ширина груди', key: 'chestWidth' },
+  { title: 'Расположение передних сосков', key: 'frontTeatPlacement' },
+  { title: 'Положение таза', key: 'rumpAngle' },
+  { title: 'Угол копыта', key: 'hoofAngle' },
+  { title: 'Постановка задних ног (вид сбоку)', key: 'rearLegsSide' },
+  { title: 'Постановка задних ног (вид сзади)', key: 'rearLegsRear' },
+  { title: 'Расположение задних сосков', key: 'rearTeatPlacement' },
+  { title: 'Глубина вымени', key: 'udderDepth' },
+  { title: 'Глубина туловища', key: 'bodyDepth' },
+  { title: 'Прикрепление передних долей вымени', key: 'foreUdder' },
+  { title: 'Рост', key: 'height' },
+]
+
+/** Двадцать шесть колонок: восемь общих и восемнадцать признаков. */
+export const LINEAR_COLUMNS: FgiasColumn[] = [
+  { title: 'Базовый номер ФГИАС ПР', type: 'uuid', width: 38 },
+  { title: 'Идентификатор строки ФГИАС ПР', type: 'uuid', width: 38 },
+  { title: 'Идентификатор учётной системы', type: 'string', width: 38 },
+  { title: 'Дата оценки', type: 'date', width: 14 },
+  { title: 'Номер отела', type: 'int' },
+  { title: 'Наименование организации-оценщика', type: 'string', width: 30 },
+  { title: 'ИНН организации-оценщика', type: 'string', width: 14 },
+  { title: 'КПП организации-оценщика', type: 'string', width: 12 },
+  ...LINEAR_TRAITS.map((t) => ({ title: t.title, type: 'int' as const })),
+]
+
+export type LinearScore = {
+  date?: string | null
+  lactation?: number | null
+  assessor?: { name?: string | null; inn?: string | null; kpp?: string | null } | null
+  /** Признаки по ключам нашей шкалы 1–9. */
+  traits?: Record<string, number | null | undefined> | null
+}
+
+export type LinearAnimal = {
+  identNumber: string
+  accountingId?: string | null
+  baseUuid?: string | null
+  scores?: LinearScore[] | null
+}
+
+/** Шкала линейной оценки, объявленная контрактом шаблона. */
+export const LINEAR_MIN = 1
+export const LINEAR_MAX = 9
+
+/**
+ * Линейная оценка — по строке на осмотр.
+ *
+ * ## Шкала совпала, и это редкость
+ *
+ * Реестр требует целое от одного до девяти по каждому признаку —
+ * ровно наша шкала. Совпадение не случайно: девятибалльной линейной
+ * оценкой меряют экстерьер во всём мире, и мы перешли на неё
+ * миграцией `20260828_140000_linear_score`, отказавшись от прежней
+ * шкалы отклонений −2…+2.
+ *
+ * Три соседних шаблона — оценка типа телосложения, комплексная оценка
+ * быка, экстерьер молодняка — устроены на шкале 50–100, и вот там
+ * совпадения нет: это не другое поле, а другая система измерения.
+ *
+ * ## Значение вне шкалы придерживается
+ *
+ * Не прижимается к краю и не округляется. Число вне единицы-девятки
+ * означает, что в поле попало что-то другое — балл по стобалльной
+ * шкале, опечатка, чужой формат, — и отправлять его реестру, обрезав
+ * до девятки, значило бы выдать чужое измерение за своё.
+ *
+ * ## Строка без единого признака не уезжает
+ *
+ * Осмотр, в котором не заполнен ни один из восемнадцати, — это дата
+ * и подпись без содержания. Реестру такая строка ничего не сообщает,
+ * а в отчёте она честно называется придержанной.
+ */
+export function buildLinear(animals: LinearAnimal[]): Built {
+  const rows: (string | number)[][] = []
+  const held: Held[] = []
+
+  const txt = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : '')
+
+  for (const a of animals) {
+    const list = (a.scores ?? []).filter(Boolean)
+    if (list.length === 0) continue
+
+    if (!a.baseUuid) {
+      held.push({
+        identNumber: a.identNumber,
+        what: `оценок экстерьера: ${list.length}`,
+        why: 'Базовый номер ФГИАС ПР',
+      })
+      continue
+    }
+
+    if (!a.accountingId) {
+      held.push({
+        identNumber: a.identNumber,
+        what: `оценок экстерьера: ${list.length}`,
+        why: 'Идентификатор учётной системы',
+      })
+      continue
+    }
+
+    for (const s of list) {
+      const date = fgiasDate(s.date)
+      if (!date) {
+        held.push({
+          identNumber: a.identNumber,
+          what: `оценка ${s.date ?? '?'}`,
+          why: 'Дата оценки',
+        })
+        continue
+      }
+
+      const values = LINEAR_TRAITS.map((t) => {
+        if (!t.key) return ''
+        const n = fgiasInt(s.traits?.[t.key]).value
+        if (n === undefined) return ''
+        return n >= LINEAR_MIN && n <= LINEAR_MAX ? n : ''
+      })
+
+      if (values.every((v) => v === '')) {
+        held.push({
+          identNumber: a.identNumber,
+          what: `оценка ${date}`,
+          why: 'Ни одного признака в шкале 1–9',
+        })
+        continue
+      }
+
+      const lact = fgiasInt(s.lactation)
+
+      rows.push([
+        a.baseUuid,
+        '',
+        a.accountingId,
+        date,
+        lact.value ?? '',
+        txt(s.assessor?.name),
+        txt(s.assessor?.inn),
+        txt(s.assessor?.kpp),
+        ...values,
+      ])
+    }
+  }
+
+  return { columns: LINEAR_COLUMNS, rows, held, rounded: 0 }
+}
+
+/**
+ * Пять колонок шаблона «КРС_Индекс_племенной_ценности_v1.2».
+ *
+ * Шапка у него лежит на листе «Пример», а лист «Контракт» устроен
+ * иначе, чем у прочих: не шапкой, а таблицей описаний, где колонки
+ * перечислены строками. Списано с «Примера» — именно он и есть форма
+ * загрузки.
+ */
+export const IPC_COLUMNS: FgiasColumn[] = [
+  { title: 'Базовый номер ФГИАС ПР', type: 'uuid', width: 38 },
+  { title: 'Идентификатор ФГИАС ПР', type: 'uuid', width: 38 },
+  { title: 'Идентификатор учётной системы', type: 'string', width: 38 },
+  { title: 'Дата расчёта', type: 'date', width: 14 },
+  { title: 'Результат оценки племенной ценности', type: 'string', width: 20 },
+]
+
+export type IpcAnimal = {
+  identNumber: string
+  accountingId?: string | null
+  baseUuid?: string | null
+  ipc?: number | null
+  evaluationDate?: string | null
+}
+
+/**
+ * Индекс племенной ценности — по строке на животное.
+ *
+ * ## Почему индекс уходит строкой, а не числом
+ *
+ * Колонка объявлена текстовой, и в примере реестра стоит «11».
+ * То есть число, записанное строкой: реестр не берётся утверждать,
+ * по какой методике его считали, и принимает результат как он есть.
+ *
+ * Нам это на руку. Индекс книги — собственный расчёт по собственной
+ * базе сравнения, и выдавать его за общероссийский было бы неверно;
+ * текстовая колонка честно означает «вот наш результат», а не «вот
+ * значение известной всем величины».
+ *
+ * ## Без даты расчёта строка не уезжает
+ *
+ * Индекс пересчитывается при каждом обновлении базы сравнения,
+ * и число без дня, когда его получили, не отличить от прошлогоднего.
+ * Та же причина, по которой не уезжает комплексный класс без даты
+ * оценки.
+ */
+export function buildIpc(animals: IpcAnimal[]): Built {
+  const rows: (string | number)[][] = []
+  const held: Held[] = []
+
+  for (const a of animals) {
+    const value = fgiasFloat(a.ipc)
+    if (value === undefined) continue
+
+    if (!a.baseUuid || !a.accountingId) {
+      held.push({
+        identNumber: a.identNumber,
+        what: 'индекс племенной ценности',
+        why: a.baseUuid ? 'Идентификатор учётной системы' : 'Базовый номер ФГИАС ПР',
+      })
+      continue
+    }
+
+    const date = fgiasDate(a.evaluationDate)
+    if (!date) {
+      held.push({
+        identNumber: a.identNumber,
+        what: 'индекс племенной ценности',
+        why: 'Дата расчёта',
+      })
+      continue
+    }
+
+    rows.push([a.baseUuid, '', a.accountingId, date, String(value)])
+  }
+
+  return { columns: IPC_COLUMNS, rows, held, rounded: 0 }
+}
+
+/**
  * Справочник «Признаки молочной продуктивности» (`sp_signums`).
  *
  * Две записи, обе прочитаны из открытого реестра 30 августа 2026 года.
