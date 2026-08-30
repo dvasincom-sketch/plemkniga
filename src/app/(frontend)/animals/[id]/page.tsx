@@ -5,6 +5,24 @@ import { notFound } from 'next/navigation'
 import { BullProofBlock, BullStatusNote } from '@/components/BullProof'
 import { bullProof } from '@/lib/bull-proof'
 import { weighingSignLabel } from '@/lib/weighing'
+import { AUTH_METHODS, ISAG_LOCI, isagField } from '@/lib/isag'
+
+/**
+ * Подписи вердикта и способа подтверждения — здесь, а не в библиотеке.
+ *
+ * В `lib/isag.ts` лежат ключи реестра: они нужны выгрузке и не должны
+ * зависеть от того, как мы называем то же самое по-русски на экране.
+ * Подпись — свойство страницы, ключ — свойство обмена.
+ */
+const DNA_VERDICT: Record<string, string> = {
+  confirmed: 'Происхождение подтверждено',
+  excluded: 'Происхождение исключено',
+  inconclusive: 'Не определено',
+}
+
+const AUTH_METHOD_LABEL: Record<string, string> = Object.fromEntries(
+  AUTH_METHODS.map((m) => [m.value, m.label]),
+)
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { ExteriorChart, LinearScoreChart } from '@/components/ExteriorChart'
@@ -2038,6 +2056,64 @@ export default async function AnimalPage({
                             <span className="text-ink-500">{dateRu(t.date)}</span>
                           </div>
                           {t.result && <p className="mt-1 text-ink-700">{t.result}</p>}
+
+                          {/*
+                             Вывод теста — раньше показывался только
+                             свободным текстом «Результат», а вердикт
+                             (подтверждено / исключено) не показывался вовсе,
+                             хотя именно от него зависит, выпустится ли
+                             свидетельство.
+                          */}
+                          {t.verdict && (
+                            <p className="mt-1 text-ink-700">{DNA_VERDICT[t.verdict]}</p>
+                          )}
+
+                          {/*
+                             Сертификат, число маркеров и способ
+                             подтверждения — одной строкой: это реквизиты
+                             документа, а не отдельные факты, и читают
+                             их вместе.
+                          */}
+                          {(t.certificateNumber || t.snpCount || t.authMethod) && (
+                            <p className="mt-1 text-[13px] leading-snug text-ink-500">
+                              {[
+                                t.certificateNumber && `сертификат ${t.certificateNumber}`,
+                                t.certificateDate && `от ${dateRu(t.certificateDate)}`,
+                                t.authMethod && AUTH_METHOD_LABEL[t.authMethod],
+                                t.snpCount && `${t.snpCount.toLocaleString('ru-RU')} SNP`,
+                              ]
+                                .filter(Boolean)
+                                .join(' · ')}
+                            </p>
+                          )}
+
+                          {/*
+                             Генотип под `details`: двенадцать пар аллелей
+                             читают редко и только при разборе спора,
+                             а места они занимают больше, чем сам тест.
+                             Показывается, только когда заполнен хоть один
+                             локус: пустая панель из двенадцати прочерков
+                             читается как «данные потеряли».
+                          */}
+                          {ISAG_LOCI.some((l) => t[isagField(l) as keyof typeof t]) && (
+                            <details className="mt-1.5">
+                              <summary className="cursor-pointer list-none text-[13px] text-ink-500 hover:text-ink-700">
+                                <span className="underline underline-offset-4">
+                                  Генотип ISAG, 12 локусов
+                                </span>
+                              </summary>
+                              <dl className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-[13px] sm:grid-cols-3">
+                                {ISAG_LOCI.map((l) => (
+                                  <div key={l} className="flex justify-between gap-2">
+                                    <dt className="text-ink-500">{l}</dt>
+                                    <dd className="tabular-nums">
+                                      {String(t[isagField(l) as keyof typeof t] ?? '') || '—'}
+                                    </dd>
+                                  </div>
+                                ))}
+                              </dl>
+                            </details>
+                          )}
                         </li>
                       ))}
                     </ul>
