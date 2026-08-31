@@ -8,6 +8,7 @@ import {
   type CheckSettingsMap,
 } from '@/lib/check-settings'
 import { pedigreeIssues } from '@/lib/checks-pedigree'
+import { isCalvingEvent } from '@/lib/calving'
 import { expectedFatKg, expectedProteinKg, KG_TOLERANCE } from '@/lib/pta-consistency'
 import { ASSOCIATION_PROFILE } from '@/lib/breeding-index'
 import { sequenceIssues } from '@/lib/checks-sequence'
@@ -677,6 +678,14 @@ async function relationalIssues(
     for (const c of calvings.docs) {
       const id = relId(c.animal)
       if (!id || !c.date) continue
+      /*
+       * Считаются отёлы, а не всё, что лежит в таблице отёлов: там теперь
+       * ещё аборты и запуски. Аборт, посчитанный отёлом, даёт ложный
+       * «слишком короткий межотельный период» и дыру в нумерации,
+       * а запуск может стать первым отёлом и испортить возраст первого
+       * отёла. Разбор — в `lib/calving.ts`.
+       */
+      if (!isCalvingEvent(typeof c.eventType === 'string' ? c.eventType : null)) continue
       byAnimal.set(id, [
         ...(byAnimal.get(id) ?? []),
         { number: typeof c.number === 'number' ? c.number : null, date: c.date },
@@ -821,7 +830,14 @@ async function relationalIssues(
           if (days < t.gestationMinDays) {
             push(
               'calving-interval-short',
-              `Между отёлами № ${prev.number} и № ${cur.number} — ${days} дней. Стельность длится около 279: либо ошибка в дате, либо вторая запись на самом деле аборт`,
+              /*
+               * Прежде здесь стояло «либо вторая запись на самом деле
+               * аборт». Подсказка устарела в тот день, когда у события
+               * завёлся тип: аборты в этот счёт больше не попадают,
+               * и предлагать эксперту объяснение, которого в модели нет,
+               * значит отправить его искать не то.
+               */
+              `Между отёлами № ${prev.number} и № ${cur.number} — ${days} дней. Стельность длится около 279: либо ошибка в дате, либо между ними был отёл, которого нет в книге`,
               'calvings',
             )
           }

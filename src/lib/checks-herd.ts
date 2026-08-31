@@ -230,12 +230,19 @@ export async function herdIssues(
     ),
     ask(
       'Отёлы по годам',
+      /*
+       * Только отёлы: в таблице лежат ещё аборты и запуски, и год,
+       * в котором были одни аборты, не должен считаться годом с отёлами.
+       * Пустой тип — старый отёл: до появления типа других записей
+       * в книге не было.
+       */
       `select extract(year from c."date" at time zone 'UTC')::int as y,
               count(*)::int as n
          from calvings c
          join animals a on a.id = c.animal_id
         where a.owner_id = $1
           and a.archived is not true
+          and (c.event_type is null or c.event_type = 'calving')
         group by 1
         order by 1`,
       org,

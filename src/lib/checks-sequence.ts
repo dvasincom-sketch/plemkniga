@@ -3,6 +3,7 @@ import type { Animal } from '@/payload-types'
 import type { CheckLimits, Issue } from '@/lib/checks-registry'
 import { defaultThresholds, type Thresholds } from '@/lib/check-thresholds'
 import { relId } from '@/lib/visibility'
+import { isCalvingEvent } from '@/lib/calving'
 
 /**
  * Проверки, которые смотрят на события во времени.
@@ -160,6 +161,13 @@ export async function sequenceIssues(
   for (const c of calvingRes?.docs ?? []) {
     const aid = relId(c.animal)
     if (!aid || !c.date) continue
+    /*
+     * Только отёлы: в таблице лежат ещё аборты и запуски. Здесь это
+     * важно всем четырём проверкам сразу — «ближайший предшествующий
+     * отёл» для осеменения, «раньше первого отёла» для дойки, дубли
+     * отёлов и двойня без двух телят. Разбор — в `lib/calving.ts`.
+     */
+    if (!isCalvingEvent(typeof c.eventType === 'string' ? c.eventType : null)) continue
     const calves = Array.isArray(c.calves)
       ? c.calves.map(relId).filter((x): x is number => x !== null)
       : []
