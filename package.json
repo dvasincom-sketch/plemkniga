@@ -48,6 +48,7 @@
     "import:fgias-return": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/import-fgias-return.ts",
     "check:fgias-export": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-fgias-export.ts",
     "check:schema": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-schema.ts",
+    "check:calving": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-calving.ts",
     "check:hooks": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-hooks.ts",
     "check:openapi": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-openapi.ts",
     "check:bulls": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-bulls.ts",

@@ -3,7 +3,7 @@ import type { Animal } from '@/payload-types'
 import type { CheckLimits, Issue } from '@/lib/checks-registry'
 import { defaultThresholds, type Thresholds } from '@/lib/check-thresholds'
 import { relId } from '@/lib/visibility'
-import { isCalvingEvent } from '@/lib/calving'
+import { birthCountIssue, isCalvingEvent } from '@/lib/calving'
 
 /**
  * Проверки, которые смотрят на события во времени.
@@ -69,6 +69,9 @@ type CalvingRow = {
   date: string
   number: number | null
   result?: string | null
+  liveHeifers?: number | null
+  liveBulls?: number | null
+  stillborn?: number | null
   dryOffDate?: string | null
   calves: number[]
 }
@@ -178,6 +181,9 @@ export async function sequenceIssues(
         date: c.date,
         number: typeof c.number === 'number' ? c.number : null,
         result: c.result,
+        liveHeifers: c.liveHeifers,
+        liveBulls: c.liveBulls,
+        stillborn: c.stillborn,
         dryOffDate: c.dryOffDate,
         calves,
       },
@@ -369,15 +375,21 @@ export async function sequenceIssues(
       }
 
       /*
-       * Пустой приплод — не расхождение, а отсутствие данных: телят
-       * часто не заводят карточками вовсе. Проверка молчит там, где
-       * сравнивать не с чем.
+       * Приплод против самого себя: тип рождения, три числа и карточки
+       * телят. Пустой приплод — не расхождение, а отсутствие данных:
+       * телят часто не заводят карточками вовсе, и проверка молчит там,
+       * где сравнивать не с чем. Разбор — в `lib/calving.ts`.
        */
-      if (c.result === 'twins' && linked.length > 0 && linked.length !== 2) {
+      const disagree = birthCountIssue(
+        c.result,
+        { liveHeifers: c.liveHeifers, liveBulls: c.liveBulls, stillborn: c.stillborn },
+        linked.length,
+      )
+      if (disagree) {
         push(
           animalId,
-          'twins-mismatch',
-          `Отёл ${asDate(c.date)} отмечен двойней, а в приплоде ${linked.length === 1 ? 'один телёнок' : `${linked.length} телят`}`,
+          'birth-count-mismatch',
+          `Отёл ${asDate(c.date)}: ${disagree}`,
           'calvings',
           'note',
         )

@@ -345,7 +345,7 @@ async function main() {
     base(ctx, 30, { ...parents }),                                                    // pregnancy-check-before-insemination
     base(ctx, 31, { ...parents }),                                                    // bull-born-later
     base(ctx, 32, { ...parents }),                                                    // calf-birth-vs-calving
-    base(ctx, 33, { ...parents }),                                                    // twins-mismatch
+    base(ctx, 33, { ...parents }),                                                    // birth-count-mismatch
     base(ctx, 34, { ...parents }),                                                    // milk-test-outside-lactation
 
     // Продуктивность
@@ -569,7 +569,7 @@ async function main() {
   await calving(at(67), 3, ymd(2024, 7, 1))
   await calving(at(29), 1, ymd(2023, 5, 1))                         // опора для insemination-too-soon
   await calving(at(32), 1, ymd(2023, 5, 1), { calves: [at(18)] })   // calf-birth-vs-calving
-  await calving(at(33), 1, ymd(2023, 5, 1), { result: 'twins', calves: [at(19)] }) // twins-mismatch
+  await calving(at(33), 1, ymd(2023, 5, 1), { result: 'twins', calves: [at(19)] }) // birth-count-mismatch
   await calving(at(34), 1, ymd(2023, 5, 1))                         // опора для milk-test-outside-lactation
 
   /*

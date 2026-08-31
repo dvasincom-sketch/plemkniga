@@ -607,7 +607,7 @@ async function main() {
     ])
   })
 
-  await plant(['twins-mismatch'], 'в отёле двойня, а телёнок записан один', async () => {
+  await plant(['birth-count-mismatch'], 'двойня, один телёнок и один живой в числах', async () => {
     const birth = yearsAgo(5)
     const mother = await withCalvings({ birth_date: birth }, [])
     const at = new Date(birth.getTime() + 900 * DAY)
@@ -616,6 +616,14 @@ async function main() {
       number: 1,
       date: at,
       result: 'twins',
+      /*
+       * Числа спорят с типом так же, как карточка: один живой плод
+       * при двойне. Стенд должен ловить и то и другое одной находкой —
+       * иначе непонятно, какое из трёх сравнений сработало.
+       */
+      live_heifers: 1,
+      live_bulls: 0,
+      stillborn: 0,
       milking_days: 305,
       ease: 'easy',
       updated_at: now,

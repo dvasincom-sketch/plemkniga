@@ -156,6 +156,122 @@ export const birthTypeOf = (counts: {
 }
 
 /**
+ * Приплод, записанный тремя способами, должен сходиться сам с собой.
+ *
+ * ## Три ответа на один вопрос
+ *
+ * Сколько родилось, книга знает трижды: типом рождения («Двойня»),
+ * числами живых тёлочек, бычков и мертворождённых, и карточками телят,
+ * связанными с отёлом. Три источника завелись в разное время и по разным
+ * поводам, и ни один не выводится из других надёжно: карточки заводят
+ * не на всех, числа проставляют не всегда, тип рождения переносили
+ * из прежней системы.
+ *
+ * Пока их было два, расхождение ловила проверка «Двойня без двух телят».
+ * Она уцелела при смене перечисления случайно — значение `twins`
+ * пережило переход, — и осталась единственной из семейства: тройня,
+ * множественные роды и все три числа не сверялись ни с чем.
+ *
+ * ## Почему одна проверка, а не три
+ *
+ * Расхождение здесь одно и то же по смыслу: «сколько же их было».
+ * Три проверки дали бы на одну неверную запись три находки — эксперт
+ * прочтёт первую и перестанет читать остальные. Поэтому функция
+ * возвращает первое несогласие и называет именно его.
+ *
+ * ## Порядок сравнений
+ *
+ * Сперва тип против чисел: оба — утверждения о самом отёле, и если они
+ * спорят, спорить с карточками бессмысленно. Потом карточки: их
+ * отсутствие — не ошибка, а обычное дело, поэтому пустой приплод
+ * не сравнивается вовсе.
+ *
+ * ## Чего функция не утверждает
+ *
+ * «Не определено» и «Множественные роды смешанного типа» ни с чем
+ * не спорят: первое — признание, что тип неизвестен, второе — значение,
+ * границы которого реестр не поясняет. Требовать от них согласия
+ * с числами значило бы выдумать смысл, которого никто не объявлял.
+ *
+ * Мертворождённые в число карточек не входят: карточку заводят живому,
+ * ради этого числа и заведены отдельно.
+ */
+export type BirthCounts = {
+  liveHeifers?: number | null
+  liveBulls?: number | null
+  stillborn?: number | null
+}
+
+/** Сколько плодов обещает тип рождения; `undefined` — не обещает точного числа. */
+const promisedBy = (result?: string | null): number | undefined =>
+  result === 'one' ? 1 : result === 'twins' ? 2 : result === 'triplets' ? 3 : undefined
+
+const plural = (n: number, one: string, few: string, many: string): string => {
+  const t = n % 100
+  if (t >= 11 && t <= 14) return many
+  const d = n % 10
+  return d === 1 ? one : d >= 2 && d <= 4 ? few : many
+}
+
+export const birthCountIssue = (
+  result: string | null | undefined,
+  counts: BirthCounts,
+  /** Сколько карточек телят связано с отёлом; `null` — не смотрим. */
+  calves: number | null,
+): string | null => {
+  const has = (v: unknown) => typeof v === 'number' && Number.isFinite(v)
+  const n = (v: unknown) => (has(v) ? (v as number) : 0)
+
+  const counted = has(counts.liveHeifers) || has(counts.liveBulls) || has(counts.stillborn)
+  const total = n(counts.liveHeifers) + n(counts.liveBulls) + n(counts.stillborn)
+  const live = n(counts.liveHeifers) + n(counts.liveBulls)
+
+  const soft = result === 'unknown' || result === 'multipleMixed'
+
+  /* --- Тип рождения против чисел --- */
+
+  if (result && counted && !soft) {
+    const derived = birthTypeOf(counts)
+    if (derived && derived !== result) {
+      const label = birthTypeLabel(result).toLowerCase()
+      return (
+        `тип рождения «${label}», а в числах ${total} ` +
+        `${plural(total, 'плод', 'плода', 'плодов')}`
+      )
+    }
+  }
+
+  /* --- Карточки телят --- */
+
+  if (calves !== null && calves > 0) {
+    /*
+     * Числа надёжнее типа: они говорят о живых прямо, а тип — обо всех
+     * плодах вместе. Поэтому при заполненных числах сравниваем с ними,
+     * и только при пустых — с типом.
+     */
+    if (counted) {
+      if (calves !== live) {
+        return (
+          `связано ${calves} ${plural(calves, 'телёнок', 'телёнка', 'телят')}, ` +
+          `а живых по числам ${live}`
+        )
+      }
+    } else {
+      const promised = promisedBy(result)
+      if (promised !== undefined && calves !== promised) {
+        const label = birthTypeLabel(result).toLowerCase()
+        return (
+          `тип рождения «${label}», а связано ${calves} ` +
+          `${plural(calves, 'телёнок', 'телёнка', 'телят')}`
+        )
+      }
+    }
+  }
+
+  return null
+}
+
+/**
  * Лёгкость родов — справочник `sp_ease_of_childbirth`, пять значений.
  *
  * ## Почему у нас три, а у реестра пять
