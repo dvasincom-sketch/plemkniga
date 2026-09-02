@@ -32,7 +32,22 @@ import Link from 'next/link'
  * и то же, и копировать его в два файла значило бы получить две разные
  * страницы «не найдено» через месяц.
  */
-export function NotFoundContent() {
+export function NotFoundContent({ mail }: { mail?: string }) {
+  /*
+   * Почта приходит свойством, а не читается здесь из книги.
+   *
+   * Первая редакция читала: `currentTenant()` смотрит заголовок запроса,
+   * а заголовок делает страницу динамической. Для страницы внутри
+   * приложения это ничего не стоит, но эта же разметка стоит и в корневой
+   * `app/not-found.tsx` — той, что собирается заранее и нарочно ни от чего
+   * не зависит («минимум, который не может сломаться»). Обращение
+   * к заголовкам из статически собираемой страницы валит сборку, и увидеть
+   * это можно только на `npm run build`, а не на `tsc`.
+   *
+   * Поэтому решает вызывающий. Внутри приложения книга известна и адрес
+   * подставляется; на корневой странице его нет — и предложение написать
+   * попросту исчезает, вместо того чтобы звать на чужой ящик.
+   */
   return (
     <div className="mx-auto max-w-[70ch] py-16">
       <p className="text-[13px] uppercase tracking-[0.09em] text-ink-500">Страница не найдена</p>
@@ -95,14 +110,18 @@ export function NotFoundContent() {
       </ul>
 
       <p className="mt-8 text-[14px] leading-relaxed text-ink-500">
-        Если сюда привела ссылка из письма Ассоциации, напишите на{' '}
-        <a
-          href="mailto:info@holstein-russia.ru"
-          className="underline underline-offset-4 hover:text-forest-500"
-        >
-          info@holstein-russia.ru
-        </a>{' '}
-        — ссылку поправят.
+        {mail ? (
+          <>
+            Если сюда привела ссылка из письма, напишите на{' '}
+            <a
+              href={`mailto:${mail}`}
+              className="underline underline-offset-4 hover:text-forest-500"
+            >
+              {mail}
+            </a>{' '}
+            — ссылку поправят.
+          </>
+        ) : null}
       </p>
     </div>
   )

@@ -1,3 +1,4 @@
+import { currentTenant } from '@/lib/tenant-server'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { SiteHeader } from '@/components/SiteHeader'
@@ -129,7 +130,21 @@ export default async function EvolutionPage({
   searchParams: Promise<{ tab?: string; change?: string }>
 }) {
   const { tab: tabParam, change } = await searchParams
-  const tab: TabKey = TABS.some((t) => t.key === tabParam) ? (tabParam as TabKey) : 'versions'
+
+  /*
+   * Вкладка государственного реестра существует не у всякой книги.
+   * Убирается она из самого списка, а не прячется при отрисовке: иначе
+   * адрес `?tab=fgias` открывался бы напрямую, и посторонний получил бы
+   * раздел про российский реестр в книге, которая ему не подчиняется.
+   *
+   * Из отсеянного списка вкладка не выбирается и подстановкой в адрес:
+   * `tab` сверяется по этому же списку и неизвестное значение падает
+   * на «Версии».
+   */
+  const { state } = await currentTenant()
+  const tabs = TABS.filter((t) => t.key !== 'fgias' || state === 'fgias')
+
+  const tab: TabKey = tabs.some((t) => t.key === tabParam) ? (tabParam as TabKey) : 'versions'
 
   /*
    * Замеры читаются только на своей вкладке. Страница открыта всем,
@@ -169,7 +184,7 @@ export default async function EvolutionPage({
           aria-label="Разделы страницы"
           className="mt-8 flex flex-wrap gap-2 text-[14px]"
         >
-          {TABS.map((t) => (
+          {tabs.map((t) => (
             <Link
               key={t.key}
               href={`/evolution?tab=${t.key}`}

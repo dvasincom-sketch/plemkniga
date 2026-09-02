@@ -1,3 +1,4 @@
+import { currentTenant } from '@/lib/tenant-server'
 import { NextResponse } from 'next/server'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { toXlsx } from '@/lib/xlsx'
@@ -82,6 +83,19 @@ import { birthTypeOf, birthTypeUuid, calvingEaseUuid, calvingEventUuid } from '@
  */
 
 export async function GET(request: Request) {
+  /*
+   * Государственный реестр — обязанность конкретной страны, а не свойство
+   * племенного учёта. У книги без такой обязанности выгрузки быть не должно:
+   * шаблоны российские, поля российские, и отдать их наружу значило бы
+   * выдать чужие правила за общие.
+   *
+   * Заслонка стоит здесь, а не только на карточке в кабинете. Кнопку можно
+   * убрать со страницы, а адрес останется — и откроется по прямому
+   * обращению. Прятать вход, оставляя дверь, — не защита, а вид защиты.
+   */
+  const { state } = await currentTenant()
+  if (state !== 'fgias') return new NextResponse('Not found', { status: 404 })
+
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ error: 'Требуется авторизация' }, { status: 401 })
 

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Logo } from './Logo'
+import { currentTenant } from '@/lib/tenant-server'
 
 /**
  * Подвал сайта.
@@ -12,7 +13,23 @@ import { Logo } from './Logo'
  * Тёмная полоса внизу решает обе задачи сразу — она одинакова везде
  * и однозначно говорит, что содержимое закончилось.
  */
-export function SiteFooter() {
+export async function SiteFooter() {
+  /*
+   * Реквизиты берутся у книги, а не вписаны сюда.
+   *
+   * Адрес, телефон и правовые документы называют конкретное юридическое
+   * лицо. У показательной книги этого лица нет, и выдумывать его нельзя:
+   * страница, которая показывает, как ведут учёт племенных животных,
+   * держится на доверии — придуманный адрес в подвале рушит ровно то,
+   * ради чего её открыли.
+   *
+   * Поэтому колонки не заменяются заглушками, а исчезают. Пустая колонка
+   * «Адрес» без адреса выглядит поломкой; отсутствующая — просто говорит,
+   * что адреса нет.
+   */
+  const { org, legal } = await currentTenant()
+  const columns = [org.address, org.phone ?? org.mail, org.telegram].filter(Boolean).length
+
   // Отступ сверху берётся из общей переменной: та же величина нужна заливке
   // страницы «не своего» животного, чтобы фон доходил до подвала без разрыва
   return (
@@ -20,7 +37,17 @@ export function SiteFooter() {
       style={{ marginTop: 'var(--footer-air)' }}
       className="bg-basement py-12 text-white"
     >
-      <div className="container-page grid grid-cols-1 gap-10 md:grid-cols-[1.2fr_1fr_1fr_1fr]">
+      <div
+        className="container-page grid grid-cols-1 gap-10"
+        /*
+           Сетка считается по числу непустых колонок: жёсткие
+           `md:grid-cols-[1.2fr_1fr_1fr_1fr]` растянули бы знак на
+           три четверти ширины, когда колонок осталась одна.
+        */
+        style={{
+          gridTemplateColumns: `1.2fr ${'1fr '.repeat(columns)}`.trim(),
+        }}
+      >
         <div className="flex flex-col items-start gap-4">
           {/*
              Под логотипом раньше висела ссылка на политику конфиденциальности.
@@ -31,32 +58,40 @@ export function SiteFooter() {
           <Logo onDark />
         </div>
 
-        <div>
-          <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-white/60">Адрес</h3>
-          <p className="text-sm leading-relaxed text-white/90">
-            443109, Россия, Самарская область, город Самара, улица Металлургическая, 92
-          </p>
-        </div>
+        {org.address && (
+          <div>
+            <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-white/60">Адрес</h3>
+            <p className="text-sm leading-relaxed text-white/90">{org.address}</p>
+          </div>
+        )}
 
         <div>
           <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-white/60">Контакты</h3>
           <p className="text-sm leading-relaxed text-white/90">
-            <a href="tel:+78469312595" className="transition-colors hover:text-brand-400">
-              +7 846 931 25 95
-            </a>
-            <br />
-            <a href="mailto:info@holstein-russia.ru" className="transition-colors hover:text-brand-400">
-              info@holstein-russia.ru
+            {org.phone && (
+              <>
+                <a
+                  href={`tel:${org.phone.href}`}
+                  className="transition-colors hover:text-brand-400"
+                >
+                  {org.phone.text}
+                </a>
+                <br />
+              </>
+            )}
+            <a href={`mailto:${org.mail}`} className="transition-colors hover:text-brand-400">
+              {org.mail}
             </a>
           </p>
         </div>
 
+        {org.telegram && (
         <div>
           <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-white/60">
             Служба поддержки
           </h3>
           <a
-            href="https://t.me/"
+            href={org.telegram}
             className="inline-flex text-white transition-colors hover:text-brand-400"
             aria-label="Telegram"
           >
@@ -68,6 +103,7 @@ export function SiteFooter() {
             </svg>
           </a>
         </div>
+        )}
       </div>
 
       {/*
@@ -171,18 +207,27 @@ export function SiteFooter() {
           >
             Аукционы
           </Link>
-          <Link
-            href="/privacy"
-            className="text-[13px] text-white/50 underline underline-offset-4 transition-colors hover:text-white"
-          >
-            Политика конфиденциальности
-          </Link>
-          <Link
-            href="/data-policy"
-            className="text-[13px] text-white/50 underline underline-offset-4 transition-colors hover:text-white"
-          >
-            Политика обработки
-          </Link>
+          {/*
+             Правовые документы — только у книги, за которой стоит
+             юридическое лицо. Показывать их от чужого имени значило бы
+             дать обещание об обработке данных за того, кто его не давал.
+          */}
+          {legal && (
+            <>
+              <Link
+                href="/privacy"
+                className="text-[13px] text-white/50 underline underline-offset-4 transition-colors hover:text-white"
+              >
+                Политика конфиденциальности
+              </Link>
+              <Link
+                href="/data-policy"
+                className="text-[13px] text-white/50 underline underline-offset-4 transition-colors hover:text-white"
+              >
+                Политика обработки
+              </Link>
+            </>
+          )}
         </nav>
       </div>
     </footer>

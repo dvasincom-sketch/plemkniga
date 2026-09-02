@@ -1,14 +1,26 @@
 import Link from 'next/link'
 import { findPublicAsset } from '@/lib/media'
+import { currentTenant } from '@/lib/tenant-server'
 
 /**
- * Знак Ассоциации производителей КРС голштинской породы.
+ * Знак организации, ведущей книгу.
  *
  * Положите свой логотип в `public/logo.svg` (или .png/.webp) — он подхватится
  * автоматически и заменит встроенную заглушку. Высота задаётся классом,
  * ширина подстраивается по пропорциям файла.
+ *
+ * Имя больше не вписано в разметку: знак стоит на каждой странице обеих
+ * книг, и вписанное имя означало бы, что показательная книга подписана
+ * голштинской ассоциацией — на каждой странице разом.
+ *
+ * Российский триколор в запасном рисунке рисуется только для книги
+ * с государственным учётом. Это не украшение: полоса говорит о стране,
+ * и в книге, у которой государственного реестра нет вовсе, она сообщала бы
+ * неправду. Условие поставлено по `state`, а не по ключу книги, — потому
+ * что связь именно такая, и следующая книга со своим реестром получит
+ * верное поведение сама.
  */
-export function Logo({
+export async function Logo({
   className = '',
   onDark = false,
   href = '/',
@@ -37,6 +49,7 @@ export function Logo({
   label?: string
 }) {
   const custom = findPublicAsset('logo')
+  const t = await currentTenant()
 
   return (
     <Link
@@ -50,7 +63,7 @@ export function Logo({
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={custom}
-          alt="Ассоциация производителей КРС голштинской породы"
+          alt={t.org.full}
           className="h-[42px] w-auto"
         />
       ) : (
@@ -72,7 +85,9 @@ export function Logo({
               fill="#17181A"
               opacity=".25"
             />
-            {/* триколор */}
+            {/* триколор — только у книги с государственным учётом */}
+            {t.state === 'fgias' && (
+              <>
             <rect
               x="6"
               y="29.6"
@@ -85,13 +100,16 @@ export function Logo({
             />
             <rect x="16.6" y="29.6" width="10.6" height="1.5" rx=".75" fill="#0039A6" />
             <rect x="27.2" y="29.6" width="10.6" height="1.5" rx=".75" fill="#D52B1E" />
+              </>
+            )}
           </svg>
           <span className="hidden text-[8.5px] font-bold uppercase leading-[1.35] tracking-[0.02em] text-ink-900 sm:block">
-            Ассоциация
-            <br />
-            производителей КРС
-            <br />
-            голштинской породы
+            {t.org.mark.map((line, i) => (
+              <span key={line}>
+                {i > 0 && <br />}
+                {line}
+              </span>
+            ))}
           </span>
         </>
       )}

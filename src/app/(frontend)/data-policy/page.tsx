@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { notFound } from 'next/navigation'
+import { currentTenant } from '@/lib/tenant-server'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 
@@ -18,7 +20,21 @@ export const metadata: Metadata = { title: 'Политика обработки 
  * юрист. Заглушка честно об этом говорит — страница, которая молчит
  * о своей неготовности, вводит в заблуждение сильнее, чем её отсутствие.
  */
-export default function DataPolicyPage() {
+export default async function DataPolicyPage() {
+  /*
+ * Документ принадлежит одному юридическому лицу и называет его поимённо.
+ *
+ * У книги без такого лица его не должно быть вовсе — и не «пустым»,
+ * а отсутствующим: страница с чужой политикой обработки данных есть
+ * обещание, данное от чужого имени, и оно хуже отсутствующего обещания.
+ *
+ * Подставлять сюда имя из настройки было бы ещё хуже: получилась бы
+ * готовая политика с чужим текстом и своим именем на ней — то есть
+ * документ, которого никто не писал.
+ */
+  const { legal } = await currentTenant()
+  if (!legal) notFound()
+
   return (
     <>
       <SiteHeader />

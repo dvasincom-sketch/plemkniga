@@ -1,3 +1,4 @@
+import { currentTenant } from '@/lib/tenant-server'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
@@ -106,6 +107,7 @@ export default async function CertificatePage({
 
   const user = await getCurrentUser()
   const payload = await getClient()
+  const tenant = await currentTenant()
 
   let animal: Animal | null = null
   try {
@@ -240,10 +242,11 @@ export default async function CertificatePage({
         {/* --------------------------- Шапка бланка -------------------------- */}
         <header className="border-b-2 border-ink-900 pb-4">
           <p className="text-[13px] leading-snug text-ink-700">
-            Ассоциация производителей КРС голштинской породы
+            {tenant.org.full}
             <br />
-            443109, Самарская обл., г. Самара, ул. Металлургическая, 92 · +7 846 931-25-95 ·
-            info@holstein-russia.ru
+            {[tenant.org.address, tenant.org.phone?.text, tenant.org.mail]
+              .filter(Boolean)
+              .join(' · ')}
           </p>
 
           <div className="mt-4 flex flex-wrap items-start justify-between gap-x-6 gap-y-3">

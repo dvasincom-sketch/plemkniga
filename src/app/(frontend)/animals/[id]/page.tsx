@@ -1,3 +1,4 @@
+import { currentTenant } from '@/lib/tenant-server'
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
@@ -339,6 +340,7 @@ export default async function AnimalPage({
   const manage: 'visibility' | 'archive' | null =
     manageParam === 'visibility' || manageParam === 'archive' ? manageParam : null
 
+  const tenant = await currentTenant()
   const user = await getCurrentUser()
   const viewer = viewerOf(user)
   const payload = await getClient()
@@ -2225,12 +2227,26 @@ export default async function AnimalPage({
                  * пока хозяйство не сдало «Основные сведения»,
                  * и это нормальное состояние, а не пробел.
                  */
-                { label: 'УНСМ (номер средства маркирования)', value: animal.fgias?.unsm || '' },
-                { label: 'Базовый номер ФГИАС ПР', value: animal.fgias?.baseUuid || '' },
-                {
-                  label: 'Регистрационный номер ФГИАС ПР',
-                  value: animal.fgias?.registrationUuid || '',
-                },
+                /*
+                 * Номера государственного реестра показываются только
+                 * в книге, которая этому реестру подчиняется. У прочих
+                 * они не «пустые», а бессмысленные: строка «Базовый номер
+                 * ФГИАС ПР» в книге вне России заставляет зоотехника
+                 * искать, где этот номер взять, — и он его не найдёт.
+                 */
+                ...(tenant.state === 'fgias'
+                  ? [
+                      {
+                        label: 'УНСМ (номер средства маркирования)',
+                        value: animal.fgias?.unsm || '',
+                      },
+                      { label: 'Базовый номер ФГИАС ПР', value: animal.fgias?.baseUuid || '' },
+                      {
+                        label: 'Регистрационный номер ФГИАС ПР',
+                        value: animal.fgias?.registrationUuid || '',
+                      },
+                    ]
+                  : []),
               ]}
             />
 

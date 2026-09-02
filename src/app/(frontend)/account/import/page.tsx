@@ -1,3 +1,4 @@
+import { currentTenant } from '@/lib/tenant-server'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
@@ -44,6 +45,7 @@ export const dynamic = 'force-dynamic'
  * разойтись с действительностью не могут.
  */
 export default async function ImportPage() {
+  const { state } = await currentTenant()
   const user = await getCurrentUser()
   // Кабинет хозяйства — не для сотрудника Ассоциации: у него свой раздел
   denyAssociation(user)
@@ -107,7 +109,13 @@ export default async function ImportPage() {
               datasets={DATASETS.map((d) => ({ value: d.key, label: d.label, hint: d.hint }))}
             />
             <ExportCard />
-            <FgiasExportCard />
+            {/*
+               Выгрузка во ФГИАС ПР — только у книги с государственной
+               обязанностью отчитываться. Не «скрыта», а отсутствует:
+               карточка с недоступной кнопкой обещает возможность, которой
+               нет, и хозяйство будет искать, почему она не работает.
+            */}
+            {state === 'fgias' && <FgiasExportCard />}
           </div>
 
           {/* --------------------- Что понимает система --------------------- */}

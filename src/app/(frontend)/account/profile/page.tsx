@@ -1,3 +1,4 @@
+import { currentTenant } from '@/lib/tenant-server'
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { SiteHeader } from '@/components/SiteHeader'
@@ -221,7 +222,14 @@ export default async function ProfilePage({
  * честно объясняет, за что здесь будет счёт, чтобы к моменту запуска
  * это не стало сюрпризом.
  */
-function BillingTab() {
+async function BillingTab() {
+  /*
+   * Книга читается здесь, а не передаётся из страницы: вкладка —
+   * единственное место, где нужны реквизиты, и тянуть их через свойство
+   * значило бы, что о них знает и страница, которой они не нужны.
+   */
+  const tenant = await currentTenant()
+
   const services = [
     {
       title: 'Выпуск племенных документов',
@@ -267,7 +275,8 @@ function BillingTab() {
       </ul>
 
       <p className="mt-6 text-[14px] leading-relaxed text-ink-500">
-        Вопросы по членству и взносам — в Ассоциацию: info@holstein-russia.ru, +7 846 931-25-95.
+        Вопросы по членству и взносам — в {tenant.org.short}: {tenant.org.mail}
+        {tenant.org.phone ? `, ${tenant.org.phone.text}` : ''}.
       </p>
     </div>
   )
