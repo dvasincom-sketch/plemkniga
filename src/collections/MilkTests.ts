@@ -1,7 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { isAdmin, isAuthenticated, animalScopedReadFor, animalScopedMutate } from '@/access'
 import { requireOwnAnimal, stampOwnerOrg } from '@/access/guards'
-import { ownerOrgField } from '@/collections/shared'
+import { ownerOrgField, adeOriginField } from '@/collections/shared'
 
 /**
  * Контрольные дойки.
@@ -84,6 +84,7 @@ export const MilkTests: CollectionConfig = {
         },
       ],
     },
+    adeOriginField,
   ],
   hooks: {
     beforeChange: [requireOwnAnimal, stampOwnerOrg],

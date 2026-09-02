@@ -72,6 +72,22 @@ export const SCHEME = {
 } as const
 
 /** Источник данных в `meta.source`: обратный домен системы, а не URL. */
+/** Коллекции ADE, которые книга отдаёт. Имена — из `url-schemes` спецификации. */
+export const ADE_COLLECTIONS = [
+  'animals',
+  'test-day-results',
+  'parturitions',
+  'inseminations',
+  'type-classifications',
+  'weights',
+  'breeding-values',
+] as const
+
+export type AdeCollectionName = (typeof ADE_COLLECTIONS)[number]
+
+export const isAdeCollection = (v: string): v is AdeCollectionName =>
+  (ADE_COLLECTIONS as readonly string[]).includes(v)
+
 export const ADE_SOURCE = 'ru.holstein-russia.plemkniga'
 
 /** Версия спецификации, по которой собран ответ. */

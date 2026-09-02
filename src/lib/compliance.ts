@@ -1,4 +1,3 @@
-import { ICAR_GAP_COUNT, ICAR_WITH_GAPS } from '@/lib/icar-map'
 /**
  * Реестр соответствия: чему книга следует и чем это подтверждается.
  *
@@ -43,6 +42,8 @@ import { ICAR_GAP_COUNT, ICAR_WITH_GAPS } from '@/lib/icar-map'
  * `docs/mezhdunarodnye-standarty.md` — разбор, откуда взяты оценки,
  * `docs/mezhdunarodnyy-plan.md` — что и в каком порядке делать дальше.
  */
+
+import { ICAR_GAP_COUNT, ICAR_WITH_GAPS } from '@/lib/icar-map'
 
 export type ComplianceState = 'done' | 'partial' | 'planned' | 'blocked' | 'out'
 

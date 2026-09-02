@@ -1,7 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { isAdmin, isAuthenticated, animalScopedReadFor, animalScopedMutate } from '@/access'
 import { requireOwnAnimal, stampOwnerOrg } from '@/access/guards'
-import { ownerOrgField } from '@/collections/shared'
+import { ownerOrgField, adeOriginField } from '@/collections/shared'
 
 /**
  * Осеменения — отдельная сущность.
@@ -117,6 +117,7 @@ export const Inseminations: CollectionConfig = {
         { value: 'api', label: 'API / вебхук' },
       ],
     },
+    adeOriginField,
   ],
   hooks: {
     beforeChange: [requireOwnAnimal, stampOwnerOrg],

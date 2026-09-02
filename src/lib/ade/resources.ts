@@ -307,7 +307,51 @@ export function adeParturition(c: CalvingInput): AdeEvent & Record<string, unkno
      */
     liveProgeny: known ? live : undefined,
     totalProgeny: known ? live + still : undefined,
+    /*
+     * Перечень приплода — вдобавок к числам, а не вместо них.
+     *
+     * Числа отвечают на вопрос «сколько», и стандарт держит их именно
+     * для случая, когда телята не идентифицированы, — наш случай.
+     * Но пол в числах не виден: `liveProgeny: 2` не говорит, тёлочки
+     * это или бычки, и приняв такой отёл обратно, мы не смогли бы
+     * восстановить то, что сами же знали.
+     *
+     * Поймал это круговой прогон `check:ade-accept`: своя выгрузка
+     * не прошла свой приём, потому что пола в ней попросту не было.
+     *
+     * Поле называется `progenyDetails`. Соседнее `progeny` в 1.5
+     * помечено устаревшим, и писать в него — закладывать поломку
+     * на версию вперёд.
+     */
+    progenyDetails: known ? progenyDetails(c) : undefined,
   })
+}
+
+/**
+ * Перечень приплода из наших трёх чисел.
+ *
+ * Записи безымянные: идентификаторов телят у нас на этот момент нет,
+ * и выдумывать их нельзя. Стандарт этого и не требует — он просит
+ * «как минимум пол и статус», а это ровно то, что мы знаем.
+ *
+ * Мертворождённые идут без пола: в книге он не записан, и подставлять
+ * его значило бы сообщить пол, которого мы не знаем, ради красоты
+ * перечня.
+ */
+function progenyDetails(c: CalvingInput): Record<string, unknown>[] {
+  const out: Record<string, unknown>[] = []
+
+  for (let i = 0; i < (c.liveHeifers ?? 0); i += 1) {
+    out.push({ gender: 'Female', birthStatus: 'Alive' })
+  }
+  for (let i = 0; i < (c.liveBulls ?? 0); i += 1) {
+    out.push({ gender: 'Male', birthStatus: 'Alive' })
+  }
+  for (let i = 0; i < (c.stillborn ?? 0); i += 1) {
+    out.push({ birthStatus: 'Stillborn' })
+  }
+
+  return out
 }
 
 /* ------------------------------------------------------------------ *

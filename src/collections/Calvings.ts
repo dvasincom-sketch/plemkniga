@@ -1,7 +1,7 @@
 import type { CollectionConfig, CollectionAfterChangeHook } from 'payload'
 import { isAdmin, isAuthenticated, animalScopedReadFor, animalScopedMutate } from '@/access'
 import { requireOwnAnimal, stampOwnerOrg } from '@/access/guards'
-import { ownerOrgField } from '@/collections/shared'
+import { ownerOrgField, adeOriginField } from '@/collections/shared'
 import { raiseAgeGroup } from '@/lib/age-group'
 import type { AgeGroup } from '@/lib/dictionaries'
 import { BIRTH_TYPES, CALVING_EASE, CALVING_EVENTS, CALVING_RESULTS } from '@/lib/calving'
@@ -265,5 +265,6 @@ export const Calvings: CollectionConfig = {
       label: 'Полученный приплод',
     },
     { name: 'comment', type: 'textarea', label: 'Комментарий' },
+    adeOriginField,
   ],
 }

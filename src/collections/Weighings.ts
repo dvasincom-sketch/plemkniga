@@ -1,7 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { isAdmin, isAuthenticated, animalScopedReadFor, animalScopedMutate } from '@/access'
 import { requireOwnAnimal, stampOwnerOrg } from '@/access/guards'
-import { ownerOrgField } from '@/collections/shared'
+import { ownerOrgField, adeOriginField } from '@/collections/shared'
 import { WEIGHING_SIGNS } from '@/lib/weighing'
 
 /**
@@ -113,6 +113,7 @@ export const Weighings: CollectionConfig = {
       ],
     },
     { name: 'note', type: 'textarea', label: 'Примечание' },
+    adeOriginField,
   ],
   hooks: {
     /*

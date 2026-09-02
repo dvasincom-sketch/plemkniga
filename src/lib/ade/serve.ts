@@ -38,21 +38,23 @@ import type { User } from '@/payload-types'
  * подставить чужой номер в адрес, чтобы прочитать чужое стадо.
  */
 
-/** Коллекции ADE, которые книга отдаёт. Имена — из `url-schemes` спецификации. */
-export const ADE_COLLECTIONS = [
-  'animals',
-  'test-day-results',
-  'parturitions',
-  'inseminations',
-  'type-classifications',
-  'weights',
-  'breeding-values',
-] as const
+/*
+ * Список коллекций переехал в `core.ts` и отсюда только переизлучается.
+ *
+ * Причина не в опрятности. Этот файл ходит в базу и тянет за собой
+ * весь Payload; всякий, кому нужен просто перечень имён — проверка
+ * разбора, описание интерфейса, страница соответствия, — поднимал вместе
+ * с ним подключение к базе. Дешёвая проверка становилась дорогой
+ * и переставала запускаться.
+ *
+ * Переизлучение оставлено ради тех, кто уже берёт список отсюда:
+ * менять десяток мест ради переезда одной константы дороже, чем
+ * оставить одну строку.
+ */
+export { ADE_COLLECTIONS, isAdeCollection, type AdeCollectionName } from '@/lib/ade/core'
 
-export type AdeCollectionName = (typeof ADE_COLLECTIONS)[number]
-
-export const isAdeCollection = (v: string): v is AdeCollectionName =>
-  (ADE_COLLECTIONS as readonly string[]).includes(v)
+/* Для собственного употребления в этом файле — переизлучение типа не вводит имя. */
+import type { AdeCollectionName } from '@/lib/ade/core'
 
 /**
  * Сколько отдаём за раз.
