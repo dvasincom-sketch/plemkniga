@@ -1,0 +1,25 @@
+{
+  "description": "The do not breed event records an observation that an animal has been assigned not to be bred. There are no other parameters.",
+
+  "allOf": [{
+      "$ref": "../resources/icarAnimalEventCoreResource.json"
+    },
+    {
+      "type": "object",
+      "properties": {
+        "doNotBreed": {
+          "type": ["boolean", "null"],
+          "description": "Set this attribute to true if the animal should not be bred, false if it may now be bred.",
+          "default": true
+        },
+        "extendedReasons": {
+          "description": "Extended reason codes why this animal should not be bred.",
+          "type": "array",
+          "items": {
+            "$ref": "../types/icarReasonIdentifierType.json"
+          }
+        }
+      }
+    }
+  ]
+}

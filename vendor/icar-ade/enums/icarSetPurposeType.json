@@ -1,0 +1,19 @@
+{
+    "description": "Describes the purpose of a set of animals.",
+  
+    "type": "string",
+  
+    "enum": [
+      "Enclosure",
+      "Feeding",
+      "Finishing",
+      "Growing",
+      "Health",
+      "Lactation",
+      "Movement",
+      "Rearing",
+      "Reproduction",
+      "Session",
+      "Other"
+    ]
+  }

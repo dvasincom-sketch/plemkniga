@@ -339,16 +339,36 @@ export function adeParturition(c: CalvingInput): AdeEvent & Record<string, unkno
  * перечня.
  */
 function progenyDetails(c: CalvingInput): Record<string, unknown>[] {
+  /*
+   * `resourceType` и `specie` обязательны, и это не наша прихоть:
+   * `icarProgenyDetailsResource` наследует `icarAnimalBaseResource`,
+   * а тот требует вид и род ресурса у каждого потомка.
+   *
+   * Первая редакция клала только пол и статус — по памяти о том, что
+   * «стандарт просит как минимум пол и статус». Просит-то он это,
+   * но поверх обязательных полей предка. Поймала сверка с настоящими
+   * схемами на первом же запуске; наша собственная проверка пройти
+   * мимо этого была обязана — она не знала про предка вовсе.
+   */
+  const base = { resourceType: 'icarProgenyDetailsResource', specie: 'Cattle' }
+
   const out: Record<string, unknown>[] = []
 
   for (let i = 0; i < (c.liveHeifers ?? 0); i += 1) {
-    out.push({ gender: 'Female', birthStatus: 'Alive' })
+    out.push({ ...base, gender: 'Female', birthStatus: 'Alive' })
   }
   for (let i = 0; i < (c.liveBulls ?? 0); i += 1) {
-    out.push({ gender: 'Male', birthStatus: 'Alive' })
+    out.push({ ...base, gender: 'Male', birthStatus: 'Alive' })
   }
   for (let i = 0; i < (c.stillborn ?? 0); i += 1) {
-    out.push({ birthStatus: 'Stillborn' })
+    /*
+     * Пол мертворождённого в книге не записан, а поле обязательно.
+     * `Unknown` — не заглушка, а ровно то, что есть: значение в списке
+     * стандарта существует именно для этого случая. Поставить сюда
+     * `Female` ради заполненности значило бы сообщить пол, которого
+     * никто не определял.
+     */
+    out.push({ ...base, gender: 'Unknown', birthStatus: 'Stillborn' })
   }
 
   return out

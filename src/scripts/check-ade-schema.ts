@@ -78,16 +78,30 @@ if (!existsSync(VENDOR)) {
   process.exit(1)
 }
 
-/* Все схемы копии — в один разбор. */
+/*
+ * В разбор идут только каталоги схем.
+ *
+ * В копии лежит ещё `url-schemes/` — это документы OpenAPI, а не JSON
+ * Schema: у них свой корень с `paths` и `components`, и Ajv, приняв
+ * их за схемы, объявил бы годным почти любой документ. Проверка стала бы
+ * мягче ровно там, где заводилась ради строгости.
+ *
+ * Их читает отдельный прогон — сверка списка адресов.
+ */
+const SCHEMA_DIRS = ['resources', 'types', 'enums', 'collections']
+
 const files: string[] = []
 const walk = (p: string) => {
   if (statSync(p).isDirectory()) {
     for (const e of readdirSync(p)) walk(join(p, e))
     return
   }
-  if (p.endsWith('.json') && !p.endsWith('SOURCE.json')) files.push(p)
+  if (p.endsWith('.json')) files.push(p)
 }
-walk(VENDOR)
+for (const dir of SCHEMA_DIRS) {
+  const full = join(VENDOR, dir)
+  if (existsSync(full)) walk(full)
+}
 
 const ajv = new Ajv2020({
   /*
@@ -254,9 +268,47 @@ const CASES: [name: string, schema: string, resource: Record<string, unknown>][]
   ],
 ]
 
+/* ------------------------------------------------------------------ *
+ *  Известные дефекты самих схем ICAR                                 *
+ * ------------------------------------------------------------------ */
+
+/*
+ * Третий случай, которого не было в замысле.
+ *
+ * Расхождение со схемой мыслилось двояким: либо наша ошибка, либо
+ * изменение стандарта, и оба принимаются руками. Первый же запуск
+ * показал третий: **ошибка в самой схеме**.
+ *
+ * `icarTypeClassificationEventResource` объявляет обязательными `score`
+ * и `traitScored`, но не определяет их — ни у себя, ни у предков.
+ * Оба поля живут в `icarConformationScoreType`, откуда список
+ * обязательных, судя по всему, и скопировали, разделяя событие на два
+ * ресурса: `icarConformationScoreEventResource` — одна оценка одного
+ * признака, `icarTypeClassificationEventResource` — набор оценок
+ * в массиве `conformationScores`.
+ *
+ * Схему в таком виде не выполнить ничем: обязательное поле, которого
+ * в схеме нет, не может быть заполнено правильно. Подставить `score`
+ * и `traitScored` на уровне события — соврать: у классификации,
+ * состоящей из тридцати признаков, нет одного «того самого» балла.
+ *
+ * Поэтому исключение, а не подгонка. Условие у исключения жёсткое:
+ * оно снимает **только названные** поля и только у названного ресурса.
+ * Любое другое расхождение по этому же ресурсу пройдёт как обычно.
+ */
+const KNOWN_DEFECTS: Record<string, { fields: string[]; why: string }> = {
+  icarTypeClassificationEventResource: {
+    fields: ['score', 'traitScored'],
+    why:
+      'обязательные поля не определены ни в самой схеме, ни у предков — ' +
+      'список required скопирован из icarConformationScoreType',
+  },
+}
+
 /* ------------------------------------------------------------------ */
 
 let checked = 0
+let excused = 0
 
 for (const [name, schemaName, resource] of CASES) {
   const id = `${BASE}resources/${schemaName}.json`
@@ -275,13 +327,40 @@ for (const [name, schemaName, resource] of CASES) {
   checked += 1
 
   if (!validate(resource)) {
+    const defect = KNOWN_DEFECTS[schemaName]
+
     for (const e of validate.errors ?? []) {
+      /*
+       * Снимается только «нет обязательного поля» и только для полей,
+       * названных в дефекте. Ошибка типа или лишнее свойство по тому же
+       * ресурсу пройдёт как обычно: исключение сделано под конкретную
+       * поломку схемы, а не под ресурс целиком.
+       */
+      const missing =
+        e.keyword === 'required'
+          ? String((e.params as { missingProperty?: string }).missingProperty ?? '')
+          : ''
+
+      if (defect && missing && defect.fields.includes(missing)) {
+        excused += 1
+        continue
+      }
+
       fail(`${name}: ${e.instancePath || '/'} ${e.message ?? ''}`.trim())
     }
   }
 }
 
 console.log(`Сверено ресурсов: ${checked} из ${CASES.length}`)
+
+if (excused > 0) {
+  console.log('')
+  console.log('Снято по известным дефектам самих схем ICAR:')
+  for (const [schema, d] of Object.entries(KNOWN_DEFECTS)) {
+    console.log(`  ${schema}: ${d.fields.join(', ')} — ${d.why}`)
+  }
+  console.log('  Сообщить о них в adewg/ICAR — работа на письмо, а не на код.')
+}
 
 /* ------------------------------------------------------------------ */
 

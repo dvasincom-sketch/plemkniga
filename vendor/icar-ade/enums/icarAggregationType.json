@@ -1,0 +1,17 @@
+{
+  "description": "The type of aggregation. In addition to obvious statistical terms, Range is the difference between min and max, and index is a computed index value.",
+
+  "type": "string",
+
+  "enum": [
+    "Average",
+    "Sum",
+    "StDev",
+    "Min",
+    "Max",
+    "Count",
+    "Range",
+    "Index"
+  ]
+}
+

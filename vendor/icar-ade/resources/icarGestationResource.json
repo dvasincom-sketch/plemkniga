@@ -1,0 +1,39 @@
+{
+  "description": "This resource holds computed or predicted gestation information for animals at a location.\n- Use this resource to understand potential sire and expected calving date.\n- This resource should be recomputed when a heat, repro-status observation, or pregnancy check event is recorded.",
+
+  "allOf": [{
+      "$ref": "icarResource.json"
+    },
+    {
+      "type": "object",
+
+      "required": [
+        "id",
+        "animal",
+        "expectedCalvingDate"
+      ],
+
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier in the source system for this computed resource."
+        },
+        "animal": {
+          "$ref": "../types/icarAnimalIdentifierType.json",
+          "description": "Unique animal scheme and identifier combination."
+        },
+        "sireIdentifiers": {
+          "type": "array",
+          "items": {
+            "$ref": "../types/icarAnimalIdentifierType.json"
+          },
+          "description": "Unique scheme/identifier combinations for the sire, including official ID and Herdbook."
+        },
+        "expectedCalvingDate": {
+          "$ref": "../types/icarDateTimeType.json",
+          "description": "The RFC3339 UTC date the calving is expected to happen (see https://ijmacd.github.io/rfc3339-iso8601/ for format guidance)."
+        }
+      }
+    }
+  ]
+}

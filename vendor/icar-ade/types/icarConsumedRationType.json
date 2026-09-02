@@ -1,0 +1,35 @@
+{
+  "description": "Gives the consumed amount of a mixed ration, and the amount the animal/group was entitled to. Amounts are real weights.",
+  
+  "type": "object",
+  "required": [
+    "rationId"
+  ],
+
+  "properties": {
+    "rationId": {
+      "$ref": "../types/icarRationIdType.json",
+      "description": "The identifier for the ration consumed"
+    },
+    "entitlement": {
+      "$ref": "../types/icarFeedQuantityType.json",
+      "description": "The amount of feed the animal/group was entitled to receive"
+    },
+    "delivered": {
+      "$ref": "../types/icarFeedQuantityType.json",
+      "description": "The amount of feed the animal/group received. If not present, it can be assumed that the delivered will be equal to entitlement"
+    },
+    "feedConsumption": {
+      "$ref": "../types/icarFeedQuantityType.json",
+      "description": "The amount of feed the animal/group has consumed"
+    },
+    "dryMatterPercentage": {
+      "type": "number",
+      "description": "The dry matter content of the ration provided or consumed, expressed as a percentage."
+    },
+    "totalCost": {
+      "$ref": "../types/icarCostType.json",
+      "description": "Total cost applied to this feeding. Based on the delivered or entitled amount"
+    }
+  }
+}

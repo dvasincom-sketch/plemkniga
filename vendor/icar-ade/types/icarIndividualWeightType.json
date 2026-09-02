@@ -1,0 +1,18 @@
+{
+    "description": "The Animal-Weight entity records a liveweight for an individual animal in a Group Weight. Either animal or weight may be null.",
+    "type": "object",
+
+    "properties": {
+        "animal": {
+            "description": "Unique animal scheme and identifier combination.",
+            "anyOf": [
+                {"type": "null"},
+                {"$ref": "../types/icarAnimalIdentifierType.json"}
+            ]
+        },
+        "weight": {
+            "type": ["number", "null"],
+            "description": "The weight measurement"
+        }
+    }
+}

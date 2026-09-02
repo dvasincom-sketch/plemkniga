@@ -1,0 +1,51 @@
+{
+  "description": "An overview of the recommended feeding of animals",
+
+  "allOf": [{
+      "$ref": "../resources/icarResource.json"
+    },
+    {
+      "type": "object",
+
+      "required": [
+        "id",
+        "animal"
+      ],
+
+      "properties": {
+        "id": {
+          "$ref": "../types/icarFeedRecommendationIdType.json",
+          "description": "Unique identifier in the source system for this recommendation."
+        },
+        "animal": {
+          "$ref": "../types/icarAnimalIdentifierType.json",
+          "description": "Unique animal scheme and identifier combination."
+        },
+        "recommendationDateTime ": {
+          "$ref": "../types/icarDateTimeType.json",
+          "description": "The RFC3339 UTC timestamp of the recommendation (see https://ijmacd.github.io/rfc3339-iso8601/ for format guidance)."
+        },
+        "startDateTime": {
+          "$ref": "../types/icarDateTimeType.json",
+          "description": "The RFC3339 UTC date of the beginning of the recommendation (see https://ijmacd.github.io/rfc3339-iso8601/ for format guidance)."
+        },
+        "endDateTime": {
+          "$ref": "../types/icarDateTimeType.json",
+          "description": "The RFC3339 UTC end date of the recommendation (see https://ijmacd.github.io/rfc3339-iso8601/ for format guidance)."
+        },
+        "recommendedFeed": {
+          "type": "array",
+            "items": {
+              "$ref": "../types/icarRecommendedFeedType.json"
+            }
+        },
+        "recommendedRation": {
+          "type": "array",
+            "items": {
+              "$ref": "../types/icarRecommendedRationType.json"
+          }
+        }
+      }
+    }
+  ]
+}

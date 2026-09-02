@@ -1,0 +1,294 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Sorting-related messages API Specifications",
+    "description": "Specifications for messages that support livestock sorting management.",
+    "version": "1.5",
+    "contact": {
+      "name": "Animal Data Exchange Working Group",
+      "url": "https://www.icar.org/index.php/technical-bodies/working-groups/animal-data-exchange-wg/",
+      "email": "icar@icar.org"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://icar-ade.standard.com"
+    }
+  ],
+  "tags": [
+    {
+      "name": "ADE-1.5-sorting",
+      "description": "Sorting messages approved by the working group"
+    }
+  ],
+  "paths": {
+    "/locations/{location-scheme}/{location-id}/sorting-sites": {
+      "get": {
+        "operationId": "get-sorting-sites",
+        "summary": "Get the sorting-sites for a certain location",
+        "description": "# Purpose\nProvides the sorting-sites for a location\n",
+        "tags": [
+          "ADE-1.5-sorting"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the resources for the given location.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarSortingSiteCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/{animal-scheme}/{animal-id}/sorting": {
+      "get": {
+        "operationId": "get-animal-sorting",
+        "summary": "Get the sorting of a certain animal for a certain site",
+        "description": "# Purpose\nProvides the sorting of a certain animal\n",
+        "tags": [
+          "ADE-1.5-sorting"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/animal-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/animal-id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the resources for the given location.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarAnimalSortingCommandResource"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "delete-animal-sorting",
+        "summary": "Delete sorting for a certain animal of a location",
+        "description": "# Purpose\nProvides the deletion of sorting for a location\n",
+        "tags": [
+          "ADE-1.5-sorting"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/animal-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/animal-id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful."
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/sortings": {
+      "get": {
+        "operationId": "get-all-animal-sorting-commands",
+        "summary": "Get the known sorting-commands for all animals of a certain location",
+        "description": "# Purpose\nProvides the known sorting-commands for all animals of a location\n",
+        "tags": [
+          "ADE-1.5-sorting"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the resources for the given location.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarAnimalSortingCommandCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      },
+      "post": {
+        "operationId": "post-animal-sorting",
+        "summary": "Add an animal into a sorting-site.",
+        "description": "# Purpose\nAllows a client to add an animal to a sorting-site",
+        "tags": [
+          "ADE-1.5-sorting"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "The sorting of an animal to be create. \nA client MAY fill in the *Id* field with a client-generated UUID and the server MAY use this *Id*.\nIf the server does not use the client-specified *ID* field it shall issue its own *ID* for the resource.\nA client SHALL ensure that the *meta.source* and *meta.sourceId* fields are filled by the client.\n",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/icarAnimalSortingCommandResource"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains a copy of the event, as modified by the server.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarAnimalSortingCommandResource"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created. The Location header contains the URI to the new resource.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "description": "Contains the URI to the new resource."
+              }
+            }
+          },
+          "202": {
+            "description": "Accepted. The Location header contains a URI that the client can query for processing status.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "description": "Contains a URI to query creation status."
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/default"
+          },
+          "500": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "icarAnimalSortingCommandCollection": {
+        "$ref": "../collections/icarAnimalSortingCommandCollection.json"
+      },
+      "icarSortingSiteCollection": {
+        "$ref": "../collections/icarSortingSiteCollection.json"
+      },
+      "icarAnimalSortingCommandResource": {
+        "$ref": "../resources/icarAnimalSortingCommandResource.json"
+      }
+    },
+    "parameters": {
+      "location-scheme": {
+        "name": "location-scheme",
+        "in": "path",
+        "description": "The scheme id for the location identifier.",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "location-id": {
+        "name": "location-id",
+        "in": "path",
+        "description": "The unique identifier for the location.",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "animal-scheme": {
+        "name": "animal-scheme",
+        "in": "path",
+        "description": "The scheme id for the animal identifier.",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "animal-id": {
+        "name": "animal-id",
+        "in": "path",
+        "description": "The unique identifier for the animal.",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "responses": {
+      "default": {
+        "description": "An error has occured while handling the request. Check the content of the message for the error details.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../collections/icarErrorCollection.json"
+            }
+          }
+        }
+      }
+    },
+"examples": {}
+  }
+}

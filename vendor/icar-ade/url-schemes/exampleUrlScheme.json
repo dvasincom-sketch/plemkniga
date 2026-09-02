@@ -1,0 +1,3860 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Release Candidate Messages",
+    "description": "The specifications of messages which are ready for ICAR approval and release",
+    "version": "1.5",
+    "contact": {
+      "name": "Animal Data Exchange Working Group",
+      "url": "https://www.icar.org/index.php/technical-bodies/working-groups/animal-data-exchange-wg/",
+      "email": "icar@icar.org"
+    }
+  },
+  "servers": [{
+    "url": "https://icar-ade.standard.com"
+  }],
+  "tags": [{
+      "name": "ADE-1.5 additions",
+      "description": "new endpoints not yet approved"
+    },
+    {
+      "name": "ADE-1.5-feed",
+      "description": "Feed messages approved by the working group"
+    },
+    {
+      "name": "ADE-1.5-health",
+      "description": "Health messages approved by the working group"
+    },
+    {
+      "name": "ADE-1.5-management",
+      "description": "Management messages approved by the working group"
+    },
+    {
+      "name": "ADE-1.5-milk",
+      "description": "Milk messages approved by the working group"
+    },
+    {
+      "name": "ADE-1.5-performance",
+      "description": "Performance messages approved by the working group"
+    },
+    {
+      "name": "ADE-1.5-registration",
+      "description": "Registration messages approved by the working group"
+    },
+    {
+      "name": "ADE-1.5-reproduction",
+      "description": "Reproduction messages approved by the working group"
+    },
+    {
+      "name": "ADE-1.5-carcass",
+      "description": "Carcass messages approved by the working group"
+    },
+    {
+      "name": "ADE-1.5-scheme",
+      "description": "Scheme definitions approved by the working group"
+    }
+  ],
+  "paths": {
+    "/locations": {
+      "get": {
+        "operationId": "get-locations",
+        "summary": "Get available schema/id combinations for locations.",
+        "description": "# Purpose\nProvide a list of available locations.\nShould return only those combinations the user currently logged in has access to.",
+        "tags": [
+          "ADE-1.5-registration"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the available locations.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarLocationCollection"
+                },
+                "examples": {
+                  "base": {
+                    "$ref": "#/components/examples/locations"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/milking-withdrawals": {
+            "get": {
+                "operationId": "get-existing-milking-withdrawals",
+                "summary": "Get the milking-withdrawals for a certain location",
+                "description": "# Purpose\nProvides the milking-withdrawals for a certain location\n",
+                "tags": [
+                    "ADE-1.5-milk"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/location-scheme"
+                    },
+                    {
+                        "$ref": "#/components/parameters/location-id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/meta-modified-from"
+                    },
+                    {
+                        "$ref": "#/components/parameters/meta-modified-to"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful. The response contains the withdrawals for the given location.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/icarWithdrawalEventCollection"
+                                }
+                            }
+                        }
+                    },
+                    "default": {
+                        "$ref": "#/components/responses/default"
+                    }
+                }
+            }
+    },
+    "/locations/{location-scheme}/{location-id}/milking-visits": {
+      "get": {
+        "operationId": "get-milking-visits",
+        "summary": "Get the data for milking visits",
+        "description": "# Purpose\nProvides data from visits of animals to a milking parlour.\n \nThis comprises all possible data. Anybody can choose to define API's that return less information in the response.\n",
+        "tags": [
+          "ADE-1.5-milk"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the milking results for the given location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarMilkingVisitEventCollection"
+                },
+                "examples": {
+                  "base": {
+                    "$ref": "#/components/examples/milking-visit"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/test-days": {
+      "get": {
+        "operationId": "get-test-days",
+        "summary": "Get the test days",
+        "description": "# Purpose\nProvides data from the test days on a farm that intersects with the given start/end date if provided. Otherwise returns all available entries.",
+        "tags": [
+          "ADE-1.5-milk"
+        ],
+        "parameters": [{
+          "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the test days for the given location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarTestDayCollection"
+                },
+                "examples": {
+                  "base": {
+                    "$ref": "#/components/examples/test-days"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/test-day-results": {
+      "get": {
+        "operationId": "get-test-day-results",
+        "summary": "Get the data for test day results",
+        "description": "# Purpose\nProvides data from the test day for animals on a farm\n",
+        "tags": [
+          "ADE-1.5-milk"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the test day results for the given location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarTestDayResultEventCollection"
+                },
+                "examples": {
+                  "base": {
+                    "$ref": "#/components/examples/test-day-result"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+        "/locations/{location-scheme}/{location-id}/milk-predictions": {
+            "get": {
+                "operationId": "get-milk-predictions",
+                "summary": "Get the milk predictions for a certain location",
+                "description": "# Purpose\nProvides the milk predictions for a location\n",
+                "tags": [
+                    "ADE-1.5-milk"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/location-scheme"
+                    },
+                    {
+                        "$ref": "#/components/parameters/location-id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/meta-modified-from"
+                    },
+                    {
+                        "$ref": "#/components/parameters/meta-modified-to"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful. The response contains the milk predictions for the given location.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/icarMilkPredictionsCollection"
+                                }
+                            }
+                        }
+                    },
+                    "default": {
+                        "$ref": "#/components/responses/default"
+                    }
+                }
+            }
+    },
+    "/locations/{location-scheme}/{location-id}/daily-milking-averages": {
+      "get": {
+        "operationId": "get-daily-milking-averages",
+        "summary": "Get daily averages for milking-visits of a animals",
+        "description": "# Purpose\nProvides daily averages of the milking-visits of per animal.",
+        "tags": [
+          "ADE-1.5-milk"
+        ],
+        "parameters": [{
+          "$ref": "#/components/parameters/location-scheme"
+        },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the daily averages per animal for the given location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarDailyMilkingAveragesCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/lactations": {
+      "get": {
+        "operationId": "get-lactations",
+        "summary": "Get the data for lactations",
+        "description": "# Purpose\nProvides data from lactations of animals.",
+        "tags": [
+          "ADE-1.5-milk"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the milking results for the given location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarLactationCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/lactation-status-observations": {
+      "get": {
+        "operationId": "get-lactation-status-observations",
+        "summary": "Get the list of observed changes to lactation status for animals.",
+        "description": "# Purpose\nProvides a list of events arising from observed changes to lactation status.",
+        "tags": [
+          "ADE-1.5-milk"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the milking results for the given location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarLactationStatusObservedEventCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/births": {
+      "get": {
+        "operationId": "get-births",
+        "summary": "Get the births for a certain location",
+        "description": "# Purpose\nProvides the born animals on a location\n",
+        "tags": [
+          "ADE-1.5-registration"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the births for the given location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarMovementBirthEventCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/deaths": {
+      "get": {
+        "operationId": "get-deaths",
+        "summary": "Get the deaths for a certain location",
+        "description": "# Purpose\nProvides the died animals on a location\n",
+        "tags": [
+          "ADE-1.5-registration"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the died animals for the given location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarMovementDeathEventCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/arrivals": {
+      "get": {
+        "operationId": "get-arrivals",
+        "summary": "Get the arrivals for a certain location",
+        "description": "# Purpose\nProvides the arrived animals on a location\n",
+        "tags": [
+          "ADE-1.5-registration"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the arrived animals for the given location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarMovementArrivalEventCollection"
+                },
+                "examples": {
+                  "base": {
+                    "$ref": "#/components/examples/arrival"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/departures": {
+      "get": {
+        "operationId": "get-departures",
+        "summary": "Get the departures for a certain location",
+        "description": "# Purpose\nProvides the departed animals from a location\n",
+        "tags": [
+          "ADE-1.5-registration"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the milking results for the given location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarMovementDepartureEventCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/animals": {
+      "get": {
+        "operationId": "get-animals",
+        "summary": "Get the animals for a certain location",
+        "description": "# Purpose\nProvides the animals on a location\n",
+        "tags": [
+          "ADE-1.5-registration"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the animals for the given location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarAnimalCoreCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/animal-sets": {
+      "get": {
+        "operationId": "get-animal-sets",
+        "summary": "Get the animal sets for a certain location",
+        "description": "# Purpose\nProvides the animal sets on a location. If animal-scheme and animal-id are provided, the sets containing that animal are returned.\n",
+        "tags": [
+          "ADE-1.5-management"
+        ],
+        "parameters": [{
+          "$ref": "#/components/parameters/location-scheme"
+          }, {
+            "$ref": "#/components/parameters/location-id"
+          }, {
+            "$ref": "#/components/parameters/animal-scheme"
+          }, {
+            "$ref": "#/components/parameters/animal-id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the animal sets for the given location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarAnimalSetCollection"
+                },
+                "examples": {
+                  "base": {
+                    "$ref": "#/components/examples/animal-sets"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/animal-set-joins": {
+      "get": {
+        "operationId": "get-animal-set-joins",
+        "summary": "Get the animal set join events for a certain location",
+        "description": "# Purpose\nProvides the animal set join events on a location\n",
+        "tags": [
+          "ADE-1.5-management"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the join animal set events of animals for the given location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarAnimalSetJoinEventCollection"
+                },
+                "examples": {
+                  "base": {
+                    "$ref": "#/components/examples/animal-set-joins"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/animal-set-leaves": {
+      "get": {
+        "operationId": "get-animal-set-leaves",
+        "summary": "Get the animal set leave events for a certain location",
+        "description": "# Purpose\nProvides the animal set leave events on a location\n",
+        "tags": [
+          "ADE-1.5-management"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the leave animal set events of animals for the given location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarAnimalSetLeaveEventCollection"
+                },
+                "examples": {
+                  "base": {
+                    "$ref": "#/components/examples/animal-set-leaves"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/service-sires": {
+      "get": {
+        "operationId": "get-service-sires",
+        "summary": "Get the service sires matching your query parameters - for now we only implement the query by some identifier, like lifetime number, ai-code, ... ",
+        "description": "# Purpose\nProvides the service sires.\nOnly animal fields relevant to service sires will be populated (location is not expected, for example).",
+        "tags": [
+          "ADE-1.5-registration"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/identifier-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/identifier-id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the service sires matching your query parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarAnimalCoreCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/statistics": {
+            "get": {
+                "operationId": "get-statistics",
+                "summary": "Get the statistics for a certain location",
+                "description": "# Purpose\nProvides the statistics for a location\n One can specify the period for which the statistics can be calculated by specifying a date to and date from parameter. Also the purpose can be provided to limit the purpose of the statistics",
+                "tags": [
+                    "ADE-1.5-management"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/location-scheme"
+                    },
+                    {
+                        "$ref": "#/components/parameters/location-id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/date-from"
+                    },
+                    {
+                        "$ref": "#/components/parameters/date-to"
+                    },
+                    {
+                        "$ref": "#/components/parameters/purpose"
+                    }                    
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful. The response contains the statistics for the given location.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/icarStatisticsCollection"
+                                }
+                            }
+                        }
+                    },
+                    "default": {
+                        "$ref": "#/components/responses/default"
+                    }
+                }
+            }
+    },    
+    "/locations/{location-scheme}/{location-id}/pregnancy-checks": {
+      "get": {
+        "operationId": "get-pregnancy-checks",
+        "summary": "Get the pregnancy checks for a certain location",
+        "description": "# Purpose\nProvides the pregnancy checks on a location\n",
+        "tags": [
+          "ADE-1.5-reproduction"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the pregnancy diagnosis for the given location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarReproPregnancyCheckEventCollection"
+                },
+                "examples": {
+                  "finland": {
+                    "$ref": "#/components/examples/pregnancy-check-finland"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/heats": {
+      "get": {
+        "operationId": "get-Heats",
+        "summary": "Get the heats for a certain location",
+        "description": "# Purpose\nProvides the Heats on a location\n",
+        "tags": [
+          "ADE-1.5-reproduction"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the heats for the given location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarReproHeatEventCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/inseminations": {
+      "get": {
+        "operationId": "get-inseminations",
+        "summary": "Get the inseminations for a certain location",
+        "description": "# Purpose\nProvides the Inseminations on a location\n",
+        "tags": [
+          "ADE-1.5-reproduction"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the inseminations for the given location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarReproInseminationEventCollection"
+                },
+                "examples": {
+                  "finland": {
+                    "$ref": "#/components/examples/insemination-finland"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/drying-offs": {
+      "get": {
+        "operationId": "get-drying-offs",
+        "summary": "Get the drying off for a certain location",
+        "description": "# Purpose\nProvides the drying off on a location\n",
+        "tags": [
+          "ADE-1.5-reproduction"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the drying off for the given location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarMilkingDryOffEventCollection"
+                },
+                "examples": {
+                  "finland": {
+                    "$ref": "#/components/examples/drying-off-finland"
+                  },
+                  "sweden": {
+                    "$ref": "#/components/examples/drying-off-sweden"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/abortions": {
+      "get": {
+        "operationId": "get-abortions",
+        "summary": "Get the abortion events for a certain location",
+        "description": "# Purpose\nProvides the abortion events on a location\n",
+        "tags": [
+          "ADE-1.5-reproduction"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the abortion events for the given location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarReproAbortionEventCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/do-not-breeds": {
+      "get": {
+        "operationId": "get-do-not-breeds",
+        "summary": "Get the animals that were assigned as do-not-breed for a certain location",
+        "description": "# Purpose\nProvides the not be bred animals on a location\n",
+        "tags": [
+          "ADE-1.5-reproduction"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the not to be bred animals for the given location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarReproDoNotBreedEventCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/parturitions": {
+      "get": {
+        "operationId": "get-parturitions",
+        "summary": "Get the parturition events for a certain location",
+        "description": "# Purpose\nProvides the Parturition events on a location\n",
+        "tags": [
+          "ADE-1.5-reproduction"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the Parturition events for the given location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarReproParturitionEventCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/embryo-flushings": {
+      "get": {
+        "operationId": "get-embyro-flushings",
+        "summary": "Get the embryo flushing events for a certain location",
+        "description": "# Purpose\nProvides the embryo flushing events on a location\n",
+        "tags": [
+          "ADE-1.5-reproduction"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the flushing events for the given location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarReproEmbryoFlushingEventCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/weights": {
+      "get": {
+        "operationId": "get-weights",
+        "summary": "Get the weight data of animals",
+        "description": "# Purpose\nProvides weight data from animals on a farm.",
+        "tags": [
+          "ADE-1.5-performance"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the weight results for the given location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarWeightEventCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/devices": {
+      "get": {
+        "operationId": "get-devices",
+        "summary": "Get the device data for a location",
+        "description": "# Purpose\nProvides device data for devices present on a farm.",
+        "tags": [
+          "ADE-1.5-management"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the device data for the given location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarDeviceCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/feed-storages": {
+      "get": {
+        "operationId": "get-feed-storages",
+        "summary": "Get the feed storage device data for a location",
+        "description": "# Purpose\nProvides feed storage device data for storages present on a farm.",
+        "tags": [
+          "ADE-1.5-feed"
+        ],
+        "parameters": [{
+          "$ref": "#/components/parameters/location-scheme"
+        },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the feed storage device data for the given location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarFeedStorageCollection"
+                },
+                "examples": {
+                  "base": {
+                    "$ref": "#/components/examples/feed-storages"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/breeding-values": {
+      "get": {
+        "operationId": "get-breeding-values",
+        "summary": "Get the breeding values of the animals of a location",
+        "description": "# Purpose\nProvides breeding values of the animals present on a farm.",
+        "tags": [
+          "ADE-1.5-performance"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the breeding values of the animals of the given location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarBreedingValueCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/mating-recommendations": {
+      "get": {
+        "operationId": "get-mating-recommendations",
+        "summary": "Get the mating recommendations for a certain location",
+        "description": "# Purpose\nProvides the mating recommendations on a location\n",
+        "tags": [
+          "ADE-1.5-reproduction"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the mating recommendations for the given location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarReproMatingRecommendationCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/conformation-scores": {
+      "get": {
+        "operationId": "get-conformation-scores",
+        "summary": "Get the conformation scores for a certain location",
+        "description": "# Purpose\nProvides the conformation scores on a location\n",
+        "tags": [
+          "ADE-1.5-performance"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the conformation scores for the given location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarConformationScoreEventCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/type-classifications": {
+            "get": {
+                "operationId": "get-type-classifications",
+                "summary": "Get the type classification events for a certain location",
+                "description": "# Purpose\nProvides the animal type classification events for a location\n",
+                "tags": [
+                    "ADE-1.5-performance"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/location-scheme"
+                    },
+                    {
+                        "$ref": "#/components/parameters/location-id"
+                    },
+                    {
+                        "$ref": "#/components/parameters/meta-modified-from"
+                    },
+                    {
+                        "$ref": "#/components/parameters/meta-modified-to"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful. The response contains the resources for the given location.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/icarTypeClassificationEventCollection"
+                                }
+                            }
+                        }
+                    },
+                    "default": {
+                        "$ref": "#/components/responses/default"
+                    }
+                }
+            }
+    },
+    "/locations/{location-scheme}/{location-id}/diagnoses": {
+      "get": {
+        "operationId": "get-Diagnoses",
+        "summary": "Get the diagnoses for a certain location",
+        "description": "# Purpose\nProvides the animal health diagnoses for a location\n",
+        "tags": [
+          "ADE-1.5-health"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the diagnoses for the given location.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarDiagnosisEventCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/treatments": {
+      "get": {
+        "operationId": "get-Treatments",
+        "summary": "Get the treatments for a certain location",
+        "description": "# Purpose\nProvides the animal health treatments for a location\n",
+        "tags": [
+          "ADE-1.5-health"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the treatments for the given location.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarTreatmentEventCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/treatment-programs": {
+      "get": {
+        "operationId": "get-Treatment-Programs",
+        "summary": "Get the treatment programs for a certain location",
+        "description": "# Purpose\nProvides the animal health treatment programs for a location\n",
+        "tags": [
+          "ADE-1.5-health"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the treatment progams for the given location.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarTreatmentProgramEventCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },      
+    "/locations/{location-scheme}/{location-id}/health-status": {
+      "get": {
+        "operationId": "get-HealthStatusObserved",
+        "summary": "Get the health-status-observed of an animal for a certain location",
+        "description": "# Purpose\nProvides the animal health-status for a location\n",
+        "tags": [
+          "ADE-1.5-health"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the treatment progams for the given location.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarHealthStatusObservedEventCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/gestations": {
+      "get": {
+        "operationId": "get-Gestations",
+        "summary": "Get the gestations for a certain location",
+        "description": "# Purpose\nProvides the gestations for a location\n",
+        "tags": [
+          "ADE-1.5-reproduction"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the gestations for the given location.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarGestationCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/feeds": {
+      "get": {
+        "operationId": "get-feeds",
+        "summary": "Get the feeds available on a certain location",
+        "description": "# Purpose\nProvides the feeds for a location. We recommend using the fao.org scheme for the type of feeds and the icar.org scheme for the feed properties\n",
+        "tags": [
+          "ADE-1.5-feed"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the feeds for the given location.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarFeedCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/rations": {
+      "get": {
+        "operationId": "get-Rations",
+        "summary": "Get the rations for a certain location",
+        "description": "# Purpose\nProvides the rations for a location\n",
+        "tags": [
+          "ADE-1.5-feed"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the rations for the given location.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarRationCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/feed-intakes": {
+      "get": {
+        "operationId": "get-Feed-Intakes",
+        "summary": "Get the feed intakes for a certain location",
+        "description": "# Purpose\nProvides the feed intakes for a location\n",
+        "tags": [
+          "ADE-1.5-feed"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the feed intakes for the given location.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarFeedIntakeEventCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/group-feeding": {
+      "get": {
+        "operationId": "get-group-feeding",
+        "deprecated": true,
+        "summary": "Get the group feeding events for a certain location. Deprecated, use /group-feedings instead.",
+        "description": "# Purpose\nProvides the group feeding events for a location.\nDeprecated, use /group-feedings instead.\n",
+        "tags": [
+          "ADE-1.5-feed"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the feed intakes for the given location.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarGroupFeedingEventCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/group-feedings": {
+      "get": {
+        "operationId": "get-group-icarGroupFeedingEventResource",
+        "summary": "Get the group feeding events for a certain location",
+        "description": "# Purpose\nProvides the group feeding events for a location.\n",
+        "tags": [
+          "ADE-1.5-feed"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the feed intakes for the given location.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarGroupFeedingEventCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+
+    "/locations/{location-scheme}/{location-id}/feed-recommendations": {
+      "get": {
+        "operationId": "get-Feed-Recommendations",
+        "summary": "Get the feed recommendations for a certain location",
+        "description": "# Purpose\nProvides the feed recommendations for a location\n",
+        "tags": [
+          "ADE-1.5-feed"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the rations for the given location.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarFeedRecommendationCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/feed-reports": {
+      "get": {
+        "operationId": "get-Feed-Report",
+        "summary": "Get the feed reports for animals on a certain location for a certain period. One can use the report-start- and report-end-date-time paramters to get a daily feed report. ",
+        "description": "# Purpose\nProvides the feed reports for animal on a location\n",
+        "tags": [
+          "ADE-1.5-feed"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          },
+          {
+            "$ref": "#/components/parameters/report-start-date-time"
+          },
+          {
+            "$ref": "#/components/parameters/report-end-date-time"
+          }
+         ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the feed reports for animals on the given location.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarFeedReportCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/repro-status-observations": {
+      "get": {
+        "operationId": "get-repro-status-observations",
+        "summary": "Get the list of observed changes to animal reproductive status",
+        "description": "# Purpose\nProvides a collection of events where a change to animal reproductive status has been observed.\n",
+        "tags": [
+          "ADE-1.5-reproduction"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the reproductive status change observations for the given location.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarReproStatusObservedEventCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/schemata":{
+      "get": {
+        "operationId": "get-schemata",
+        "summary": "Get the list of schemata/schema types supported",
+        "description": "# Purpose\nProvides a list of schemata/schema types supported.\n",
+        "tags": [
+          "ADE-1.5-scheme"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the suppoted schemata for the given location.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarSchemeTypeCollection"
+                },
+                "examples": {
+                  "schemata": {
+                    "$ref": "#/components/examples/schemata"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/schemata/{scheme-type}":{
+      "get": {
+        "operationId": "get-schema-types",
+        "summary": "Get the list of schema type schemes",
+        "description": "# Purpose\nProvides a list of schemata/schema types supported.\n",
+        "tags": [
+          "ADE-1.5-scheme"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/scheme-type"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the suppoted scheme for specific scheme type for the given location.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarSchemeTypeCollection"
+                },
+                "examples": {
+                  "breeds": {
+                    "$ref": "#/components/examples/schemata-breeds"
+                  },
+                  "locations": {
+                    "$ref": "#/components/examples/schemata-locations"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/schemata/{scheme-type}/{scheme}":{
+      "get": {
+        "operationId": "get-scheme-values",
+        "summary": "Get the list of values for specidif sheme",
+        "description": "# Purpose\nProvides a list of scheme values for specific scheme\n",
+        "tags": [
+          "ADE-1.5-scheme"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/scheme-type"
+          },
+          {
+            "$ref": "#/components/parameters/scheme"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the suppoted scheme for specific scheme type for the given location.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarSchemeValueCollection"
+                },
+                "examples": {
+                  "breeds-interbull": {
+                    "$ref": "#/components/examples/schemata-breeds-interbull"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/group-treatments": {
+      "get": {
+        "operationId": "get-group-treatments",
+        "summary": "Get the group treatments for a certain location",
+        "description": "# Purpose\nProvides the group health treatments for a location\n",
+        "tags": [
+          "ADE-1.5-health"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the treatments for the given location.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarGroupTreatmentEventCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/group-weights": {
+      "get": {
+          "operationId": "get-group-weights",
+          "summary": "Get the weights for a certain location",
+          "description": "# Purpose\nProvides the group weights for a location\n",
+          "tags": [
+              "ADE-1.5-performance"
+          ],
+          "parameters": [
+              {
+                  "$ref": "#/components/parameters/location-scheme"
+              },
+              {
+                  "$ref": "#/components/parameters/location-id"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-from"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-to"
+              }
+          ],
+          "responses": {
+              "200": {
+                  "description": "Successful. The response contains the resources for the given location.",
+                  "content": {
+                      "application/json": {
+                          "schema": {
+                              "$ref": "#/components/schemas/icarGroupWeightEventCollection"
+                          }
+                      }
+                  }
+              },
+              "default": {
+                  "$ref": "#/components/responses/default"
+              }
+          }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/group-arrivals": {
+      "get": {
+          "operationId": "get-group-arrivals",
+          "summary": "Get the group arrival events for a certain location",
+          "description": "# Purpose\nProvides the group arrival records for a location\n",
+          "tags": [
+              "ADE-1.5-registration"
+          ],
+          "parameters": [
+              {
+                  "$ref": "#/components/parameters/location-scheme"
+              },
+              {
+                  "$ref": "#/components/parameters/location-id"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-from"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-to"
+              }
+          ],
+          "responses": {
+              "200": {
+                  "description": "Successful. The response contains the arrival events for the given location.",
+                  "content": {
+                      "application/json": {
+                          "schema": {
+                              "$ref": "#/components/schemas/icarGroupMovementArrivalEventCollection"
+                          }
+                      }
+                  }
+              },
+              "default": {
+                  "$ref": "#/components/responses/default"
+              }
+          }
+      }
+    },    
+    "/locations/{location-scheme}/{location-id}/group-births": {
+      "get": {
+          "operationId": "get-group-births",
+          "summary": "Get the group birth or registration events for a certain location",
+          "description": "# Purpose\nProvides the group birth records for a location\n",
+          "tags": [
+              "ADE-1.5-registration"
+          ],
+          "parameters": [
+              {
+                  "$ref": "#/components/parameters/location-scheme"
+              },
+              {
+                  "$ref": "#/components/parameters/location-id"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-from"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-to"
+              }
+          ],
+          "responses": {
+              "200": {
+                  "description": "Successful. The response contains the birth or initial registration events for the given location.",
+                  "content": {
+                      "application/json": {
+                          "schema": {
+                              "$ref": "#/components/schemas/icarGroupMovementBirthEventCollection"
+                          }
+                      }
+                  }
+              },
+              "default": {
+                  "$ref": "#/components/responses/default"
+              }
+          }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/group-deaths": {
+      "get": {
+          "operationId": "get-group-deaths",
+          "summary": "Get the group death events for a certain location",
+          "description": "# Purpose\nProvides the group death records for a location\n",
+          "tags": [
+              "ADE-1.5-registration"
+          ],
+          "parameters": [
+              {
+                  "$ref": "#/components/parameters/location-scheme"
+              },
+              {
+                  "$ref": "#/components/parameters/location-id"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-from"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-to"
+              }
+          ],
+          "responses": {
+              "200": {
+                  "description": "Successful. The response contains the group death events for the given location.",
+                  "content": {
+                      "application/json": {
+                          "schema": {
+                              "$ref": "#/components/schemas/icarGroupMovementDeathEventCollection"
+                          }
+                      }
+                  }
+              },
+              "default": {
+                  "$ref": "#/components/responses/default"
+              }
+          }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/group-departures": {
+      "get": {
+          "operationId": "get-group-departures",
+          "summary": "Get the group departure events for a certain location",
+          "description": "# Purpose\nProvides the group departure records for a location\n",
+          "tags": [
+              "ADE-1.5-registration"
+          ],
+          "parameters": [
+              {
+                  "$ref": "#/components/parameters/location-scheme"
+              },
+              {
+                  "$ref": "#/components/parameters/location-id"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-from"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-to"
+              }
+          ],
+          "responses": {
+              "200": {
+                  "description": "Successful. The response contains the group departure events for the given location.",
+                  "content": {
+                      "application/json": {
+                          "schema": {
+                              "$ref": "#/components/schemas/icarGroupMovementDepartureEventCollection"
+                          }
+                      }
+                  }
+              },
+              "default": {
+                  "$ref": "#/components/responses/default"
+              }
+          }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/carcass-processing-lots": {
+      "get": {
+          "operationId": "get-carcass-processing-lots",
+          "summary": "Get the processing lots that relate to a certain location",
+          "description": "# Purpose\nProvides the carcass processing lots relating to a location\n",
+          "tags": [
+              "ADE-1.5-carcass"
+          ],
+          "parameters": [
+              {
+                  "$ref": "#/components/parameters/location-scheme"
+              },
+              {
+                  "$ref": "#/components/parameters/location-id"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-from"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-to"
+              }
+          ],
+          "responses": {
+              "200": {
+                  "description": "Successful. The response contains the group departure events for the given location.",
+                  "content": {
+                      "application/json": {
+                          "schema": {
+                              "$ref": "#/components/schemas/icarProcessingLotCollection"
+                          }
+                      }
+                  }
+              },
+              "default": {
+                  "$ref": "#/components/responses/default"
+              }
+          }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/carcass-carcasses": {
+      "get": {
+          "operationId": "get-carcass-carcasses",
+          "summary": "Get the carcasses that relate to a certain location",
+          "description": "# Purpose\nProvides the carcasses relating to a location\n",
+          "tags": [
+              "ADE-1.5-carcass"
+          ],
+          "parameters": [
+              {
+                  "$ref": "#/components/parameters/location-scheme"
+              },
+              {
+                  "$ref": "#/components/parameters/location-id"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-from"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-to"
+              }
+          ],
+          "responses": {
+              "200": {
+                  "description": "Successful. The response contains the group departure events for the given location.",
+                  "content": {
+                      "application/json": {
+                          "schema": {
+                              "$ref": "#/components/schemas/icarCarcassCollection"
+                          }
+                      }
+                  }
+              },
+              "default": {
+                  "$ref": "#/components/responses/default"
+              }
+          }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/carcass-observations": {
+      "get": {
+          "operationId": "get-carcass-observations",
+          "summary": "Get the carcass observation events that relate to a certain location",
+          "description": "# Purpose\nProvides the carcass observation events relating to a location\n",
+          "tags": [
+              "ADE-1.5-carcass"
+          ],
+          "parameters": [
+              {
+                  "$ref": "#/components/parameters/location-scheme"
+              },
+              {
+                  "$ref": "#/components/parameters/location-id"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-from"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-to"
+              }
+          ],
+          "responses": {
+              "200": {
+                  "description": "Successful. The response contains the group departure events for the given location.",
+                  "content": {
+                      "application/json": {
+                          "schema": {
+                              "$ref": "#/components/schemas/icarCarcassObservationsEventCollection"
+                          }
+                      }
+                  }
+              },
+              "default": {
+                  "$ref": "#/components/responses/default"
+              }
+          }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/inventory-transactions": {
+      "get": {
+          "operationId": "get-inventory-transactions",
+          "summary": "Get the inventory transactions that relate to a certain location",
+          "description": "# Purpose\nProvides the inventory transactions relating to a location\n",
+          "tags": [
+              "ADE-1.5-management"
+          ],
+          "parameters": [
+              {
+                  "$ref": "#/components/parameters/location-scheme"
+              },
+              {
+                  "$ref": "#/components/parameters/location-id"
+              },
+              {
+                "$ref": "#/components/parameters/date-from"
+              },
+              {
+                  "$ref": "#/components/parameters/date-to"
+              },
+              {
+                  "$ref": "#/components/parameters/family"
+              },
+              {
+                "$ref": "#/components/parameters/identifier-scheme"
+              },
+              {
+                "$ref": "#/components/parameters/identifier-id"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-from"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-to"
+              }
+          ],
+          "responses": {
+              "200": {
+                  "description": "Successful. The response contains the inventory transactions for the given location.",
+                  "content": {
+                      "application/json": {
+                          "schema": {
+                              "$ref": "#/components/schemas/icarInventoryTransactionCollection"
+                          }
+                      }
+                  }
+              },
+              "default": {
+                  "$ref": "#/components/responses/default"
+              }
+          }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/feed-inventory-transactions": {
+      "get": {
+          "operationId": "get-feed-inventory-transactions",
+          "summary": "Get the feed inventory transactions that relate to a certain location",
+          "description": "# Purpose\nProvides the feed inventory transactions relating to a location\n",
+          "tags": [
+              "ADE-1.5-management"
+          ],
+          "parameters": [
+              {
+                  "$ref": "#/components/parameters/location-scheme"
+              },
+              {
+                  "$ref": "#/components/parameters/location-id"
+              },
+              {
+                "$ref": "#/components/parameters/date-from"
+              },
+              {
+                  "$ref": "#/components/parameters/date-to"
+              },
+              {
+                "$ref": "#/components/parameters/identifier-scheme"
+              },
+              {
+                "$ref": "#/components/parameters/identifier-id"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-from"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-to"
+              }
+          ],
+          "responses": {
+              "200": {
+                  "description": "Successful. The response contains the feed inventory transactions for the given location.",
+                  "content": {
+                      "application/json": {
+                          "schema": {
+                              "$ref": "#/components/schemas/icarFeedTransactionCollection"
+                          }
+                      }
+                  }
+              },
+              "default": {
+                  "$ref": "#/components/responses/default"
+              }
+          }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/medicine-inventory-transactions": {
+      "get": {
+          "operationId": "get-medicine-inventory-transactions",
+          "summary": "Get the medicine inventory transactions that relate to a certain location",
+          "description": "# Purpose\nProvides the medicine inventory transactions relating to a location\n",
+          "tags": [
+              "ADE-1.5-health"
+          ],
+          "parameters": [
+              {
+                  "$ref": "#/components/parameters/location-scheme"
+              },
+              {
+                  "$ref": "#/components/parameters/location-id"
+              },
+              {
+                "$ref": "#/components/parameters/date-from"
+              },
+              {
+                  "$ref": "#/components/parameters/date-to"
+              },
+              {
+                "$ref": "#/components/parameters/identifier-scheme"
+              },
+              {
+                "$ref": "#/components/parameters/identifier-id"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-from"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-to"
+              }
+          ],
+          "responses": {
+              "200": {
+                  "description": "Successful. The response contains the medicine inventory transactions for the given location.",
+                  "content": {
+                      "application/json": {
+                          "schema": {
+                              "$ref": "#/components/schemas/icarMedicineTransactionCollection"
+                          }
+                      }
+                  }
+              },
+              "default": {
+                  "$ref": "#/components/responses/default"
+              }
+          }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/attention-events": {
+      "get": {
+        "operationId": "get-attention-events",
+        "summary": "Get attention events.",
+        "description": "# Purpose\nProvides the attention events for a location. These are individual animal events, typically generated by devices such as wearables and sensors.\n",
+          "tags": [
+              "ADE-1.5-health"
+          ],
+          "parameters": [
+              {
+                  "$ref": "#/components/parameters/location-scheme"
+              },
+              {
+                  "$ref": "#/components/parameters/location-id"
+              },
+              {
+                "$ref": "#/components/parameters/date-from"
+              },
+              {
+                  "$ref": "#/components/parameters/date-to"
+              },
+              {
+                "$ref": "#/components/parameters/identifier-scheme"
+              },
+              {
+                "$ref": "#/components/parameters/identifier-id"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-from"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-to"
+              }
+          ],
+          "responses": {
+              "200": {
+                  "description": "Successful. The response contains the attention event resources for the given location.",
+                  "content": {
+                      "application/json": {
+                          "schema": {
+                              "$ref": "#/components/schemas/icarAttentionEventCollection"
+                          }
+                      }
+                  }
+              },
+              "default": {
+                  "$ref": "#/components/responses/default"
+              }
+          }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/position-observations": {
+      "get": {
+          "operationId": "get-animal-position-observations",
+          "summary": "Get position observation events for animals that relate to a given location",
+          "description": "# Purpose\nProvides the collection of position observation events for animals at the specified location.\n",
+          "tags": [
+              "ADE-1.5-management"
+          ],
+          "parameters": [
+              {
+                  "$ref": "#/components/parameters/location-scheme"
+              },
+              {
+                  "$ref": "#/components/parameters/location-id"
+              },
+              {
+                "$ref": "#/components/parameters/date-from"
+              },
+              {
+                  "$ref": "#/components/parameters/date-to"
+              },
+              {
+                "$ref": "#/components/parameters/identifier-scheme"
+              },
+              {
+                "$ref": "#/components/parameters/identifier-id"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-from"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-to"
+              }
+          ],
+          "responses": {
+              "200": {
+                  "description": "Successful. The response contains the animal position observation events for the given location.",
+                  "content": {
+                      "application/json": {
+                          "schema": {
+                              "$ref": "#/components/schemas/icarPositionObservationEventCollection"
+                          }
+                      }
+                  }
+              },
+              "default": {
+                  "$ref": "#/components/responses/default"
+              }
+          }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/group-position-observations": {
+      "get": {
+          "operationId": "get-group-position-observations",
+          "summary": "Get position observation events for groups that relate to a given location",
+          "description": "# Purpose\nProvides the collection of position observation events for groups at the specified location.\n",
+          "tags": [
+              "ADE-1.5-management"
+          ],
+          "parameters": [
+              {
+                  "$ref": "#/components/parameters/location-scheme"
+              },
+              {
+                  "$ref": "#/components/parameters/location-id"
+              },
+              {
+                "$ref": "#/components/parameters/date-from"
+              },
+              {
+                  "$ref": "#/components/parameters/date-to"
+              },
+              {
+                "$ref": "#/components/parameters/identifier-scheme"
+              },
+              {
+                "$ref": "#/components/parameters/identifier-id"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-from"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-to"
+              }
+          ],
+          "responses": {
+              "200": {
+                  "description": "Successful. The response contains the animal position observation events for the given location.",
+                  "content": {
+                      "application/json": {
+                          "schema": {
+                              "$ref": "#/components/schemas/icarGroupPositionObservationEventCollection"
+                          }
+                      }
+                  }
+              },
+              "default": {
+                  "$ref": "#/components/responses/default"
+              }
+          }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/observation-summary-metrics": {
+      "get": {
+          "operationId": "get-animal-observation-summary-metrics",
+          "summary": "Get summary statistics for individual animal observations.",
+          "description": "# Purpose\nProvides the collection of animal observation summary statistics for animals at the specified location.\n",
+          "tags": [
+              "ADE-1.5-management"
+          ],
+          "parameters": [
+              {
+                  "$ref": "#/components/parameters/location-scheme"
+              },
+              {
+                  "$ref": "#/components/parameters/location-id"
+              },
+              {
+                "$ref": "#/components/parameters/date-from"
+              },
+              {
+                  "$ref": "#/components/parameters/date-to"
+              },
+              {
+                "$ref": "#/components/parameters/animal-scheme"
+              },
+              {
+                "$ref": "#/components/parameters/animal-id"
+              },
+              {
+                "$ref": "#/components/parameters/metric-scheme"
+              },
+              {
+                "$ref": "#/components/parameters/metric-id"
+              },
+              {
+                "$ref": "#/components/parameters/duration"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-from"
+              },
+              {
+                  "$ref": "#/components/parameters/meta-modified-to"
+              }
+          ],
+          "responses": {
+              "200": {
+                  "description": "Successful. The response contains the animal observation summary resources for the given location.",
+                  "content": {
+                      "application/json": {
+                          "schema": {
+                              "$ref": "#/components/schemas/icarObservationSummaryCollection"
+                          }
+                      }
+                  }
+              },
+              "default": {
+                  "$ref": "#/components/responses/default"
+              }
+          }
+      }
+    },
+    "/locations/{location-scheme}/{location-id}/remarks": {
+      "get": {
+        "operationId": "get-remark-events",
+        "summary": "Get the animal remarks for a certain location",
+        "description": "# Purpose\nProvides the animal remarks or notes recorded for a location\n",
+        "tags": [
+          "ADE-1.5-management"
+        ],
+        "parameters": [{
+            "$ref": "#/components/parameters/location-scheme"
+          },
+          {
+            "$ref": "#/components/parameters/location-id"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-from"
+          },
+          {
+            "$ref": "#/components/parameters/meta-modified-to"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful. The response contains the remark events for the given location.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/icarRemarkEventCollection"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        }
+      }
+    }    
+  },
+  "components": {
+    "schemas": {
+      "icarLocationCollection": {
+        "$ref": "../collections/icarLocationCollection.json"
+      },
+      "icarMilkingVisitEventCollection": {
+        "$ref": "../collections/icarMilkingVisitEventCollection.json"
+      },
+      "icarWithdrawalEventCollection": {
+        "$ref": "../collections/icarWithdrawalEventCollection.json"
+      },
+      "icarMilkPredictionsCollection": {
+        "$ref": "../collections/icarMilkPredictionsCollection.json"
+      },
+      "icarReproMatingRecommendationCollection": {
+        "$ref": "../collections/icarReproMatingRecommendationCollection.json"
+      },
+      "icarTestDayCollection": {
+        "$ref": "../collections/icarTestDayCollection.json"
+      },
+      "icarTestDayResultEventCollection": {
+        "$ref": "../collections/icarTestDayResultEventCollection.json"
+      },
+      "icarDailyMilkingAveragesCollection": {
+        "$ref": "../collections/icarDailyMilkingAveragesCollection.json"
+      },
+      "icarLactationCollection": {
+        "$ref": "../collections/icarLactationCollection.json"
+      },
+      "icarMovementBirthEventCollection": {
+        "$ref": "../collections/icarMovementBirthEventCollection.json"
+      },
+      "icarMovementDeathEventCollection": {
+        "$ref": "../collections/icarMovementDeathEventCollection.json"
+      },
+      "icarMovementArrivalEventCollection": {
+        "$ref": "../collections/icarMovementArrivalEventCollection.json"
+      },
+      "icarMovementDepartureEventCollection": {
+        "$ref": "../collections/icarMovementDepartureEventCollection.json"
+      },
+      "icarAnimalCoreCollection": {
+        "$ref": "../collections/icarAnimalCoreCollection.json"
+      },
+      "icarAnimalSetCollection": {
+        "$ref": "../collections/icarAnimalSetCollection.json"
+      },
+      "icarAnimalSetJoinEventCollection": {
+        "$ref": "../collections/icarAnimalSetJoinEventCollection.json"
+      },
+      "icarAnimalSetLeaveEventCollection": {
+        "$ref": "../collections/icarAnimalSetLeaveEventCollection.json"
+      },
+      "icarStatisticsCollection": {
+        "$ref": "../collections/icarStatisticsCollection.json"
+      },
+      "icarReproPregnancyCheckEventCollection": {
+        "$ref": "../collections/icarReproPregnancyCheckEventCollection.json"
+      },
+      "icarReproHeatEventCollection": {
+        "$ref": "../collections/icarReproHeatEventCollection.json"
+      },
+      "icarReproInseminationEventCollection": {
+        "$ref": "../collections/icarReproInseminationEventCollection.json"
+      },
+      "icarMilkingDryOffEventCollection": {
+        "$ref": "../collections/icarMilkingDryOffEventCollection.json"
+      },
+      "icarReproAbortionEventCollection": {
+        "$ref": "../collections/icarReproAbortionEventCollection.json"
+      },
+      "icarReproDoNotBreedEventCollection": {
+        "$ref": "../collections/icarReproDoNotBreedEventCollection.json"
+      },
+      "icarReproParturitionEventCollection": {
+        "$ref": "../collections/icarReproParturitionEventCollection.json"
+      },
+      "icarWeightEventCollection": {
+        "$ref": "../collections/icarWeightEventCollection.json"
+      },
+      "icarDeviceCollection": {
+        "$ref": "../collections/icarDeviceCollection.json"
+      },
+      "icarFeedStorageCollection": {
+        "$ref": "../collections/icarFeedStorageCollection.json"
+      },
+      "icarBreedingValueCollection": {
+        "$ref": "../collections/icarBreedingValueCollection.json"
+      },
+      "icarConformationScoreEventCollection": {
+        "$ref": "../collections/icarConformationScoreEventCollection.json"
+      },
+      "icarTypeClassificationEventCollection": {
+        "$ref": "../collections/icarTypeClassificationEventCollection.json"
+      },
+      "icarDiagnosisEventCollection": {
+        "$ref": "../collections/icarDiagnosisEventCollection.json"
+      },
+      "icarTreatmentEventCollection": {
+        "$ref": "../collections/icarTreatmentEventCollection.json"
+      },
+      "icarTreatmentProgramEventCollection": {
+        "$ref": "../collections/icarTreatmentProgramEventCollection.json"
+      },
+      "icarHealthStatusObservedEventCollection": {
+        "$ref": "../collections/icarHealthStatusObservedEventCollection.json"
+      },
+      "icarGestationCollection": {
+        "$ref": "../collections/icarGestationCollection.json"
+      },
+      "icarFeedCollection": {
+        "$ref": "../collections/icarFeedCollection.json"
+      },
+      "icarRationCollection": {
+        "$ref": "../collections/icarRationCollection.json"
+      },
+      "icarFeedIntakeEventCollection": {
+        "$ref": "../collections/icarFeedIntakeEventCollection.json"
+      },
+      "icarGroupFeedingEventCollection": {
+        "$ref": "../collections/icarGroupFeedingEventCollection.json"
+      },
+      "icarFeedReportCollection": {
+        "$ref": "../collections/icarFeedReportCollection.json"
+      },
+      "icarFeedRecommendationCollection": {
+        "$ref": "../collections/icarFeedRecommendationCollection.json"
+      },
+      "icarLactationStatusObservedEventCollection": {
+        "$ref": "../collections/icarLactationStatusObservedEventCollection.json"
+      },
+      "icarReproStatusObservedEventCollection": {
+        "$ref": "../collections/icarReproStatusObservedEventCollection.json"
+      },
+      "icarSchemeTypeCollection": {
+        "$ref": "../collections/icarSchemeTypeCollection.json"
+      },
+      "icarSchemeValueCollection": {
+        "$ref": "../collections/icarSchemeValueCollection.json"
+      },
+      "icarGroupMovementBirthEventCollection": {
+        "$ref": "../collections/icarGroupMovementBirthEventCollection.json"
+      },
+      "icarGroupMovementDeathEventCollection": {
+        "$ref": "../collections/icarGroupMovementDeathEventCollection.json"
+      },
+      "icarGroupMovementArrivalEventCollection": {
+        "$ref": "../collections/icarGroupMovementArrivalEventCollection.json"
+      },
+      "icarGroupMovementDepartureEventCollection": {
+        "$ref": "../collections/icarGroupMovementDepartureEventCollection.json"
+      },
+      "icarGroupTreatmentEventCollection": {
+        "$ref": "../collections/icarGroupTreatmentEventCollection.json"
+      },
+      "icarGroupWeightEventCollection": {
+        "$ref": "../collections/icarGroupWeightEventCollection.json"
+      },
+      "icarReproEmbryoFlushingEventCollection" : {
+        "$ref": "../collections/icarReproEmbryoFlushingEventCollection.json"
+      },
+      "icarProcessingLotCollection" : {
+        "$ref": "../collections/icarProcessingLotCollection.json"
+      },
+      "icarCarcassCollection" : {
+        "$ref": "../collections/icarCarcassCollection.json"
+      },
+      "icarCarcassObservationsEventCollection" : {
+        "$ref": "../collections/icarCarcassObservationsEventCollection.json"
+      },
+      "icarInventoryTransactionCollection": {
+        "$ref": "../collections/icarInventoryTransactionCollection.json"
+      },
+      "icarFeedTransactionCollection": {
+        "$ref": "../collections/icarFeedTransactionCollection.json"
+      },
+      "icarMedicineTransactionCollection": {
+        "$ref": "../collections/icarMedicineTransactionCollection.json"
+      },
+      "icarAttentionEventCollection": {
+        "$ref": "../collections/icarAttentionEventCollection.json"
+      },
+      "icarPositionObservationEventCollection": {
+        "$ref": "../collections/icarPositionObservationEventCollection.json"
+      },
+      "icarGroupPositionObservationEventCollection": {
+        "$ref": "../collections/icarGroupPositionObservationEventCollection.json"
+      },
+      "icarObservationSummaryCollection": {
+        "$ref": "../collections/icarObservationSummaryCollection.json"
+      },
+      "icarRemarkEventCollection": {
+        "$ref": "../collections/icarRemarkEventCollection.json"
+      }
+    },
+    "parameters": {
+      "location-scheme": {
+        "name": "location-scheme",
+        "in": "path",
+        "description": "The scheme id for the location identifier.",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "enum": [
+            "nl.ubn",
+            "de.farmid",
+            "be.pen"
+          ]
+        }
+      },
+      "location-id": {
+        "name": "location-id",
+        "in": "path",
+        "description": "The unique identifier for the location.",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "meta-modified-from": {
+        "name": "meta-modified-from",
+        "in": "query",
+        "description": "The start of the date-time range for the data to get in the request.",
+        "schema": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "meta-modified-to": {
+        "name": "meta-modified-to",
+        "in": "query",
+        "description": "The end of the date-time range for the data to get in the request.",
+        "schema": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "date-from": {
+          "name": "date-to",
+          "in": "query",
+          "description": "The end of the date range for the period for which data is needed, the date inclusive.",
+          "schema": {
+              "type": "string",
+              "format": "date"
+          }
+      },
+      "date-to": {
+          "name": "date-from",
+          "in": "query",
+          "description": "The start of the date range for the period for which data is needed, the date inclusive.",
+          "schema": {
+              "type": "string",
+              "format": "date"
+          }
+      },
+      "purpose": {
+          "name": "purpose",
+          "in": "query",
+          "description": "The purpose of the statistics.",
+          "required": false,
+          "schema": {
+            "allOf": [
+              { "$ref": "../enums/icarStatisticsPurposeType.json" }
+            ]
+          }
+      },
+      "family": {
+        "name": "family",
+        "in": "query",
+        "description": "The family of products.",
+        "required": false,
+        "schema": {
+          "allOf": [
+            { "$ref": "../enums/icarProductFamilyType.json" }
+          ]
+        }
+    },
+    "report-start-date-time": {
+        "name": "report-start-date-time",
+        "in": "query",
+        "description": "The start of the date-time range for the data to get in the request based on the event date time.",
+        "schema": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "report-end-date-time": {
+        "name": "report-end-date-time",
+        "in": "query",
+        "description": "The end of the date-time range for the data to get in the request based on the event date time.",
+        "schema": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "animal-scheme": {
+        "name": "animal-scheme",
+        "in": "query",
+        "description": "The scheme id for the animal identifier.",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "animal-id": {
+        "name": "animal-id",
+        "in": "query",
+        "description": "The unique identifier for the animal.",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "scheme-type": {
+        "name": "scheme-type",
+        "in": "path",
+        "description": "The unique identifier scheme type (location, trait, breed)",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "scheme": {
+        "name": "scheme",
+        "in": "path",
+        "description": "The unique identifier scheme",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "identifier-scheme": {
+        "name": "identifier-scheme",
+        "in": "query",
+        "description": "The scheme for an identifier.",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "identifier-id": {
+        "name": "identifier-id",
+        "in": "query",
+        "description": "The unique identifier within a scheme.",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "metric-scheme": {
+        "name": "metric-scheme",
+        "in": "query",
+        "description": "The scheme for a metric.",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "metric-id": {
+        "name": "metric-id",
+        "in": "query",
+        "description": "The unique metric within a scheme.",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "duration": {
+        "name": "duration",
+        "in": "query",
+        "description": "The duration for aggregations (e.g. 1D, 1H, 24H, 96H).",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "responses": {
+      "default": {
+        "description": "An error has occured while handling the request. Check the content of the message for the error details.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                { "$ref": "../collections/icarErrorCollection.json" }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "examples": {
+      "locations": {
+        "value": {
+          "view": {
+            "totalItems": 1,
+            "totalPages": 1,
+            "pageSize": 10,
+            "currentPage": 1
+          },
+          "member": [{
+            "identifier": {
+              "id": "276031231231234",
+              "scheme": "eu.farmId"
+            },
+            "name": "My little farm",
+            "timeZoneId": "Europe/Paris",
+            "meta": {
+              "source": "source",
+              "creator": "creator",
+              "modified": "2020-01-29T08:49:06.1314223+00:00",
+              "created": "2020-01-29T08:49:06.1314223+00:00"
+            }
+          }
+         ]
+        }
+      },
+      "feed-storages": {
+        "value": {
+          "view": {
+            "totalItems": 1,
+            "totalPages": 1,
+            "pageSize": 10,
+            "currentPage": 1
+          },
+          "member": [{
+            "id": "276031231231234",
+            "name": "My first silo",
+            "feedId": "a8f5944e-de92-4768-a1ff-392e15a2195e",
+            "capacity": {
+              "value": 50000,
+              "unitCode": "KGM"
+            },
+            "quantityAvailable": {
+              "value": 28765,
+              "unitCode": "KGM"
+            },
+            "meta": {
+              "source": "source",
+              "creator": "creator",
+              "modified": "2020-01-29T08:49:06.1314223+00:00",
+              "created": "2020-01-29T08:49:06.1314223+00:00"
+            }
+          }
+          ]
+        }
+      },
+      "arrival": {
+        "value": {
+          "view": {
+            "totalItems": 1,
+            "totalPages": 1,
+            "pageSize": 10,
+            "currentPage": 1
+          },
+          "member": [{
+            "id": "ac9bdd26-0e20-44e7-b311-7d3d988f9717",
+            "animal": {
+              "id": "NL 919713288",
+              "scheme": "nl.ubn"
+            },
+            "eventDateTime": "2016-01-06T14:00:00Z",
+            "location": {
+              "id": "231817",
+              "scheme": "nl.ubn"
+            },
+            "animalDetail": { 
+              "identifier": { 
+                "id": "NL 919713288",
+                "scheme": "nl.ubn"  
+              },
+              "specie": "Cattle",
+              "gender": "Female",
+              "birthDate": "2013-11-06T08:00:00Z", 
+              "breedFractions": {
+                "denominator": 8,
+                "fractions": [{
+                  "breed": {
+                    "id": "HF",
+                    "scheme": "icar.org"
+                  },
+                  "fraction": 8
+                }]
+              },
+              "coatColor": "RB",
+              "managementTag": "88",
+              "name": "NELLY 258",
+              "productionPurpose": "Milk",
+              "status": "Alive",
+              "parentage": [{
+                  "parentOf": {
+                    "id": "NL 919713288",
+                    "scheme": "nl.ubn"
+                  },
+                  "gender": "Female",
+                  "relation": "Genetic",
+                  "identifier": {
+                    "id": "NL 765410142",
+                    "scheme": "nl.ubn"
+                  },
+                  "officialName": "NELLY 211"
+                },
+                {
+                  "parentOf": {
+                    "id": "NL 919713288",
+                    "scheme": "nl.ubn"
+                  },
+                  "gender": "Male",
+                  "relation": "Genetic",
+                  "identifier": {
+                    "id": "NL 399745212",
+                    "scheme": "nl.ubn"
+                  },
+                  "officialName": "TOPSPEED KODAK"
+                }
+              ]
+            },
+            "consignment": {            
+              "originLocation": {
+                "id": "NL 765410142",
+                "scheme": "nl.ubn"
+              }
+            }
+          }]
+        }
+      },
+      "milking-visit": {
+        "value": {
+          "view": {
+            "totalItems": 1,
+            "totalPages": 1,
+            "pageSize": 10,
+            "currentPage": 1
+          },
+          "member": [{
+            "id": "706250",
+            "animal": {
+              "id": "NL 877034232",
+              "scheme": "nl-v1"
+            },
+            "milkingStartingDateTime": "2019-11-01T23:58:31Z",
+            "milkingVisitDuration": {
+              "value": 349.0,
+              "unitCode": "SEC"
+            },
+            "milkingDuration": {
+              "value": 210,
+              "unitCode": "SEC"
+            },
+            "milkingType": "Automated",
+            "milkingMilkWeight": {
+              "value": 3.5,
+              "unitCode": "KGM"
+            },
+            "milkingComplete": true,
+            "milkingParlourUnit": "101",
+            "milkingBoxNumber": "0",
+            "milkingDeviceId": "101",
+            "measureDeviceId": "101",
+            "eventOffset": "2019-11-01T23:58:31",
+            "eventDeviceId": "101",
+            "quarterMilkings": [{
+              "icarQuarterId": "LF",
+              "milkingDuration": {
+                "value": 210,
+                "unitCode": "SEC"
+              },
+              "milkingMilkWeight": {
+                "value": 3.5,
+                "unitCode": "KGM"
+              }
+            }],
+            "animalMilkingSample": [{
+              "bottleIdentifierType": "BRC",
+              "rackNumber": "3",
+              "bottlePosition": "7"
+            }],
+            "icarMilkCharacteristics": [{
+                "characteristic": "FAT",
+                "value": "3.74",
+                "unit": "VP",
+                "icarMeasuringDevice": "to_be_defined_by_ICAR-sensor_group"
+              },
+              {
+                "characteristic": "PROTEIN",
+                "value": "3.54",
+                "unit": "VP"
+              }
+            ]
+          }]
+        }
+      },
+      "test-day-result": {
+        "value": {
+          "view": {
+            "totalItems": 1,
+            "totalPages": 1,
+            "pageSize": 10,
+            "currentPage": 1
+          },
+          "member": [{
+            "id": "706250",
+            "animal": {
+              "id": "NL 877034232",
+              "scheme": "nl-v1"
+            },
+            "EventDateTime": "2019-11-01T23:58:31Z",
+            "milkWeight24Hours": {
+              "value": 21.7,
+              "unitCode": "KGM"
+            },
+            "icarMilkCharacteristics": [{
+                "characteristic": "FAT",
+                "value": "3.74",
+                "unit": "VP",
+                "icarMeasuringDevice": "to_be_defined_by_ICAR-sensor_group"
+              },
+              {
+                "characteristic": "PROTEIN",
+                "value": "3.54",
+                "unit": "VP"
+              }
+            ]
+          }]
+        }
+      },
+      "animal-sets": {
+        "value": {
+          "view": {
+            "totalItems": 1,
+            "totalPages": 1,
+            "pageSize": 10,
+            "currentPage": 1
+          },
+          "member": [{
+            "id": "6e47cd5c-2d42-4268-a665-bd17cd5fc222",
+            "name": "My Barn Group",
+            "purpose": "Enclosure",
+            "member": [{
+                "scheme": "eu.animalId",
+                "id": "276000312312345"
+              }, {
+                "scheme": "eu.animalId",
+                "id": "276000312319876"
+              }
+            ]
+          }]
+        }
+      },
+      "animal-set-joins": {
+        "value": {
+          "view": {
+            "totalItems": 1,
+            "totalPages": 1,
+            "pageSize": 10,
+            "currentPage": 1
+          },
+          "member": [{
+              "animal": {
+                "scheme": "eu.animalId",
+                "id": "276000312312345"
+              },
+              "eventDateTime": "2019-11-01T23:58:31Z",
+              "animalSetId": "6e47cd5c-2d42-4268-a665-bd17cd5fc222"
+            }
+          ]
+        }
+      },
+      "animal-set-leaves": {
+        "value": {
+          "view": {
+            "totalItems": 1,
+            "totalPages": 1,
+            "pageSize": 10,
+            "currentPage": 1
+          },
+          "member": [{
+              "animal": {
+                "scheme": "eu.animalId",
+                "id": "276000312312345"
+              },
+              "eventDateTime": "2019-11-01T23:58:31Z",
+              "animalSetId": "6e47cd5c-2d42-4268-a665-bd17cd5fc222"
+            }
+          ]
+        }
+      },
+      "test-days": {
+        "value": {
+          "summary": "Example of test day resources.",
+          "externalValue": "../examples/exampleTestDayResourceCollection.json"
+        }
+      },
+      "insemination-finland": {
+        "value": {
+          "summary": "Example of insemination event messages from finnish milk recording organization",
+          "externalValue": "../examples/exampleInseminationEventResources_Finland.json"
+        }
+      },
+      "pregnancy-check-finland": {
+        "value": {
+          "summary": "Example of pregnancy check event messages from finnish milk recording organization",
+          "externalValue": "../examples/examplePregnancyCheckEventResources_Finland.json"
+        }
+      },
+      "drying-off-finland": {
+        "value": {
+          "summary": "Example of drying off event messages from finnish milk recording organization",
+          "externalValue": "../examples/exampleDryOffEventResources_Finland.json"
+        }
+      },
+      "drying-off-sweden": {
+        "value": {
+          "summary": "Example of drying off event messages from swedish milk recording organization",
+          "externalValue": "../examples/exampleDryOffEventResources_Sweden.json"
+        }
+      },
+      "schemata": {
+        "value": {
+          "view": {
+            "totalItems": 3,
+            "totalPages": 1,
+            "pageSize": 10,
+            "currentPage": 1
+          },
+          "member": [
+            {
+              "name": "locations"
+            },
+            {
+              "name": "animals"
+            },
+            {
+              "name": "breeds"
+            }
+          ]
+        }
+      },
+      "schemata-locations": {
+        "value": {
+          "view": {
+            "totalItems": 2,
+            "totalPages": 1,
+            "pageSize": 10,
+            "currentPage": 1
+          },
+          "member": [
+            {
+              "name": "nl.ubn"
+            },
+            {
+              "name": "nl.brs"
+            },
+            {
+              "name": "dk.herdnumber"
+            }
+          ]
+        }
+      },
+      "schemata-breeds": {
+        "value": {
+          "view": {
+            "totalItems": 2,
+            "totalPages": 1,
+            "pageSize": 10,
+            "currentPage": 1
+          },
+          "member": [
+            {
+              "name": "icar.breed.interbull"
+            },
+            {
+              "name": "finland.breed"
+            }
+          ]
+        }
+      },
+      "schemata-breeds-interbull": {
+        "value": {
+          "view": {
+            "totalItems": 50,
+            "totalPages": 1,
+            "pageSize": 50,
+            "currentPage": 1
+          },
+          "member": [
+            {
+              "id": "ABO",
+              "name": "Abondance"
+            },
+            {
+              "id": "AAN",
+              "name": "Angus"
+            },
+            {
+              "id": "AUB",
+              "name": "Aubrac"
+            },
+            {
+              "id": "RDC",
+              "name": "Ayrshire"
+            },
+            {
+              "id": "BZD",
+              "name": "Bazadais"
+            },
+            {
+              "id": "BBL",
+              "name": "Belgian Blue"
+            },
+            {
+              "id": "BAQ",
+              "name": "Blonde d'Aquitaine"
+            },
+            {
+              "id": "BSH",
+              "name": "Beef Shorthorn"
+            },
+            {
+              "id": "BMA",
+              "name": "Beefmaster"
+            },
+            {
+              "id": "BER",
+              "name": "Belgium Red & White"
+            },
+            {
+              "id": "BFD",
+              "name": "Braford"
+            },
+            {
+              "id": "BRM",
+              "name": "Brahman"
+            },
+            {
+              "id": "BRG",
+              "name": "Brangus"
+            },
+            {
+              "id": "BRR",
+              "name": "Brand Rood"
+            },
+            {
+              "id": "BRF",
+              "name": "British Frisian"
+            },
+            {
+              "id": "BSW",
+              "name": "Brown Swiss"
+            },
+            {
+              "id": "CIA",
+              "name": "Chianina"
+            },
+            {
+              "id": "CHA",
+              "name": "Charolais"
+            },
+            {
+              "id": "MSH",
+              "name": "Dairy Shorthorn"
+            },
+            {
+              "id": "DFR",
+              "name": "Dutch Frisian"
+            },
+            {
+              "id": "ERI",
+              "name": "Eringer"
+            },
+            {
+              "id": "MRY",
+              "name": "Meuse Rhine Yssel"
+            },
+            {
+              "id": "DXT",
+              "name": "Dexter"
+            },
+            {
+              "id": "DEV",
+              "name": "Devon"
+            },
+            {
+              "id": "DIK",
+              "name": "Dikbil"
+            },
+            {
+              "id": "BWR",
+              "name": "Eastern Flanders White Red"
+            },
+            {
+              "id": "RDC",
+              "name": "European Red Dairy Breed"
+            },
+            {
+              "id": "GAS",
+              "name": "Gascon"
+            },
+            {
+              "id": "GDB",
+              "name": "Glan Donnersberg"
+            },
+            {
+              "id": "GLW",
+              "name": "Galloway"
+            },
+            {
+              "id": "GUE",
+              "name": "Guernsey"
+            },
+            {
+              "id": "GVH",
+              "name": "Gelbvieh"
+            },
+            {
+              "id": "GRO",
+              "name": "Groninger"
+            },
+            {
+              "id": "HER",
+              "name": "Hereford"
+            },
+            {
+              "id": "HLA",
+              "name": "Highland Cattle"
+            },
+            {
+              "id": "HWD",
+              "name": "Hinterwälder"
+            },
+            {
+              "id": "HOL",
+              "name": "Holstein"
+            },
+            {
+              "id": "RED",
+              "name": "Holstein, Red and White"
+            },
+            {
+              "id": "JER",
+              "name": "Jersey"
+            },
+            {
+              "id": "KER",
+              "name": "Kerry"
+            },
+            {
+              "id": "DBE",
+              "name": "Dutch Belted- Lakenvelder"
+            },
+            {
+              "id": "LIM",
+              "name": "Limousin"
+            },
+            {
+              "id": "LON",
+              "name": "Longhorn"
+            },
+            {
+              "id": "LUI",
+              "name": "Luing"
+            },
+            {
+              "id": "RDP",
+              "name": "Rouge des Pres"
+            },
+            {
+              "id": "MGR",
+              "name": "Murray-Grey"
+            },
+            {
+              "id": "MON",
+              "name": "Montbéliard"
+            },
+            {
+              "id": "MAR",
+              "name": "Marchigiana"
+            },
+            {
+              "id": "MAE",
+              "name": "Maremmana"
+            },
+            {
+              "id": "NEL",
+              "name": "Nellore"
+            },
+            {
+              "id": "NMD",
+              "name": "Normandy"
+            },
+            {
+              "id": "RDC",
+              "name": "Norwegian Red"
+            },
+            {
+              "id": "PAR",
+              "name": "Parthenaise"
+            },
+            {
+              "id": "PIE",
+              "name": "Piedmont"
+            },
+            {
+              "id": "PIN",
+              "name": "Pinzgau"
+            },
+            {
+              "id": "RAN",
+              "name": "Red Angus"
+            },
+            {
+              "id": "ROM",
+              "name": "Romagnola"
+            },
+            {
+              "id": "SAL",
+              "name": "Salers"
+            },
+            {
+              "id": "SGE",
+              "name": "Santa Gertrudis"
+            },
+            {
+              "id": "SDE",
+              "name": "South Devon"
+            },
+            {
+              "id": "SUS",
+              "name": "Sussex"
+            },
+            {
+              "id": "SIM",
+              "name": "Simmental/Fleckvieh"
+            },
+            {
+              "id": "RDC",
+              "name": "Swedish Red"
+            },
+            {
+              "id": "SAH",
+              "name": "Sahiwal"
+            },
+            {
+              "id": "TAR",
+              "name": "Tarentaise"
+            },
+            {
+              "id": "TUX",
+              "name": "Tux"
+            },
+            {
+              "id": "TGR",
+              "name": "Tyrol Grey"
+            },
+            {
+              "id": "VRB",
+              "name": "Verbeter Roodbont"
+            },
+            {
+              "id": "WAG",
+              "name": "Wagyu"
+            },
+            {
+              "id": "WBM",
+              "name": "Belgium Blue Mixte"
+            },
+            {
+              "id": "WBL",
+              "name": "Welsh Black"
+            },
+            {
+              "id": "BRV",
+              "name": "Western Flanders Meat"
+            },
+            {
+              "id": "BRD",
+              "name": "West-Vlaams Rood"
+            },
+            {
+              "id": "WRI",
+              "name": "Witrik"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

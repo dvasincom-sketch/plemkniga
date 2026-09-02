@@ -1,0 +1,31 @@
+{
+  "description": "Site available on a location.",
+  "allOf": [
+    {
+      "$ref": "../resources/icarResource.json"
+    },
+    {
+      "type": "object",
+      "required": [
+        "id",
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier in the system for this site."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the site as it is known on the location."
+        },
+        "capacity": {
+          "type": "number",
+          "default": 0,
+          "description": "The maximum capacity of this site.",
+          "format": "int32"
+        }
+      }
+    }
+  ]
+}

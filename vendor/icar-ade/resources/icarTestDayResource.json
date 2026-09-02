@@ -1,0 +1,30 @@
+{
+  "description": "Information about test day for milk sampling.",
+  "allOf": [
+    {
+      "$ref": "icarResource.json"
+    },
+    {
+      "type": "object",
+      "required": [
+        "id",
+        "beginDate",
+        "endDate"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for this test day."
+        },
+        "beginDate": {
+          "$ref": "../types/icarDateTimeType.json",
+          "description": "The RFC3339 UTC datetime of the beginning of the milk sampling (see https://ijmacd.github.io/rfc3339-iso8601/ for format guidance)."
+        },
+        "endDate": {
+          "$ref": "../types/icarDateTimeType.json",
+          "description": "The RFC3339 UTC datetime of the end of the milk sampling (see https://ijmacd.github.io/rfc3339-iso8601/ for format guidance)."
+        }
+      }
+    }
+  ]
+}
