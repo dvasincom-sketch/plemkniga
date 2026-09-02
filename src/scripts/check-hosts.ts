@@ -150,6 +150,7 @@ const SHARED: [path: string, why: string][] = [
   ['/icar/gaps', 'вложенная страница разбора'],
   ['/api-docs', 'описание интерфейса'],
   ['/api-docs/openapi.json', 'машинное описание внутри неё'],
+  ['/tour', 'английская экскурсия по книге'],
 ]
 
 const NOT_SHARED: [path: string, why: string][] = [
@@ -166,6 +167,7 @@ const NOT_SHARED: [path: string, why: string][] = [
   ['/compliance-report', 'другое слово, начинается так же'],
   ['/icarus', 'другое слово, начинается так же'],
   ['/api-docsets', 'другое слово, начинается так же'],
+  ['/tourism', 'другое слово, начинается так же'],
 ]
 
 for (const [path, why] of SHARED) {

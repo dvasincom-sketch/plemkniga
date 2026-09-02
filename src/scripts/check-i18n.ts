@@ -33,10 +33,22 @@ import { negotiateLocale, resolveLocale } from '@/lib/i18n/negotiate'
 
 const fails: string[] = []
 
-/** Обойти все строки набора, отдавая путь и значение. */
-function walk(node: unknown, path: string, out: [string, string][]): void {
+/**
+ * Обойти все строки набора, отдавая путь и значение.
+ *
+ * `null` — не пропуск, а «здесь этой строки нет намеренно»: так помечена
+ * ссылка на английскую экскурсию, которой русскому набору не нужно.
+ * Путь при этом записывается со значением `null`, а не выбрасывается:
+ * иначе сверка ключей увидела бы у пяти языков строку, «которой нет
+ * в русском», и потребовала бы выдумать русский перевод ради самой сверки.
+ */
+function walk(node: unknown, path: string, out: [string, string | null][]): void {
   if (typeof node === 'string') {
     out.push([path, node])
+    return
+  }
+  if (node === null) {
+    out.push([path, null])
     return
   }
   if (Array.isArray(node)) {
@@ -48,8 +60,8 @@ function walk(node: unknown, path: string, out: [string, string][]): void {
   }
 }
 
-const stringsOf = (m: Messages | SiteMessages): [string, string][] => {
-  const out: [string, string][] = []
+const stringsOf = (m: Messages | SiteMessages): [string, string | null][] => {
+  const out: [string, string | null][] = []
   walk(m, '', out)
   return out
 }
@@ -118,6 +130,9 @@ for (const info of LOCALES) {
   }
 
   for (const [path, value] of items) {
+    /* Намеренно отсутствующая строка проверкам содержимого не подлежит. */
+    if (value === null) continue
+
     if (!value.trim()) fails.push(`${setName}, ${locale}: пустая строка ${path}`)
 
     if (locale !== 'ru' && looksRussian(value)) {
@@ -126,7 +141,8 @@ for (const info of LOCALES) {
   }
 
   const mark = info.reviewed ? 'проверен' : 'НЕ проверен носителем'
-  console.log(`  ${locale} (${info.native}): ${items.length} строк, ${mark}`)
+  const said = items.filter(([, v]) => v !== null).length
+  console.log(`  ${locale} (${info.native}): ${said} строк, ${mark}`)
 }
 }
 
@@ -187,6 +203,7 @@ for (const [setName, byLocale] of SETS) {
     if (info.code === DEFAULT_LOCALE) continue
 
     for (const [path, value] of stringsOf(byLocale[info.code])) {
+      if (value === null) continue
       if (ALLOWED_PATHS.has(path)) continue
 
       const lower = value.toLowerCase()

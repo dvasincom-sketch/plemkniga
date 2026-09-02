@@ -318,6 +318,28 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
             >
               {s.book.cta}
             </a>
+            {/*
+               Экскурсия стоит рядом с кнопкой «открыть книгу», а не вместо
+               неё, и только на нерусских языках.
+
+               Причина в том, куда ведёт сама кнопка: книга по-русски.
+               Русскому посетителю этого достаточно — он открывает и читает.
+               Всем прочим прямая ссылка упирается в непонятный экран
+               на втором щелчке, и разбор устройства по-английски для них
+               ближе к тому, зачем они сюда пришли, чем сама книга.
+
+               Убирать при этом кнопку нельзя: работающая книга — главный
+               довод, и прятать её за пересказом значило бы предлагать
+               рассказ вместо доказательства.
+            */}
+            {s.book.tour && (
+              <a
+                href={`${base}/tour`}
+                className="text-[15px] text-white/80 underline underline-offset-4 transition-colors hover:text-white"
+              >
+                {s.book.tour}
+              </a>
+            )}
             <a
               href={`${base}/compliance`}
               className="text-[15px] text-white/80 underline underline-offset-4 transition-colors hover:text-white"

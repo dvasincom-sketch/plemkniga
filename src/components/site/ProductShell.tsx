@@ -64,11 +64,26 @@ export function ProductHeader({ children }: { children?: React.ReactNode }) {
  * называют другое лицо. Подписи разработчика тоже нет — последнее,
  * что видит уходящий, должно вести к системе.
  */
-export function ProductFooter() {
+/**
+ * Подписи подвала на двух языках.
+ *
+ * Полноценного набора строк здесь нет намеренно: подписей четыре, и заводить
+ * ради них механику перевода значило бы построить дорогу к одному дому.
+ * Как только страниц продукта на английском станет больше двух, это
+ * перерастёт в общий набор — а пока лишний слой только мешал бы читать.
+ */
+const FOOTER_LABELS = {
+  ru: { about: 'О продукте', compliance: 'Соответствие', api: 'API' },
+  en: { about: 'About', compliance: 'Compliance', api: 'API' },
+} as const
+
+export function ProductFooter({ lang = 'ru' }: { lang?: 'ru' | 'en' }) {
+  const l = FOOTER_LABELS[lang]
+
   const links: { href: string; label: string }[] = [
-    { href: '/', label: 'О продукте' },
-    { href: '/compliance', label: 'Соответствие' },
-    { href: '/api-docs', label: 'API' },
+    { href: '/', label: l.about },
+    { href: '/compliance', label: l.compliance },
+    { href: '/api-docs', label: l.api },
     /*
      * Ссылка названа доменом, а не словами «Племенная книга».
      *
@@ -87,7 +102,7 @@ export function ProductFooter() {
   return (
     <footer style={{ marginTop: 'var(--footer-air)' }} className="bg-basement py-10 text-white">
       <nav
-        aria-label="Разделы продукта"
+        aria-label={lang === 'en' ? 'Product sections' : 'Разделы продукта'}
         className="container-page flex flex-wrap items-center gap-x-8 gap-y-3 text-[14px]"
       >
         {links.map((l) =>
