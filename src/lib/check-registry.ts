@@ -318,6 +318,15 @@ export const CHECKS: CheckSpec[] = [
     probe: false,
   },
   {
+    code: 'check:breed-codes',
+    title: 'У пород есть коды ICAR',
+    what: 'Без трёхбуквенного кода порода не уезжает в обмен вовсе, а международный номер собирается коротким: шестнадцать символов вместо девятнадцати',
+    area: 'exchange',
+    writes: false,
+    needsServer: false,
+    probe: false,
+  },
+  {
     code: 'check:aiid',
     title: 'Международный номер собирается и разбирается верно',
     what: 'Настоящие номера из чешских списков быков разбираются; импортное животное считается от страны происхождения; длинный номер не обрезается',
@@ -325,6 +334,25 @@ export const CHECKS: CheckSpec[] = [
     writes: false,
     needsServer: false,
     /* Чистые функции на живых образцах: секунда, идёт в `check:all`. */
+    probe: false,
+  },
+  {
+    code: 'check:compliance',
+    title: 'Соответствие подтверждается, а не заявляется',
+    what: 'Каждое доказательство на странице соответствия ведёт на существующий прогон, файл или адрес; у «выполнено» и «частично» доказательство обязательно',
+    area: 'ui',
+    writes: false,
+    needsServer: false,
+    probe: false,
+    where: { href: '/compliance', label: 'Соответствие' },
+  },
+  {
+    code: 'check:hosts',
+    title: 'Домены разводятся верно',
+    what: 'Витрина и книга живут на разных доменах одного приложения; ошибка тут не падает, а показывает не то — рекламу вместо кабинета',
+    area: 'ui',
+    writes: false,
+    needsServer: false,
     probe: false,
   },
   {

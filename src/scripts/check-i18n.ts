@@ -1,4 +1,5 @@
 import { EAEU_MESSAGES, type Messages } from '@/lib/i18n/eaeu-messages'
+import { SITE_MESSAGES, type SiteMessages } from '@/lib/i18n/site-messages'
 import { LOCALES, DEFAULT_LOCALE, type Locale } from '@/lib/i18n/locales'
 import { negotiateLocale, resolveLocale } from '@/lib/i18n/negotiate'
 
@@ -47,7 +48,7 @@ function walk(node: unknown, path: string, out: [string, string][]): void {
   }
 }
 
-const stringsOf = (m: Messages): [string, string][] => {
+const stringsOf = (m: Messages | SiteMessages): [string, string][] => {
   const out: [string, string][] = []
   walk(m, '', out)
   return out
@@ -87,32 +88,46 @@ const looksRussian = (s: string): boolean => {
  *  1. Полнота и осмысленность строк                                  *
  * ------------------------------------------------------------------ */
 
-const reference = stringsOf(EAEU_MESSAGES[DEFAULT_LOCALE])
+/*
+ * Наборов два: страница для стран союза и витрина продукта. Проверяются
+ * одинаково и одним проходом — иначе второй набор заведётся без проверки
+ * ровно потому, что первый уже проверен.
+ */
+const SETS: [name: string, byLocale: Record<Locale, Messages | SiteMessages>][] = [
+  ['страница ЕАЭС', EAEU_MESSAGES],
+  ['витрина продукта', SITE_MESSAGES],
+]
+
+for (const [setName, byLocale] of SETS) {
+const reference = stringsOf(byLocale[DEFAULT_LOCALE])
 const referencePaths = reference.map(([p]) => p)
 
-console.log(`Строк в наборе (${DEFAULT_LOCALE}): ${reference.length}`)
+console.log(`Строк в наборе «${setName}» (${DEFAULT_LOCALE}): ${reference.length}`)
 
 for (const info of LOCALES) {
   const locale: Locale = info.code
-  const items = stringsOf(EAEU_MESSAGES[locale])
+  const items = stringsOf(byLocale[locale])
   const paths = items.map(([p]) => p)
 
   const missing = referencePaths.filter((p) => !paths.includes(p))
   const extra = paths.filter((p) => !referencePaths.includes(p))
 
-  for (const p of missing) fails.push(`${locale}: нет строки ${p}`)
-  for (const p of extra) fails.push(`${locale}: лишняя строка ${p}, которой нет в ${DEFAULT_LOCALE}`)
+  for (const p of missing) fails.push(`${setName}, ${locale}: нет строки ${p}`)
+  for (const p of extra) {
+    fails.push(`${setName}, ${locale}: лишняя строка ${p}, которой нет в ${DEFAULT_LOCALE}`)
+  }
 
   for (const [path, value] of items) {
-    if (!value.trim()) fails.push(`${locale}: пустая строка ${path}`)
+    if (!value.trim()) fails.push(`${setName}, ${locale}: пустая строка ${path}`)
 
     if (locale !== 'ru' && looksRussian(value)) {
-      fails.push(`${locale}: строка ${path} похожа на непереведённый русский текст`)
+      fails.push(`${setName}, ${locale}: строка ${path} похожа на непереведённый русский текст`)
     }
   }
 
   const mark = info.reviewed ? 'проверен' : 'НЕ проверен носителем'
   console.log(`  ${locale} (${info.native}): ${items.length} строк, ${mark}`)
+}
 }
 
 /* ------------------------------------------------------------------ *

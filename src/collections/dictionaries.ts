@@ -113,8 +113,13 @@ export const Breeds = dictionary({
         {
           name: 'whffCode',
           type: 'text',
-          label: 'Код WHFF',
-          admin: { description: 'Трёхбуквенный код: HOL — голштинская, JER — джерсейская' },
+          label: 'Код породы (WHFF / ICAR)',
+          admin: {
+            description:
+              'Трёхбуквенный код: HOL — голштинская, JER — джерсейская. Справочник ведёт ' +
+              'Interbull, один и тот же код у WHFF и ICAR. Уезжает в обмен по ADE ' +
+              'и входит в международный номер животного; без него порода наружу не идёт',
+          },
         },
         {
           name: 'isImprover',

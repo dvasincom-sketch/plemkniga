@@ -864,7 +864,7 @@ export interface Breed {
    */
   isActive?: boolean | null;
   /**
-   * Трёхбуквенный код: HOL — голштинская, JER — джерсейская
+   * Трёхбуквенный код: HOL — голштинская, JER — джерсейская. Справочник ведёт Interbull, один и тот же код у WHFF и ICAR. Уезжает в обмен по ADE и входит в международный номер животного; без него порода наружу не идёт
    */
   whffCode?: string | null;
   isImprover?: boolean | null;

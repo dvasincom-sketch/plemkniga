@@ -98,6 +98,19 @@ export function animalInput(doc: Record<string, unknown>): AnimalInput {
   const alt = doc.altIds as
     | { chipNumber?: string | null; internationalId?: string | null }
     | undefined
+  /*
+   * Код породы лежит в справочнике под именем `whffCode`, и это тот же
+   * трёхбуквенный код, который ведёт Interbull для ICAR: HOL, JER, AYR.
+   * Два имени у одного кода — наследство того, что первым его спросил
+   * WHFF; переименовывать поле ради ясности значило бы тронуть загрузки
+   * и выгрузки ради подписи.
+   *
+   * До этой правки порода не уезжала в обмен **никогда**: отображение
+   * ждало `breedCode`, а собиравший вход его не заполнял. Ошибка тихая —
+   * необязательное поле, которого просто нет, выглядит как животное
+   * без указанной породы.
+   */
+  const breed = doc.breed as { whffCode?: string | null } | number | null | undefined
   const owner = doc.owner as { id?: number } | number | null | undefined
   const father = relOf(doc.father as Rel)
   const mother = relOf(doc.mother as Rel)
@@ -117,6 +130,8 @@ export function animalInput(doc: Record<string, unknown>): AnimalInput {
      */
     rfid: checkRfid(alt?.chipNumber).ok ? (alt?.chipNumber ?? null) : null,
     internationalId: alt?.internationalId ?? null,
+    breedCode:
+      breed && typeof breed === 'object' ? (breed.whffCode?.trim().toUpperCase() ?? null) : null,
     name: (doc.name as string | null) ?? null,
     nameLatin: (doc.nameLatin as string | null) ?? null,
     sex: (doc.sex as AnimalInput['sex']) ?? null,
