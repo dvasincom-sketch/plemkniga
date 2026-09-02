@@ -10,6 +10,10 @@ import { isLocalDatabase, resolveDatabase } from '@/lib/db-url'
 import type { BenchMeasurement, BenchRow, BenchServer } from '@/lib/bench-report'
 import { poolOf } from '@/lib/sql'
 import { biggestHerd } from '@/lib/biggest-herd'
+import { herdConditions } from '@/lib/herd-condition'
+import { bookQuality } from '@/lib/book-quality'
+import { afcSireBook } from '@/lib/afc-sires'
+import { checkAnimals } from '@/lib/data-checks'
 
 /**
  * Замер по критериям приёмки: поиск, свидетельство, выгрузка.
@@ -347,6 +351,76 @@ export async function runBench(
         return s ? 1 : 0
       },
     })
+
+  /* ---------------------------------------------------------------- */
+  startGroup('Кабинет Ассоциации')
+
+  /*
+   * Почему эта группа появилась.
+   *
+   * Кабинет хозяйства читает своё стадо, и запрос отсекает чужое сразу
+   * же — по владельцу. Кабинет Ассоциации так не умеет: он про все
+   * хозяйства разом, и каждый его экран проходит по книге целиком.
+   * Разница видна не в коде, а во времени открытия, и до сих пор мерили
+   * только кабинет хозяйства.
+   *
+   * Поводом стала жалоба: «Состояние стад» открывалось секундами.
+   * Мерить надо было раньше, но начинать всегда есть с чего.
+   *
+   * Потолки здесь выше, чем у поиска, и это не поблажка. Поиск —
+   * ежеминутное действие зоотехника, эти экраны эксперт открывает
+   * несколько раз в день; секунда там, где ждут ответа на набранный
+   * запрос, и секунда там, где открывают сводку по сорока хозяйствам,
+   * стоят разного.
+   */
+  await measure({
+    what: 'состояние стад (все хозяйства)',
+    limitMs: 2000,
+    run: async () => (await herdConditions(payload)).size,
+  })
+
+  await measure({
+    what: 'качество книги',
+    limitMs: 2000,
+    run: async () => {
+      const q = await bookQuality(payload)
+      return q ? 1 : 0
+    },
+  })
+
+  await measure({
+    what: 'возраст первого отёла по быкам',
+    limitMs: 2000,
+    run: async () => (await afcSireBook(payload)).rows.length,
+  })
+
+  /*
+   * Разбор подтверждённых записей — самый тяжёлый экран кабинета:
+   * пятьдесят пять правил по четырёмстам животным, и часть правил
+   * ходит в базу за отёлами, дойками и родословной.
+   *
+   * Прогонов меньше: на трёх повторах видно и медиану, и худший случай,
+   * а десять таких прогонов заняли бы минуту ради второго знака.
+   */
+  await measure({
+    what: 'проверка подтверждённых записей',
+    limitMs: 5000,
+    runs: 3,
+    run: async () => {
+      const found = await payload.find({
+        collection: 'animals',
+        where: { and: [{ trustLevel: { equals: 3 } }, { archived: { not_equals: true } }] },
+        limit: 400,
+        sort: 'trustCheckedAt',
+        depth: 1,
+        overrideAccess: true,
+      })
+      const animals = found.docs as Animal[]
+      if (!animals.length) return 0
+      const { issues } = await checkAnimals(payload, animals)
+      return issues.length
+    },
+  })
 
   /* ---------------------------------------------------------------- */
   startGroup('Выгрузка стада')

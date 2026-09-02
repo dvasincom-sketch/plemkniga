@@ -4,7 +4,6 @@ import type { SignalInput } from '@/lib/herd-signals'
 import { numOf, poolOf } from '@/lib/sql'
 import {
   ageMonths,
-  calvingsCount,
   culledYear,
   isHeifer,
   liveFemale,
@@ -46,11 +45,17 @@ import {
  * Тот же довод, что у `farm-stats.ts`: сводка по списку считается
  * группировкой, а не повторением поштучного запроса.
  *
+ * Один запрос, впрочем, ещё не значит один проход. Первая редакция
+ * складывала пять подзапросов в один текст — и это были те же пять
+ * проходов по книге плюс триста тысяч поисков по отёлам, только
+ * записанные рядом. Страница открывалась секундами, и жалоба пришла
+ * оттуда, откуда и должна была: от эксперта, который её открыл.
+ *
  * Дорогое место здесь одно и известно заранее: выбор последнего замера
  * на каждую корову идёт по всей таблице доек, а не по одному хозяйству,
  * — поштучный запрос успевал отсечь чужие строки раньше. Ложится это
  * на индекс `(animal_id, date)`, но проверять надо замером, а не верой:
- * `npm run bench` на боевом объёме.
+ * `npm run bench`, раздел «Кабинет Ассоциации».
  *
  * ## Почему числа обязаны сойтись с кабинетом хозяйства
  *
@@ -80,90 +85,109 @@ export async function herdConditions(payload: Payload): Promise<Map<number, Herd
   if (!pool) return out
 
   /*
-   * Четыре подзапроса, а не один общий: у отчётов разные основания,
-   * и свести их в одну выборку значило бы подменить основание.
+   * Условия названы один раз и подставляются в счётчики.
    *
-   * Тёлки — живые самки без отёла; инбридинг считается по всем записям
-   * не в архиве, включая быков; соматика — по последнему замеру живой
-   * коровы; выбытие — по всем, кто выбыл за год, включая убранных
-   * в архив. Каждое из этих оснований объяснено там, где считается
-   * поштучно (`herd-analytics.ts`), и повторено здесь дословно.
+   * Каждое повторяется в запросе по два-три раза — у «тёлки» три
+   * счётчика, у живой коровы два, — и переписывать их руками значило бы
+   * завести расхождение внутри одного запроса. Такое не находится
+   * чтением: три условия выглядят одинаково, пока не начнёшь считать
+   * скобки.
+   *
+   * Факт отёла берётся из соединения `k`, а не подзапросом: разбор
+   * в `sql-herd.ts`.
+   */
+  const heifer = isHeifer('a', 'k.animal_id is not null')
+  const liveCow = `${notArchived()} and ${liveFemale()}`
+  const months = ageMonths()
+
+  /*
+   * Один проход по книге вместо пяти.
+   *
+   * ## Что было и почему стало долго
+   *
+   * Здесь стояли пять отдельных подзапросов — по одному на отчёт, —
+   * и написаны они были так намеренно: у отчётов разные основания,
+   * и свести их в одну выборку значило бы подменить основание.
+   * Довод верный, вывод из него был неверный.
+   *
+   * Пять подзапросов означали пять полных проходов по таблице животных
+   * плюс триста тысяч поисков по отёлам: и «тёлка», и «выбыла первотёлкой»
+   * спрашивали про отёлы подзапросом на каждую строку. На сорока
+   * хозяйствах это работало, на настоящем объёме страница открывалась
+   * секундами.
+   *
+   * ## Почему основания при этом не подменены
+   *
+   * `filter (where …)` даёт каждому счётчику своё условие целиком.
+   * Общего отбора у прохода нет вовсе — а значит, нечему и слиться:
+   * тёлки по-прежнему живые самки без отёла, инбридинг по-прежнему
+   * считается и по быкам, выбытие по-прежнему включает архив.
+   * Опасность была бы в общем `where`, и его здесь нет.
+   *
+   * ## Отёлы сосчитаны один раз
+   *
+   * Соединением, а не подзапросом на строку. Правило «кто такая тёлка»
+   * при этом не изменилось — изменился способ узнать, телилась ли она;
+   * разбор в `sql-herd.ts`.
+   *
+   * ## Последний замер соматики отделён от животных
+   *
+   * Прежде выбор последнего замера шёл по соединению с животными,
+   * и порядок `(животное, дата)` терялся в середине. Теперь `distinct on`
+   * идёт по одной таблице и ложится прямо на индекс `animal_id, date`,
+   * а отбор живых коров происходит уже над одной строкой на животное.
+   *
+   * ## Организаций без животных в ответе больше нет
+   *
+   * Раньше они приходили с нулями из-за левого соединения
+   * с `organizations`. Видно этого не было: страница и так отбрасывает
+   * хозяйства без живых коров, а сверка `check:condition` идёт
+   * по наибольшему стаду. Правило чтения одно: нет в карте — нет стада.
    */
   const res = await pool.query(
     `
+    with calved as (
+      select animal_id, count(*)::int as n
+        from calvings
+       group by animal_id
+    ),
+    scc as (
+      /*
+       * По одному — последнему — замеру на корову: взяв все, мы
+       * посчитали бы долю по дойкам, а не по стаду, и корова
+       * с двенадцатью замерами весила бы вдвенадцатеро больше
+       * отелившейся месяц назад.
+       */
+      select distinct on (t.animal_id) t.animal_id, t.somatic_cells as value
+        from milk_tests t
+       where t.somatic_cells is not null and t.somatic_cells > 0
+       order by t.animal_id, t."date" desc
+    )
     select
-      o.id::int                             as organization_id,
-      coalesce(c.cows, 0)::int              as cows,
-      coalesce(h.total, 0)::int             as heifers_total,
-      coalesce(h.ready, 0)::int             as heifers_ready,
-      coalesce(h.overdue, 0)::int           as heifers_overdue,
-      coalesce(i.total, 0)::int             as inbreeding_total,
-      coalesce(i.above, 0)::int             as inbreeding_above,
-      coalesce(u.measured, 0)::int          as scc_measured,
-      coalesce(u.above, 0)::int             as scc_above,
-      coalesce(g.total, 0)::int             as culled_total,
-      coalesce(g.first_lactation, 0)::int   as culled_first
-    from organizations o
+      a.owner_id::int as organization_id,
 
-    left join (
-      select a.owner_id, count(*) as cows
-        from animals a
-       where ${notArchived()} and ${liveFemale()}
-       group by a.owner_id
-    ) c on c.owner_id = o.id
+      (count(*) filter (where ${notArchived()} and ${liveFemale()}))::int as cows,
 
-    left join (
-      select owner_id,
-             count(*)                                          as total,
-             count(*) filter (where months between 13 and 15)  as ready,
-             count(*) filter (where months > 15)               as overdue
-        from (
-          select a.owner_id, ${ageMonths()} as months
-            from animals a
-           where ${isHeifer()}
-        ) h
-       group by owner_id
-    ) h on h.owner_id = o.id
+      (count(*) filter (where ${heifer}))::int as heifers_total,
+      (count(*) filter (where ${heifer} and ${months} between 13 and 15))::int as heifers_ready,
+      (count(*) filter (where ${heifer} and ${months} > 15))::int as heifers_overdue,
 
-    left join (
-      select a.owner_id,
-             count(*)                                   as total,
-             count(*) filter (where a.inbreeding > $1)  as above
-        from animals a
-       where ${notArchived()} and a.inbreeding is not null
-       group by a.owner_id
-    ) i on i.owner_id = o.id
+      (count(*) filter (where ${notArchived()} and a.inbreeding is not null))::int
+        as inbreeding_total,
+      (count(*) filter (where ${notArchived()} and a.inbreeding > $1))::int
+        as inbreeding_above,
 
-    left join (
-      select owner_id,
-             count(*)                          as measured,
-             count(*) filter (where scc > $2)  as above
-        from (
-          /*
-           * По одному — последнему — замеру на корову: взяв все, мы
-           * посчитали бы долю по дойкам, а не по стаду, и корова
-           * с двенадцатью замерами весила бы вдвенадцатеро больше
-           * отелившейся месяц назад.
-           */
-          select distinct on (t.animal_id)
-                 a.owner_id, t.somatic_cells as scc
-            from milk_tests t
-            join animals a on a.id = t.animal_id
-           where ${notArchived()} and ${liveFemale()}
-             and t.somatic_cells is not null and t.somatic_cells > 0
-           order by t.animal_id, t."date" desc
-        ) l
-       group by owner_id
-    ) u on u.owner_id = o.id
+      (count(*) filter (where ${liveCow} and s.value is not null))::int as scc_measured,
+      (count(*) filter (where ${liveCow} and s.value > $2))::int as scc_above,
 
-    left join (
-      select a.owner_id,
-             count(*) as total,
-             count(*) filter (where ${calvingsCount()} <= 1) as first_lactation
-        from animals a
-       where ${culledYear()}
-       group by a.owner_id
-    ) g on g.owner_id = o.id
+      (count(*) filter (where ${culledYear()}))::int as culled_total,
+      (count(*) filter (where ${culledYear()} and coalesce(k.n, 0) <= 1))::int as culled_first
+
+      from animals a
+      left join calved k on k.animal_id = a.id
+      left join scc s on s.animal_id = a.id
+     where a.owner_id is not null
+     group by a.owner_id
     `,
     [INBREEDING_THRESHOLD, SCC_THRESHOLD],
   )
