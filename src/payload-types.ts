@@ -375,6 +375,49 @@ export interface Animal {
     chipDate?: string | null;
     gpkMark?: string | null;
     gpkNumber?: string | null;
+    /**
+     * Для импортных животных. Пусто означает Россию — так номер и строится
+     */
+    originCountry?:
+      | (
+          | 'RUS'
+          | 'BLR'
+          | 'KAZ'
+          | 'KGZ'
+          | 'ARM'
+          | 'NLD'
+          | 'DEU'
+          | 'USA'
+          | 'CAN'
+          | 'FRA'
+          | 'DNK'
+          | 'CZE'
+          | 'BEL'
+          | 'ITA'
+          | 'ESP'
+          | 'GBR'
+          | 'IRL'
+          | 'AUT'
+          | 'CHE'
+          | 'POL'
+          | 'SWE'
+          | 'FIN'
+          | 'HUN'
+          | 'ISR'
+          | 'EST'
+          | 'LVA'
+          | 'LTU'
+          | 'AUS'
+          | 'NZL'
+          | 'URY'
+          | 'BRA'
+          | 'ARG'
+        )
+      | null;
+    /**
+     * Заполняется один раз при вводе импортного животного и не меняется
+     */
+    originNumber?: string | null;
   };
   sex: 'female' | 'male';
   state?: ('alive' | 'sold' | 'culled' | 'dead') | null;
@@ -2843,6 +2886,8 @@ export interface AnimalsSelect<T extends boolean = true> {
         chipDate?: T;
         gpkMark?: T;
         gpkNumber?: T;
+        originCountry?: T;
+        originNumber?: T;
       };
   sex?: T;
   state?: T;

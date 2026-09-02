@@ -14,6 +14,7 @@ import {
   toOptions,
 } from '@/lib/dictionaries'
 import { validateIdentNumber, type IdFormat } from '@/lib/animal-id'
+import { COUNTRIES, buildInternationalId } from '@/lib/aiid'
 import { AUTH_METHODS, ISAG_LOCI, isagField } from '@/lib/isag'
 import { animalMutate, animalRead, isAdmin } from '@/access'
 
@@ -220,6 +221,51 @@ export const Animals: CollectionConfig = {
                   fields: [
                     { name: 'gpkMark', type: 'text', label: 'Марка ГПК' },
                     { name: 'gpkNumber', type: 'text', label: 'Номер в ГПК' },
+                  ],
+                },
+                /*
+                 * Происхождение — два поля, без которых международный номер
+                 * не собрать, а собранный будет неверным.
+                 *
+                 * Корова, приехавшая из Нидерландов, известна миру под
+                 * голландским номером: по нему ищутся её родословная,
+                 * её оценки и её сёстры. Наш номер — вторая, местная запись
+                 * о том же животном. Построить международный номер от нашей
+                 * страны значило бы придумать идентификатор, которого нет
+                 * ни в одном реестре мира.
+                 *
+                 * `originNumber` **никогда не перезаписывается**. Добавить
+                 * поле можно в любой день; восстановить задним числом, под
+                 * каким номером животное записано на родине, — неоткуда.
+                 * Стоит один раз затереть его своим, и связь с родословной
+                 * в стране происхождения теряется навсегда.
+                 *
+                 * Страна здесь отдельным полем, а не берётся из «места
+                 * рождения»: там справочник ФГИАС ПР без кодов ISO, а нужен
+                 * именно трёхбуквенный код, который войдёт в номер.
+                 */
+                {
+                  type: 'row',
+                  fields: [
+                    {
+                      name: 'originCountry',
+                      type: 'select',
+                      label: 'Страна происхождения (ISO 3166)',
+                      options: COUNTRIES.map((c) => ({ value: c.alpha3, label: `${c.ru} (${c.alpha3})` })),
+                      admin: {
+                        description:
+                          'Для импортных животных. Пусто означает Россию — так номер и строится',
+                      },
+                    },
+                    {
+                      name: 'originNumber',
+                      type: 'text',
+                      label: 'Номер в стране происхождения',
+                      admin: {
+                        description:
+                          'Заполняется один раз при вводе импортного животного и не меняется',
+                      },
+                    },
                   ],
                 },
               ],
@@ -1787,6 +1833,37 @@ export const Animals: CollectionConfig = {
         // Аудит: кто и когда изменил (ТЗ, п. 1.6 — для MVP достаточно этих полей)
         if (req.user) data.lastEditUser = req.user.id
         data.lastEditTime = new Date().toISOString()
+
+        /*
+         * Международный номер — считается, но не перетирает введённое.
+         *
+         * Поле `internationalId` живёт в книге давно и заполнялось руками
+         * и загрузками. Пересобирать его на каждом сохранении значило бы
+         * однажды затереть номер, который человек списал с настоящего
+         * племенного документа, — а наш расчёт всего лишь догадка,
+         * собранная из трёх полей.
+         *
+         * Поэтому расчёт заполняет только пустое. Расхождение между
+         * записанным номером и собранным из частей — находка, а не повод
+         * для правки: его должен увидеть человек. Отдельного правила
+         * проверки на это пока нет, и это названный долг.
+         */
+        const alt = (data.altIds ?? originalDoc?.altIds) as
+          | { internationalId?: string | null; originCountry?: string | null; originNumber?: string | null }
+          | undefined
+
+        if (alt && !alt.internationalId) {
+          const imported = alt.originNumber && alt.originCountry && alt.originCountry !== 'RUS'
+          const computed = buildInternationalId({
+            country: imported ? alt.originCountry : (alt.originCountry ?? 'RUS'),
+            sex: (data.sex ?? originalDoc?.sex) as 'male' | 'female' | null,
+            number: imported ? alt.originNumber : (data.identNumber ?? originalDoc?.identNumber),
+          })
+          if (computed) {
+            if (!data.altIds || typeof data.altIds !== 'object') data.altIds = { ...alt }
+            data.altIds.internationalId = computed
+          }
+        }
 
         // Ранги сортировки: пустые значения уходят в конец списка, а не в начало
         const ipcValue = data.ipc ?? originalDoc?.ipc
