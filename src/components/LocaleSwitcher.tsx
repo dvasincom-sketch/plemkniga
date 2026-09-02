@@ -1,6 +1,6 @@
 'use client'
 
-import { useId } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   LOCALES,
@@ -10,52 +10,54 @@ import {
 } from '@/lib/i18n/locales'
 
 /**
- * Переключатель языка.
+ * Переключатель языка — свой раскрывающийся список.
  *
- * ## Почему он есть, хотя язык определяется сам
+ * ## Как мы сюда пришли
  *
- * Любое угадывание ошибается, и главное свойство хорошего угадывания —
- * не точность, а возможность его отменить. Человек, попавший не на свой
- * язык, должен исправить это одним движением и больше к вопросу
- * не возвращаться.
+ * Сперва был ряд кнопок: шесть языков разными письмами, своё слово
+ * находят глазами. Ряд переносился во вторую строку на телефоне
+ * и отжимал вниз то, ради чего страницу открыли.
  *
- * ## Почему выпадающий список, хотя раньше был ряд кнопок
+ * Потом был родной `select` с убранным оформлением. Он решил ширину,
+ * но решил наполовину: у `select` браузеру можно отдать только закрытую
+ * часть, а **раскрытый список рисует система**. На нашей странице
+ * посреди фирменных цветов открывалось серое окно операционки —
+ * и выглядело оно чужим ровно в тот момент, когда на него смотрят.
  *
- * Ряд кнопок стоял здесь намеренно: шесть языков написаны разными
- * письмами — кириллицей, латиницей, армянским алфавитом, — и в развёрнутом
- * ряду своё слово находят глазами, не нажимая ничего.
+ * ## Чего это стоило
  *
- * Довод верный, и мы его меняем сознательно, а не по забывчивости.
- * Плата за ряд — шесть кнопок в шапке: на узком экране они переносятся
- * во вторую строку и отжимают вниз то, ради чего страницу открыли.
- * Переключатель языка — не главное на витрине, а места занимал как
- * главное.
+ * Всего, что у родного `select` было даром. Ниже переписано руками
+ * и перечислено поимённо, потому что забыть здесь легко, а проверить
+ * трудно:
  *
- * Что теряем: все языки больше не видны сразу. Смягчено тем, что
- * в свёрнутом виде показано **своё** название текущего языка, а не слово
- * «Язык», — то есть видно, на каком ты сейчас, и понятно, что его можно
- * сменить.
+ * - раскрытие по Enter, пробелу, стрелкам вниз и вверх;
+ * - перебор стрелками, переход в начало и конец по Home и End;
+ * - поиск набором первых букв («қа» находит «Қазақша»);
+ * - закрытие по Esc с возвратом внимания на кнопку;
+ * - закрытие при нажатии мимо и при уходе внимания со списка;
+ * - объявление вслух как список: `listbox`, `option`, `aria-selected`;
+ * - связь кнопки со списком через `aria-controls` и `aria-expanded`.
  *
- * ## Почему `select`, а не своё меню
+ * Каждое из этого делают неправильно чаще, чем правильно, — потому
+ * родной `select` и стоял здесь до сих пор. Меняем сознательно: список
+ * из шести строк открывается на витрине, и чужое системное окно
+ * на ней заметнее, чем неудобство, которого никто не заметит,
+ * пока всё перечисленное работает.
  *
- * Своё меню на `div`-ах пришлось бы учить всему, что у `select` есть
- * из коробки: открытию с клавиатуры, перебору стрелками, поиску набором
- * первых букв, закрытию по Esc, чтению вслух как «список из шести».
- * Каждое из этого делают неправильно чаще, чем правильно, а на телефоне
- * `select` вдобавок раскрывается родным колесом выбора, к которому
- * человек привык.
+ * ## Почему `lang` на каждой строке
+ *
+ * Раскрытый список читается вслух подряд. Без пометки все шесть слов
+ * пойдут одним произношением — тем, что у страницы, — и пять из шести
+ * прозвучат неразборчиво. Это единственное место, где на одном экране
+ * соседствуют шесть языков.
  *
  * ## Почему cookie, а не только адрес
  *
  * Адрес помнит язык этой страницы, cookie помнит выбор человека. Нужны
  * оба: по адресу ссылку пересылают коллеге, по cookie узнают язык
- * при следующем заходе на корень. Записывается cookie здесь, на клиенте,
- * а не серверным действием — это предпочтение показа, а не данные,
- * и гонять ради него запрос на сервер незачем.
- *
- * `SameSite=Lax` и без `Secure` в разработке: на localhost по http
- * браузер молча выбросил бы `Secure`-cookie, и выбор языка не сохранялся
- * бы именно там, где его проверяют.
+ * при следующем заходе на корень. `SameSite=Lax` и без `Secure`
+ * в разработке: на localhost по http браузер молча выбросил бы
+ * `Secure`-cookie, и выбор не сохранялся бы именно там, где его проверяют.
  */
 export function LocaleSwitcher({
   active,
@@ -69,85 +71,228 @@ export function LocaleSwitcher({
    * Куда вести для каждого языка — готовыми адресами, а не функцией.
    *
    * Здесь стояло `hrefOf: (locale) => string`, и сборка на этом падала:
-   * функцию нельзя передать из серверного компонента в клиентский, её
-   * нечем сериализовать. Ошибка вылезла только на `next build`, при
-   * предварительной отрисовке `/eaeu/ru`, — в разработке страница
-   * работала, потому что там серверный компонент и клиентский живут
-   * в одном процессе.
-   *
-   * Простой объект решает это без потерь: адреса всё так же знает
-   * страница, а не переключатель, и их всего шесть.
+   * функцию нельзя передать из серверного компонента в клиентский.
+   * Ошибка вылезала только на `next build`, при предварительной
+   * отрисовке, — в разработке серверный и клиентский компоненты живут
+   * в одном процессе, и всё работало.
    */
   hrefs: Record<Locale, string>
 }) {
   const router = useRouter()
+  const id = useId()
+
+  const [open, setOpen] = useState(false)
+  /** На чём стоит подсветка в раскрытом списке — не то же, что выбранный. */
+  const [cursor, setCursor] = useState(() => LOCALES.findIndex((l) => l.code === active))
+
+  const boxRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const listRef = useRef<HTMLUListElement>(null)
+  /** Набранное для поиска по первым буквам и когда его забыть. */
+  const typed = useRef({ text: '', at: 0 })
+
+  const activeInfo = LOCALES.find((l) => l.code === active) ?? LOCALES[0]!
 
   /*
-   * Подпись связана с полем через `id`, а не обёрнута вокруг него.
-   * Обёртка тоже связала бы, но `id` нужен уникальный: переключатель
-   * может встретиться на странице дважды — в шапке и в подвале, —
-   * и два одинаковых `id` сделали бы вторую подпись указывающей
-   * на первое поле.
+   * Закрытие при нажатии мимо. Слушатель вешается только на раскрытый
+   * список: постоянный обработчик на всём документе ради шести строк —
+   * плата, которую платят все страницы, а польза бывает изредка.
    */
-  const id = useId()
+  useEffect(() => {
+    if (!open) return
+
+    const away = (e: MouseEvent) => {
+      if (!boxRef.current?.contains(e.target as Node)) setOpen(false)
+    }
+
+    document.addEventListener('mousedown', away)
+    return () => document.removeEventListener('mousedown', away)
+  }, [open])
+
+  /* Внимание переводится на список: без этого стрелки некому ловить. */
+  useEffect(() => {
+    if (open) listRef.current?.focus()
+  }, [open])
 
   const choose = (locale: Locale) => {
     const secure = window.location.protocol === 'https:' ? '; Secure' : ''
     document.cookie =
       `${LOCALE_COOKIE}=${locale}; Path=/; Max-Age=${LOCALE_COOKIE_MAX_AGE}` +
       `; SameSite=Lax${secure}`
+    setOpen(false)
     router.push(hrefs[locale])
+  }
+
+  const close = () => {
+    setOpen(false)
+    buttonRef.current?.focus()
+  }
+
+  /**
+   * Поиск набором первых букв.
+   *
+   * Копит нажатые буквы полторы секунды и ищет по началу названия.
+   * Полторы — не круглое число: меньше не хватает на «қа» вторым
+   * пальцем, больше означает, что новая попытка дописывается к старой,
+   * и человек не понимает, почему «а» находит не то.
+   */
+  const typeAhead = (key: string) => {
+    const now = Date.now()
+    typed.current.text = now - typed.current.at > 1500 ? key : typed.current.text + key
+    typed.current.at = now
+
+    const found = LOCALES.findIndex((l) =>
+      l.native.toLowerCase().startsWith(typed.current.text.toLowerCase()),
+    )
+    if (found >= 0) setCursor(found)
+  }
+
+  const onListKey = (e: React.KeyboardEvent) => {
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setCursor((c) => Math.min(c + 1, LOCALES.length - 1))
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setCursor((c) => Math.max(c - 1, 0))
+        break
+      case 'Home':
+        e.preventDefault()
+        setCursor(0)
+        break
+      case 'End':
+        e.preventDefault()
+        setCursor(LOCALES.length - 1)
+        break
+      case 'Enter':
+      case ' ':
+        e.preventDefault()
+        choose(LOCALES[cursor]!.code)
+        break
+      case 'Escape':
+      case 'Tab':
+        e.preventDefault()
+        close()
+        break
+      default:
+        if (e.key.length === 1) typeAhead(e.key)
+    }
+  }
+
+  const onButtonKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      setCursor(LOCALES.findIndex((l) => l.code === active))
+      setOpen(true)
+    }
   }
 
   return (
     <div className="flex items-center gap-2">
-      <label htmlFor={id} className="text-[13px] text-ink-500">
+      <span id={`${id}-label`} className="text-[13px] text-ink-500">
         {label}
-      </label>
+      </span>
 
-      <div className="relative">
-        <select
-          id={id}
-          value={active}
-          onChange={(e) => choose(e.target.value as Locale)}
-          /*
-           * `lang` на самом поле — язык текущего значения: синтезатор
-           * речи прочитает «Қазақша» правилами казахского, а не языка
-           * страницы, то есть внятно. На каждом варианте он тоже стоит:
-           * раскрытый список читается вслух подряд, и без разметки все
-           * шесть слов пойдут одним, чужим для пяти из них произношением.
-           */
-          lang={active}
+      <div ref={boxRef} className="relative">
+        <button
+          ref={buttonRef}
+          type="button"
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          aria-controls={`${id}-list`}
+          aria-labelledby={`${id}-label ${id}-value`}
+          onClick={() => {
+            setCursor(LOCALES.findIndex((l) => l.code === active))
+            setOpen((v) => !v)
+          }}
+          onKeyDown={onButtonKey}
           className={
-            'appearance-none rounded-lg border border-ink-200 bg-white py-1.5 pl-3 pr-9 ' +
+            'flex items-center gap-2 rounded-lg border border-ink-200 bg-white py-1.5 pl-3 pr-2.5 ' +
             'text-[14px] text-ink-900 transition-colors hover:border-forest-500 ' +
             'focus:border-forest-500 focus:outline-none focus:ring-2 focus:ring-forest-500/30'
           }
         >
-          {LOCALES.map((l) => (
-            <option key={l.code} value={l.code} lang={l.code}>
-              {l.native}
-            </option>
-          ))}
-        </select>
+          <span id={`${id}-value`} lang={active}>
+            {activeInfo.native}
+          </span>
 
-        {/*
-           Своя стрелка вместо системной: `appearance-none` убирает
-           родное оформление, иначе поле в разных браузерах выглядит
-           по-разному и рядом с прочими кнопками смотрится чужим.
-           `pointer-events-none` обязателен — иначе стрелка перехватит
-           нажатие, и список не раскроется именно там, куда целятся.
-        */}
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 20 20"
-          className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-        >
-          <path d="M6 8l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 20 20"
+            className={`h-4 w-4 text-ink-400 transition-transform ${open ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+          >
+            <path d="M6 8l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+
+        {open && (
+          <ul
+            ref={listRef}
+            id={`${id}-list`}
+            role="listbox"
+            aria-labelledby={`${id}-label`}
+            aria-activedescendant={`${id}-opt-${cursor}`}
+            tabIndex={-1}
+            onKeyDown={onListKey}
+            onBlur={(e) => {
+              /* Уход внимания наружу закрывает; внутрь — нет. */
+              if (!boxRef.current?.contains(e.relatedTarget as Node)) setOpen(false)
+            }}
+            className={
+              'absolute right-0 z-20 mt-1 min-w-[11rem] overflow-hidden rounded-xl border ' +
+              'border-ink-200 bg-white py-1 shadow-[0_8px_24px_rgb(23_24_26_/_0.12)] ' +
+              'focus:outline-none'
+            }
+          >
+            {LOCALES.map((l, i) => {
+              const selected = l.code === active
+              const under = i === cursor
+
+              return (
+                <li
+                  key={l.code}
+                  id={`${id}-opt-${i}`}
+                  role="option"
+                  aria-selected={selected}
+                  lang={l.code}
+                  onMouseEnter={() => setCursor(i)}
+                  onClick={() => choose(l.code)}
+                  className={
+                    'flex cursor-pointer items-center justify-between gap-3 px-3 py-2 text-[14px] ' +
+                    (under ? 'bg-brand-50 text-forest-600 ' : 'text-ink-700 ') +
+                    (selected ? 'font-medium' : '')
+                  }
+                >
+                  {l.native}
+
+                  {/*
+                     Галочка у выбранного, а не только подсветка: подсветка
+                     показывает, где курсор, и в раскрытом списке эти две
+                     вещи почти никогда не совпадают. Без галочки человек,
+                     переставивший курсор стрелкой, теряет из виду, какой
+                     язык стоит сейчас.
+                  */}
+                  {selected && (
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 20 20"
+                      className="h-4 w-4 flex-none text-forest-500"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path d="M5 10.5l3.5 3.5L15 7" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        )}
       </div>
     </div>
   )
