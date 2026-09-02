@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation'
 import { PlemLogo } from '@/components/PlemLogo'
 import { LocaleSwitcher } from '@/components/LocaleSwitcher'
 import { FEATURE_ICONS, FlowArt, LayersArt, RankArt } from '@/components/site/SiteArt'
+import { AnimalScreen } from '@/components/site/ScreenArt'
 import { PRODUCT_MESSAGES } from '@/lib/i18n/product-messages'
 import { SITE_MESSAGES } from '@/lib/i18n/site-messages'
 import { LOCALE_CODES, isLocale, localeInfo, type Locale } from '@/lib/i18n/locales'
@@ -253,6 +254,34 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
           </div>
 
           <p className="mt-4 max-w-[70ch] text-[14px] leading-relaxed text-ink-500">{s.flow.note}</p>
+        </section>
+
+        {/* --------------------- Как выглядит внутри --------------------- */}
+        {/*
+           Стоит после пути данных и до рейтинга — там, где читатель уже
+           понял, что система делает, и впервые спрашивает «а как это
+           выглядит». Раньше показывать нечего: карточка животного без
+           объяснения, что в неё попадает, — просто таблица.
+
+           Нарисовано вёрсткой, а не снимком. Снимок стареет молча
+           (интерфейс поедет, картинка останется), весит сотни килобайт
+           ради читаемых подписей и не переводится: на казахской странице
+           надпись внутри картинки осталась бы русской. Разбор —
+           в `ScreenArt.tsx`.
+        */}
+        <section className="mt-20">
+          <h2 className="text-[26px] font-medium leading-tight sm:text-[30px]">{s.screen.title}</h2>
+          <p className="mt-4 max-w-[70ch] text-[16px] leading-relaxed text-ink-700">
+            {s.screen.lead}
+          </p>
+
+          <div className="mt-8">
+            <AnimalScreen labels={s.screen} />
+          </div>
+
+          <p className="mt-4 max-w-[70ch] text-[14px] leading-relaxed text-ink-500">
+            {s.screen.note}
+          </p>
         </section>
 
         {/* ------------------------------ Рейтинг ------------------------------ */}

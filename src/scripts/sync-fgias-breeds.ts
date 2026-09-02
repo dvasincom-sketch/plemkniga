@@ -1,4 +1,6 @@
 import 'dotenv/config'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { dirname } from 'node:path'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { fetchRegistry, type NsiRecord } from '@/lib/fgias-nsi'
@@ -35,6 +37,27 @@ import { fetchRegistry, type NsiRecord } from '@/lib/fgias-nsi'
  * за чужими ключами не должно молча править наши данные. Без `--apply`
  * скрипт только показывает, что нашёл и что собирается сделать.
  *
+ * ## Почему выписка ложится файлом, а не в справочник пород
+ *
+ * Первая редакция заводила недостающие породы записями в `breeds`.
+ * Первый же прогон показал, чем это кончится: молочных пород в реестре
+ * пятьдесят пять, у нас семь. Сорок восемь новых записей — это сорок
+ * восемь строк в выпадающем списке породы у каждой формы, где заводят
+ * животное. Зоотехник, ищущий «голштинскую», пролистывал бы мимо
+ * «бушуевской» и «аулиеатинской», которых в стране может не быть вовсе.
+ *
+ * Это две разные вещи, и путать их нельзя:
+ *
+ * - **справочник `breeds`** — породы, которыми пользуются наши животные.
+ *   Он должен быть коротким, иначе мешает работать;
+ * - **выписка из реестра** — что признано государством. Она нужна
+ *   странице пород: показать, что порода существует и ждёт первой записи.
+ *
+ * Поэтому выписка кладётся файлом рядом с кодом, как копия схем ICAR:
+ * обновление видно построчным сравнением, а справочник не пухнет.
+ * Порода заводится в справочник тогда, когда появляется животное, —
+ * и её государственный ключ к тому моменту уже известен, он в файле.
+ *
  * ## Что скрипт не делает
  *
  * Не удаляет наши породы, которых в реестре нет. Такая порода —
@@ -43,8 +66,11 @@ import { fetchRegistry, type NsiRecord } from '@/lib/fgias-nsi'
  * животных ради опрятности справочника.
  *
  *   npm run sync:fgias-breeds            — посмотреть
- *   npm run sync:fgias-breeds -- --apply — записать недостающие
+ *   npm run sync:fgias-breeds -- --apply — записать выписку файлом
  */
+
+/** Куда ложится выписка. Файл коммитится: его читает страница пород. */
+const SNAPSHOT = 'src/data/fgias-dairy-breeds.json'
 
 /** Реестр «Породы животных» — постоянный ключ открытой части ФГИАС. */
 const BREEDS_REGISTRY = 'b0647b61-dc45-4c30-a0e2-0e74208d9e93'
@@ -134,31 +160,33 @@ async function main(): Promise<void> {
   }
 
   if (!APPLY) {
-    console.log('\n  Сухой прогон. Записать недостающие: npm run sync:fgias-breeds -- --apply')
+    console.log(`\n  Сухой прогон. Записать выписку: npm run sync:fgias-breeds -- --apply`)
     process.exit(0)
   }
 
-  let created = 0
-  for (const b of missing) {
-    await payload.create({
-      collection: 'breeds',
-      data: {
-        name: b.name,
-        /*
-         * Государственный ключ кладётся сразу. Порода, заведённая
-         * без него, потом ищется по названию — а именно от поиска
-         * по названию мы и уходим: «Чёрно-пёстрая» и «Черно-пестрая»
-         * в реестре соседствуют.
-         */
-        fgiasUuid: b.uuid,
-        code: b.code ?? undefined,
-      } as never,
-      overrideAccess: true,
-    })
-    created += 1
+  /*
+   * В файл идут все молочные породы реестра, а не только недостающие:
+   * выписка — снимок чужого списка целиком, и «те, которых у нас нет» —
+   * это наш взгляд на него, а не его содержание. Наш взгляд меняется
+   * с каждой заведённой породой, снимок — только когда меняется реестр.
+   */
+  const snapshot = {
+    source: 'https://fgias-pr.mcx.ru/public/public/api/v1/nsi',
+    registry: BREEDS_REGISTRY,
+    species: SPECIES,
+    direction: DAIRY,
+    fetchedAt: new Date().toISOString(),
+    breeds: dairy
+      .map((b) => ({ uuid: b.uuid, name: b.name, code: b.code }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'ru')),
   }
 
-  console.log(`\n  ✓ заведено пород: ${created}`)
+  mkdirSync(dirname(SNAPSHOT), { recursive: true })
+  writeFileSync(SNAPSHOT, `${JSON.stringify(snapshot, null, 2)}\n`)
+
+  console.log(`\n  ✓ выписка записана: ${SNAPSHOT}, пород ${snapshot.breeds.length}`)
+  console.log('  Справочник `breeds` не тронут: породы заводятся под животных,')
+  console.log('  а не про запас — иначе выпадающий список породы станет нечитаемым.')
   process.exit(0)
 }
 

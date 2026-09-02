@@ -1,0 +1,284 @@
+{
+  "source": "https://fgias-pr.mcx.ru/public/public/api/v1/nsi",
+  "registry": "b0647b61-dc45-4c30-a0e2-0e74208d9e93",
+  "species": "Крупный рогатый скот",
+  "direction": "Молочное",
+  "fetchedAt": "2026-09-02T18:27:05.482Z",
+  "breeds": [
+    {
+      "uuid": "7dbd1530-a4dc-4437-8a75-734dfe3e5dc8",
+      "name": "Айрширская",
+      "code": "br_aishirskay"
+    },
+    {
+      "uuid": "be15ee1e-051f-4cd3-ab54-8fba182dc491",
+      "name": "Алатауская",
+      "code": "br_alatautskay"
+    },
+    {
+      "uuid": "542f6c1c-01a5-44c9-b3c5-7fcd17e38e18",
+      "name": "Альгау",
+      "code": "algau_cattle"
+    },
+    {
+      "uuid": "8c8529f8-4dc9-4f4a-8487-b5a576b9ce17",
+      "name": "Англерская",
+      "code": "anglerskaya_cattle"
+    },
+    {
+      "uuid": "8fcd6872-f98d-4e5b-8d50-9470a80d87f8",
+      "name": "Аулиеатинская",
+      "code": "aulieatinskaya_cattle"
+    },
+    {
+      "uuid": "11d2a50f-fc74-4dc7-9c57-900e5fbbb1dd",
+      "name": "Белоголовая украинская",
+      "code": "belogolovaya_ukrainskaya_cattle"
+    },
+    {
+      "uuid": "6522f275-75b1-4fd6-a232-0b513a751e1f",
+      "name": "Бестужевская",
+      "code": "bestuzhevskaya_cattle"
+    },
+    {
+      "uuid": "0858236b-0f77-4e17-929f-3c52e7844f5b",
+      "name": "Британо-фризская",
+      "code": "britano-frizskaya_cattle"
+    },
+    {
+      "uuid": "f9f14b2f-8de6-46a1-a31a-a3852c489d39",
+      "name": "Бурая карпатская",
+      "code": "buraya_karpatskaya_cattle"
+    },
+    {
+      "uuid": "226c08f0-c550-49bd-bb9b-0a96e393b33b",
+      "name": "Бурая латвийская",
+      "code": "buraya_latviyskaya_cattle"
+    },
+    {
+      "uuid": "575240a4-22c7-4a0c-8089-60500cd97b34",
+      "name": "Бурая швицкая",
+      "code": "br_bur_shveed"
+    },
+    {
+      "uuid": "96d7a0b3-fcd7-4409-92c0-34282f5864d4",
+      "name": "Бушуевская",
+      "code": "bushuevskaya_cattle"
+    },
+    {
+      "uuid": "03a65713-13cf-469c-ac89-0589d2b6af7b",
+      "name": "Восточно-финская",
+      "code": "vostochno-finskaya_cattle"
+    },
+    {
+      "uuid": "65c8896f-7a3d-4883-bf25-e73fcfe9783b",
+      "name": "Голландская",
+      "code": "gollandskaya_cattle"
+    },
+    {
+      "uuid": "fcde6fa5-dcbc-44c5-a32a-ca87dcae4723",
+      "name": "Голштинская",
+      "code": "br_golshtinskay"
+    },
+    {
+      "uuid": "91199c08-18a7-4cde-8304-addb7f6ff7da",
+      "name": "Горный скот Дагестана",
+      "code": "gornyy_skot_dagestana_cattle"
+    },
+    {
+      "uuid": "b8478043-af73-4c1e-8527-ee703ad03834",
+      "name": "Джерсейская",
+      "code": "dzherseyskaya_cattle"
+    },
+    {
+      "uuid": "ce655acd-add1-400d-95ac-a7f46c223b21",
+      "name": "Истобенская",
+      "code": "istobenskaya_cattle"
+    },
+    {
+      "uuid": "316bd070-8c50-4a4a-ac6a-685ce7df5e4a",
+      "name": "Кавказская бурая",
+      "code": "kavkazskaya_buraya_cattle"
+    },
+    {
+      "uuid": "2198c4cc-80bc-46ee-b508-52986e419485",
+      "name": "Костромская",
+      "code": "kostromskaya_cattle"
+    },
+    {
+      "uuid": "d0328d59-0639-47e9-a001-3317e4064e40",
+      "name": "Красная горбатовская",
+      "code": "krasnaya_gorbatovskaya_cattle"
+    },
+    {
+      "uuid": "7780a104-b505-43da-b72d-99ca384249d5",
+      "name": "Красная датская",
+      "code": "krasnaya_datskaya_cattle"
+    },
+    {
+      "uuid": "55fbb82d-d6d7-44a5-8ec7-0f8e61afc4d5",
+      "name": "Красная литовская",
+      "code": "krasnaya_litovskaya_cattle"
+    },
+    {
+      "uuid": "725248b2-29ac-4cf8-8055-927cec1d8236",
+      "name": "Красная польская",
+      "code": "krasnaya_polskaya_cattle"
+    },
+    {
+      "uuid": "398728e7-2dbe-4f77-b05f-2836a2dfd316",
+      "name": "Красная степная",
+      "code": "krasnaya_stepnaya_cattle"
+    },
+    {
+      "uuid": "01c83738-8700-419c-8a9e-64134960be40",
+      "name": "Красная тамбовская",
+      "code": "krasnaya_tambovskaya_cattle"
+    },
+    {
+      "uuid": "a6dc5ee8-65dd-4fb7-8ce5-792e64d1c698",
+      "name": "Красная эстонская",
+      "code": "krasnaya_estonskaya_cattle"
+    },
+    {
+      "uuid": "03ccbc66-cec5-470f-950b-3b245c47c9f3",
+      "name": "Красно-пестрая",
+      "code": "krasno-pestraya_cattle"
+    },
+    {
+      "uuid": "4b4702ae-2395-4a8c-a657-64eadb4e16cd",
+      "name": "Красно-пестрая немецкая",
+      "code": "krasno-pestraya_nemetskaya_cattle"
+    },
+    {
+      "uuid": "03d8bf8e-955b-46ce-960c-d22a91a55b9e",
+      "name": "Красный белорусский скот",
+      "code": "krasnyi_belorusskiy_skot_cattle"
+    },
+    {
+      "uuid": "3553ec81-1e4b-4b31-b7ac-acca87f116ca",
+      "name": "Курганская",
+      "code": "kurganskaya_cattle"
+    },
+    {
+      "uuid": "f30ea206-dec0-4c63-bdf2-016126b9cdbf",
+      "name": "Лебединская",
+      "code": "lebedinskaya_cattle"
+    },
+    {
+      "uuid": "9109d6bb-dbef-4b0e-95e5-5b3cc32dbc58",
+      "name": "Монбельярд",
+      "code": "monbelyard_cattle"
+    },
+    {
+      "uuid": "f6231e02-31ea-459d-9a68-bcb3cb0df24e",
+      "name": "Норвижн ред",
+      "code": "norvizhn_red_cattle"
+    },
+    {
+      "uuid": "7eb40a55-f2a7-4a88-a127-2a219d4d68dc",
+      "name": "Остфризская",
+      "code": "ostfrizskaya_cattle"
+    },
+    {
+      "uuid": "fe5ecd7b-8c78-4afa-a427-a68bafe0fcca",
+      "name": "Пинцгау",
+      "code": "pintsgau_cattle"
+    },
+    {
+      "uuid": "c77b2b4c-6e29-4a5a-b690-0b85bc703414",
+      "name": "Российская голштинская",
+      "code": "rossiyskaya_golshtinskaya_cattle"
+    },
+    {
+      "uuid": "3acb4017-2a5a-44f3-b98e-f928d4c9a088",
+      "name": "Северная комолая",
+      "code": "severnaya_komolaya_cattle"
+    },
+    {
+      "uuid": "f5a0e561-ef0e-4e95-a424-8056cae73025",
+      "name": "Серая украинская",
+      "code": "seraya_ukrainskaya_cattle"
+    },
+    {
+      "uuid": "49b1d42d-3681-49b9-a5cc-d6f5db203647",
+      "name": "Сибирячка",
+      "code": "sibiryachka_cattle"
+    },
+    {
+      "uuid": "bd506e27-a7f8-4467-9c5f-343a2b7640f2",
+      "name": "Симментальская",
+      "code": "simmentalskaya_cattle"
+    },
+    {
+      "uuid": "a959b834-1e49-4fe8-9619-b1b60f2d3678",
+      "name": "Суксунская",
+      "code": "suksunskaya_cattle"
+    },
+    {
+      "uuid": "ce6cd4dc-929d-4d1e-ae53-229dbcdbbcf5",
+      "name": "Сычевская",
+      "code": "sychevskaya_cattle"
+    },
+    {
+      "uuid": "9ea0a917-f150-4ff5-aade-6cb7cfa9a502",
+      "name": "Тагильская",
+      "code": "tagilskaya_cattle"
+    },
+    {
+      "uuid": "424dff2f-2f1a-4dca-a303-cdede33376f3",
+      "name": "Украинская красная молочная",
+      "code": "ukrainskaya_krasnaya_molnaya_cattle"
+    },
+    {
+      "uuid": "f6775296-2e7d-413a-9e82-0a47ce0389bd",
+      "name": "Холмогорская",
+      "code": "kholomgorskaya_cattle"
+    },
+    {
+      "uuid": "065aba0f-d1d9-40f2-a25d-736ab9e8e536",
+      "name": "Черно-пестрая",
+      "code": "br_black_pestr"
+    },
+    {
+      "uuid": "6a33363c-0f5d-4faf-be72-802cd132fc71",
+      "name": "Черно-пестрая датская",
+      "code": "cherno-pestraya_datskaya_cattle"
+    },
+    {
+      "uuid": "e2e30c15-a166-4cbe-b3f6-f4f2e5a49b5e",
+      "name": "Черно-пестрая литовская",
+      "code": "cherno-pestraya_litovskaya_cattle"
+    },
+    {
+      "uuid": "ffc04782-47e0-4285-8154-b642d68e63cb",
+      "name": "Черно-пестрая немецкая",
+      "code": "cherno-pestraya_nemetskaya_cattle"
+    },
+    {
+      "uuid": "2605bf5e-4057-4397-9dbc-2baa666c8074",
+      "name": "Черно-пестрая польская",
+      "code": "cherno-pestraya_polskaya_cattle"
+    },
+    {
+      "uuid": "662c0dde-c964-4bbe-98a8-8320d8f6cd2d",
+      "name": "Черно-пестрая шведская",
+      "code": "cherno-pestraya_shvedskaya_cattle"
+    },
+    {
+      "uuid": "2ada4a54-6d57-48e4-a452-c04a0a118f67",
+      "name": "Черно-пестрая эстонская",
+      "code": "cherno-pestraya_estonskaya_cattle"
+    },
+    {
+      "uuid": "e98921a5-92ea-4469-bd98-3347a8238c51",
+      "name": "Шведиш ред",
+      "code": "shvedish_red_cattle"
+    },
+    {
+      "uuid": "b0de0d04-f3c2-4499-ba05-28b5d170c47d",
+      "name": "Ярославская",
+      "code": "yaroslavskaya_cattle"
+    }
+  ]
+}
