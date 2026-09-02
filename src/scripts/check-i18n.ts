@@ -1,4 +1,4 @@
-import { EAEU_MESSAGES, type Messages } from '@/lib/i18n/eaeu-messages'
+import { PRODUCT_MESSAGES, type Messages } from '@/lib/i18n/product-messages'
 import { SITE_MESSAGES, type SiteMessages } from '@/lib/i18n/site-messages'
 import { LOCALES, DEFAULT_LOCALE, type Locale } from '@/lib/i18n/locales'
 import { negotiateLocale, resolveLocale } from '@/lib/i18n/negotiate'
@@ -89,12 +89,12 @@ const looksRussian = (s: string): boolean => {
  * ------------------------------------------------------------------ */
 
 /*
- * Наборов два: страница для стран союза и витрина продукта. Проверяются
- * одинаково и одним проходом — иначе второй набор заведётся без проверки
- * ровно потому, что первый уже проверен.
+ * Наборов два: общее описание продукта и строки, которые есть только
+ * у витрины. Проверяются одинаково и одним проходом — иначе второй набор
+ * заведётся без проверки ровно потому, что первый уже проверен.
  */
 const SETS: [name: string, byLocale: Record<Locale, Messages | SiteMessages>][] = [
-  ['страница ЕАЭС', EAEU_MESSAGES],
+  ['описание продукта', PRODUCT_MESSAGES],
   ['витрина продукта', SITE_MESSAGES],
 ]
 

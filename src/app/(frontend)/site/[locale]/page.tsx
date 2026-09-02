@@ -4,7 +4,7 @@ import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { PlemLogo } from '@/components/PlemLogo'
 import { LocaleSwitcher } from '@/components/LocaleSwitcher'
-import { EAEU_MESSAGES } from '@/lib/i18n/eaeu-messages'
+import { PRODUCT_MESSAGES } from '@/lib/i18n/product-messages'
 import { SITE_MESSAGES } from '@/lib/i18n/site-messages'
 import { LOCALE_CODES, isLocale, localeInfo, type Locale } from '@/lib/i18n/locales'
 import { BOOK_URL, SITE_PREFIX, isSiteHost } from '@/lib/hosts'
@@ -12,22 +12,19 @@ import { BOOK_URL, SITE_PREFIX, isSiteHost } from '@/lib/hosts'
 /**
  * Витрина продукта — то, что видно на `plem.online`.
  *
- * ## Чем она отличается от страницы для стран ЕАЭС
+ * ## Единственное место, где живёт это предложение
  *
- * Содержанием — почти ничем, и это осознанно: обе рассказывают, что это
- * за система и какие задачи она закрывает. Тексты берутся из одного
- * набора, и правятся в одном месте.
+ * Прежде такая же страница стояла внутри книги, по адресу `/eaeu/ru`.
+ * С появлением своего домена она стала второй копией одного текста —
+ * и копией на домене голштинской ассоциации: хозяйство из Казахстана,
+ * пришедшее по ссылке, читало предложение продукта с чужим знаком,
+ * чужим подвалом и чужими реквизитами. Страница удалена, адрес
+ * перенаправлен сюда постоянным перенаправлением.
  *
- * Отличается обращением. Страница союза говорит «вот решение для стран
- * ЕАЭС» и стоит внутри сайта Ассоциации, с её знаком и её подвалом.
- * Витрина говорит «вот продукт», носит собственный знак ПЛЕМ и **не имеет
- * подвала Ассоциации вовсе**.
- *
- * Последнее — не мелочь оформления. В подвале книги стоят адрес, телефон
- * и правовые документы Ассоциации производителей КРС голштинской породы.
- * Показать их на витрине продукта значило бы сказать чужому хозяйству
- * из другой страны, что оно обращается в Самару к голштинской ассоциации,
- * — а оно обращается к разработчику системы. Разные лица, разная
+ * Поэтому здесь **нет подвала Ассоциации вовсе**. В подвале книги стоят
+ * адрес, телефон и правовые документы Ассоциации производителей КРС
+ * голштинской породы; на витрине они назвали бы не то лицо — читатель
+ * обращается к разработчику системы, а не в Самару. Разные лица, разная
  * ответственность, разные реквизиты.
  *
  * ## Почему адреса собираются от приставки, а не пишутся прямо
@@ -57,7 +54,7 @@ export async function generateMetadata({
   const { locale } = await params
   if (!isLocale(locale)) return {}
 
-  const m = EAEU_MESSAGES[locale]
+  const m = PRODUCT_MESSAGES[locale]
 
   return {
     title: m.meta.title,
@@ -82,7 +79,7 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
   if (!isLocale(raw)) notFound()
 
   const locale: Locale = raw
-  const m = EAEU_MESSAGES[locale]
+  const m = PRODUCT_MESSAGES[locale]
   const s = SITE_MESSAGES[locale]
   const info = localeInfo(locale)
 
@@ -222,52 +219,45 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
       {/*
          Свой подвал, а не общий. В общем стоят адрес, телефон и правовые
          документы Ассоциации — на витрине продукта они назвали бы
-         не то лицо. Здесь только знак, авторство и ссылка на книгу.
+         не то лицо.
+
+         Здесь только ссылки. Знак убран: он уже стоит в шапке, а страница
+         короткая — на экране помещаются оба, и второй прочитывается
+         не как завершение, а как повтор. Подпись разработчика убрана тоже:
+         витрина говорит о продукте, а не о том, кто его написал, и первое,
+         что видит уходящий с неё человек, должно вести к системе,
+         а не к чужому телеграму.
       */}
       <footer style={{ marginTop: 'var(--footer-air)' }} className="bg-basement py-10 text-white">
-        <div className="container-page flex flex-wrap items-center justify-between gap-x-8 gap-y-6">
-          <span className="rounded-xl bg-white px-4 py-3">
-            <PlemLogo />
-          </span>
-
-          <nav
-            aria-label={m.nav.language}
-            className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[13px]"
+        <nav
+          aria-label={m.nav.home}
+          className="container-page flex flex-wrap items-center gap-x-8 gap-y-3 text-[14px]"
+        >
+          <a
+            href={BOOK_URL}
+            className="text-white/70 underline underline-offset-4 transition-colors hover:text-white"
           >
-            <a
-              href={BOOK_URL}
-              className="text-white/50 underline underline-offset-4 transition-colors hover:text-white"
-            >
-              {s.book.cta}
-            </a>
-            <a
-              href={`${BOOK_URL}/compliance`}
-              className="text-white/50 underline underline-offset-4 transition-colors hover:text-white"
-            >
-              {s.footer.note}
-            </a>
-            <a
-              href={`${BOOK_URL}/api-docs`}
-              className="text-white/50 underline underline-offset-4 transition-colors hover:text-white"
-            >
-              API
-            </a>
-          </nav>
-        </div>
-
-        <div className="container-page mt-8 border-t border-white/10 pt-6" lang="ru">
-          <p className="text-[13px] text-white/50">
-            © 2026 Разработка и платформа:{' '}
-            <a
-              href="https://t.me/dvasin"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-white/75 underline underline-offset-4 transition-colors hover:text-brand-400"
-            >
-              Дмитрий Васин
-            </a>
-          </p>
-        </div>
+            {s.book.cta}
+          </a>
+          <a
+            href={`${BOOK_URL}/compliance`}
+            className="text-white/50 underline underline-offset-4 transition-colors hover:text-white"
+          >
+            {s.footer.note}
+          </a>
+          <a
+            href={`${BOOK_URL}/api-docs`}
+            className="text-white/50 underline underline-offset-4 transition-colors hover:text-white"
+          >
+            API
+          </a>
+          <a
+            href="mailto:info@holstein-russia.ru"
+            className="text-white/50 underline underline-offset-4 transition-colors hover:text-white"
+          >
+            info@holstein-russia.ru
+          </a>
+        </nav>
       </footer>
     </div>
   )
