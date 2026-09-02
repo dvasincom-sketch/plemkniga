@@ -1,0 +1,1524 @@
+{
+  "source": "https://github.com/adewg/ICAR",
+  "branch": "ADE-1",
+  "commit": "ac55844e9c76acf632436381e6c9bc11804619d7",
+  "total": 303,
+  "used": 77,
+  "schemas": [
+    {
+      "name": "exampleErrorResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarAnimalBaseResource",
+      "dir": "resources",
+      "in": true
+    },
+    {
+      "name": "icarAnimalCoreResource",
+      "dir": "resources",
+      "in": true
+    },
+    {
+      "name": "icarAnimalEventCoreResource",
+      "dir": "resources",
+      "in": true
+    },
+    {
+      "name": "icarAnimalSetJoinEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarAnimalSetLeaveEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarAnimalSetResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarAnimalSortingCommandResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarAttentionEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarBatchResult",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarBreedingValueResource",
+      "dir": "resources",
+      "in": true
+    },
+    {
+      "name": "icarCarcassObservationsEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarCarcassResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarConformationScoreEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarDailyMilkingAveragesResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarDeviceResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarDiagnosisEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarEventCoreResource",
+      "dir": "resources",
+      "in": true
+    },
+    {
+      "name": "icarFeedIntakeEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarFeedRecommendationResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarFeedReportResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarFeedResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarFeedStorageResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarFeedTransactionResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarGestationResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarGroupEventCoreResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarGroupFeedingEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarGroupMovementArrivalEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarGroupMovementBirthEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarGroupMovementDeathEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarGroupMovementDepartureEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarGroupPositionObservationEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarGroupTreatmentEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarGroupWeightEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarHealthStatusObservedEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarInventoryTransactionResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarLactationResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarLactationStatusObservedEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarLocationResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarMedicineResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarMedicineTransactionResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarMilkPredictionResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarMilkingDryOffEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarMilkingVisitEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarMovementArrivalEventResource",
+      "dir": "resources",
+      "in": true
+    },
+    {
+      "name": "icarMovementBirthEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarMovementDeathEventResource",
+      "dir": "resources",
+      "in": true
+    },
+    {
+      "name": "icarMovementDepartureEventResource",
+      "dir": "resources",
+      "in": true
+    },
+    {
+      "name": "icarObservationSummaryResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarPositionObservationEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarProcessingLotResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarProgenyDetailsResource",
+      "dir": "resources",
+      "in": true
+    },
+    {
+      "name": "icarRationResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarRemarkEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarReproAbortionEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarReproDoNotBreedEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarReproEmbryoFlushingEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarReproEmbryoResource",
+      "dir": "resources",
+      "in": true
+    },
+    {
+      "name": "icarReproHeatEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarReproInseminationEventResource",
+      "dir": "resources",
+      "in": true
+    },
+    {
+      "name": "icarReproMatingRecommendationResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarReproParturitionEventResource",
+      "dir": "resources",
+      "in": true
+    },
+    {
+      "name": "icarReproPregnancyCheckEventResource",
+      "dir": "resources",
+      "in": true
+    },
+    {
+      "name": "icarReproSemenStrawResource",
+      "dir": "resources",
+      "in": true
+    },
+    {
+      "name": "icarReproStatusObservedEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarResource",
+      "dir": "resources",
+      "in": true
+    },
+    {
+      "name": "icarResourceCollectionReference",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarResponseMessageResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarSchemeTypeResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarSchemeValueResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarSortingSiteResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarStatisticsResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarTestDayResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarTestDayResultEventResource",
+      "dir": "resources",
+      "in": true
+    },
+    {
+      "name": "icarTreatmentEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarTreatmentProgramEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "icarTypeClassificationEventResource",
+      "dir": "resources",
+      "in": true
+    },
+    {
+      "name": "icarWeightEventResource",
+      "dir": "resources",
+      "in": true
+    },
+    {
+      "name": "icarWithdrawalEventResource",
+      "dir": "resources",
+      "in": false
+    },
+    {
+      "name": "PostalAddress",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarAnimalIdType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarAnimalIdentifierType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarAnimalMilkingSampleType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarAnimalSetReferenceType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarAnimalStateType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarBVBaseIdentifierType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarBreedFractionsType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarBreedIdentifierType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarBreedingValueType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarCarcassMetricIdentifierType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarCarcassMetricType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarCarcassObservationType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarCarcassType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarCoatColorIdentifierType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarConformationScoreType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarConsignmentDeclarationType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarConsignmentType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarConsumedFeedType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarConsumedRationType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarCostType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarDateTimeType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarDateType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarDeclarationIdentifierType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarDeviceManufacturerType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarDeviceReferenceType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarDeviceRegistrationIdentifierType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarDiagnosisIdentifierType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarDiagnosisType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarFeedDurationType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarFeedIdentifierType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarFeedPropertyType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarFeedQuantityType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarFeedRecommendationIdType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarFeedReferenceType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarFeedsInRationType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarGroupSpecifierType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarIdentifierType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarIndividualWeightType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarInterestedPartyType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarInventoryClassificationType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarInventoryTransactionType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarLocationIdentifierType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarMassMeasureType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarMedicineBatchType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarMedicineCourseSummaryType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarMedicineDoseType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarMedicineIdentifierType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarMedicineReferenceType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarMedicineWithdrawalType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarMetaDataType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarMetricType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarMilkCharacteristicsType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarMilkDurationType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarMilkRecordingMethodType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarMilkingMilkWeightType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarMilkingPredictionType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarObservationStatisticsType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarOrganizationIdentifierType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarOrganizationIdentityType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarOrganizationType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarParentageType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarPlantChainType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarPositionObservationType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarPositionType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarProcessingLotType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarProductIdentifierType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarProductReferenceType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarPropertyIdentifierType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarQuarterMilkingSampleType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarQuarterMilkingType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarRationIdType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarReasonIdentifierType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarRecommendedFeedType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarRecommendedRationType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarReproHeatWindowType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarResourceReferenceType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarSireRecommendationType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarStatisticsGroupType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarStatisticsType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarTraitAmountType",
+      "dir": "types",
+      "in": false
+    },
+    {
+      "name": "icarTraitLabelIdentifierType",
+      "dir": "types",
+      "in": true
+    },
+    {
+      "name": "icarAggregationType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarAnimalGenderType",
+      "dir": "enums",
+      "in": true
+    },
+    {
+      "name": "icarAnimalHealthStatusType",
+      "dir": "enums",
+      "in": true
+    },
+    {
+      "name": "icarAnimalIdSchemeCode",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarAnimalLactationStatusType",
+      "dir": "enums",
+      "in": true
+    },
+    {
+      "name": "icarAnimalRelationType",
+      "dir": "enums",
+      "in": true
+    },
+    {
+      "name": "icarAnimalReproductionStatusType",
+      "dir": "enums",
+      "in": true
+    },
+    {
+      "name": "icarAnimalSpecieType",
+      "dir": "enums",
+      "in": true
+    },
+    {
+      "name": "icarAnimalStatusType",
+      "dir": "enums",
+      "in": true
+    },
+    {
+      "name": "icarArrivalReasonType",
+      "dir": "enums",
+      "in": true
+    },
+    {
+      "name": "icarAttentionCategoryType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarAttentionCauseType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarAttentionPriorityType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarBatchResultSeverityType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarBottleIdentifierType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarBreedingValueCalculationType",
+      "dir": "enums",
+      "in": true
+    },
+    {
+      "name": "icarCarcassPrimalType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarCarcassSideType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarCarcassStateType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarChainProcessType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarConformationScoringMethodType",
+      "dir": "enums",
+      "in": true
+    },
+    {
+      "name": "icarConformationTraitGroupType",
+      "dir": "enums",
+      "in": true
+    },
+    {
+      "name": "icarConformationTraitType",
+      "dir": "enums",
+      "in": true
+    },
+    {
+      "name": "icarDeathDisposalMethodType",
+      "dir": "enums",
+      "in": true
+    },
+    {
+      "name": "icarDeathMethodType",
+      "dir": "enums",
+      "in": true
+    },
+    {
+      "name": "icarDeathReasonType",
+      "dir": "enums",
+      "in": true
+    },
+    {
+      "name": "icarDepartureKindType",
+      "dir": "enums",
+      "in": true
+    },
+    {
+      "name": "icarDepartureReasonType",
+      "dir": "enums",
+      "in": true
+    },
+    {
+      "name": "icarDiagnosisSeverityType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarDiagnosisStageType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarDurationType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarFeedCategoryType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarGroupEventMethodType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarGroupType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarInventoryTransactionKindType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarLactationType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarMessageType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarMethodType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarMilkCharacteristicCodeType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarMilkRecordingProtocolType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarMilkRecordingSchemeType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarMilkSamplingMomentType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarMilkSamplingSchemeType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarMilkingRemarksType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarMilkingType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarMilkingTypeCode",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarMilkingsPerDayType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarObservationStatusType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarParturitionBirthSizeType",
+      "dir": "enums",
+      "in": true
+    },
+    {
+      "name": "icarParturitionBirthStatusType",
+      "dir": "enums",
+      "in": true
+    },
+    {
+      "name": "icarPositionOnAnimalType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarProductFamilyType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarProductionPurposeType",
+      "dir": "enums",
+      "in": true
+    },
+    {
+      "name": "icarRecommendationType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarRegistrationReasonType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarReproCalvingEaseType",
+      "dir": "enums",
+      "in": true
+    },
+    {
+      "name": "icarReproEmbryoFlushingMethodType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarReproHeatCertaintyType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarReproHeatDetectionMethodType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarReproHeatIntensityType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarReproHeatSignType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarReproInseminationType",
+      "dir": "enums",
+      "in": true
+    },
+    {
+      "name": "icarReproPregnancyMethodType",
+      "dir": "enums",
+      "in": true
+    },
+    {
+      "name": "icarReproPregnancyResultType",
+      "dir": "enums",
+      "in": true
+    },
+    {
+      "name": "icarReproSemenPreservationType",
+      "dir": "enums",
+      "in": true
+    },
+    {
+      "name": "icarSetPurposeType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarStatisticsPurposeType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarTestDayCodeType",
+      "dir": "enums",
+      "in": true
+    },
+    {
+      "name": "icarValidSampleFillingIndicatorType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "icarWeightMethodType",
+      "dir": "enums",
+      "in": true
+    },
+    {
+      "name": "icarWithdrawalProductType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "uncefactDoseUnitsType",
+      "dir": "enums",
+      "in": false
+    },
+    {
+      "name": "uncefactMassUnitsType",
+      "dir": "enums",
+      "in": true
+    },
+    {
+      "name": "icarAnimalCoreCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarAnimalSetCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarAnimalSetJoinEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarAnimalSetLeaveEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarAnimalSortingCommandCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarAttentionEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarBreedingValueCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarCarcassCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarCarcassObservationsEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarConformationScoreEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarDailyFeedReportCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarDailyMilkingAveragesCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarDeviceCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarDiagnosisEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarErrorCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarFeedCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarFeedIntakeEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarFeedRecommendationCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarFeedReportCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarFeedStorageCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarFeedTransactionCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarGestationCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarGroupFeedingEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarGroupMovementArrivalEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarGroupMovementBirthEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarGroupMovementDeathEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarGroupMovementDepartureEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarGroupPositionObservationEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarGroupTreatmentEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarGroupWeightEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarHealthStatusObservedEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarInventoryTransactionCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarLactationCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarLactationStatusObservedEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarLocationCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarMedicineTransactionCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarMilkPredictionsCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarMilkingDryOffEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarMilkingVisitEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarMovementArrivalEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarMovementBirthEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarMovementDeathEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarMovementDepartureEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarObservationSummaryCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarPositionObservationEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarProcessingLotCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarRationCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarRemarkEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarReproAbortionEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarReproDoNotBreedEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarReproEmbryoFlushingEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarReproHeatEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarReproInseminationEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarReproMatingRecommendationCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarReproParturitionEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarReproPregnancyCheckEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarReproStatusObservedEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarResourceCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarSchemeTypeCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarSchemeValueCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarSortingSiteCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarStatisticsCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarTestDayCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarTestDayResultEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarTreatmentEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarTreatmentProgramEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarTypeClassificationEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarWeightEventCollection",
+      "dir": "collections",
+      "in": false
+    },
+    {
+      "name": "icarWithdrawalEventCollection",
+      "dir": "collections",
+      "in": false
+    }
+  ]
+}

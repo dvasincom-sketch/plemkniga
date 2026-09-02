@@ -252,6 +252,7 @@ export const COMPLIANCE: ComplianceItem[] = [
       { kind: 'check', value: 'check:ade' },
       { kind: 'check', value: 'check:ade-accept' },
       { kind: 'check', value: 'check:ade-schema' },
+      { kind: 'page', value: '/ade' },
       { kind: 'page', value: '/api-docs' },
       { kind: 'doc', value: 'docs/ade-spec.md' },
     ],

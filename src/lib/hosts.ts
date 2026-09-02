@@ -162,7 +162,7 @@ export const rewriteToSite = (pathname: string): string | null => {
  * `/certificates`, и он молча уедет на витрину вместе со всем
  * содержимым. Перечень короткий и меняется редко — пусть будет явным.
  */
-export const SHARED_PATHS = ['/compliance', '/icar', '/api-docs', '/tour'] as const
+export const SHARED_PATHS = ['/compliance', '/icar', '/api-docs', '/tour', '/ade'] as const
 
 /** Сквозная ли это страница — сама или что-то внутри неё. */
 export const isSharedPath = (pathname: string): boolean =>
