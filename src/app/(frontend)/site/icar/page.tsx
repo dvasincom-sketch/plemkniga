@@ -10,6 +10,8 @@ import {
   ICAR_WITH_GAPS,
 } from '@/lib/icar-map'
 import { plural } from '@/lib/format'
+import { ADE_COLLECTIONS } from '@/lib/ade/core'
+import { ADE_WRITABLE } from '@/lib/ade/parse'
 
 export const metadata: Metadata = { title: 'Руководства ICAR' }
 
@@ -179,7 +181,9 @@ export default function IcarPage() {
               на GitHub
             </a>{' '}
             под лицензией Apache 2.0 — его можно внедрять и дорабатывать свободно; книга отдаёт
-            по нему семь коллекций. Двадцать девять выпусков{' '}
+            по нему {ADE_COLLECTIONS.length}{' '}
+            {plural(ADE_COLLECTIONS.length, 'коллекцию', 'коллекции', 'коллекций')} и принимает{' '}
+            {ADE_WRITABLE.length} из них на запись. Двадцать девять выпусков{' '}
             <a
               href="https://www.icar.org/publications/technical-series-and-proceedings/"
               target="_blank"

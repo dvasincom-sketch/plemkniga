@@ -11,6 +11,9 @@ import {
   STATE_LABEL,
   STATE_ORDER,
   byArea,
+  EXTERNAL,
+  OURS,
+  OURS_DONE,
   countByState,
   type ComplianceItem,
   type Evidence,
@@ -127,6 +130,32 @@ export default function CompliancePage() {
           — отдельной страницей.
         </p>
 
+        {/*
+           Ответ на вопрос, который задают первым: «а можно закрыть всё?».
+           Без него список читается как перечень недоделок, и владелец
+           системы разумно требует их доделать — при том, что часть
+           не доделывается ни за какие деньги на разработку.
+
+           Числа считаются из самого реестра. Написать их словами значило
+           бы завести второе место, где состояние живёт, — и то, которое
+           отстанет первым, окажется как раз на самом видном месте.
+        */}
+        <div className="card mt-6 max-w-[80ch] text-[14px] leading-relaxed text-ink-700">
+          <p>
+            <strong className="font-medium">Закрыть весь список нельзя</strong>, и это свойство
+            самого списка, а не состояние работы. {EXTERNAL.length} из {COMPLIANCE.length}{' '}
+            {plural(EXTERNAL.length, 'позиции', 'позиций', 'позиций')} зависят не от кода:
+            их закрывают членство в международной организации, аккредитованный аудитор,
+            ведомство или решение самой Ассоциации. Разработкой их можно только подготовить.
+          </p>
+          <p className="mt-3">
+            Нашей работой закрываются {OURS.length}{' '}
+            {plural(OURS.length, 'позиция', 'позиции', 'позиций')}; закрыто{' '}
+            {OURS_DONE.length}. У каждой оставшейся сказано, чего именно не хватает, — и это
+            честнее круглого числа готовности, которое ничего не обещает.
+          </p>
+        </div>
+
         {AREA_ORDER.map((area) => {
           const items = byArea(area)
           if (!items.length) return null
@@ -192,6 +221,18 @@ function Item({ item }: { item: ComplianceItem }) {
       {item.next && (
         <p className="mt-2 max-w-[80ch] text-[14px] leading-relaxed text-ink-700">
           <span className="text-ink-500">Что дальше.</span> {item.next}
+        </p>
+      )}
+
+      {/*
+         Кто должен действовать, кроме нас. Стоит после «что дальше»
+         и до доказательств: сперва читатель узнаёт работу, потом — что
+         она не наша. Обратный порядок читался бы как отговорка вперёд
+         объяснения.
+      */}
+      {item.external && (
+        <p className="mt-2 max-w-[80ch] text-[14px] leading-relaxed text-ink-700">
+          <span className="text-ink-500">Зависит не от нас.</span> {item.external}
         </p>
       )}
 

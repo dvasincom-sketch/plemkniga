@@ -1,0 +1,21 @@
+{
+    "description": "Returned by a batch POST event to return identity (meta), errors, and warnings for a resource.",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string",
+            "description": "Unique identifier created in the system for this event. SHOULD be a UUID."
+        },
+        "meta": {
+            "$ref": "../types/icarMetaDataType.json",
+            "description": "Metadata for the posted resource. Allows specification of the source, source Id to synchronise data."
+        },        
+        "messages": {
+            "type": ["array", "null"],
+            "description": "An array of errors for this resource. The messages array may be unspecified OR null.",
+            "items": {
+                "$ref": "../resources/icarResponseMessageResource.json" 
+            }
+        }
+    }
+}

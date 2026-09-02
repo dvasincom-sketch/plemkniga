@@ -1,4 +1,6 @@
 import type { Payload } from 'payload'
+import { ADE_COLLECTIONS } from '@/lib/ade/core'
+import { ADE_WRITABLE } from '@/lib/ade/parse'
 
 /**
  * Описание REST API в формате OpenAPI (ТЗ, требование №16).
@@ -396,6 +398,19 @@ const SECTIONS = [
     slugs: ['bench-runs', 'check-runs'],
   },
   {
+    /*
+     * У обмена нет коллекций Payload — только свои адреса, поэтому
+     * `slugs` пуст. Раздел всё равно объявлен здесь, а не приписан
+     * в конец: порядок разделов — это порядок чтения, и обмен читают
+     * после того, как разобрались, что в книге лежит.
+     */
+    key: 'Обмен',
+    description:
+      'Стандартный интерфейс ICAR ADE: то же содержимое книги, но именами ' +
+      'и адресами, которые чужая система понимает без чтения нашей документации.',
+    slugs: [],
+  },
+  {
     key: 'Прочее',
     description:
       'Сюда попадает коллекция, для которой раздел не назван. Раздел обязан ' +
@@ -588,6 +603,109 @@ export function buildOpenApi(payload: Payload, serverUrl: string): OpenApiDocume
     },
   }
 
+
+  /* ---------------------------------------------------------------- *
+   *  Обмен по стандарту ICAR ADE                                     *
+   * ---------------------------------------------------------------- */
+
+  /*
+   * Описание интерфейса обмена стояло в стороне от описания API,
+   * и это было не разделением, а пропажей: интегратор, открывший
+   * `/api-docs`, узнавал про наши собственные ручки и не узнавал,
+   * что есть стандартный интерфейс, ради которого ему не пришлось бы
+   * изучать наши.
+   *
+   * Пути описаны шаблоном, а не по одному на коллекцию: их одиннадцать,
+   * и одиннадцать почти одинаковых страниц в описании читаются хуже,
+   * чем одна с перечнем имён. Это же и честнее по сути — в спецификации
+   * ADE адрес именно шаблонный.
+   */
+  const adeTag = `Обмен${SECTION_SEP}ICAR ADE`
+
+  paths['/ade/v1/locations'] = {
+    get: {
+      tags: [adeTag],
+      summary: 'Локации, доступные вошедшему',
+      description:
+        'Локация в ADE — это хозяйство. Список зависит от того, кто спрашивает: ' +
+        'хозяйство видит своё, сотрудник Ассоциации — все.',
+      responses: { '200': { description: 'Коллекция icarLocationResource' } },
+    },
+  }
+
+  paths['/ade/v1/locations/{scheme}/{id}/{collection}'] = {
+    get: {
+      tags: [adeTag],
+      summary: 'Отдать коллекцию ADE',
+      description:
+        'Адрес задан спецификацией: локация парой «схема + идентификатор», ' +
+        'дальше имя коллекции. Отдаются: ' +
+        ADE_COLLECTIONS.join(', ') +
+        '. Ответ — icarResourceCollection с `view` и `member`. ' +
+        'Локация в адресе говорит, о каком хозяйстве спрашивают; право ответить ' +
+        'берётся из того, кто спрашивает, — свести эти два вопроса в один значило ' +
+        'бы открыть чужое стадо подстановкой номера.',
+      parameters: [
+        {
+          name: 'scheme',
+          in: 'path',
+          required: true,
+          schema: { type: 'string' },
+          description: 'Схема идентификатора локации.',
+        },
+        {
+          name: 'id',
+          in: 'path',
+          required: true,
+          schema: { type: 'string' },
+          description: 'Идентификатор локации в этой схеме.',
+        },
+        {
+          name: 'collection',
+          in: 'path',
+          required: true,
+          schema: { type: 'string', enum: [...ADE_COLLECTIONS] },
+          description: 'Имя коллекции ADE.',
+        },
+        {
+          name: 'meta-modified-from',
+          in: 'query',
+          required: false,
+          schema: { type: 'string', format: 'date-time' },
+          description: 'Отдать только изменённое с этого момента.',
+        },
+      ],
+      responses: {
+        '200': { description: 'Коллекция ресурсов ADE' },
+        '401': { description: 'icarErrorResource: нужна авторизация' },
+        '404': { description: 'icarErrorResource: локация не найдена или недоступна' },
+      },
+    },
+    post: {
+      tags: [adeTag],
+      summary: 'Принять события',
+      description:
+        'Принимаются: ' +
+        ADE_WRITABLE.join(', ') +
+        '. Тело — один ресурс или массив ресурсов. ' +
+        '`meta.source` и `meta.sourceId` обязательны: по этой паре повторная ' +
+        'отправка узнаётся как та же запись, а не создаёт вторую. ' +
+        'Остальные коллекции отвечают 405 с объяснением: запись животного ' +
+        'и переход прав — утверждения, за которые отвечает Ассоциация, ' +
+        'и они идут заявкой с проверкой.',
+      requestBody: {
+        content: { 'application/json': { schema: { type: 'object' } } },
+      },
+      responses: {
+        '200': { description: 'Обновлено, либо icarBatchResult для пакета' },
+        '201': { description: 'Создано' },
+        '400': { description: 'icarErrorResource: тело не разобралось' },
+        '405': { description: 'icarErrorResource: коллекция только на чтение' },
+        '422': { description: 'icarErrorResource: животное не найдено в этой локации' },
+      },
+    },
+  }
+
   /*
    * Разделы идут в объявленном порядке, коллекции внутри раздела — в том,
    * в каком они перечислены у него: это порядок по существу, а не
@@ -618,6 +736,23 @@ export function buildOpenApi(payload: Payload, serverUrl: string): OpenApiDocume
         .map((t) => ({ name: t.name, ...(t.description ? { description: t.description } : {}) })),
       ...(section.key === 'Доступ'
         ? [{ name: `Доступ${SECTION_SEP}Вход`, description: 'Получить токен и узнать, кто вы.' }]
+        : []),
+      /*
+       * У обмена нет коллекций Payload, и объявить его тег больше негде:
+       * `orderedTags` собирается из `slugs`, а их у раздела нет. Без этой
+       * строки тег встречался бы у ручек, но не был бы объявлен — Swagger
+       * UI вывел бы его в конец, ниже всех объявленных, и «Обмен» оказался
+       * бы не на своём месте. Ловит это `check:openapi`.
+       */
+      ...(section.key === 'Обмен'
+        ? [
+            {
+              name: `Обмен${SECTION_SEP}ICAR ADE`,
+              description:
+                'Location-centric API стандарта ICAR ADE 1.5. Отдача — все коллекции, ' +
+                'приём — события у уже записанных животных.',
+            },
+          ]
         : []),
     ]),
     /*

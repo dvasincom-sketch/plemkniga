@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs'
-import { COMPLIANCE, STATE_ORDER, countByState } from '@/lib/compliance'
+import { COMPLIANCE, EXTERNAL, OURS, OURS_DONE, STATE_ORDER, countByState } from '@/lib/compliance'
 import { SITE_PREFIX, isSharedPath } from '@/lib/hosts'
 
 /**
@@ -84,6 +84,24 @@ for (const item of COMPLIANCE) {
     fail(`${where}: состояние «${item.state}» без ответа на вопрос «что дальше»`)
   }
 
+  /*
+   * «Закрыто извне» и «вне области» обязаны называть, кто именно должен
+   * действовать. Без имени такая позиция читается как отговорка, а с ним —
+   * как факт, который можно проверить: написать в EHRC, найти аудитора,
+   * спросить Ассоциацию.
+   */
+  if ((item.state === 'blocked' || item.state === 'out') && !item.external) {
+    fail(`${where}: состояние «${item.state}», но не сказано, от кого оно зависит`)
+  }
+
+  /*
+   * Обратное тоже: выполненная позиция не может зависеть от чужого
+   * действия — если зависит, значит выполнена не она.
+   */
+  if (item.state === 'done' && item.external) {
+    fail(`${where}: помечено выполненным, но зависит от чужого действия`)
+  }
+
   if (item.state === 'done' && item.next) {
     fail(`${where}: помечено выполненным, но у него есть «что дальше» — значит, не выполнено`)
   }
@@ -148,6 +166,10 @@ console.log(
  */
 const bare = COMPLIANCE.filter((i) => i.evidence.length === 0).length
 console.log(`  без доказательства: ${bare}`)
+console.log(
+  `  зависят не только от нас: ${EXTERNAL.length}; закрываются нашей работой: ${OURS.length}, ` +
+    `из них закрыто ${OURS_DONE.length}`,
+)
 
 if (fails.length) {
   console.log('')
