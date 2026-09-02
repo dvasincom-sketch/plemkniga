@@ -1376,6 +1376,13 @@ export interface Calving {
   stillborn?: number | null;
   calves?: (number | Animal)[] | null;
   comment?: string | null;
+  /**
+   * Заполняется только у записей, принятых обменом
+   */
+  ade?: {
+    source?: string | null;
+    sourceId?: string | null;
+  };
   updatedAt: string;
   createdAt: string;
 }
@@ -1405,6 +1412,13 @@ export interface Insemination {
   pregnancyCheckDate?: string | null;
   comment?: string | null;
   source?: ('manual' | 'import' | 'api') | null;
+  /**
+   * Заполняется только у записей, принятых обменом
+   */
+  ade?: {
+    source?: string | null;
+    sourceId?: string | null;
+  };
   updatedAt: string;
   createdAt: string;
 }
@@ -1500,6 +1514,13 @@ export interface MilkTest {
   somaticCells?: number | null;
   laboratory?: (number | null) | Organization;
   source?: ('lab' | 'owner' | 'import' | 'api') | null;
+  /**
+   * Заполняется только у записей, принятых обменом
+   */
+  ade?: {
+    source?: string | null;
+    sourceId?: string | null;
+  };
   updatedAt: string;
   createdAt: string;
 }
@@ -1528,6 +1549,13 @@ export interface Weighing {
    */
   lactationNumber?: number | null;
   note?: string | null;
+  /**
+   * Заполняется только у записей, принятых обменом
+   */
+  ade?: {
+    source?: string | null;
+    sourceId?: string | null;
+  };
   updatedAt: string;
   createdAt: string;
 }
@@ -3280,6 +3308,12 @@ export interface CalvingsSelect<T extends boolean = true> {
   stillborn?: T;
   calves?: T;
   comment?: T;
+  ade?:
+    | T
+    | {
+        source?: T;
+        sourceId?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
 }
@@ -3302,6 +3336,12 @@ export interface InseminationsSelect<T extends boolean = true> {
   pregnancyCheckDate?: T;
   comment?: T;
   source?: T;
+  ade?:
+    | T
+    | {
+        source?: T;
+        sourceId?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
 }
@@ -3320,6 +3360,12 @@ export interface MilkTestsSelect<T extends boolean = true> {
   somaticCells?: T;
   laboratory?: T;
   source?: T;
+  ade?:
+    | T
+    | {
+        source?: T;
+        sourceId?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
 }
@@ -3335,6 +3381,12 @@ export interface WeighingsSelect<T extends boolean = true> {
   sign?: T;
   lactationNumber?: T;
   note?: T;
+  ade?:
+    | T
+    | {
+        source?: T;
+        sourceId?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
 }

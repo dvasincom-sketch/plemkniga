@@ -593,3 +593,154 @@ export function adeLocation(o: LocationInput): AdeResource & Record<string, unkn
     name: o.shortName || o.name,
   })
 }
+
+/* ------------------------------------------------------------------ *
+ *  Движение: поступление, выбытие, падёж                             *
+ * ------------------------------------------------------------------ */
+
+export type MovementInput = {
+  id: number
+  animal: AnimalInput
+  date: string
+  /** Вид из нашего справочника: sale, lease, transfer, import, cull, death. */
+  kind: string
+  /** Организация, отдавшая животное; `null` — поступило извне книги. */
+  fromId: number | null
+  /** Организация, принявшая животное; `null` — выбраковка или падёж. */
+  toId: number | null
+  updatedAt: string | null
+}
+
+/**
+ * Одна запись перемещения — два разных события в ADE.
+ *
+ * У нас продажа записана одной строкой: от кого, кому, когда. В стандарте
+ * это два события у двух локаций: у продавца выбытие, у покупателя
+ * поступление. И это не избыточность стандарта, а верное описание мира:
+ * хозяйство видит только свою сторону сделки, и «продажа» без указания
+ * стороны не отвечает на вопрос «уехало или приехало».
+ *
+ * Поэтому одна строка отдаётся дважды — в `departures` той локации,
+ * от которой ушло, и в `arrivals` той, куда пришло, — и это не дубль.
+ * `meta.sourceId` у них разный: к нашему номеру приписывается сторона,
+ * иначе потребитель, забравший обе коллекции, склеил бы два события
+ * в одно и потерял бы половину движения.
+ */
+const ARRIVAL_REASON: Record<string, string> = {
+  sale: 'Purchase',
+  import: 'Imported',
+  transfer: 'InternalTransfer',
+  lease: 'Agistment',
+}
+
+const DEPARTURE_KIND: Record<string, string> = {
+  sale: 'Sale',
+  transfer: 'InternalTransfer',
+  lease: 'Agistment',
+  cull: 'Slaughter',
+}
+
+export function adeArrival(m: MovementInput): AdeEvent & Record<string, unknown> {
+  return adeClean({
+    resourceType: 'icarMovementArrivalEventResource',
+    /*
+     * Сторона приписана к номеру записи. Без неё поступление и выбытие
+     * из одной строки пришли бы к потребителю с одинаковым `sourceId`,
+     * и добросовестный клиент, различающий записи по нему, счёл бы
+     * второе событие повтором первого — и потерял бы половину движения.
+     */
+    meta: adeMeta({ sourceId: `${m.id}-in`, modified: m.updatedAt ?? m.date }),
+    location: locationOf(m.toId),
+    id: `${m.id}-in`,
+    animal: animalIdentifier(m.animal),
+    eventDateTime: adeDateTime(m.date),
+    arrivalReason: ARRIVAL_REASON[m.kind] ?? 'Other',
+  })
+}
+
+export function adeDeparture(m: MovementInput): AdeEvent & Record<string, unknown> {
+  return adeClean({
+    resourceType: 'icarMovementDepartureEventResource',
+    meta: adeMeta({ sourceId: `${m.id}-out`, modified: m.updatedAt ?? m.date }),
+    location: locationOf(m.fromId),
+    id: `${m.id}-out`,
+    animal: animalIdentifier(m.animal),
+    eventDateTime: adeDateTime(m.date),
+    departureKind: DEPARTURE_KIND[m.kind] ?? 'Other',
+    /*
+     * Причина выбытия у нас не записана отдельным полем: справочник
+     * причин ведёт ФГИАС и лежит у животного, а не у перемещения.
+     * Подставлять `Sale` в качестве причины нельзя — это вид выбытия,
+     * а не причина; корову продают по разным причинам, и выдуманная
+     * причина уедет в чужую систему как факт.
+     */
+  })
+}
+
+export function adeDeath(m: MovementInput): AdeEvent & Record<string, unknown> {
+  return adeClean({
+    resourceType: 'icarMovementDeathEventResource',
+    meta: adeMeta({ sourceId: `${m.id}-death`, modified: m.updatedAt ?? m.date }),
+    location: locationOf(m.fromId),
+    id: `${m.id}-death`,
+    animal: animalIdentifier(m.animal),
+    eventDateTime: adeDateTime(m.date),
+    /*
+     * Причина гибели тоже не записана. `Unknown` здесь честнее пропуска:
+     * поле необязательное, но потребитель, увидев событие падежа без
+     * причины, не знает, не записали её или не смогли определить.
+     * `Unknown` — это «не определено», и ровно так дело и обстоит.
+     */
+    deathReason: 'Unknown',
+  })
+}
+
+/* ------------------------------------------------------------------ *
+ *  Проверка стельности                                               *
+ * ------------------------------------------------------------------ */
+
+export type PregnancyCheckInput = {
+  /** Номер осеменения: проверка живёт при нём, своей записи у неё нет. */
+  id: number
+  animal: AnimalInput
+  date: string
+  /** Название результата из справочника — разбирается по смыслу. */
+  result: string | null
+  updatedAt: string | null
+}
+
+/**
+ * Результат из нашего справочника в перечисление стандарта.
+ *
+ * Справочник результатов осеменения ведётся строками и пополняется
+ * зоотехниками, поэтому разбор идёт по вхождению слова, а не по коду.
+ * Это грубо, и грубость здесь допустима ровно потому, что неузнанное
+ * даёт `Unknown` — то есть «не разобрали», а не выдуманный ответ.
+ *
+ * Обратное было бы хуже: сопоставление по порядку строк в справочнике
+ * молча поехало бы при первой же вставке новой строки в середину.
+ */
+const pregnancyResult = (name: string | null): string => {
+  const t = (name ?? '').toLowerCase()
+  if (/двойн|многоплод/.test(t)) return 'Multiple'
+  if (/стель|жерёб|положит/.test(t)) return 'Pregnant'
+  if (/яловая|не стель|пуст|отрицат|прохолост/.test(t)) return 'Empty'
+  return 'Unknown'
+}
+
+export function adePregnancyCheck(p: PregnancyCheckInput): AdeEvent & Record<string, unknown> {
+  return adeClean({
+    resourceType: 'icarReproPregnancyCheckEventResource',
+    meta: adeMeta({ sourceId: `${p.id}-pc`, modified: p.updatedAt ?? p.date }),
+    location: locationOf(p.animal.ownerId),
+    id: `${p.id}-pc`,
+    animal: animalIdentifier(p.animal),
+    eventDateTime: adeDateTime(p.date),
+    result: pregnancyResult(p.result),
+    /*
+     * Метод диагностики не записан. Не подставляем `Palpation`: он
+     * распространён, но это утверждение о том, как проверяли, а мы
+     * не знаем. Незаполненное необязательное поле честнее правдоподобного.
+     */
+  })
+}

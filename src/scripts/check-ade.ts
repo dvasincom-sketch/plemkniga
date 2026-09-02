@@ -1,4 +1,5 @@
 import {
+  ADE_ANIMAL_STATUS,
   ADE_BIRTH_STATUS,
   ADE_BV_CALCULATION,
   ADE_CALVING_EASE,
@@ -11,16 +12,19 @@ import {
   ADE_RELATION,
   ADE_SCORING_METHOD,
   ADE_SPECIE,
-  ADE_ANIMAL_STATUS,
   SCHEME,
 } from '@/lib/ade/core'
 import {
   COMPOSITE_TO_ADE,
   LINEAR_TO_ADE,
   adeAnimal,
+  adeArrival,
   adeBreedingValue,
+  adeDeath,
+  adeDeparture,
   adeInsemination,
   adeParturition,
+  adePregnancyCheck,
   adeTestDayResult,
   adeTypeClassification,
   adeWeight,
@@ -281,6 +285,66 @@ const built: [string, Record<string, unknown>, string[]][] = [
     }),
     ['resourceType', 'id', 'animal'],
   ],
+
+  /* ---------------- Движение и стельность ---------------- */
+
+  /*
+   * Продажа проверяется дважды — как поступление и как выбытие,
+   * из одной и той же записи. Это не удвоение проверки: у двух ресурсов
+   * разные локации и разные `sourceId`, и именно эта разница
+   * и проверяется. Слипшиеся `sourceId` означали бы, что потребитель,
+   * забравший обе коллекции, потеряет половину движения.
+   */
+  [
+    'поступление',
+    adeArrival({
+      id: 7001,
+      animal: cow,
+      date: '2026-05-01',
+      kind: 'sale',
+      fromId: 12,
+      toId: 49,
+      updatedAt: null,
+    }),
+    ['resourceType', 'id', 'animal', 'location', 'arrivalReason'],
+  ],
+  [
+    'выбытие',
+    adeDeparture({
+      id: 7001,
+      animal: cow,
+      date: '2026-05-01',
+      kind: 'sale',
+      fromId: 12,
+      toId: 49,
+      updatedAt: null,
+    }),
+    ['resourceType', 'id', 'animal', 'location', 'departureKind'],
+  ],
+  [
+    'падёж',
+    adeDeath({
+      id: 7002,
+      animal: cow,
+      date: '2026-06-11',
+      kind: 'death',
+      fromId: 49,
+      toId: null,
+      updatedAt: null,
+    }),
+    ['resourceType', 'id', 'animal', 'location', 'deathReason'],
+  ],
+  [
+    'проверка стельности',
+    adePregnancyCheck({
+      id: 7003,
+      animal: cow,
+      date: '2026-04-20',
+      result: 'Стельная',
+      updatedAt: null,
+    }),
+    ['resourceType', 'id', 'animal', 'result'],
+  ],
 ]
 
 for (const [name, resource, required] of built) {
@@ -289,6 +353,50 @@ for (const [name, resource, required] of built) {
 }
 
 console.log(`Собрано ресурсов: ${built.length}`)
+
+/* ------------------------------------------------------------------ *
+ *  Две стороны одной сделки — два разных события                     *
+ * ------------------------------------------------------------------ */
+
+/*
+ * Одна наша запись о продаже отдаётся дважды: поступлением покупателю
+ * и выбытием продавцу. Это верно по стандарту — хозяйство видит только
+ * свою сторону, — но опасно ровно одним: если `sourceId` у обоих
+ * окажется одинаковым, добросовестный потребитель, различающий записи
+ * по нему, сочтёт второе событие повтором первого и потеряет половину
+ * движения. А отдача при этом будет выглядеть исправной.
+ */
+{
+  const sale = {
+    id: 7001,
+    animal: cow,
+    date: '2026-05-01',
+    kind: 'sale',
+    fromId: 12,
+    toId: 49,
+    updatedAt: null,
+  }
+
+  const inn = adeArrival(sale)
+  const out = adeDeparture(sale)
+
+  const idOf = (r: Record<string, unknown>) =>
+    String((r.meta as { sourceId?: string } | undefined)?.sourceId ?? '')
+
+  if (idOf(inn) === idOf(out)) {
+    fail(
+      'поступление и выбытие из одной записи имеют одинаковый sourceId — ' +
+        'потребитель сочтёт второе повтором первого и потеряет половину движения',
+    )
+  }
+
+  const locOf = (r: Record<string, unknown>) =>
+    JSON.stringify((r as { location?: unknown }).location ?? null)
+
+  if (locOf(inn) === locOf(out)) {
+    fail('поступление и выбытие отданы одной локации — стороны сделки разные')
+  }
+}
 
 /* ------------------------------------------------------------------ *
  *  Частности, которые общая сверка не поймает                        *

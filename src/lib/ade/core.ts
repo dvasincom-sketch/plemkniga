@@ -81,6 +81,17 @@ export const ADE_COLLECTIONS = [
   'type-classifications',
   'weights',
   'breeding-values',
+  /*
+   * Движение и стельность добавлены позже остальных, и позже намеренно:
+   * без них потребитель получал картину продуктивности без картины
+   * перемещений — а без неё непонятно, почему у коровы оборвался ряд
+   * доений. Ряд обрывается либо потому, что её продали, либо потому,
+   * что она пала, и различить это по одним доениям нельзя.
+   */
+  'arrivals',
+  'departures',
+  'deaths',
+  'pregnancy-checks',
 ] as const
 
 export type AdeCollectionName = (typeof ADE_COLLECTIONS)[number]
@@ -191,6 +202,39 @@ export const ADE_DEPARTURE_KIND = [
   'InternalTransfer', 'Export', 'Slaughter', 'Newborn', 'StudService', 'StudServiceReturn',
   'Agistment', 'AgistmentReturn', 'Show', 'ShowReturn', 'Sale', 'SaleReturn', 'Other',
 ] as const
+
+/**
+ * Причина поступления и вид выбытия.
+ *
+ * Списки взяты целиком, а не урезаны до того, что встречается у нас.
+ * Урезанный список выглядит как полный и молча отвергает законное
+ * значение, присланное чужой программой: та шлёт `Agistment`,
+ * получает отказ и справедливо считает, что мы стандарт не держим.
+ */
+export const ADE_ARRIVAL_REASON = [
+  'Purchase', 'InternalTransfer', 'Imported', 'StudService', 'StudServiceReturn',
+  'Slaughter', 'Agistment', 'AgistmentReturn', 'Show', 'ShowReturn', 'Sale',
+  'SaleReturn', 'Other',
+] as const
+
+export const ADE_DEPARTURE_REASON = [
+  'Age', 'Superfluous', 'Slaughter', 'Sale', 'Newborn', 'LegOrClaw', 'Nutrition',
+  'Parturition', 'Mastitis', 'Fertility', 'Health', 'Production', 'MilkingAbility',
+  'BadType', 'Behaviour', 'Other', 'Unknown',
+] as const
+
+export const ADE_PREGNANCY_METHOD = [
+  'Echography', 'Palpation', 'Blood', 'Milk', 'Visual', 'Other',
+] as const
+
+/**
+ * Результат проверки стельности.
+ *
+ * `Unknown` в списке есть, и это не мусорное значение: проверка,
+ * не давшая ответа, — обычный исход на малом сроке, и записать её
+ * как «пусто» значило бы утверждать, что корова не стельна.
+ */
+export const ADE_PREGNANCY_RESULT = ['Empty', 'Pregnant', 'Multiple', 'Unknown'] as const
 
 export const ADE_WEIGHT_METHOD = [
   'LoadCell', 'Girth', 'Assessed', 'WalkOver', 'Predicted', 'Imaged',

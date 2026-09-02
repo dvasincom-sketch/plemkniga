@@ -4,13 +4,18 @@ import { checkRfid } from '@/lib/aiid'
 import { SCHEME, type AdeCollection } from '@/lib/ade/core'
 import {
   adeAnimal,
+  adeArrival,
   adeBreedingValue,
+  adeDeath,
+  adeDeparture,
   adeInsemination,
   adeParturition,
+  adePregnancyCheck,
   adeTestDayResult,
   adeTypeClassification,
   adeWeight,
   type AnimalInput,
+  type MovementInput,
 } from '@/lib/ade/resources'
 import type { User } from '@/payload-types'
 
@@ -196,6 +201,73 @@ const animalOf = (doc: Record<string, unknown>): AnimalInput | null => {
   return a && typeof a === 'object' ? animalInput(a as Record<string, unknown>) : null
 }
 
+/**
+ * Перемещения нужной стороны.
+ *
+ * `in` — то, что пришло в хозяйство; `out` — то, что ушло; `death` —
+ * падёж. Падёж выделен отдельно, потому что в стандарте это отдельный
+ * ресурс, а не разновидность выбытия: у гибели свои поля — причина,
+ * способ, утилизация, — и складывать её с продажей значило бы
+ * потерять их все.
+ *
+ * Выбраковка при этом остаётся выбытием со `Slaughter`: животное ушло
+ * на убой живым, и это перемещение, а не гибель на ферме.
+ */
+async function loadMovements(
+  payload: Payload,
+  orgId: number,
+  q: AdeQuery,
+  side: 'in' | 'out' | 'death',
+): Promise<Loaded> {
+  const and: Where[] = [
+    side === 'in'
+      ? { and: [{ to: { equals: orgId } }, { kind: { not_equals: 'death' } }] }
+      : side === 'out'
+        ? { and: [{ from: { equals: orgId } }, { kind: { not_equals: 'death' } }] }
+        : { and: [{ from: { equals: orgId } }, { kind: { equals: 'death' } }] },
+  ]
+
+  if (q.modifiedSince) and.push({ updatedAt: { greater_than: q.modifiedSince } })
+
+  const res = await payload.find({
+    collection: 'movements',
+    where: { and },
+    limit: q.pageSize,
+    page: q.page,
+    depth: 1,
+    sort: 'id',
+    overrideAccess: true,
+  })
+
+  return { docs: res.docs as unknown as Record<string, unknown>[], total: res.totalDocs ?? 0 }
+}
+
+/** Собрать вход перемещения и отдать его нужному отображению. */
+const movementOf = (
+  d: Record<string, unknown>,
+  make: (m: MovementInput) => Record<string, unknown>,
+): Record<string, unknown>[] => {
+  const animal = animalOf(d)
+  if (!animal) return []
+
+  const side = (v: unknown): number | null => {
+    if (v && typeof v === 'object') return Number((v as { id?: number }).id) || null
+    return typeof v === 'number' ? v : null
+  }
+
+  return [
+    make({
+      id: Number(d.id),
+      animal,
+      date: String(d.date),
+      kind: String(d.kind ?? ''),
+      fromId: side(d.from),
+      toId: side(d.to),
+      updatedAt: (d.updatedAt as string | null) ?? null,
+    }),
+  ]
+}
+
 export async function serveAdeCollection(
   payload: Payload,
   name: AdeCollectionName,
@@ -346,6 +418,64 @@ export async function serveAdeCollection(
       })
       return page(out, total)
     }
+    /* ---------------------------------------------------------- *
+     *  Движение                                                  *
+     * ---------------------------------------------------------- */
+
+    /*
+     * У перемещений владелец берётся не от животного, а от самой записи,
+     * и это единственное место, где так.
+     *
+     * Причина в том, что перемещение — событие про смену владельца.
+     * Спросив «чьё животное», мы получили бы нового владельца и отдали
+     * бы продажу только покупателю: у продавца в книге не осталось бы
+     * следа, что корова у него была. Спрашивать надо стороны сделки,
+     * а их две, и каждая видит свою.
+     */
+    case 'arrivals': {
+      const { docs, total } = await loadMovements(payload, orgId, q, 'in')
+      return page(docs.flatMap((d) => movementOf(d, (m) => adeArrival(m))), total)
+    }
+
+    case 'departures': {
+      const { docs, total } = await loadMovements(payload, orgId, q, 'out')
+      return page(docs.flatMap((d) => movementOf(d, (m) => adeDeparture(m))), total)
+    }
+
+    case 'deaths': {
+      const { docs, total } = await loadMovements(payload, orgId, q, 'death')
+      return page(docs.flatMap((d) => movementOf(d, (m) => adeDeath(m))), total)
+    }
+
+    /* ---------------------------------------------------------- *
+     *  Проверка стельности                                       *
+     * ---------------------------------------------------------- */
+
+    /*
+     * Своей записи у проверки нет: она живёт при осеменении двумя полями —
+     * дата теста и результат. Отдаются только те осеменения, у которых
+     * дата теста проставлена: осеменение без теста — это не проверка
+     * с неизвестным исходом, а проверка, которой не было.
+     */
+    case 'pregnancy-checks': {
+      const { docs, total } = await load(payload, 'inseminations', orgId, q, 2)
+      const out = docs.flatMap((d) => {
+        const animal = animalOf(d)
+        if (!animal || !d.pregnancyCheckDate) return []
+        const result = d.result as { name?: string | null } | number | null | undefined
+        return [
+          adePregnancyCheck({
+            id: Number(d.id),
+            animal,
+            date: String(d.pregnancyCheckDate),
+            result: result && typeof result === 'object' ? (result.name ?? null) : null,
+            updatedAt: (d.updatedAt as string | null) ?? null,
+          }),
+        ]
+      })
+      return page(out, total)
+    }
+
   }
 }
 
