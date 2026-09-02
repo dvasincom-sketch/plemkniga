@@ -17,6 +17,7 @@ import {
   type Evidence,
 } from '@/lib/compliance'
 import { plural } from '@/lib/format'
+import { BOOK_URL, isSharedPath } from '@/lib/hosts'
 
 export const metadata: Metadata = { title: 'Соответствие' }
 
@@ -224,16 +225,39 @@ function Item({ item }: { item: ComplianceItem }) {
  * а не в вебе. Показывать их как ссылку, ведущую в никуда, хуже, чем
  * показать имя: по имени находят за секунду, по битой ссылке идут
  * и не находят.
+ *
+ * ## Два домена среди доказательств
+ *
+ * Сама эта страница живёт на витрине, а половина доказательств ведёт
+ * в книгу: кабинет с профилями индекса, «Эволюция продукта», выгрузка
+ * во ФГИАС ПР. Другая половина — сквозные страницы, которые переехали
+ * сюда же (`/icar`, `/api-docs`).
+ *
+ * Различать их по виду адреса нельзя — они выглядят одинаково. Признак
+ * берётся из того же списка, по которому страницы и переезжали
+ * (`lib/hosts.ts`): что в нём есть, то живёт здесь, остальное на домене
+ * книги и требует полного адреса. Одна ошибка здесь означает ссылку,
+ * ведущую в «страница не найдена», — то есть ровно то, ради чего вся
+ * эта страница и написана: битое доказательство хуже отсутствующего.
  */
 function EvidenceLink({ evidence }: { evidence: Evidence }) {
   if (evidence.kind === 'page') {
-    return (
+    const local = isSharedPath(evidence.value.split(/[?#]/)[0]!)
+
+    return local ? (
       <Link
         href={evidence.value}
         className="underline underline-offset-4 hover:text-forest-500"
       >
         {evidence.value}
       </Link>
+    ) : (
+      <a
+        href={`${BOOK_URL}${evidence.value}`}
+        className="underline underline-offset-4 hover:text-forest-500"
+      >
+        {evidence.value}
+      </a>
     )
   }
 

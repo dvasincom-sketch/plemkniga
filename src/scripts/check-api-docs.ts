@@ -49,8 +49,21 @@ const check = (ok: boolean, what: string, detail = '') => {
   }
 }
 
+/**
+ * Заголовок витринного домена в каждом запросе.
+ *
+ * Описание интерфейса переехало на витрину: физически оно лежит
+ * под `site/`, а короткий адрес `/api-docs` собирает промежуточный
+ * обработчик — но только когда в запросе стоит витринный `Host`.
+ *
+ * Без этого заголовка прогон, идущий на `localhost`, получил бы
+ * перенаправление на боевой `plem.online` и проверял бы прод вместо
+ * своей сборки — молча и с зелёным результатом.
+ */
+const SITE_HEADERS = { host: 'plem.online' }
+
 const get = async (p: string) => {
-  const res = await fetch(`${BASE}${p}`)
+  const res = await fetch(`${BASE}${p}`, { headers: SITE_HEADERS, redirect: 'manual' })
   return { status: res.status, body: res.ok ? await res.text() : '' }
 }
 

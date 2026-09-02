@@ -321,9 +321,9 @@ export default async function AccountPage({
                   </p>
                   <p className="mt-4 text-sm leading-relaxed text-ink-700">
                     Описание ручек —{' '}
-                    <Link href="/api-docs" className="underline underline-offset-4">
-                      /api-docs
-                    </Link>
+                    <a href="https://plem.online/api-docs" className="underline underline-offset-4">
+                      plem.online/api-docs
+                    </a>
                     . Административная панель Payload:{' '}
                     <Link href="/admin" className="underline underline-offset-4">
                       /admin

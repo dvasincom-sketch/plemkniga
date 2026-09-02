@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { isSiteHost, rewriteToSite } from '@/lib/hosts'
+import { isSiteHost, redirectToSite, rewriteToSite } from '@/lib/hosts'
 
 /**
  * Разведение двух доменов по одному приложению.
@@ -31,7 +31,21 @@ import { isSiteHost, rewriteToSite } from '@/lib/hosts'
  */
 export function middleware(request: NextRequest) {
   const host = request.headers.get('host')
-  if (!isSiteHost(host)) return NextResponse.next()
+
+  /*
+   * На домене книги сквозные страницы больше не живут: «Соответствие»,
+   * карта ICAR и описание интерфейса переехали на витрину, потому что
+   * отвечают на вопросы о продукте, а не о племенной книге ассоциации.
+   *
+   * Перенаправление постоянное (308, а не 301): 308 сохраняет метод
+   * запроса, и машинный `openapi.json` доедет до нового адреса тем же
+   * способом, каким его запросили.
+   */
+  if (!isSiteHost(host)) {
+    const away = redirectToSite(request.nextUrl.pathname)
+    if (away) return NextResponse.redirect(new URL(away), 308)
+    return NextResponse.next()
+  }
 
   /*
    * Само превращение адреса живёт в `lib/hosts.ts`: обработчик

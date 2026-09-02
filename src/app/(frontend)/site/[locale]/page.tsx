@@ -54,6 +54,10 @@ import { BOOK_URL, SITE_PREFIX, isSiteHost } from '@/lib/hosts'
  * переключение языка на одном из доменов роняет в «страница не найдена».
  *
  * Ссылки на книгу — абсолютные: `holstein.plem.online` другой домен.
+ * А «Соответствие» и описание интерфейса теперь свои: они переехали
+ * на витринный домен, потому что отвечают на вопросы о продукте,
+ * а не о книге Ассоциации, — и адрес у них собирается от той же
+ * приставки, что и переключатель языка.
  */
 
 export function generateStaticParams() {
@@ -286,7 +290,7 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
           </h2>
           <p className="mt-4 text-[16px] leading-relaxed text-ink-700">{m.standards.body}</p>
           <a
-            href={`${BOOK_URL}/compliance`}
+            href={`${base}/compliance`}
             className="mt-4 inline-block text-[15px] underline underline-offset-4 hover:text-forest-500"
           >
             {m.standards.link}
@@ -315,7 +319,7 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
               {s.book.cta}
             </a>
             <a
-              href={`${BOOK_URL}/compliance`}
+              href={`${base}/compliance`}
               className="text-[15px] text-white/80 underline underline-offset-4 transition-colors hover:text-white"
             >
               {s.footer.note}
@@ -368,22 +372,33 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
             {s.book.cta}
           </a>
           <a
-            href={`${BOOK_URL}/compliance`}
+            href={`${base}/compliance`}
             className="text-white/50 underline underline-offset-4 transition-colors hover:text-white"
           >
             {s.footer.note}
           </a>
           <a
-            href={`${BOOK_URL}/api-docs`}
+            href={`${base}/api-docs`}
             className="text-white/50 underline underline-offset-4 transition-colors hover:text-white"
           >
             API
           </a>
+          {/*
+             Адрес не печатается словами, а подписан действием.
+             В самом домене почтового ящика стоит имя страны, и на
+             нерусской странице оно читается как «это решение про Россию,
+             не про нас» — при том, что письмо идёт разработчику.
+
+             Названный долг: у продукта должен быть свой ящик
+             на `plem.online`. Подставить его сейчас нельзя — писать
+             в несуществующий ящик хуже, чем в существующий с неудобным
+             именем.
+          */}
           <a
             href="mailto:info@holstein-russia.ru"
             className="text-white/50 underline underline-offset-4 transition-colors hover:text-white"
           >
-            info@holstein-russia.ru
+            {m.contact.action}
           </a>
         </nav>
       </footer>

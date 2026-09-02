@@ -344,7 +344,7 @@ export const CHECKS: CheckSpec[] = [
     writes: false,
     needsServer: false,
     probe: false,
-    where: { href: '/compliance', label: 'Соответствие' },
+    where: { href: 'https://plem.online/compliance', label: 'Соответствие' },
   },
   {
     code: 'check:hosts',
@@ -434,7 +434,7 @@ export const CHECKS: CheckSpec[] = [
     writes: false,
     needsServer: false,
     probe: false,
-    where: { href: '/api-docs', label: 'Описание API' },
+    where: { href: 'https://plem.online/api-docs', label: 'Описание API' },
   },
 
   /* -------------------------- Страницы и ссылки -------------------------- */

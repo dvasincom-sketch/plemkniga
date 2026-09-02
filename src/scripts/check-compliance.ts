@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { COMPLIANCE, STATE_ORDER, countByState } from '@/lib/compliance'
+import { SITE_PREFIX, isSharedPath } from '@/lib/hosts'
 
 /**
  * Страница соответствия не ссылается на то, чего нет.
@@ -55,7 +56,15 @@ const scripts = new Set(Object.keys(pkg.scripts ?? {}))
  * что и `/evolution`, только с выбранной вкладкой.
  */
 const pageFiles = (href: string): string[] => {
-  const clean = href.split(/[?#]/)[0]!.replace(/^\/|\/$/g, '')
+  const path = href.split(/[?#]/)[0]!
+  /*
+   * Сквозные страницы переехали под `site/`: они про продукт, а не про
+   * книгу. Разбор — в `lib/hosts.ts`. Приставка берётся из того же
+   * списка, что и переезд, — иначе прогон объявит несуществующим то,
+   * что просто лежит в другой папке.
+   */
+  const prefix = isSharedPath(path) ? SITE_PREFIX : ''
+  const clean = `${prefix}${path}`.replace(/^\/|\/$/g, '')
   const dir = `src/app/(frontend)/${clean}`
   return [`${dir}/page.tsx`, `${dir}/route.ts`]
 }
