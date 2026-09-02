@@ -101,7 +101,7 @@ export const DOMAIN_RULES: DomainRule[] = [
     table: 'animals',
     name: 'chk_animals_blood_percent',
     expr: range('blood_percent', 0, 100),
-    note: 'кровность по голштину 0…100 %',
+    note: 'кровность 0…100 %',
   },
   {
     table: 'animals',

@@ -437,6 +437,9 @@ export interface Animal {
   birthDate?: string | null;
   breed?: (number | null) | Breed;
   breedType?: (number | null) | BreedType;
+  /**
+   * Доля крови улучшающей породы, 0…100.
+   */
   bloodPercent?: number | null;
   improvers?: {
     breed1?: (number | null) | Breed;

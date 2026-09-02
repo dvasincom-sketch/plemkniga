@@ -133,7 +133,7 @@ function localIssues(a: Animal, t: Thresholds): Issue[] {
 
   const bp = a.bloodPercent
   if (typeof bp === 'number' && (bp < PLAUSIBLE.bloodPercent.min || bp > PLAUSIBLE.bloodPercent.max)) {
-    push('blood-out-of-range', `Кровность по голштину ${bp}% вне диапазона 0…100`, 'bloodPercent')
+    push('blood-out-of-range', `Кровность ${bp}% вне диапазона 0…100`, 'bloodPercent')
   }
 
   const s = a.summary ?? {}

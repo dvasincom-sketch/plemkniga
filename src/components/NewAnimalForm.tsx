@@ -158,10 +158,19 @@ export function NewAnimalForm({
   breeds,
   herds,
   initialScenario,
+  bloodLabel,
 }: {
   breeds: Opt[]
   herds: Opt[]
   initialScenario?: Scenario
+  /*
+   * Подпись к полю кровности приходит свойством, а не читается здесь.
+   *
+   * Форма клиентская, а книга опознаётся по заголовку запроса — читать
+   * его на клиенте нечем. Свойство простое, строка: через границу
+   * сервер→клиент уезжают только данные (`check:client-props`).
+   */
+  bloodLabel: string
 }) {
   const [scenario, setScenario] = useState<Scenario | null>(initialScenario ?? null)
   const [state, formAction, pending] = useActionState<AnimalFormState, FormData>(
@@ -317,7 +326,7 @@ export function NewAnimalForm({
           <Select name="breed" options={fromRefs(breeds)} placeholder="Не указана" onLight />
         </SelectField>
 
-        <Field label="Кровность по голштину, %">
+        <Field label={bloodLabel}>
           <input name="bloodPercent" inputMode="decimal" className="field field-on-light" />
         </Field>
 

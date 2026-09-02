@@ -263,7 +263,7 @@ export default async function HerdbookPage({
           {!hasActive && (
             <ImageSlot
               name="images/hero-plemkniga"
-              alt="Голштинская порода"
+              alt="Молочное стадо"
               priority
               sizes="(max-width: 1024px) 100vw, 50vw"
               minHeight={260}

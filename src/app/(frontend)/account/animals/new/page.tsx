@@ -10,6 +10,8 @@ import { NewAnimalForm, type Scenario } from '@/components/NewAnimalForm'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { denyAssociation } from '@/lib/association'
 import { relId } from '@/lib/visibility'
+import { bloodLabel } from '@/lib/tenant'
+import { currentTenant } from '@/lib/tenant-server'
 
 export const metadata: Metadata = { title: 'Новое животное' }
 export const dynamic = 'force-dynamic'
@@ -98,6 +100,7 @@ export default async function NewAnimalPage({
 
           <div className="mt-8 max-w-[70rem]">
             <NewAnimalForm
+              bloodLabel={bloodLabel(await currentTenant())}
               breeds={breeds.docs.map((b) => ({ id: b.id as number, name: b.name }))}
               herds={herds.docs.map((h) => ({ id: h.id as number, name: h.name }))}
               initialScenario={initialScenario}

@@ -57,7 +57,7 @@ export const JOURNALLED: JournalField[] = [
   f('ageGroup', 'Возрастная группа', 'select', { options: AGE_GROUPS }),
   f('birthDate', 'Дата рождения', 'date'),
   f('breed', 'Порода', 'relation', { relation: 'breeds' }),
-  f('bloodPercent', 'Кровность по голштину, %', 'number'),
+  f('bloodPercent', 'Кровность, %', 'number'),
   f('improvers.breed1', 'Улучшающая порода 1', 'relation', { relation: 'breeds' }),
   f('improvers.share1', 'Доля крови 1, %', 'number'),
   f('improvers.breed2', 'Улучшающая порода 2', 'relation', { relation: 'breeds' }),

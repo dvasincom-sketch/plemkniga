@@ -83,7 +83,7 @@ export default async function RegisterPage({
         <section className="mt-16 grid grid-cols-1 gap-10 lg:grid-cols-2 lg:items-stretch">
           <ImageSlot
             name="images/contacts"
-            alt="Голштинская порода"
+            alt="Молочное стадо"
             minHeight={420}
             className="h-full w-full"
           />

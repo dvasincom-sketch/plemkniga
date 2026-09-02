@@ -72,6 +72,7 @@
     "check:breed-codes": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-breed-codes.ts",
     "check:hosts": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-hosts.ts",
     "check:tenant": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-tenant.ts",
+    "check:registry": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-registry.ts",
     "check:mating": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-mating.ts",
     "check:all": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-all.ts",
     "check:nav": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-nav.ts",

@@ -8,6 +8,8 @@ import { dateRu, nf } from '@/lib/format'
 import { trustLabel } from '@/lib/dictionaries'
 import { INBREEDING_MANUAL_APPROVAL, INBREEDING_WARNING } from '@/lib/animal-id'
 import type { Animal } from '@/payload-types'
+import { bloodLabel } from '@/lib/tenant'
+import { currentTenant } from '@/lib/tenant-server'
 
 const relName = (v: unknown): string => {
   if (v && typeof v === 'object') {
@@ -20,6 +22,7 @@ const relName = (v: unknown): string => {
 
 export async function AnimalOriginTab({ animal }: { animal: Animal }) {
   const payload = await getClient()
+  const tenant = await currentTenant()
 
   /*
    * Дерево и разбор вглубь считаются из одного и того же графа предков,
@@ -174,7 +177,7 @@ export async function AnimalOriginTab({ animal }: { animal: Animal }) {
                 ['Линия', relName(animal.line)],
                 ['Семейство', relName(animal.family)],
                 ['Порода', relName(animal.breed)],
-                ['Кровность по голштину, %', animal.bloodPercent ?? '—'],
+                [bloodLabel(tenant), animal.bloodPercent ?? '—'],
                 ['Статус данных', trustLabel(animal.trustLevel)],
               ].map(([k, v]) => (
                 <div key={String(k)} className="flex justify-between gap-6 py-2.5">

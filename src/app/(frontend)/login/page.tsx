@@ -37,7 +37,7 @@ export default async function LoginPage({
 
             <ImageSlot
               name="images/login"
-              alt="Голштинская порода"
+              alt="Молочное стадо"
               sizes="(max-width: 1024px) 100vw, 40vw"
               ratio="16 / 9"
               minHeight={200}

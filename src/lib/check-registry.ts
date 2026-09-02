@@ -503,6 +503,69 @@ export const CHECKS: CheckSpec[] = [
     needsServer: false,
     probe: false,
   },
+  /*
+   * Пять проверок, живших мимо реестра.
+   *
+   * Они были заведены в `package.json` и работали, но на странице
+   * состояния их не было, и `check:all` про них не знал. Хуже, чем
+   * отсутствующая проверка: страница показывала полный список и молчала
+   * о том, что список неполон, — а именно этой странице верят, решая,
+   * всё ли проверено. Расхождение теперь стережёт `check:registry`.
+   */
+  {
+    code: 'check:registry',
+    title: 'Реестр проверок совпадает с тем, что можно запустить',
+    what: 'Проверка без записи в реестре невидима на этой самой странице, а запись без команды обещает запуск, которого не будет',
+    area: 'code',
+    writes: false,
+    needsServer: false,
+    probe: false,
+  },
+  {
+    code: 'check:schema',
+    title: 'Схема базы совпадает с ожиданиями Payload',
+    what: 'Поле, добавленное в коллекцию без миграции, ломает запись молча: типы переписаны, а колонки в базе нет',
+    area: 'db',
+    writes: false,
+    needsServer: false,
+    probe: false,
+  },
+  {
+    code: 'check:cow',
+    title: 'Возрастная группа против факта отёла',
+    what: 'Группа животного и его отёлы должны говорить одно и то же; расхождение уводит животное не в тот раздел книги',
+    area: 'data',
+    writes: false,
+    needsServer: false,
+    probe: false,
+  },
+  {
+    code: 'check:fgias-readiness',
+    title: 'Готовность книги к выгрузке в реестр',
+    what: 'Реестр отвергает запись целиком из-за одного незаполненного поля; проверка считает, сколько животных уедет, а сколько вернётся',
+    area: 'exchange',
+    writes: false,
+    needsServer: false,
+    probe: false,
+  },
+  {
+    code: 'check:import-values',
+    title: 'Разбор чисел и дат из чужой таблицы',
+    what: '«5.03.2026» разбирается прекрасно — во второе марта; проверка утверждает сами значения, а не то, что файл загрузился',
+    area: 'exchange',
+    writes: false,
+    needsServer: false,
+    probe: false,
+  },
+  {
+    code: 'check:import-formats',
+    title: 'Загрузка чужих форматов, файл за файлом',
+    what: 'Кодировка, разделитель и разбор значений проверяются по отдельности; здесь настоящий файл проходит весь путь целиком',
+    area: 'exchange',
+    writes: false,
+    needsServer: false,
+    probe: false,
+  },
 ]
 
 export const checkSpec = (code: string): CheckSpec | undefined => CHECKS.find((c) => c.code === code)
