@@ -94,9 +94,13 @@ export default async function EaeuPage({ params }: { params: Promise<{ locale: s
          обратно. Всё остальное меню обращено к тем, кто уже внутри книги.
       */}
       <header className="container-page flex flex-wrap items-center justify-between gap-x-8 gap-y-4 py-6">
-        <Link href="/" aria-label={m.nav.home}>
-          <Logo />
-        </Link>
+        {/*
+           Знак не обёрнут в ссылку: он сам ссылка. Обёртка давала
+           вложенные `<a>` — разметку, недопустимую по HTML, и вместе
+           с ней расхождение при гидратации. Подпись на языке страницы
+           передаётся знаку доводом, а не наружной ссылкой.
+        */}
+        <Logo label={m.nav.home} />
 
         {/*
            Адреса собраны здесь и уходят готовым объектом: через границу
