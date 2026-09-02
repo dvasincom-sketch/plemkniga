@@ -4,6 +4,7 @@ import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { PlemLogo } from '@/components/PlemLogo'
 import { LocaleSwitcher } from '@/components/LocaleSwitcher'
+import { FEATURE_ICONS, FlowArt, LayersArt, RankArt } from '@/components/site/SiteArt'
 import { PRODUCT_MESSAGES } from '@/lib/i18n/product-messages'
 import { SITE_MESSAGES } from '@/lib/i18n/site-messages'
 import { LOCALE_CODES, isLocale, localeInfo, type Locale } from '@/lib/i18n/locales'
@@ -21,25 +22,35 @@ import { BOOK_URL, SITE_PREFIX, isSiteHost } from '@/lib/hosts'
  * чужим подвалом и чужими реквизитами. Страница удалена, адрес
  * перенаправлен сюда постоянным перенаправлением.
  *
- * Поэтому здесь **нет подвала Ассоциации вовсе**. В подвале книги стоят
- * адрес, телефон и правовые документы Ассоциации производителей КРС
- * голштинской породы; на витрине они назвали бы не то лицо — читатель
- * обращается к разработчику системы, а не в Самару. Разные лица, разная
- * ответственность, разные реквизиты.
+ * Поэтому здесь **нет подвала Ассоциации вовсе**: на витрине он назвал бы
+ * не то лицо — читатель обращается к разработчику системы, а не в Самару.
  *
- * ## Почему адреса собираются от приставки, а не пишутся прямо
+ * ## Порядок разделов — это порядок сомнений
  *
- * На витринном домене промежуточный обработчик превращает `/ru`
- * в `/site/ru`, и человек видит короткий адрес. На книжном домене
- * та же страница живёт по настоящему `/site/ru`. Ссылка внутри страницы
- * обязана вести туда, откуда пришёл читатель, — иначе переключение
- * языка на одном из двух доменов роняет в «страница не найдена».
+ * Не «что умеем», а «что вас беспокоит». Сначала три числа и дата,
+ * с которой регистрация обязательна: они отвечают на «зачем мне это
+ * сейчас». Потом три контура учёта — на «а разве у меня этого нет».
+ * Потом возможности, путь данных и рейтинг — на «а как это работает».
+ * И только в конце «система работает, вот адрес», потому что до этого
+ * места читателю нечего было открывать.
  *
- * ## Ссылка на книгу — абсолютная
+ * Список возможностей нарочно стоит не первым. Он убедителен для того,
+ * кто уже понял задачу, и бессмыслен для того, кто ещё не понял.
  *
- * `holstein.plem.online` — другой домен, и относительный адрес увёл бы
- * на несуществующую страницу витрины. Это единственное место, где адрес
- * пишется целиком.
+ * ## Почему схемы, а не фотографии
+ *
+ * Разбор в `components/site/SiteArt.tsx`. Коротко: подписи на схемах —
+ * настоящий текст, он переводится вместе со страницей; картинку пришлось
+ * бы рисовать шесть раз, по разу на язык.
+ *
+ * ## Почему адреса собираются от приставки
+ *
+ * На витринном домене обработчик превращает `/ru` в `/site/ru`, и человек
+ * видит короткий адрес; на книжном та же страница живёт по настоящему
+ * `/site/ru`. Ссылка обязана вести туда, откуда пришёл читатель, — иначе
+ * переключение языка на одном из доменов роняет в «страница не найдена».
+ *
+ * Ссылки на книгу — абсолютные: `holstein.plem.online` другой домен.
  */
 
 export function generateStaticParams() {
@@ -104,14 +115,15 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
       </header>
 
       <main className="container-page pb-8">
+        {/* ---------------------------- Первый экран --------------------------- */}
         <section className="max-w-[70ch] pt-6">
           <p className="text-[14px] uppercase tracking-wide text-forest-500">{s.eyebrow}</p>
 
-          <h1 className="mt-3 text-[38px] font-medium leading-tight sm:text-[52px]">
+          <h1 className="mt-3 text-[38px] font-medium leading-tight sm:text-[54px]">
             {m.hero.title}
           </h1>
 
-          <p className="mt-6 text-[17px] leading-relaxed text-ink-700">{m.hero.lead}</p>
+          <p className="mt-6 text-[18px] leading-relaxed text-ink-700">{m.hero.lead}</p>
 
           <div className="mt-8 flex flex-wrap items-center gap-4">
             <a
@@ -121,67 +133,155 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
               {s.book.cta}
             </a>
             <a
-              href={`${BOOK_URL}/compliance`}
-              className="text-[15px] underline underline-offset-4 hover:text-forest-500"
+              href="mailto:info@holstein-russia.ru"
+              className="rounded-xl border border-ink-200 px-6 py-3 text-[15px] transition-colors hover:border-forest-500 hover:text-forest-500"
             >
-              {s.footer.note}
+              {m.contact.action}
             </a>
           </div>
         </section>
 
+        {/*
+           Четыре числа сразу под первым экраном. Числа читают те, кто
+           не станет читать абзацы, — а таких большинство. Каждое
+           проверяемо прогоном; круглое непроверяемое число здесь было бы
+           хуже отсутствия числа.
+        */}
+        <section className="mt-14 grid grid-cols-2 gap-x-6 gap-y-8 border-y border-ink-100 py-8 lg:grid-cols-4">
+          {s.proof.map((p) => (
+            <div key={p.label}>
+              <div className="text-[28px] font-medium leading-none tabular-nums text-forest-600 sm:text-[32px]">
+                {p.value}
+              </div>
+              <p className="mt-2 max-w-[22ch] text-[13px] leading-snug text-ink-500">{p.label}</p>
+            </div>
+          ))}
+        </section>
+
+        {/* ------------------------------ Проблема ----------------------------- */}
         <section className="mt-16 max-w-[70ch]">
-          <h2 className="text-[26px] font-medium leading-tight">{m.problem.title}</h2>
+          <h2 className="text-[26px] font-medium leading-tight sm:text-[30px]">{m.problem.title}</h2>
           <p className="mt-4 text-[16px] leading-relaxed text-ink-700">{m.problem.body}</p>
         </section>
 
+        {/* --------------------------- Три контура ----------------------------- */}
         <section className="mt-16">
-          <h2 className="text-[26px] font-medium leading-tight">{m.features.title}</h2>
+          <h2 className="text-[26px] font-medium leading-tight sm:text-[30px]">{s.layers.title}</h2>
+          <p className="mt-4 max-w-[70ch] text-[16px] leading-relaxed text-ink-700">
+            {s.layers.lead}
+          </p>
 
-          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {m.features.items.map((item) => (
-              <div
-                key={item.title}
-                className="rounded-2xl bg-white p-6 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)]"
-              >
-                <h3 className="text-[17px] font-medium leading-tight">{item.title}</h3>
-                <p className="mt-2 text-[14px] leading-relaxed text-ink-500">{item.body}</p>
-              </div>
-            ))}
+          <div className="mt-8 grid grid-cols-1 items-start gap-10 lg:grid-cols-[320px_1fr]">
+            <LayersArt
+              title={s.layers.title}
+              labels={s.layers.items.map((i) => i.title)}
+            />
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+              {s.layers.items.map((item, i) => (
+                <div
+                  key={item.title}
+                  /*
+                     Третий слой выделен: он и есть предмет разговора.
+                     Остальные два у хозяйства обычно уже есть, и делать
+                     вид, что мы их изобрели, значило бы соврать первому же
+                     зоотехнику.
+                  */
+                  className={`rounded-2xl p-6 ${
+                    i === 2
+                      ? 'bg-forest-500 text-white'
+                      : 'border border-ink-100 bg-white text-ink-700'
+                  }`}
+                >
+                  <h3 className="text-[16px] font-medium leading-snug">{item.title}</h3>
+                  <p
+                    className={`mt-2 text-[14px] leading-relaxed ${
+                      i === 2 ? 'text-white/80' : 'text-ink-500'
+                    }`}
+                  >
+                    {item.body}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
-        <section className="mt-16">
-          <h2 className="text-[26px] font-medium leading-tight">{m.who.title}</h2>
+        {/* ---------------------------- Возможности ---------------------------- */}
+        <section className="mt-20">
+          <h2 className="text-[26px] font-medium leading-tight sm:text-[30px]">
+            {m.features.title}
+          </h2>
 
-          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {m.features.items.map((item, i) => {
+              const Glyph = FEATURE_ICONS[i]
+              return (
+                <div
+                  key={item.title}
+                  className="rounded-2xl bg-white p-6 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)]"
+                >
+                  {Glyph && <Glyph />}
+                  <h3 className="mt-4 text-[17px] font-medium leading-tight">{item.title}</h3>
+                  <p className="mt-2 text-[14px] leading-relaxed text-ink-500">{item.body}</p>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+
+        {/* ---------------------------- Путь данных ---------------------------- */}
+        <section className="mt-20">
+          <h2 className="text-[26px] font-medium leading-tight sm:text-[30px]">{s.flow.title}</h2>
+          <p className="mt-4 max-w-[70ch] text-[16px] leading-relaxed text-ink-700">{s.flow.lead}</p>
+
+          {/*
+             Схема шире текста и на узком экране не помещается. Прокрутка
+             внутри своей рамки, а не по всей странице: горизонтально
+             ездящая страница — самая раздражающая поломка на телефоне.
+          */}
+          <div className="mt-8 overflow-x-auto rounded-2xl bg-white p-6 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)]">
+            <div className="min-w-[560px]">
+              <FlowArt title={s.flow.title} nodes={s.flow.nodes} />
+            </div>
+          </div>
+
+          <p className="mt-4 max-w-[70ch] text-[14px] leading-relaxed text-ink-500">{s.flow.note}</p>
+        </section>
+
+        {/* ------------------------------ Рейтинг ------------------------------ */}
+        <section className="mt-20">
+          <div className="grid grid-cols-1 items-center gap-10 rounded-2xl bg-white p-8 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] lg:grid-cols-[1fr_320px]">
+            <div className="max-w-[60ch]">
+              <h2 className="text-[26px] font-medium leading-tight sm:text-[30px]">
+                {s.ranking.title}
+              </h2>
+              <p className="mt-4 text-[16px] leading-relaxed text-ink-700">{s.ranking.body}</p>
+            </div>
+
+            <RankArt title={s.ranking.title} />
+          </div>
+        </section>
+
+        {/* -------------------------------- Кому ------------------------------- */}
+        <section className="mt-20">
+          <h2 className="text-[26px] font-medium leading-tight sm:text-[30px]">{m.who.title}</h2>
+
+          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
             {[m.who.farms, m.who.associations].map((who) => (
               <div key={who.title} className="rounded-2xl border border-ink-100 p-6">
                 <h3 className="text-[17px] font-medium leading-tight">{who.title}</h3>
-                <p className="mt-2 text-[14px] leading-relaxed text-ink-500">{who.body}</p>
+                <p className="mt-2 text-[15px] leading-relaxed text-ink-500">{who.body}</p>
               </div>
             ))}
           </div>
         </section>
 
-        {/*
-           Действующая книга — отдельным блоком и ближе к концу.
-           Это самое сильное, что можно сказать продукту: не «умеет»,
-           а «работает, вот адрес». Ставить такое в начало рано —
-           читатель ещё не знает, о чём речь.
-        */}
-        <section className="mt-16 max-w-[70ch] rounded-2xl bg-white p-8 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)]">
-          <h2 className="text-[26px] font-medium leading-tight">{s.book.title}</h2>
-          <p className="mt-4 text-[16px] leading-relaxed text-ink-700">{s.book.body}</p>
-          <a
-            href={BOOK_URL}
-            className="mt-6 inline-block rounded-xl bg-forest-500 px-6 py-3 text-[15px] text-white transition-colors hover:bg-forest-600"
-          >
-            {s.book.cta}
-          </a>
-        </section>
-
-        <section className="mt-16 max-w-[70ch]">
-          <h2 className="text-[26px] font-medium leading-tight">{m.standards.title}</h2>
+        {/* --------------------------- На чём построено ------------------------ */}
+        <section className="mt-20 max-w-[70ch]">
+          <h2 className="text-[26px] font-medium leading-tight sm:text-[30px]">
+            {m.standards.title}
+          </h2>
           <p className="mt-4 text-[16px] leading-relaxed text-ink-700">{m.standards.body}</p>
           <a
             href={`${BOOK_URL}/compliance`}
@@ -191,8 +291,41 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
           </a>
         </section>
 
-        <section className="mt-16 max-w-[70ch]">
-          <h2 className="text-[26px] font-medium leading-tight">{m.contact.title}</h2>
+        {/*
+           Действующая книга — предпоследним блоком, а не первым.
+           Это самое сильное, что можно сказать о продукте: не «умеет»,
+           а «работает, вот адрес». Но до этого места читателю нечего
+           было там искать.
+        */}
+        <section className="mt-20 rounded-2xl bg-forest-500 p-8 text-white sm:p-10">
+          <h2 className="max-w-[60ch] text-[26px] font-medium leading-tight sm:text-[32px]">
+            {s.book.title}
+          </h2>
+          <p className="mt-4 max-w-[70ch] text-[16px] leading-relaxed text-white/85">
+            {s.book.body}
+          </p>
+
+          <div className="mt-8 flex flex-wrap items-center gap-4">
+            <a
+              href={BOOK_URL}
+              className="rounded-xl bg-white px-6 py-3 text-[15px] text-forest-600 transition-colors hover:bg-white/90"
+            >
+              {s.book.cta}
+            </a>
+            <a
+              href={`${BOOK_URL}/compliance`}
+              className="text-[15px] text-white/80 underline underline-offset-4 transition-colors hover:text-white"
+            >
+              {s.footer.note}
+            </a>
+          </div>
+        </section>
+
+        {/* ------------------------------ Как начать --------------------------- */}
+        <section className="mt-20 max-w-[70ch]">
+          <h2 className="text-[26px] font-medium leading-tight sm:text-[30px]">
+            {m.contact.title}
+          </h2>
           <p className="mt-4 text-[16px] leading-relaxed text-ink-700">{m.contact.body}</p>
           <a
             href="mailto:info@holstein-russia.ru"
@@ -203,7 +336,7 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
         </section>
 
         {!info.reviewed && (
-          <p className="mt-14 max-w-[70ch] text-[13px] leading-relaxed text-ink-500">
+          <p className="mt-16 max-w-[70ch] text-[13px] leading-relaxed text-ink-500">
             {m.draft.notice}{' '}
             <Link href={`${base}/ru`} className="underline underline-offset-4 hover:text-forest-500">
               Русский
@@ -217,16 +350,9 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
       </main>
 
       {/*
-         Свой подвал, а не общий. В общем стоят адрес, телефон и правовые
-         документы Ассоциации — на витрине продукта они назвали бы
-         не то лицо.
-
-         Здесь только ссылки. Знак убран: он уже стоит в шапке, а страница
-         короткая — на экране помещаются оба, и второй прочитывается
-         не как завершение, а как повтор. Подпись разработчика убрана тоже:
-         витрина говорит о продукте, а не о том, кто его написал, и первое,
-         что видит уходящий с неё человек, должно вести к системе,
-         а не к чужому телеграму.
+         Свой подвал: только ссылки. Знак уже стоит в шапке, а подпись
+         разработчика уводила бы от системы — последнее, что видит
+         уходящий, должно вести к ней.
       */}
       <footer style={{ marginTop: 'var(--footer-air)' }} className="bg-basement py-10 text-white">
         <nav
