@@ -33,17 +33,39 @@ export const HERD_SUBTABS = [
 
 export type HerdSub = (typeof HERD_SUBTABS)[number]['key']
 
-export function HerdNav({ active }: { active: HerdSub }) {
+/**
+ * Рейтинг стоит в этом ряду, но не входит в `HERD_SUBTABS`, и это не описка.
+ *
+ * Три подраздела выше — куски одной страницы `/account`, переключаемые
+ * параметром `sub`. Рейтинг — отдельный маршрут: ему нужен свой запрос
+ * по всей книге, свои разряды и свой профиль в адресе, и втискивать это
+ * в общий параметр значило бы завести четвёртый смысл у `?sub=`.
+ *
+ * Разделение здесь ровно затем, чтобы `/account?tab=herd&sub=ranking`
+ * не открывал пустую вкладку: такого ключа среди подразделов нет,
+ * и разбор честно откатывается к списку.
+ */
+const RANKING_TAB = {
+  key: 'ranking',
+  label: 'Рейтинг',
+  hint: 'Места ваших животных среди всей книги',
+  href: '/account/ranking',
+} as const
+
+export function HerdNav({ active }: { active: HerdSub | 'ranking' }) {
   return (
     <SubTabs
       label="Разделы стада"
       active={active}
-      items={HERD_SUBTABS.map((s) => ({
-        key: s.key,
-        label: s.label,
-        hint: s.hint,
-        href: s.key === 'list' ? '/account?tab=herd' : `/account?tab=herd&sub=${s.key}`,
-      }))}
+      items={[
+        ...HERD_SUBTABS.map((s) => ({
+          key: s.key as string,
+          label: s.label as string,
+          hint: s.hint as string,
+          href: s.key === 'list' ? '/account?tab=herd' : `/account?tab=herd&sub=${s.key}`,
+        })),
+        { key: RANKING_TAB.key, label: RANKING_TAB.label, hint: RANKING_TAB.hint, href: RANKING_TAB.href },
+      ]}
     />
   )
 }
