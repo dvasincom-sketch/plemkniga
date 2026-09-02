@@ -1,5 +1,6 @@
 'use client'
 
+import { useId } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   LOCALES,
@@ -18,13 +19,31 @@ import {
  * язык, должен исправить это одним движением и больше к вопросу
  * не возвращаться.
  *
- * ## Почему список, а не выпадающее меню
+ * ## Почему выпадающий список, хотя раньше был ряд кнопок
  *
- * Языков шесть, они помещаются в строку, и каждый написан своим письмом:
- * кириллицей, латиницей, армянским алфавитом. В свёрнутом меню человек
- * видит только текущий язык и должен догадаться, что остальные там есть.
- * Развёрнутый список решает это без единого нажатия — своё слово
- * находят глазами.
+ * Ряд кнопок стоял здесь намеренно: шесть языков написаны разными
+ * письмами — кириллицей, латиницей, армянским алфавитом, — и в развёрнутом
+ * ряду своё слово находят глазами, не нажимая ничего.
+ *
+ * Довод верный, и мы его меняем сознательно, а не по забывчивости.
+ * Плата за ряд — шесть кнопок в шапке: на узком экране они переносятся
+ * во вторую строку и отжимают вниз то, ради чего страницу открыли.
+ * Переключатель языка — не главное на витрине, а места занимал как
+ * главное.
+ *
+ * Что теряем: все языки больше не видны сразу. Смягчено тем, что
+ * в свёрнутом виде показано **своё** название текущего языка, а не слово
+ * «Язык», — то есть видно, на каком ты сейчас, и понятно, что его можно
+ * сменить.
+ *
+ * ## Почему `select`, а не своё меню
+ *
+ * Своё меню на `div`-ах пришлось бы учить всему, что у `select` есть
+ * из коробки: открытию с клавиатуры, перебору стрелками, поиску набором
+ * первых букв, закрытию по Esc, чтению вслух как «список из шести».
+ * Каждое из этого делают неправильно чаще, чем правильно, а на телефоне
+ * `select` вдобавок раскрывается родным колесом выбора, к которому
+ * человек привык.
  *
  * ## Почему cookie, а не только адрес
  *
@@ -63,6 +82,15 @@ export function LocaleSwitcher({
 }) {
   const router = useRouter()
 
+  /*
+   * Подпись связана с полем через `id`, а не обёрнута вокруг него.
+   * Обёртка тоже связала бы, но `id` нужен уникальный: переключатель
+   * может встретиться на странице дважды — в шапке и в подвале, —
+   * и два одинаковых `id` сделали бы вторую подпись указывающей
+   * на первое поле.
+   */
+  const id = useId()
+
   const choose = (locale: Locale) => {
     const secure = window.location.protocol === 'https:' ? '; Secure' : ''
     document.cookie =
@@ -72,35 +100,55 @@ export function LocaleSwitcher({
   }
 
   return (
-    <nav aria-label={label} className="flex flex-wrap items-center gap-x-1 gap-y-2">
-      <span className="mr-2 text-[13px] text-ink-500">{label}</span>
+    <div className="flex items-center gap-2">
+      <label htmlFor={id} className="text-[13px] text-ink-500">
+        {label}
+      </label>
 
-      {LOCALES.map((l) => {
-        const isActive = l.code === active
+      <div className="relative">
+        <select
+          id={id}
+          value={active}
+          onChange={(e) => choose(e.target.value as Locale)}
+          /*
+           * `lang` на самом поле — язык текущего значения: синтезатор
+           * речи прочитает «Қазақша» правилами казахского, а не языка
+           * страницы, то есть внятно. На каждом варианте он тоже стоит:
+           * раскрытый список читается вслух подряд, и без разметки все
+           * шесть слов пойдут одним, чужим для пяти из них произношением.
+           */
+          lang={active}
+          className={
+            'appearance-none rounded-lg border border-ink-200 bg-white py-1.5 pl-3 pr-9 ' +
+            'text-[14px] text-ink-900 transition-colors hover:border-forest-500 ' +
+            'focus:border-forest-500 focus:outline-none focus:ring-2 focus:ring-forest-500/30'
+          }
+        >
+          {LOCALES.map((l) => (
+            <option key={l.code} value={l.code} lang={l.code}>
+              {l.native}
+            </option>
+          ))}
+        </select>
 
-        return (
-          <button
-            key={l.code}
-            type="button"
-            onClick={() => choose(l.code)}
-            aria-current={isActive ? 'true' : undefined}
-            /*
-               lang на самой кнопке: без него синтезатор речи прочитает
-               «Қазақша» правилами языка страницы, то есть невнятно.
-               Это единственное место, где на одном экране соседствуют
-               шесть языков, и разметить их — не педантизм.
-            */
-            lang={l.code}
-            className={`rounded-lg px-3 py-1.5 text-[14px] transition-colors ${
-              isActive
-                ? 'bg-forest-500 text-white'
-                : 'text-ink-700 hover:bg-ink-50 hover:text-forest-500'
-            }`}
-          >
-            {l.native}
-          </button>
-        )
-      })}
-    </nav>
+        {/*
+           Своя стрелка вместо системной: `appearance-none` убирает
+           родное оформление, иначе поле в разных браузерах выглядит
+           по-разному и рядом с прочими кнопками смотрится чужим.
+           `pointer-events-none` обязателен — иначе стрелка перехватит
+           нажатие, и список не раскроется именно там, куда целятся.
+        */}
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+        >
+          <path d="M6 8l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
+    </div>
   )
 }
