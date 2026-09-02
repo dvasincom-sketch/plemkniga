@@ -8,7 +8,7 @@ import { FEATURE_ICONS, FlowArt, LayersArt, RankArt } from '@/components/site/Si
 import { PRODUCT_MESSAGES } from '@/lib/i18n/product-messages'
 import { SITE_MESSAGES } from '@/lib/i18n/site-messages'
 import { LOCALE_CODES, isLocale, localeInfo, type Locale } from '@/lib/i18n/locales'
-import { BOOK_URL, SITE_PREFIX, isSiteHost } from '@/lib/hosts'
+import { BOOK_URL, PRODUCT_MAIL, SITE_PREFIX, isSiteHost } from '@/lib/hosts'
 
 /**
  * Витрина продукта — то, что видно на `plem.online`.
@@ -140,7 +140,7 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
               {s.book.cta}
             </a>
             <a
-              href="mailto:info@holstein-russia.ru"
+              href={`mailto:${PRODUCT_MAIL}`}
               className="rounded-xl border border-ink-200 px-6 py-3 text-[15px] transition-colors hover:border-forest-500 hover:text-forest-500"
             >
               {m.contact.action}
@@ -334,7 +334,7 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
           </h2>
           <p className="mt-4 text-[16px] leading-relaxed text-ink-700">{m.contact.body}</p>
           <a
-            href="mailto:info@holstein-russia.ru"
+            href={`mailto:${PRODUCT_MAIL}`}
             className="mt-6 inline-block rounded-xl bg-forest-500 px-6 py-3 text-[15px] text-white transition-colors hover:bg-forest-600"
           >
             {m.contact.action}
@@ -384,21 +384,17 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
             API
           </a>
           {/*
-             Адрес не печатается словами, а подписан действием.
-             В самом домене почтового ящика стоит имя страны, и на
-             нерусской странице оно читается как «это решение про Россию,
-             не про нас» — при том, что письмо идёт разработчику.
-
-             Названный долг: у продукта должен быть свой ящик
-             на `plem.online`. Подставить его сейчас нельзя — писать
-             в несуществующий ящик хуже, чем в существующий с неудобным
-             именем.
+             Адрес печатается словами, и теперь это можно: у продукта
+             свой ящик на своём домене. Прежде здесь стоял адрес
+             Ассоциации, в котором имя страны и породы читалось
+             как «решение не про вас», — и его приходилось прятать
+             за подписью действия.
           */}
           <a
-            href="mailto:info@holstein-russia.ru"
-            className="text-white/50 underline underline-offset-4 transition-colors hover:text-white"
+            href={`mailto:${PRODUCT_MAIL}`}
+            className="text-white/70 underline underline-offset-4 transition-colors hover:text-white"
           >
-            {m.contact.action}
+            {PRODUCT_MAIL}
           </a>
         </nav>
       </footer>

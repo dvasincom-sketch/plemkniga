@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { SiteHeader } from '@/components/SiteHeader'
-import { SiteFooter } from '@/components/SiteFooter'
+import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import {
   AREA_HINT,
   AREA_ORDER,
@@ -75,7 +74,7 @@ export default function CompliancePage() {
 
   return (
     <>
-      <SiteHeader />
+      <ProductHeader />
 
       <main className="container-page pb-8">
         <h1 className="text-[38px] font-medium sm:text-[46px]">Соответствие</h1>
@@ -162,7 +161,7 @@ export default function CompliancePage() {
         </div>
       </main>
 
-      <SiteFooter />
+      <ProductFooter />
     </>
   )
 }

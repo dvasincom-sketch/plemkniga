@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { SiteHeader } from '@/components/SiteHeader'
-import { SiteFooter } from '@/components/SiteFooter'
+import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import {
   ICAR_GAP_COUNT,
   ICAR_SECTIONS,
@@ -52,7 +51,7 @@ export const metadata: Metadata = { title: 'Руководства ICAR' }
 export default function IcarPage() {
   return (
     <>
-      <SiteHeader />
+      <ProductHeader />
 
       <main className="container-page pb-8">
         <h1 className="text-[38px] font-medium sm:text-[46px]">Руководства ICAR</h1>
@@ -194,7 +193,7 @@ export default function IcarPage() {
         </div>
       </main>
 
-      <SiteFooter />
+      <ProductFooter />
     </>
   )
 }

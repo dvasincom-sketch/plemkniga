@@ -1,4 +1,7 @@
+import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { join } from 'node:path'
 import {
+  PRODUCT_MAIL,
   SHARED_PATHS,
   SITE_HOSTS,
   SITE_PREFIX,
@@ -196,6 +199,47 @@ console.log(
   `Сквозных путей: ${SHARED_PATHS.length}, ` +
     `проверено адресов: ${SHARED.length + NOT_SHARED.length}`,
 )
+
+/* ------------------------------------------------------------------ *
+ *  Почта продукта                                                    *
+ * ------------------------------------------------------------------ */
+
+/*
+ * Витрина не должна писать на почту Ассоциации: в самом домене её ящика
+ * стоят имя страны и породы, и хозяйство из другой страны читает адрес
+ * как «это решение не про меня» — при том, что письмо идёт разработчику.
+ *
+ * Проверяется по дереву витрины целиком, а не по одному файлу: адрес
+ * стоит в четырёх местах — две кнопки, подвал витрины и подвал страниц
+ * продукта, — и вернуть старый можно в любое из них.
+ */
+const siteTree = 'src/app/(frontend)/site'
+const shellFile = 'src/components/site/ProductShell.tsx'
+
+for (const dir of [siteTree, shellFile]) {
+  const files: string[] = []
+  const walk = (p: string) => {
+    if (statSync(p).isDirectory()) {
+      for (const e of readdirSync(p)) walk(join(p, e))
+      return
+    }
+    if (p.endsWith('.tsx') || p.endsWith('.ts')) files.push(p)
+  }
+  walk(dir)
+
+  for (const file of files) {
+    const text = readFileSync(file, 'utf8')
+    if (text.includes('holstein-russia')) {
+      fail(`${file}: витрина пишет на почту Ассоциации, а должна на ${PRODUCT_MAIL}`)
+    }
+  }
+}
+
+if (!PRODUCT_MAIL.endsWith(`@${SITE_HOSTS[0]}`)) {
+  fail(`почта продукта «${PRODUCT_MAIL}» не на витринном домене`)
+}
+
+console.log(`Почта продукта: ${PRODUCT_MAIL}`)
 
 /* ------------------------------------------------------------------ */
 

@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { SiteHeader } from '@/components/SiteHeader'
-import { SiteFooter } from '@/components/SiteFooter'
+import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import { ApiReference } from '@/components/ApiReference'
 
 export const metadata: Metadata = { title: 'API' }
@@ -71,7 +70,7 @@ function Snippet({ children, wrap = false }: { children: React.ReactNode; wrap?:
 export default function ApiDocsPage() {
   return (
     <>
-      <SiteHeader />
+      <ProductHeader />
 
       <main className="container-page pb-8">
         <div className="min-w-0">
@@ -219,7 +218,7 @@ curl -X POST \\
         </div>
       </main>
 
-      <SiteFooter />
+      <ProductFooter />
     </>
   )
 }

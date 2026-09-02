@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { SiteHeader } from '@/components/SiteHeader'
-import { SiteFooter } from '@/components/SiteFooter'
+import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { ICAR_GAP_COUNT, ICAR_WIKI, ICAR_WITH_GAPS } from '@/lib/icar-map'
 import { plural } from '@/lib/format'
@@ -44,7 +43,7 @@ export const metadata: Metadata = { title: 'Чего не хватает до р
 export default function IcarGapsPage() {
   return (
     <>
-      <SiteHeader />
+      <ProductHeader />
 
       <main className="container-page pb-8">
         <Breadcrumbs
@@ -146,7 +145,7 @@ export default function IcarGapsPage() {
         </div>
       </main>
 
-      <SiteFooter />
+      <ProductFooter />
     </>
   )
 }
