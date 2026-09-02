@@ -1,43 +1,42 @@
 /**
  * Рисунки витрины: значки и схемы.
  *
- * ## Почему всё рисуется разметкой, а не картинками
+ * ## Значки рисуются разметкой SVG, схемы — обычной вёрсткой
  *
- * Ни один рисунок здесь не содержит фотографии — только линии, круги
- * и подписи. Такое дешевле нарисовать разметкой, чем нарисовать
- * и положить файлом:
+ * Разделение не стилистическое. Значок — это линии на фиксированной
+ * сетке, в нём нет ни одного слова, и SVG для него идеален: резкость
+ * на любом экране, цвет из темы через `currentColor`, ни одного файла
+ * и ни одного лишнего запроса.
  *
- * Резкость на любом экране без второго файла под удвоенную плотность.
- * Цвета берутся из темы через `currentColor`, поэтому рисунок сам
- * подстраивается под окружение и не выцветает рядом с изменённой палитрой.
- * Подписи на схемах — настоящий текст: он переводится вместе со страницей
- * и читается программой чтения с экрана. Файл пришлось бы рисовать
- * шесть раз, по разу на язык.
+ * Схема — это подписи в рамках, и подписи приходят переводом. Первая
+ * редакция рисовала их тоже в SVG, растягивая каждую до ширины рамки
+ * через `textLength`. На русском это выглядело сносно, на языках
+ * с другой длиной слов — распёртым или сплющенным, а длинная подпись
+ * просто не влезала: в SVG текст не переносится по строкам вовсе.
  *
- * И главное: ни одного лишнего запроса. Витрина открывается одним
- * ответом, без ожидания картинок.
+ * Обычная вёрстка решает это сама: перенос, выравнивание, размер шрифта
+ * и поведение на узком экране — всё то, ради чего вёрстка и существует.
+ * Схема при этом ничего не теряет: рамки со скруглением и стрелки между
+ * ними одинаково хорошо рисуются и там, и там.
  *
  * ## Почему у схем нет собственных подписей внутри кода
  *
- * Все слова приходят доводами. Рисунок, у которого текст зашит внутри,
- * на пятом языке показывает шестую копию русского — и заметить это может
- * только тот, кто открыл страницу на киргизском.
+ * Все слова приходят доводами. Рисунок с зашитым внутри текстом
+ * на пятом языке показывает шестую копию русского — и заметить это
+ * может только тот, кто открыл страницу на киргизском.
  *
  * ## Про доступность
  *
- * Схема — картинка со смыслом, поэтому у неё есть `role="img"`
- * и подпись целиком: программе чтения с экрана нужен связный ответ
- * на вопрос «что нарисовано», а не пять оторванных слов в порядке
- * отрисовки. Значки же чисто украшательные и от чтения скрыты —
- * рядом с каждым стоит заголовок, и произносить ещё и значок значит
- * повторять.
+ * Схема — картинка со смыслом: у неё есть `role="img"` и подпись целиком,
+ * потому что программе чтения с экрана нужен связный ответ на вопрос
+ * «что нарисовано», а не пять оторванных слов в порядке отрисовки.
+ * Значки же украшательные и от чтения скрыты — рядом с каждым стоит
+ * заголовок, и произносить ещё и значок значит повторять.
  */
 
 /* ------------------------------------------------------------------ *
  *  Значки возможностей                                               *
  * ------------------------------------------------------------------ */
-
-const ICON = 'h-7 w-7 flex-none text-forest-500'
 
 /** Общая обёртка: одна сетка координат и одна толщина линии на все значки. */
 function Icon({ children }: { children: React.ReactNode }) {
@@ -49,7 +48,7 @@ function Icon({ children }: { children: React.ReactNode }) {
       strokeWidth={1.6}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={ICON}
+      className="h-7 w-7 flex-none text-forest-500"
       aria-hidden="true"
     >
       {children}
@@ -125,50 +124,52 @@ export const FEATURE_ICONS = [IconBook, IconMilk, IconRuler, IconIndex, IconChec
  * ------------------------------------------------------------------ */
 
 /**
- * Три слоя один над другим: отчётность, учёт стада, экономика коровы.
+ * Три полосы одна над другой: снизу самая широкая и бледная, сверху
+ * узкая и яркая.
  *
- * Нижний слой самый широкий и самый бледный — он обязателен и общий
- * для всех. Верхний узкий и яркий: он не обязателен никому, и именно
- * поэтому его чаще всего нет. Порядок снизу вверх повторяет порядок
- * появления в хозяйстве.
+ * Ширина здесь означает охват, а не важность. Нижняя полоса —
+ * отчётность государству: она обязательна и есть у всех. Верхняя —
+ * экономика коровы: не обязательна никому, и потому её чаще всего
+ * нет вовсе. Порядок снизу вверх повторяет порядок появления
+ * в хозяйстве.
+ *
+ * Подписи приходят сверху вниз — так они читаются в тексте рядом, —
+ * а полосы рисуются снизу вверх. Первая редакция перевернула массив
+ * и **промахнулась**: самая широкая нижняя полоса получила «экономику
+ * коровы», то есть ровно то, чего у хозяйства обычно нет. Схема
+ * при этом выглядела осмысленной, и заметить подмену можно было только
+ * прочитав её как утверждение.
  */
 export function LayersArt({ labels, title }: { labels: string[]; title: string }) {
   const rows = [
-    { y: 84, w: 300, fill: 'var(--color-ink-100)', text: 'var(--color-ink-500)' },
-    { y: 48, w: 240, fill: 'var(--color-brand-100)', text: 'var(--color-forest-600)' },
-    { y: 12, w: 180, fill: 'var(--color-forest-500)', text: '#ffffff' },
+    { width: 'w-[58%]', box: 'bg-forest-500', text: 'text-white' },
+    { width: 'w-[78%]', box: 'bg-brand-100', text: 'text-forest-600' },
+    { width: 'w-full', box: 'bg-ink-100', text: 'text-ink-500' },
   ]
 
-  /* Подписи приходят сверху вниз, слои рисуются снизу вверх. */
-  const ordered = [...labels].reverse()
-
   return (
-    <svg viewBox="0 0 320 124" className="h-auto w-full max-w-[320px]" role="img" aria-label={title}>
+    <div
+      role="img"
+      aria-label={`${title}: ${labels.join(', ')}`}
+      className="flex w-full max-w-[320px] flex-col items-center gap-2"
+    >
       {rows.map((row, i) => (
-        <g key={row.y}>
-          <rect
-            x={(320 - row.w) / 2}
-            y={row.y}
-            width={row.w}
-            height={28}
-            rx={8}
-            fill={row.fill}
-          />
-          <text
-            x={160}
-            y={row.y + 18}
-            textAnchor="middle"
-            fontSize={11}
-            fill={row.text}
-            /* Подпись может не влезть на длинном языке — сжимаем, а не режем. */
-            textLength={row.w - 24}
-            lengthAdjust="spacingAndGlyphs"
-          >
-            {ordered[i]}
-          </text>
-        </g>
+        <div
+          key={row.width}
+          className={`${row.width} ${row.box} rounded-lg px-3 py-2.5 text-center`}
+        >
+          {/*
+             Настоящий текст, а не подпись внутри рисунка: он переносится
+             по строкам, если перевод длиннее русского, и не растягивается,
+             если короче.
+          */}
+          <span className={`text-[12px] font-medium leading-snug ${row.text}`}>
+            {/* Подписи идут сверху вниз, полосы — снизу вверх. */}
+            {labels[labels.length - 1 - i]}
+          </span>
+        </div>
       ))}
-    </svg>
+    </div>
   )
 }
 
@@ -176,93 +177,79 @@ export function LayersArt({ labels, title }: { labels: string[]; title: string }
  *  Схема: путь данных                                                *
  * ------------------------------------------------------------------ */
 
+/** Стрелка между узлами: вниз на узком экране, вправо на широком. */
+function Arrow() {
+  return (
+    <svg
+      viewBox="0 0 24 12"
+      className="h-3 w-6 flex-none rotate-90 self-center text-ink-300 lg:rotate-0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M1 6h20M16 1l5 5-5 5" />
+    </svg>
+  )
+}
+
+function Node({ label, accent = false }: { label?: string; accent?: boolean }) {
+  return (
+    <div
+      className={`flex-none rounded-xl px-4 py-3 text-center text-[13px] leading-snug lg:w-[136px] ${
+        accent
+          ? 'bg-forest-500 font-medium text-white'
+          : 'border border-ink-100 bg-white text-ink-700'
+      }`}
+    >
+      {label}
+    </div>
+  )
+}
+
 /**
- * Пять узлов в строку: хозяйство → проверки → книга → реестр и рынок.
+ * Пять узлов: хозяйство → проверки → книга, и от книги — к реестру
+ * и к рейтингу.
  *
  * Раздвоение в конце нарисовано намеренно: одни и те же записи уходят
- * и в государственный реестр, и в рейтинг с обменом. Прямая линия
+ * и в государственный реестр, и в рейтинг с обменом. Прямая цепочка
  * из пяти узлов сказала бы, что реестр — предпоследний шаг перед
  * рейтингом, а это не так: адресаты равноправны и получают одно и то же.
+ *
+ * На узком экране цепочка разворачивается в столбец, стрелки
+ * поворачиваются вниз, а раздвоение превращается в отступ слева.
+ * Прежняя редакция рисовала схему в SVG фиксированной ширины и
+ * прокручивалась вбок — на телефоне это худшее, что можно сделать.
  */
 export function FlowArt({ nodes, title }: { nodes: string[]; title: string }) {
   const [farm, checks, book, registry, market] = nodes
 
-  const Node = ({
-    x,
-    y,
-    label,
-    accent,
-  }: {
-    x: number
-    y: number
-    label?: string
-    accent?: boolean
-  }) => (
-    <g>
-      <rect
-        x={x}
-        y={y}
-        width={104}
-        height={40}
-        rx={10}
-        fill={accent ? 'var(--color-forest-500)' : '#ffffff'}
-        stroke={accent ? 'var(--color-forest-500)' : 'var(--color-ink-100)'}
-        strokeWidth={1.5}
-      />
-      <text
-        x={x + 52}
-        y={y + 24}
-        textAnchor="middle"
-        fontSize={11}
-        fill={accent ? '#ffffff' : 'var(--color-ink-700)'}
-        textLength={88}
-        lengthAdjust="spacingAndGlyphs"
-      >
-        {label}
-      </text>
-    </g>
-  )
-
-  const Arrow = ({ d }: { d: string }) => (
-    <path
-      d={d}
-      fill="none"
-      stroke="var(--color-ink-300)"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      markerEnd="url(#flow-arrow)"
-    />
-  )
-
   return (
-    <svg viewBox="0 0 560 160" className="h-auto w-full" role="img" aria-label={`${title}: ${nodes.join(' → ')}`}>
-      <defs>
-        <marker
-          id="flow-arrow"
-          viewBox="0 0 8 8"
-          refX={7}
-          refY={4}
-          markerWidth={6}
-          markerHeight={6}
-          orient="auto"
-        >
-          <path d="M0 0 L8 4 L0 8 z" fill="var(--color-ink-300)" />
-        </marker>
-      </defs>
+    <div
+      role="img"
+      aria-label={`${title}: ${nodes.join(' → ')}`}
+      className="flex flex-col items-stretch gap-2 lg:flex-row lg:items-center lg:gap-3"
+    >
+      <Node label={farm} />
+      <Arrow />
+      <Node label={checks} />
+      <Arrow />
+      <Node label={book} accent />
+      <Arrow />
 
-      <Node x={0} y={60} label={farm} />
-      <Node x={140} y={60} label={checks} />
-      <Node x={280} y={60} label={book} accent />
-
-      <Node x={440} y={12} label={registry} />
-      <Node x={440} y={108} label={market} />
-
-      <Arrow d="M108 80 h24" />
-      <Arrow d="M248 80 h24" />
-      {/* Раздвоение: от книги вверх к реестру и вниз к рейтингу. */}
-      <Arrow d="M388 80 h20 q12 0 12 -12 v-20 q0 -12 12 -12 h4" />
-      <Arrow d="M388 80 h20 q12 0 12 12 v20 q0 12 12 12 h4" />
-    </svg>
+      {/*
+         Два адресата в одном столбце с чертой слева: черта и есть
+         раздвоение. Рисовать настоящую вилку линиями пришлось бы
+         в SVG — и вернуться к фиксированной ширине, из-за которой
+         схема и переехала в вёрстку.
+      */}
+      <div className="flex flex-col gap-2 border-ink-100 pl-4 lg:border-l">
+        <Node label={registry} />
+        <Node label={market} />
+      </div>
+    </div>
   )
 }
 
@@ -276,24 +263,40 @@ export function FlowArt({ nodes, title }: { nodes: string[]; title: string }) {
  * Числа здесь выдуманные и нарочно круглые — это рисунок, а не выдержка
  * из книги. Настоящие числа на витрине означали бы, что мы показываем
  * чужое поголовье поимённо посторонним, чего книга как раз не делает.
+ *
+ * Собрано вёрсткой, а не SVG, по той же причине, что и остальные схемы:
+ * подписи «1» и «21 480» короткие, но отметка должна стоять на своей
+ * доле полосы при любой ширине, а доля — это проценты, то есть
+ * обычное свойство вёрстки.
  */
 export function RankArt({ title }: { title: string }) {
+  /* Пятнадцать процентов — «сорок седьмое место» на глаз, не расчёт. */
+  const at = '15%'
+
   return (
-    <svg viewBox="0 0 320 96" className="h-auto w-full max-w-[320px]" role="img" aria-label={title}>
-      <rect x={0} y={40} width={320} height={12} rx={6} fill="var(--color-ink-100)" />
-      <rect x={0} y={40} width={48} height={12} rx={6} fill="var(--color-forest-500)" />
+    <div role="img" aria-label={title} className="w-full max-w-[320px]">
+      <div className="relative pt-7">
+        <span
+          className="absolute top-0 -translate-x-1/2 text-[13px] font-medium tabular-nums text-forest-600"
+          style={{ left: at }}
+        >
+          47
+        </span>
 
-      <circle cx={48} cy={46} r={9} fill="#ffffff" stroke="var(--color-forest-500)" strokeWidth={3} />
+        <div className="h-3 w-full rounded-full bg-ink-100">
+          <div className="h-3 rounded-full bg-forest-500" style={{ width: at }} />
+        </div>
 
-      <text x={48} y={28} textAnchor="middle" fontSize={13} fontWeight={600} fill="var(--color-forest-600)">
-        47
-      </text>
-      <text x={0} y={76} fontSize={11} fill="var(--color-ink-500)">
-        1
-      </text>
-      <text x={320} y={76} textAnchor="end" fontSize={11} fill="var(--color-ink-500)">
-        21 480
-      </text>
-    </svg>
+        <span
+          className="absolute -translate-x-1/2 rounded-full border-[3px] border-forest-500 bg-white"
+          style={{ left: at, top: '1.5rem', height: '1.125rem', width: '1.125rem' }}
+        />
+      </div>
+
+      <div className="mt-3 flex justify-between text-[12px] tabular-nums text-ink-500">
+        <span>1</span>
+        <span>21 480</span>
+      </div>
+    </div>
   )
 }
