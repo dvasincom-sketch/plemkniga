@@ -69,7 +69,24 @@ async function sampleIds() {
         where u.email = '${EMAIL.replace(/'/g, "''")}' limit 1`,
     ),
     profile: await one(`select id from index_profiles order by id limit 1`),
-    submission: await one(`select id from data_submissions order by id desc limit 1`),
+    /*
+     * Заявка берётся своя, а не последняя в базе.
+     *
+     * Прежде здесь стоял `order by id desc limit 1` без оглядки
+     * на хозяйство, и обход стучался в чужую заявку. Приложение отвечало
+     * «не найдено» — правильно и по правилам доступа, — а прогон
+     * записывал это в поломки. Красная строка про исправную защиту:
+     * прицел был наведён не туда, и виноватым выглядело приложение.
+     *
+     * Тот же вид ошибки, что и у прочих наших промахов на этой неделе:
+     * проверка ругается на то, чего сама и попросила.
+     */
+    submission: await one(
+      `select s.id from data_submissions s
+         join users u on u.organization_id = s.organization_id
+        where u.email = '${EMAIL.replace(/'/g, "''")}'
+        order by s.id desc limit 1`,
+    ),
     herd: await one(`select id from herds order by id limit 1`),
   }
 }

@@ -50,10 +50,20 @@ export type NsiRegistry = {
   statusActive: boolean
 }
 
+/**
+ * Запись справочника ФГИАС.
+ *
+ * Три поля названы, потому что они есть у всех реестров и на них
+ * держится сверка. Остальные приходят как есть: у пород это
+ * `direction_name` и `species_name`, у линий своё, и перечислять
+ * их здесь значило бы держать копию чужой схемы, которая меняется
+ * без нас.
+ */
 export type NsiRecord = {
   uuid: string
   name: string
   code: string | null
+  [field: string]: unknown
 }
 
 /**
@@ -133,7 +143,22 @@ export async function fetchRegistry(uuid: string): Promise<NsiRecord[]> {
       const row = r as Record<string, unknown>
       const id = asString(row.uuid)
       const name = asString(row.name)
-      if (id && name) out.push({ uuid: id, name, code: asString(row.code) })
+      /*
+       * Строка кладётся целиком, а не тремя полями.
+       *
+       * Прежде здесь собирался новый объект `{ uuid, name, code }`,
+       * и всё остальное молча терялось. Сверке справочников хватало,
+       * а выборке молочных пород — нет: у породы в реестре есть
+       * `direction_name` и `species_name`, и именно они отвечают
+       * на вопрос «молочная ли». Приведение типа на стороне вызывающего
+       * тут не спасает: приведение не создаёт данных, которых нет,
+       * и выборка молча возвращала ноль пород из пятисот пятидесяти
+       * шести.
+       *
+       * Именованные поля идут после развёртывания: они разобраны
+       * и проверены, а `row` кладёт их сырыми.
+       */
+      if (id && name) out.push({ ...row, uuid: id, name, code: asString(row.code) })
     }
 
     offset += PAGE
