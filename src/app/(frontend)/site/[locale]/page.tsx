@@ -522,16 +522,44 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
 
           <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
             {[m.who.farms, m.who.associations].map((who, i) => (
-              <div key={who.title} className="rounded-2xl border border-ink-100 p-6">
+              /*
+                 Рисунок слева от текста, а не над ним.
+
+                 Стоя сверху, он съедал целую строку высоты и отодвигал
+                 заголовок от края карточки: взгляд шёл сверху вниз через
+                 пустое поле и только потом добирался до слов. Слева
+                 рисунок читается вместе с заголовком, одним движением,
+                 и карточка становится ниже на ту же строку.
+
+                 Такой же порядок — рисунок слева, текст справа — уже
+                 у полосы о международном стандарте, и это единственная
+                 причина, по которой две карточки перестроены именно так:
+                 два одинаковых по смыслу блока не должны собираться
+                 по-разному на одной странице.
+
+                 Рисунок не сжимается (`shrink-0`) и на узком экране
+                 остаётся слева: перенос его наверх вернул бы ту же
+                 потерянную строку, а уменьшение сделало бы строки листа
+                 неразличимыми.
+              */
+              <div
+                key={who.title}
+                className="flex items-start gap-5 rounded-2xl border border-ink-100 p-6"
+              >
                 {/*
-                   Рисунки разные не для украшения: у хозяйства это свой
-                   двор и своё стадо, у объединения — несколько хозяйств
-                   вокруг общей книги. Разница рисунков и есть содержание
+                   Рисунки разные не для украшения: у хозяйства один лист,
+                   и в нём видна каждая корова; у объединения листов много,
+                   и они сходятся в один. Разница рисунков и есть содержание
                    раздела: два читателя с разными вопросами.
                 */}
-                {i === 0 ? <FarmArt title={who.title} /> : <AssociationArt title={who.title} />}
-                <h3 className="mt-4 text-[17px] font-medium leading-tight">{who.title}</h3>
-                <p className="mt-2 text-[15px] leading-relaxed text-ink-500">{who.body}</p>
+                <div className="shrink-0">
+                  {i === 0 ? <FarmArt title={who.title} /> : <AssociationArt title={who.title} />}
+                </div>
+
+                <div>
+                  <h3 className="text-[17px] font-medium leading-tight">{who.title}</h3>
+                  <p className="mt-2 text-[15px] leading-relaxed text-ink-500">{who.body}</p>
+                </div>
               </div>
             ))}
           </div>
