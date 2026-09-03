@@ -50,6 +50,26 @@ export default async function RulesPage({ params }: { params: Promise<{ locale: 
   const notice = PAGE_MESSAGES[locale].notice
 
   const rules = CHECKS as readonly CheckSpec[]
+
+  /*
+   * Номер правила — его место в реестре, считая с единицы.
+   *
+   * Нужен он для разговора: «посмотри правило 45» короче и точнее, чем
+   * «ну то, про кровность потомка». До сих пор такого номера не было
+   * вовсе, и в переписке правила называли пересказом — а пересказ
+   * у двоих собеседников редко совпадает.
+   *
+   * Номер берётся из порядка в реестре, а не пишется рядом с правилом.
+   * Написанный руками, он разъехался бы с порядком при первой вставке
+   * в середину; посчитанный — не может. Плата за это названа честно:
+   * вставка нового правила в середину сдвигает номера следующих,
+   * и потому новые правила дописываются в конец своей группы.
+   *
+   * Свой код у правила при этом есть и остаётся главным ключом
+   * (`no-birth-date`): он не меняется никогда и уезжает в выгрузки.
+   * Номер — для людей, код — для машин.
+   */
+  const numberOf = new Map(rules.map((c, i) => [c.code, i + 1]))
   const fix = rules.filter((c) => c.severity === 'fix').length
   const note = rules.length - fix
   const withThreshold = rules.filter((c) => c.threshold).length
@@ -121,6 +141,13 @@ export default async function RulesPage({ params }: { params: Promise<{ locale: 
         <section className="mt-14">
           <h2 className="text-[24px] font-medium leading-tight sm:text-[28px]">Список</h2>
 
+          <p className="mt-3 max-w-[75ch] text-[15px] leading-relaxed text-ink-500">
+            У каждого правила есть номер — на него можно сослаться в письме или в разговоре
+            с поддержкой: «правило 45». Номер отражает место в реестре и меняется, если
+            в середину списка добавят новое; неизменный ключ правила — его код, он уезжает
+            в выгрузки и остаётся прежним навсегда.
+          </p>
+
           <div className="mt-8 space-y-12">
             {CHECK_GROUPS.map((group) => {
               const items = rules.filter((c) => c.group === group.key)
@@ -145,7 +172,14 @@ export default async function RulesPage({ params }: { params: Promise<{ locale: 
                         className="rounded-2xl border border-ink-100 bg-white p-5"
                       >
                         <div className="flex items-start justify-between gap-4">
-                          <h4 className="text-[15px] font-medium leading-snug">{c.label}</h4>
+                          <h4 className="text-[15px] font-medium leading-snug">
+                            <span
+                              className={`${unbounded.className} mr-2 tabular-nums text-ink-300`}
+                            >
+                              {numberOf.get(c.code)}
+                            </span>
+                            {c.label}
+                          </h4>
                           {/*
                              Вес правила назван словом, а не цветом: цвет
                              сообщает настроение, а нам надо сообщить, что

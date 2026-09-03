@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
+import { unbounded } from '@/lib/fonts'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
 import {
@@ -60,7 +61,7 @@ export const metadata: Metadata = {
 function Num({ value, label }: { value: string; label: string }) {
   return (
     <div>
-      <div className="text-[30px] font-medium leading-none tabular-nums text-forest-600">
+      <div className={`${unbounded.className} text-[30px] font-medium leading-none tabular-nums text-forest-600`}>
         {value}
       </div>
       <p className="mt-2 max-w-[26ch] text-[13px] leading-snug text-ink-500">{label}</p>
@@ -134,8 +135,20 @@ export default async function AdePage({
             <dt className="text-ink-500">Версия стандарта</dt>
             <dd className="mt-1 font-medium tabular-nums">ICAR ADE {ADE_VERSION}</dd>
           </div>
+          {/*
+             Ветка и коммит — **чужие**, из открытого репозитория ICAR,
+             и подписаны так прямо.
+
+             Подпись «Ветка репозитория» без хозяина читалась как наша,
+             и вопрос «зачем на витрине внутренности нашего репозитория»
+             возникал справедливо. Убрать эти два поля было бы легче
+             всего и неверно: именно они делают проверяемым заявление
+             «схемы взяты у ICAR и не изменялись». Читатель может открыть
+             тот же коммит и сверить файлы побайтно — а без координат
+             ему остаётся верить на слово.
+          */}
           <div>
-            <dt className="text-ink-500">Ветка репозитория</dt>
+            <dt className="text-ink-500">Ветка у ICAR</dt>
             <dd className="mt-1 font-medium">{ADE_MAP.branch}</dd>
           </div>
           <div>
@@ -143,7 +156,7 @@ export default async function AdePage({
             <dd className="mt-1 font-medium tabular-nums">{copied}</dd>
           </div>
           <div>
-            <dt className="text-ink-500">Коммит</dt>
+            <dt className="text-ink-500">Коммит у ICAR</dt>
             <dd className="mt-1 font-medium tabular-nums">{ADE_MAP.commit.slice(0, 10)}</dd>
           </div>
         </dl>

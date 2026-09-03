@@ -5,6 +5,7 @@ import {
   FGIAS_TOTALS,
   type FgiasTemplateState,
 } from '@/lib/fgias-templates'
+import { unbounded } from '@/lib/fonts'
 
 /**
  * Вкладка «ФГИАС ПР».
@@ -99,7 +100,7 @@ export function EvolutionFgias() {
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="card">
             <p className="text-[13px] text-ink-500">Шаблонов реестра</p>
-            <p className="mt-1 text-[30px] font-medium leading-none tabular-nums">
+            <p className={`${unbounded.className} mt-1 text-[30px] font-medium leading-none tabular-nums`}>
               {FGIAS_TOTALS.templates}
             </p>
             <p className="mt-2 text-[14px] leading-snug text-ink-700">
@@ -116,7 +117,7 @@ export function EvolutionFgias() {
 
           <div className="card">
             <p className="text-[13px] text-ink-500">Колонок во всех шаблонах</p>
-            <p className="mt-1 text-[30px] font-medium leading-none tabular-nums">
+            <p className={`${unbounded.className} mt-1 text-[30px] font-medium leading-none tabular-nums`}>
               {FGIAS_TOTALS.fill}
               <span className="text-[20px] text-ink-500"> из {FGIAS_TOTALS.columns}</span>
             </p>
@@ -127,7 +128,7 @@ export function EvolutionFgias() {
 
           <div className="card">
             <p className="text-[13px] text-ink-500">Строк уехало бы сегодня</p>
-            <p className="mt-1 text-[30px] font-medium leading-none tabular-nums">
+            <p className={`${unbounded.className} mt-1 text-[30px] font-medium leading-none tabular-nums`}>
               {FGIAS_TOTALS.rowsReady.toLocaleString('ru-RU')}
             </p>
             <p className="mt-2 text-[14px] leading-snug text-ink-700">

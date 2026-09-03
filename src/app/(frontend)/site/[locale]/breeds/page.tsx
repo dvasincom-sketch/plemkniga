@@ -77,6 +77,22 @@ export default async function BreedsPage({
 
   const STATES: BreedState[] = ['book', 'ready', 'listed']
 
+  /*
+   * Чего породе не хватает до следующего состояния.
+   *
+   * Считается из тех же двух ключей, из которых складывается само
+   * состояние (`buildCatalog`), — иначе столбец разошёлся бы
+   * с плашкой рядом, и читатель поверил бы тому из двух, что удобнее.
+   */
+  const missingOf = (r: BreedRow): string => {
+    if (r.state === 'book') return '—'
+    const gaps: string[] = []
+    if (!r.fgiasUuid) gaps.push('ключа реестра')
+    if (!r.icar) gaps.push('кода ICAR')
+    if (gaps.length === 0) return 'объединения, которое возьмётся вести'
+    return `нет ${gaps.join(' и ')}`
+  }
+
   return (
     <>
       <ProductHeader locale={locale} path="/breeds" />
@@ -191,9 +207,29 @@ export default async function BreedsPage({
             <table className="data-table w-full min-w-[720px]">
               <thead>
                 <tr>
+                  {/*
+                     Столбцов стало больше, и все они — из того, что
+                     о породе действительно известно.
+
+                     Поголовье и год утверждения просились сами, но их
+                     у нас нет: национальной численности по породам
+                     в наших данных не лежит, а взять её неоткуда без
+                     источника, который придётся назвать. Выдуманное
+                     число в таблице, обещающей проверяемость, стоило бы
+                     дороже пустого столбца.
+
+                     Зато есть то, чего нет больше нигде: почему порода
+                     стоит в том состоянии, в каком стоит. «Чего
+                     не хватает» и превращает список в разбор — видно,
+                     что до готовности не хватает ключа реестра,
+                     а не нашего желания.
+                  */}
                   <th className="text-left">Порода</th>
                   <th className="w-[110px] text-left">Код ICAR</th>
+                  <th className="w-[110px] text-left">В реестре</th>
+                  <th className="w-[130px] text-left">Улучшающая</th>
                   <th className="w-[190px] text-left">Состояние</th>
+                  <th className="w-[210px] text-left">Чего не хватает</th>
                   <th className="text-left">Где посмотреть</th>
                 </tr>
               </thead>
@@ -202,6 +238,8 @@ export default async function BreedsPage({
                   <tr key={String(r.id)}>
                     <td>{r.name}</td>
                     <td className="tabular-nums text-ink-500">{r.icar ?? '—'}</td>
+                    <td className="text-ink-500">{r.fgiasUuid ? 'есть' : '—'}</td>
+                    <td className="text-ink-500">{r.improver ? 'да' : '—'}</td>
                     <td>
                       <span
                         className={`row-chip inline-block rounded-md px-2 py-0.5 text-[13px] ${STATE_CLASS[r.state]}`}
@@ -209,6 +247,7 @@ export default async function BreedsPage({
                         {STATE_LABEL[r.state]}
                       </span>
                     </td>
+                    <td className="text-[13px] leading-snug text-ink-500">{missingOf(r)}</td>
                     <td>
                       {r.bookUrl ? (
                         <a

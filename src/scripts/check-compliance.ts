@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { COMPLIANCE, EXTERNAL, OURS, OURS_DONE, STATE_ORDER, countByState } from '@/lib/compliance'
 import { SITE_PREFIX, isSharedPath } from '@/lib/hosts'
+import { FGIAS_MEASURED_ON_DATE, FGIAS_MEASURE_MAX_DAYS } from '@/lib/fgias-templates'
 
 /**
  * Страница соответствия не ссылается на то, чего нет.
@@ -67,6 +68,31 @@ const pageFiles = (href: string): string[] => {
   const clean = `${prefix}${path}`.replace(/^\/|\/$/g, '')
   const dir = `src/app/(frontend)/${clean}`
   return [`${dir}/page.tsx`, `${dir}/route.ts`]
+}
+
+/*
+ * Замер готовности к реестру стареет молча.
+ *
+ * Числа «заполним столько-то колонок» посчитаны прогоном по живой базе
+ * в конкретный день, и день этот написан на витрине. Данные с тех пор
+ * меняются каждую неделю: хозяйства вносят записи, шаблоны реестра
+ * выходят новыми версиями. Через полгода цифра остаётся на странице
+ * такой же уверенной, какой была, — и это худший вид неправды,
+ * потому что она подписана датой и выглядит проверенной.
+ *
+ * Порог в полгода взят из того, что за это время меняется состав
+ * данных, но не устройство выгрузок. Обновлять дату автоматически
+ * нельзя: она означает не «когда собрали страницу», а «когда считали».
+ */
+const measuredDays = Math.floor(
+  (Date.now() - new Date(FGIAS_MEASURED_ON_DATE).getTime()) / 86_400_000,
+)
+if (measuredDays > FGIAS_MEASURE_MAX_DAYS) {
+  fail(
+    `замер готовности к реестру старше ${FGIAS_MEASURE_MAX_DAYS} дней ` +
+      `(${measuredDays}): пересчитайте npm run check:fgias-readiness ` +
+      `и обновите FGIAS_MEASURED_ON_DATE`,
+  )
 }
 
 let evidence = 0
