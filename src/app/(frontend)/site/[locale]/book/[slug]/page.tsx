@@ -6,6 +6,7 @@ import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
 import { BOOK_FEATURES, featureBySlug } from '@/lib/book-features'
 import { CertificateArt } from '@/components/site/CertificateArt'
+import { AnimalStates, PedigreeScreen, QualityScreen } from '@/components/site/BookScreens'
 import { BOOK_URL, PRODUCT_MAIL } from '@/lib/hosts'
 
 export const metadata: Metadata = { title: 'Раздел книги' }
@@ -79,6 +80,50 @@ export default async function BookFeaturePage({
            Показанный бланк отвечает сразу — что в нём есть, по какой форме
            он сделан и чем проверяется.
         */}
+        {/*
+           Экран раздела там, где у раздела есть визуальный код.
+
+           Не у всех он есть, и рисовать «что-нибудь» ради полноты
+           не следует: пустой рисунок обесценивает те, что несут смысл.
+           Карточка животного, родословная и качество данных показывают
+           то, чего текст не передаёт, — чем своё отличается от чужого,
+           где книга предупреждает, а где утверждает.
+        */}
+        {feature.slug === 'animal' && (
+          <section className="mt-10">
+            <AnimalStates />
+            <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
+              Одна карточка, три прочтения. Разница не в оформлении, а в правах: посторонний
+              видит то, что хозяйство открыло, владелец — работу, а у быка другой предмет
+              разговора. Нарисовано вёрсткой; значения показаны для примера.
+            </p>
+          </section>
+        )}
+
+        {feature.slug === 'pedigree' && (
+          <section className="mt-10">
+            <div className="max-w-[75ch]">
+              <PedigreeScreen />
+            </div>
+            <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
+              Подтверждённое ДНК помечено, неизвестный предок показан пунктиром. Скрывать
+              пропуск нельзя: он меняет смысл коэффициента родства.
+            </p>
+          </section>
+        )}
+
+        {feature.slug === 'quality' && (
+          <section className="mt-10">
+            <div className="max-w-[75ch]">
+              <QualityScreen />
+            </div>
+            <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
+              Находка называет животное и поле — иначе её нельзя исправить. Отказ реестра
+              приходит через неделю и говорит про файл.
+            </p>
+          </section>
+        )}
+
         {feature.slug === 'documents' && (
           <section className="mt-10">
             <div className="max-w-[75ch]">

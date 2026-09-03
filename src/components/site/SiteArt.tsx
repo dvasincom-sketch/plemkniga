@@ -300,3 +300,113 @@ export function RankArt({ title }: { title: string }) {
     </div>
   )
 }
+
+/* ------------------------------------------------------------------ *
+ *  Международный стандарт: наши данные читаются снаружи               *
+ * ------------------------------------------------------------------ */
+
+/**
+ * Рисунок к полосе о стандарте.
+ *
+ * Показывает ровно то, что говорит текст: запись книги проходит через
+ * схемы стандарта и оказывается читаемой чужой системой. Без рисунка
+ * полоса — три строки текста среди других трёх строк; с ним видно,
+ * что посередине стоит не наша проверка, а чужая.
+ */
+export function StandardArt({ title }: { title: string }) {
+  return (
+    <svg viewBox="0 0 220 96" className="h-[96px] w-full max-w-[220px]" role="img" aria-label={title}>
+      {/* наша запись */}
+      <rect x="2" y="26" width="56" height="44" rx="10" fill="#fff" stroke="#D7DBD9" />
+      <rect x="12" y="38" width="36" height="4" rx="2" fill="#17181A" opacity=".55" />
+      <rect x="12" y="47" width="26" height="4" rx="2" fill="#17181A" opacity=".3" />
+      <rect x="12" y="56" width="30" height="4" rx="2" fill="#17181A" opacity=".3" />
+
+      {/* схема стандарта — шестерня как чужая проверка */}
+      <circle cx="110" cy="48" r="26" fill="#EAF3EE" stroke="#BFD9C9" />
+      <path
+        d="M110 32v-6M110 70v6M94 48h-6M132 48h6M99 37l-4-4M121 59l4 4M99 59l-4 4M121 37l4-4"
+        stroke="#2E7D52"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+      <circle cx="110" cy="48" r="9" fill="#fff" stroke="#2E7D52" strokeWidth="2.5" />
+
+      {/* мир */}
+      <circle cx="190" cy="48" r="26" fill="#fff" stroke="#D7DBD9" />
+      <ellipse cx="190" cy="48" rx="26" ry="10" fill="none" stroke="#D7DBD9" />
+      <path d="M190 22v52M172 32c8 6 28 6 36 0M172 64c8-6 28-6 36 0" fill="none" stroke="#D7DBD9" />
+
+      {/* стрелки */}
+      <path d="M60 48h20M142 48h20" stroke="#2E7D52" strokeWidth="2.5" strokeLinecap="round" />
+      <path d="M76 44l5 4-5 4M158 44l5 4-5 4" fill="none" stroke="#2E7D52" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+/* ------------------------------------------------------------------ *
+ *  Кому это: хозяйство и объединение                                  *
+ * ------------------------------------------------------------------ */
+
+/**
+ * Два рисунка к разделу «кому это».
+ *
+ * Хозяйство — двор и одно стадо: работа идёт со своими животными.
+ * Объединение — несколько хозяйств вокруг общей книги: смысл в том,
+ * что оно видит их разом, и только поэтому умеет считать место
+ * животного среди всех.
+ *
+ * Различие рисунков и есть содержание раздела: два читателя, у которых
+ * разные вопросы, и подписи под ними тоже разные.
+ */
+export function FarmArt({ title }: { title: string }) {
+  return (
+    <svg viewBox="0 0 120 72" className="h-[72px] w-[120px]" role="img" aria-label={title}>
+      {/* коровник */}
+      <path d="M14 40l22-16 22 16v22H14V40Z" fill="#fff" stroke="#D7DBD9" />
+      <path d="M14 40l22-16 22 16" fill="none" stroke="#2E7D52" strokeWidth="2.5" strokeLinejoin="round" />
+      <rect x="29" y="46" width="14" height="16" rx="2" fill="#EAF3EE" stroke="#BFD9C9" />
+
+      {/* три животных — своё стадо */}
+      {[70, 88, 106].map((x) => (
+        <g key={x}>
+          <ellipse cx={x} cy="50" rx="7" ry="5" fill="#fff" stroke="#D7DBD9" />
+          <circle cx={x + 5} cy="45" r="3.4" fill="#17181A" opacity=".75" />
+          <path d={`M${x - 4} 55v5M${x + 3} 55v5`} stroke="#D7DBD9" strokeWidth="1.6" strokeLinecap="round" />
+        </g>
+      ))}
+      <rect x="62" y="62" width="52" height="2" rx="1" fill="#D7DBD9" />
+    </svg>
+  )
+}
+
+export function AssociationArt({ title }: { title: string }) {
+  return (
+    <svg viewBox="0 0 120 72" className="h-[72px] w-[120px]" role="img" aria-label={title}>
+      {/* книга в середине */}
+      <rect x="44" y="24" width="32" height="24" rx="4" fill="#2E7D52" />
+      <path d="M60 24v24" stroke="#fff" strokeWidth="1.6" opacity=".6" />
+      <rect x="49" y="30" width="8" height="2" rx="1" fill="#fff" opacity=".8" />
+      <rect x="63" y="30" width="8" height="2" rx="1" fill="#fff" opacity=".8" />
+
+      {/* четыре хозяйства вокруг */}
+      {[
+        [14, 14],
+        [92, 14],
+        [14, 54],
+        [92, 54],
+      ].map(([x, y]) => (
+        <g key={`${x}-${y}`}>
+          <path d={`M${x} ${y + 10}l7-6 7 6v8h-14v-8Z`} fill="#fff" stroke="#D7DBD9" />
+          <path
+            d={`M${x + 7} ${y + 14}L60 36`}
+            stroke="#BFD9C9"
+            strokeWidth="1.6"
+            strokeDasharray="3 3"
+          />
+        </g>
+      ))}
+    </svg>
+  )
+}
+

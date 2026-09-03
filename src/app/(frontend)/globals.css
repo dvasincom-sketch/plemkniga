@@ -555,8 +555,18 @@
   .data-table tbody tr:not(.is-empty):hover td a,
   .data-table tbody tr:not(.is-empty):hover td .row-chip {
     color: #fff !important;
-    background: transparent;
-    border-color: rgb(255 255 255 / 0.4);
+  }
+  /*
+   * Плашка состояния теряет свою заливку вместе с цветом текста.
+   *
+   * Первая правка сделала белым только текст, а заливка осталась
+   * светлой — белое по белому, и подпись пропала совсем. Заливка
+   * задана утилитой, а утилиты лежат вне слоя и перебивают обычное
+   * правило: снимать её приходится так же жёстко, как ставился цвет.
+   */
+  .data-table tbody tr:not(.is-empty):hover td .row-chip {
+    background: rgb(255 255 255 / 0.18) !important;
+    border-color: rgb(255 255 255 / 0.45) !important;
   }
   .data-table tbody tr:not(.is-empty):hover td a {
     text-decoration-color: rgb(255 255 255 / 0.6);

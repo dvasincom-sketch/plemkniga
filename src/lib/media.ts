@@ -11,13 +11,21 @@ const EXTENSIONS = ['.svg', '.webp', '.avif', '.jpg', '.jpeg', '.png'] as const
 
 const cache = new Map<string, string | null>()
 
-export function findPublicAsset(basename: string): string | null {
-  if (cache.has(basename)) return cache.get(basename)!
+export function findPublicAsset(basename: string, extensions?: string[]): string | null {
+  /*
+   * Расширения можно задать свои: у знака они одни, у записи работы
+   * в кабинете другие. Ключ кэша при этом обязан их учитывать —
+   * иначе первый же поиск запомнил бы ответ для чужого набора.
+   */
+  const list = extensions ? extensions.map((e) => (e.startsWith('.') ? e : `.${e}`)) : EXTENSIONS
+  const key = extensions ? `${basename}|${list.join(',')}` : basename
+
+  if (cache.has(key)) return cache.get(key)!
 
   const publicDir = path.join(process.cwd(), 'public')
   let found: string | null = null
 
-  for (const ext of EXTENSIONS) {
+  for (const ext of list) {
     const rel = `${basename}${ext}`
     if (fs.existsSync(path.join(publicDir, rel))) {
       found = `/${rel}`
@@ -26,6 +34,6 @@ export function findPublicAsset(basename: string): string | null {
   }
 
   // В dev пересканируем каждый раз, чтобы новый файл появлялся без перезапуска.
-  if (process.env.NODE_ENV === 'production') cache.set(basename, found)
+  if (process.env.NODE_ENV === 'production') cache.set(key, found)
   return found
 }

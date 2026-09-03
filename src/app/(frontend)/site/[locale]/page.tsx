@@ -3,14 +3,24 @@ import Link from 'next/link'
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { PlemLogo } from '@/components/PlemLogo'
+import { unbounded } from '@/lib/fonts'
 import { LocaleSwitcher } from '@/components/LocaleSwitcher'
-import { FEATURE_ICONS, FlowArt, LayersArt, RankArt } from '@/components/site/SiteArt'
+import {
+  AssociationArt,
+  FarmArt,
+  FEATURE_ICONS,
+  FlowArt,
+  LayersArt,
+  RankArt,
+  StandardArt,
+} from '@/components/site/SiteArt'
+import { DemoVideo } from '@/components/site/DemoVideo'
 import { AnimalScreen } from '@/components/site/ScreenArt'
 import { ADE_MAP } from '@/lib/ade-schema-map'
 import { PRODUCT_MESSAGES } from '@/lib/i18n/product-messages'
 import { SITE_MESSAGES } from '@/lib/i18n/site-messages'
 import { LOCALE_CODES, isLocale, localeInfo, type Locale } from '@/lib/i18n/locales'
-import { BOOK_URL, PRODUCT_MAIL, SITE_PREFIX, isSiteHost } from '@/lib/hosts'
+import { BOOK_URL, PRODUCT_MAIL, SITE_PREFIX, demoUrl, isSiteHost } from '@/lib/hosts'
 import { breedCatalog } from '@/lib/breeds-catalog-server'
 import { countByState, type BreedRow } from '@/lib/breeds-catalog'
 import { BOOK_FEATURES } from '@/lib/book-features'
@@ -97,6 +107,16 @@ export async function generateMetadata({
   }
 }
 
+/**
+ * Куда ведёт каждое число первого экрана.
+ *
+ * Число без разбора — обещание: его нельзя проверить, а спорить с ним
+ * нечем. Ссылка превращает его в утверждение, за которым стоит
+ * страница. Порядок здесь тот же, что у чисел в наборе строк, и это
+ * единственное место, где они связаны, — потому и стоит рядом.
+ */
+const PROOF_LINKS: (string | null)[] = ['/compliance', '/ade', '/compliance', '/breeds']
+
 export default async function SitePage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: raw } = await params
   if (!isLocale(raw)) notFound()
@@ -118,6 +138,17 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
     ready: String(breedCount.ready),
     own: String(breeds.filter((b: BreedRow) => !b.icar).length),
   }
+
+  /*
+   * Первая кнопка ведёт туда, где посетителю можно всё.
+   *
+   * Действующая книга принадлежит Ассоциации: там настоящие животные,
+   * и незнакомому человеку она открыта только на просмотр. Показательная
+   * книга для того и заводится, чтобы в ней можно было ходить свободно.
+   * Пока её нет, кнопка ведёт в действующую — это честнее, чем ссылка
+   * в пустоту, но как только стенд поднимется, порядок меняется сам.
+   */
+  const demo = demoUrl()
 
   const host = (await headers()).get('host')
   const base = isSiteHost(host) ? '' : SITE_PREFIX
@@ -152,11 +183,19 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
 
           <div className="mt-8 flex flex-wrap items-center gap-4">
             <a
-              href={BOOK_URL}
+              href={demo ?? BOOK_URL}
               className="rounded-xl bg-forest-500 px-6 py-3 text-[15px] text-white transition-colors hover:bg-forest-600"
             >
-              {s.book.cta}
+              {demo ? s.book.demoCta : s.book.cta}
             </a>
+            {demo && (
+              <a
+                href={BOOK_URL}
+                className="text-[15px] underline underline-offset-4 hover:text-forest-500"
+              >
+                {s.book.cta}
+              </a>
+            )}
             <a
               href={`mailto:${PRODUCT_MAIL}`}
               className="rounded-xl border border-ink-200 px-6 py-3 text-[15px] transition-colors hover:border-forest-500 hover:text-forest-500"
@@ -185,8 +224,9 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
            Число схем подставляется, а не пишется: оно меняется вместе
            с копией стандарта.
         */}
-        <div className="mt-10 rounded-2xl border border-brand-100 bg-brand-50 px-5 py-4 sm:px-6">
-          <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
+        <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-5 rounded-2xl border border-brand-100 bg-brand-50 px-5 py-5 sm:px-6">
+          <StandardArt title={s.standard.title} />
+          <p className="max-w-[70ch] flex-1 text-[15px] leading-relaxed text-ink-700">
             <strong className="font-medium text-ink-900">{s.standard.title}.</strong>{' '}
             {s.standard.body.replace('{n}', String(ADE_MAP.used))}{' '}
             <a
@@ -205,14 +245,34 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
            хуже отсутствия числа.
         */}
         <section className="mt-14 grid grid-cols-2 gap-x-6 gap-y-8 border-y border-ink-100 py-8 lg:grid-cols-4">
-          {s.proof.map((p) => (
-            <div key={p.label}>
-              <div className="text-[28px] font-medium leading-none tabular-nums text-forest-600 sm:text-[32px]">
-                {p.value}
-              </div>
-              <p className="mt-2 max-w-[22ch] text-[13px] leading-snug text-ink-500">{p.label}</p>
-            </div>
-          ))}
+          {s.proof.map((p, i) => {
+            const href = PROOF_LINKS[i]
+            const inner = (
+              <>
+                <div
+                  className={`${unbounded.className} text-[34px] font-medium leading-none tabular-nums text-forest-600 sm:text-[40px]`}
+                >
+                  {p.value}
+                </div>
+                <p className="mt-2 max-w-[22ch] text-[13px] leading-snug text-ink-500">{p.label}</p>
+              </>
+            )
+
+            return href ? (
+              <Link
+                key={p.label}
+                href={`${base}/${locale}${href}`}
+                className="group block transition-colors"
+              >
+                {inner}
+                <span className="mt-2 inline-block text-[12px] text-forest-600 opacity-0 transition-opacity group-hover:opacity-100">
+                  Разобрать →
+                </span>
+              </Link>
+            ) : (
+              <div key={p.label}>{inner}</div>
+            )
+          })}
         </section>
 
         {/* --------------------------- Три контура ----------------------------- */}
@@ -263,6 +323,8 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
           <h2 className="text-[26px] font-medium leading-tight sm:text-[30px]">{m.problem.title}</h2>
           <p className="mt-4 text-[16px] leading-relaxed text-ink-700">{m.problem.body}</p>
         </section>
+
+        <DemoVideo title={s.video.title} lead={s.video.lead} note={s.video.note} />
 
         {/* ------------------------------ Рейтинг ------------------------------ */}
         <section className="mt-20">
@@ -459,9 +521,16 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
           <h2 className="text-[26px] font-medium leading-tight sm:text-[30px]">{m.who.title}</h2>
 
           <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {[m.who.farms, m.who.associations].map((who) => (
+            {[m.who.farms, m.who.associations].map((who, i) => (
               <div key={who.title} className="rounded-2xl border border-ink-100 p-6">
-                <h3 className="text-[17px] font-medium leading-tight">{who.title}</h3>
+                {/*
+                   Рисунки разные не для украшения: у хозяйства это свой
+                   двор и своё стадо, у объединения — несколько хозяйств
+                   вокруг общей книги. Разница рисунков и есть содержание
+                   раздела: два читателя с разными вопросами.
+                */}
+                {i === 0 ? <FarmArt title={who.title} /> : <AssociationArt title={who.title} />}
+                <h3 className="mt-4 text-[17px] font-medium leading-tight">{who.title}</h3>
                 <p className="mt-2 text-[15px] leading-relaxed text-ink-500">{who.body}</p>
               </div>
             ))}
