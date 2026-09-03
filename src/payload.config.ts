@@ -42,6 +42,8 @@ import { IndexProfiles } from '@/collections/IndexProfiles'
 import { IndexValues } from '@/collections/IndexValues'
 import { IndexBases } from '@/collections/IndexBases'
 import { DICTIONARY_COLLECTIONS } from '@/collections/dictionaries'
+import { AdeTombstones } from '@/collections/AdeTombstones'
+import { withTombstones } from '@/lib/ade/tombstone'
 import { addDomainConstraints } from '@/lib/db-constraints'
 import { databaseEnvKeys, maskUri, resolveDatabase, shouldPushSchema } from '@/lib/db-url'
 import { migrations } from '@/migrations'
@@ -74,15 +76,27 @@ export default buildConfig({
     Users,
     Organizations,
     Herds,
-    Animals,
-    Movements,
-    Calvings,
-    Inseminations,
-    MilkTests,
-    Weighings,
+    /*
+     * Восемь коллекций уезжают в обмен, и удаление в каждой обязано
+     * оставить след — иначе партнёр, ведущий свою копию книги, никогда
+     * не узнает, что запись отозвали (`lib/ade/tombstone.ts`).
+     *
+     * Обёртка стоит здесь, а не в самих коллекциях, ровно затем, чтобы
+     * пропуск был виден: список наборов обмена читается одним взглядом.
+     * Имя рядом с коллекцией — имя набора стандарта, а не таблицы;
+     * у перемещений набор определяется видом записи и потому назван
+     * условно, разбор внутри обёртки.
+     */
+    withTombstones(Animals, 'animals'),
+    withTombstones(Movements, 'arrivals'),
+    withTombstones(Calvings, 'parturitions'),
+    withTombstones(Inseminations, 'inseminations'),
+    withTombstones(MilkTests, 'test-day-results'),
+    withTombstones(Weighings, 'weights'),
+    AdeTombstones,
     HealthEvents,
     AnimalEvaluations,
-    AnimalExteriors,
+    withTombstones(AnimalExteriors, 'type-classifications'),
     Gradings,
     AnimalRevisions,
     AnimalRemovals,
@@ -97,7 +111,7 @@ export default buildConfig({
     CheckSettings,
     CheckThresholds,
     IndexProfiles,
-    IndexValues,
+    withTombstones(IndexValues, 'breeding-values'),
     IndexBases,
     Events,
     Documents,

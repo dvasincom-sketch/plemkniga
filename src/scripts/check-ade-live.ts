@@ -359,11 +359,109 @@ async function main() {
   })
   if (readOnly.status !== 405) fail(`запись в animals ответила ${readOnly.status}, ожидалось 405`)
 
+  /* ---------------------------------------------------------------- *
+   *  Обмен наборами: перечень, лента, метка                          *
+   * ---------------------------------------------------------------- */
+
+  const datasets = await ask(`${BASE}/ade/v1/datasets`)
+  const list = (datasets.body as unknown as { name?: string; changes?: string }[]) ?? []
+
+  if (datasets.status !== 200 || !Array.isArray(datasets.body)) {
+    fail(`перечень наборов ответил ${datasets.status} — с него начинается весь обмен наборами`)
+  } else if (list.length === 0) {
+    fail('перечень наборов пуст — клиенту некуда идти дальше')
+  }
+
+  const dataset = list.find((d) => d.name === 'test-day-results')
+
+  if (!dataset?.changes) {
+    fail('в перечне нет набора test-day-results или у него не назван адрес ленты')
+  } else {
+    /*
+     * Адрес ленты берётся из ответа, а не пишется здесь руками. Клиент
+     * по стандарту поступает именно так, и проверять надо тот путь,
+     * которым он пойдёт: адрес, набранный в прогоне, проверяет прогон.
+     */
+    const feedUrl = `${BASE}${dataset.changes}`
+    const first = await ask(`${feedUrl}?pageSize=5`)
+    const items = (first.body as unknown as Record<string, unknown>[]) ?? []
+
+    if (first.status !== 200 || !Array.isArray(first.body)) {
+      fail(`лента ответила ${first.status}, ожидалось 200 и массив`)
+    } else {
+      const head = items[0] as { id?: string } | undefined
+      const tail = items[items.length - 1] as { id?: string; token?: string } | undefined
+
+      if (head?.id !== '@context') fail('первый элемент ленты не @context — клиент пропустит ресурс')
+      if (tail?.id !== '@continuation') fail('последний элемент ленты не метка продолжения')
+      if (!tail?.token) fail('в метке продолжения нет самой метки — обмен не сдвинется')
+
+      /*
+       * Вторая страница по выданной метке обязана начаться там, где
+       * кончилась первая. Совпадение первых ресурсов означало бы, что
+       * метка не двигается, и партнёр забирал бы одно и то же вечно.
+       */
+      if (tail?.token) {
+        const second = await ask(`${feedUrl}?since=${encodeURIComponent(tail.token)}&pageSize=5`)
+        const two = (second.body as unknown as Record<string, unknown>[]) ?? []
+
+        if (second.status !== 200) fail(`лента по метке ответила ${second.status}`)
+
+        const sidOf = (arr: Record<string, unknown>[]) =>
+          arr
+            .filter((r) => r.meta)
+            .map((r) => String((r.meta as { sourceId?: string }).sourceId ?? ''))
+
+        const a = sidOf(items)
+        const b = sidOf(two)
+        const repeated = a.filter((x) => b.includes(x))
+
+        if (a.length && repeated.length) {
+          fail(`вторая страница ленты повторила ${repeated.length} ресурсов — метка не двигается`)
+        }
+      }
+
+      /* Подделанная метка — отказ, а не «начнём сначала». */
+      const forged = await ask(`${feedUrl}?since=${encodeURIComponent('bm90LWEtdG9rZW4')}`)
+      if (forged.status !== 400) {
+        fail(`негодная метка принята с кодом ${forged.status} — клиент получил бы всю книгу как «изменения»`)
+      }
+    }
+
+    /* Неизвестный набор — 404, а не пустая лента. */
+    const nodata = await ask(`${BASE}/ade/v1/datasets/выдумка/changes`)
+    if (nodata.status !== 404) fail(`неизвестный набор ответил ${nodata.status}, ожидалось 404`)
+
+    /* Лента без входа закрыта так же, как выборка по локации. */
+    const anonFeed = await fetch(`${BASE}${dataset.changes}`, { redirect: 'manual' })
+    if (anonFeed.status !== 401) fail(`лента без входа ответила ${anonFeed.status}, ожидалось 401`)
+  }
+
+  /* Приём в набор: закрытая на запись коллекция отвечает 405, а не 404. */
+  const pushRead = await ask(`${BASE}/ade/v1/datasets/animals/resources`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify([{ id: '@context' }, { resourceType: 'icarAnimalCoreResource' }]),
+  })
+  if (pushRead.status === 404) fail('адрес приёма в набор не заведён — для клиента по стандарту его нет')
+  else if (pushRead.status !== 405) notes.push(`приём в закрытый набор ответил ${pushRead.status}`)
+
+  /* Единственное число пути — из текста спецификации; тоже должно отвечать. */
+  const single = await ask(`${BASE}/ade/v1/dataset/animals/resources`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify([{ id: '@context' }]),
+  })
+  if (single.status === 404) {
+    fail('адрес приёма в единственном числе не отвечает — в спецификации он написан именно так')
+  }
+
   /* ------------------------------- Итог -------------------------------- */
 
   console.log(
     `Проверено: схема локации, заголовки, отбор по дате события и по дате изменения, ` +
-      `отбор по животному, права, пакетный адрес, закрытая коллекция`,
+      `отбор по животному, права, пакетный адрес, закрытая коллекция, ` +
+      `перечень наборов, лента изменений и метка продолжения`,
   )
 
   if (notes.length) {

@@ -12,6 +12,7 @@ import {
   isAdeCollection,
 } from '@/lib/ade/core'
 import { adeUser } from '@/lib/ade/auth'
+import type { User } from '@/payload-types'
 import { ADE_CODE, adeError, adeErrors, type AdeError } from '@/lib/ade/errors'
 import { allowedLocations, parseLocation } from '@/lib/ade/serve'
 
@@ -111,6 +112,42 @@ export async function adeGate(
   }
 
   return { ok: true, payload, orgId, collection }
+}
+
+/**
+ * Кто спрашивает — без локации в адресе.
+ *
+ * Обмену наборами локация в пути не нужна: клиент не знает про хозяйства
+ * и не должен. Но права те же самые, и берутся они тем же способом —
+ * иначе завелись бы две двери с разными замками, и второй однажды
+ * отстал бы от первого.
+ */
+export type AdeAuth =
+  | { ok: true; payload: Payload; user: User; orgs: number[] }
+  | { ok: false; response: NextResponse }
+
+export async function adeAuth(request: Request): Promise<AdeAuth> {
+  const payload = await getClient()
+  const user = await adeUser(request, payload)
+
+  if (!user) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        adeErrors(
+          adeError(
+            401,
+            ADE_CODE.unauthorized,
+            'Требуется авторизация',
+            'Заголовок Authorization: JWT <токен> или Bearer <токен>.',
+          ),
+        ),
+        { status: 401 },
+      ),
+    }
+  }
+
+  return { ok: true, payload, user, orgs: await allowedLocations(payload, user) }
 }
 
 /**

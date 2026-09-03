@@ -1,7 +1,7 @@
 # Схемы ICAR ADE
 
-Копия из [adewg/ICAR](https://github.com/adewg/ICAR), ветка `ADE-1`,
-коммит `ac55844e9c76acf632436381e6c9bc11804619d7`, под лицензией Apache License 2.0. Файлы не изменялись.
+Копия из [adewg/ICAR](https://github.com/adewg/ICAR), ветка `ADE-1`, коммит `ac55844e9c76acf632436381e6c9bc11804619d7`,
+под лицензией Apache License 2.0. Файлы не изменялись.
 
 Обновление: `npm run ade:schemas` — команда сносит копию и кладёт новую
 целиком. Дополнять её нельзя: файл, удалённый в стандарте, остался бы

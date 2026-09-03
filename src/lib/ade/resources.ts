@@ -163,7 +163,7 @@ export function adeAnimal(a: AnimalInput): AdeResource & Record<string, unknown>
 
   return adeClean({
     resourceType: 'icarAnimalCoreResource',
-    meta: adeMeta({ sourceId: a.uuid ?? a.id, modified: a.updatedAt, created: a.createdAt }),
+    meta: adeMeta({ scope: 'animals', sourceId: a.uuid ?? a.id, modified: a.updatedAt, created: a.createdAt }),
     location: locationOf(a.ownerId),
     identifier: self,
     alternativeIdentifiers: alternatives.length ? alternatives : undefined,
@@ -228,7 +228,7 @@ export function adeTestDayResult(t: MilkTestInput): AdeEvent & Record<string, un
 
   return adeClean({
     resourceType: 'icarTestDayResultEventResource',
-    meta: adeMeta({ sourceId: t.id, modified: t.updatedAt ?? t.date }),
+    meta: adeMeta({ scope: 'test-day-results', sourceId: t.id, modified: t.updatedAt ?? t.date }),
     location: locationOf(t.animal.ownerId),
     id: String(t.id),
     animal: animalIdentifier(t.animal),
@@ -292,7 +292,7 @@ export function adeParturition(c: CalvingInput): AdeEvent & Record<string, unkno
 
   return adeClean({
     resourceType: 'icarReproParturitionEventResource',
-    meta: adeMeta({ sourceId: c.id, modified: c.updatedAt ?? c.date }),
+    meta: adeMeta({ scope: 'parturitions', sourceId: c.id, modified: c.updatedAt ?? c.date }),
     location: locationOf(c.animal.ownerId),
     id: String(c.id),
     animal: animalIdentifier(c.animal),
@@ -404,7 +404,7 @@ export function adeInsemination(i: InseminationInput): AdeEvent & Record<string,
 
   return adeClean({
     resourceType: 'icarReproInseminationEventResource',
-    meta: adeMeta({ sourceId: i.id, modified: i.updatedAt ?? i.date }),
+    meta: adeMeta({ scope: 'inseminations', sourceId: i.id, modified: i.updatedAt ?? i.date }),
     location: locationOf(i.animal.ownerId),
     id: String(i.id),
     animal: animalIdentifier(i.animal),
@@ -505,7 +505,7 @@ export function adeTypeClassification(e: ExteriorInput): AdeEvent & Record<strin
 
   return adeClean({
     resourceType: 'icarTypeClassificationEventResource',
-    meta: adeMeta({ sourceId: e.id, modified: e.updatedAt ?? e.assessedAt }),
+    meta: adeMeta({ scope: 'type-classifications', sourceId: e.id, modified: e.updatedAt ?? e.assessedAt }),
     location: locationOf(e.animal.ownerId),
     id: String(e.id),
     animal: animalIdentifier(e.animal),
@@ -530,7 +530,7 @@ export type WeightInput = {
 export function adeWeight(w: WeightInput): AdeEvent & Record<string, unknown> {
   return adeClean({
     resourceType: 'icarWeightEventResource',
-    meta: adeMeta({ sourceId: w.id, modified: w.updatedAt ?? w.date }),
+    meta: adeMeta({ scope: 'weights', sourceId: w.id, modified: w.updatedAt ?? w.date }),
     location: locationOf(w.animal.ownerId),
     id: String(w.id),
     animal: animalIdentifier(w.animal),
@@ -582,7 +582,7 @@ export function adeBreedingValue(v: BreedingValueInput): AdeResource & Record<st
 
   return adeClean({
     resourceType: 'icarBreedingValueResource',
-    meta: adeMeta({ sourceId: `${v.animal.id}:${v.profileKey}`, modified: v.computedAt }),
+    meta: adeMeta({ scope: 'breeding-values', sourceId: `${v.animal.id}:${v.profileKey}`, modified: v.computedAt }),
     location: locationOf(v.animal.ownerId),
     id: `${animal.id}:${v.profileKey}`,
     animal,
@@ -669,7 +669,7 @@ export function adeArrival(m: MovementInput): AdeEvent & Record<string, unknown>
      * и добросовестный клиент, различающий записи по нему, счёл бы
      * второе событие повтором первого — и потерял бы половину движения.
      */
-    meta: adeMeta({ sourceId: `${m.id}-in`, modified: m.updatedAt ?? m.date }),
+    meta: adeMeta({ scope: 'arrivals', sourceId: m.id, modified: m.updatedAt ?? m.date }),
     location: locationOf(m.toId),
     id: `${m.id}-in`,
     animal: animalIdentifier(m.animal),
@@ -681,7 +681,7 @@ export function adeArrival(m: MovementInput): AdeEvent & Record<string, unknown>
 export function adeDeparture(m: MovementInput): AdeEvent & Record<string, unknown> {
   return adeClean({
     resourceType: 'icarMovementDepartureEventResource',
-    meta: adeMeta({ sourceId: `${m.id}-out`, modified: m.updatedAt ?? m.date }),
+    meta: adeMeta({ scope: 'departures', sourceId: m.id, modified: m.updatedAt ?? m.date }),
     location: locationOf(m.fromId),
     id: `${m.id}-out`,
     animal: animalIdentifier(m.animal),
@@ -700,7 +700,7 @@ export function adeDeparture(m: MovementInput): AdeEvent & Record<string, unknow
 export function adeDeath(m: MovementInput): AdeEvent & Record<string, unknown> {
   return adeClean({
     resourceType: 'icarMovementDeathEventResource',
-    meta: adeMeta({ sourceId: `${m.id}-death`, modified: m.updatedAt ?? m.date }),
+    meta: adeMeta({ scope: 'deaths', sourceId: m.id, modified: m.updatedAt ?? m.date }),
     location: locationOf(m.fromId),
     id: `${m.id}-death`,
     animal: animalIdentifier(m.animal),
@@ -751,7 +751,7 @@ const pregnancyResult = (name: string | null): string => {
 export function adePregnancyCheck(p: PregnancyCheckInput): AdeEvent & Record<string, unknown> {
   return adeClean({
     resourceType: 'icarReproPregnancyCheckEventResource',
-    meta: adeMeta({ sourceId: `${p.id}-pc`, modified: p.updatedAt ?? p.date }),
+    meta: adeMeta({ scope: 'pregnancy-checks', sourceId: p.id, modified: p.updatedAt ?? p.date }),
     location: locationOf(p.animal.ownerId),
     id: `${p.id}-pc`,
     animal: animalIdentifier(p.animal),

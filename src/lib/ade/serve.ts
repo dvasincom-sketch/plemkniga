@@ -381,14 +381,76 @@ export async function serveAdeCollection(
    */
   if (q.animal && animalId === null) return page([], 0)
 
+  const [collection, depth] = SOURCE_OF[name]
+
+  const { docs, total } =
+    name === 'arrivals' || name === 'departures' || name === 'deaths'
+      ? await loadMovements(payload, orgId, q, MOVEMENT_SIDE[name], animalId)
+      : await load(payload, name, collection, orgId, q, depth, animalId)
+
+  return page(adeMapDocs(name, docs), total)
+}
+
+/**
+ * Из какой коллекции книги берётся каждый раздел стандарта.
+ *
+ * Таблицей, а не одиннадцатью ветками с именами внутри. Пока имя
+ * коллекции стояло в каждой ветке отдельно, туда же попадало и второе
+ * имя — то, которым раздел зовётся снаружи, — и однажды они разошлись:
+ * в разбор условий уходило `milk-tests` вместо `test-day-results`,
+ * и отбор по дате молча переставал работать. Одно место — одна пара имён.
+ *
+ * Второе число — глубина связей. У проверки стельности она двойка:
+ * результат теста лежит справочником, и без второго уровня оттуда
+ * приедет номер вместо названия.
+ */
+const SOURCE_OF: Record<AdeCollectionName, [collection: string, depth: number]> = {
+  animals: ['animals', 1],
+  'test-day-results': ['milk-tests', 1],
+  parturitions: ['calvings', 1],
+  inseminations: ['inseminations', 1],
+  'type-classifications': ['animal-exteriors', 1],
+  weights: ['weighings', 1],
+  'breeding-values': ['index-values', 1],
+  'pregnancy-checks': ['inseminations', 2],
+  /*
+   * У перемещений владелец берётся не от животного, а от самой записи,
+   * и это единственное место, где так.
+   *
+   * Причина в том, что перемещение — событие про смену владельца.
+   * Спросив «чьё животное», мы получили бы нового владельца и отдали
+   * бы продажу только покупателю: у продавца в книге не осталось бы
+   * следа, что корова у него была. Спрашивать надо стороны сделки,
+   * а их две, и каждая видит свою.
+   */
+  arrivals: ['movements', 1],
+  departures: ['movements', 1],
+  deaths: ['movements', 1],
+}
+
+const MOVEMENT_SIDE = { arrivals: 'in', departures: 'out', deaths: 'death' } as const
+
+/**
+ * Записи книги в ресурсы стандарта.
+ *
+ * Отделено от выборки, потому что выбирают их двумя разными способами:
+ * по локации с постраничным обходом — и лентой изменений, где порядок
+ * задаётся временем правки. Отображение при этом обязано быть одним
+ * и тем же: две копии разошлись бы, и один и тот же отёл приезжал бы
+ * партнёру по-разному в зависимости от того, каким путём он его забрал.
+ */
+export function adeMapDocs(
+  name: AdeCollectionName,
+  docs: Record<string, unknown>[],
+): Record<string, unknown>[] {
   switch (name) {
     case 'animals': {
-      const { docs, total } = await load(payload, 'animals', 'animals', orgId, q, 1, animalId)
-      return page(docs.map((d) => adeAnimal(animalInput(d))), total)
+
+      return docs.map((d) => adeAnimal(animalInput(d)))
     }
 
     case 'test-day-results': {
-      const { docs, total } = await load(payload, 'test-day-results', 'milk-tests', orgId, q, 1, animalId)
+
       const out = docs.flatMap((d) => {
         const animal = animalOf(d)
         if (!animal) return []
@@ -405,11 +467,11 @@ export async function serveAdeCollection(
           }),
         ]
       })
-      return page(out, total)
+      return out
     }
 
     case 'parturitions': {
-      const { docs, total } = await load(payload, 'parturitions', 'calvings', orgId, q, 1, animalId)
+
       const out = docs.flatMap((d) => {
         const animal = animalOf(d)
         /*
@@ -432,11 +494,11 @@ export async function serveAdeCollection(
           }),
         ]
       })
-      return page(out, total)
+      return out
     }
 
     case 'inseminations': {
-      const { docs, total } = await load(payload, 'inseminations', 'inseminations', orgId, q, 1, animalId)
+
       const out = docs.flatMap((d) => {
         const animal = animalOf(d)
         if (!animal) return []
@@ -455,11 +517,11 @@ export async function serveAdeCollection(
           }),
         ]
       })
-      return page(out, total)
+      return out
     }
 
     case 'type-classifications': {
-      const { docs, total } = await load(payload, 'type-classifications', 'animal-exteriors', orgId, q, 1, animalId)
+
       const out = docs.flatMap((d) => {
         const animal = animalOf(d)
         if (!animal) return []
@@ -475,11 +537,11 @@ export async function serveAdeCollection(
           }),
         ]
       })
-      return page(out, total)
+      return out
     }
 
     case 'weights': {
-      const { docs, total } = await load(payload, 'weights', 'weighings', orgId, q, 1, animalId)
+
       const out = docs.flatMap((d) => {
         const animal = animalOf(d)
         if (!animal || typeof d.weight !== 'number') return []
@@ -493,11 +555,11 @@ export async function serveAdeCollection(
           }),
         ]
       })
-      return page(out, total)
+      return out
     }
 
     case 'breeding-values': {
-      const { docs, total } = await load(payload, 'breeding-values', 'index-values', orgId, q, 1, animalId)
+
       const out = docs.flatMap((d) => {
         const animal = animalOf(d)
         if (!animal) return []
@@ -513,49 +575,26 @@ export async function serveAdeCollection(
           }),
         ]
       })
-      return page(out, total)
+      return out
     }
-    /* ---------------------------------------------------------- *
-     *  Движение                                                  *
-     * ---------------------------------------------------------- */
 
-    /*
-     * У перемещений владелец берётся не от животного, а от самой записи,
-     * и это единственное место, где так.
-     *
-     * Причина в том, что перемещение — событие про смену владельца.
-     * Спросив «чьё животное», мы получили бы нового владельца и отдали
-     * бы продажу только покупателю: у продавца в книге не осталось бы
-     * следа, что корова у него была. Спрашивать надо стороны сделки,
-     * а их две, и каждая видит свою.
-     */
     case 'arrivals': {
-      const { docs, total } = await loadMovements(payload, orgId, q, 'in', animalId)
-      return page(docs.flatMap((d) => movementOf(d, (m) => adeArrival(m))), total)
+
+      return docs.flatMap((d) => movementOf(d, (m) => adeArrival(m)))
     }
 
     case 'departures': {
-      const { docs, total } = await loadMovements(payload, orgId, q, 'out', animalId)
-      return page(docs.flatMap((d) => movementOf(d, (m) => adeDeparture(m))), total)
+
+      return docs.flatMap((d) => movementOf(d, (m) => adeDeparture(m)))
     }
 
     case 'deaths': {
-      const { docs, total } = await loadMovements(payload, orgId, q, 'death', animalId)
-      return page(docs.flatMap((d) => movementOf(d, (m) => adeDeath(m))), total)
+
+      return docs.flatMap((d) => movementOf(d, (m) => adeDeath(m)))
     }
 
-    /* ---------------------------------------------------------- *
-     *  Проверка стельности                                       *
-     * ---------------------------------------------------------- */
-
-    /*
-     * Своей записи у проверки нет: она живёт при осеменении двумя полями —
-     * дата теста и результат. Отдаются только те осеменения, у которых
-     * дата теста проставлена: осеменение без теста — это не проверка
-     * с неизвестным исходом, а проверка, которой не было.
-     */
     case 'pregnancy-checks': {
-      const { docs, total } = await load(payload, 'pregnancy-checks', 'inseminations', orgId, q, 2, animalId)
+
       const out = docs.flatMap((d) => {
         const animal = animalOf(d)
         if (!animal || !d.pregnancyCheckDate) return []
@@ -570,9 +609,8 @@ export async function serveAdeCollection(
           }),
         ]
       })
-      return page(out, total)
+      return out
     }
-
   }
 }
 

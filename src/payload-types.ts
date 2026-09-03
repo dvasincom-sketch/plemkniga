@@ -76,6 +76,7 @@ export interface Config {
     inseminations: Insemination;
     'milk-tests': MilkTest;
     weighings: Weighing;
+    'ade-tombstones': AdeTombstone;
     'health-events': HealthEvent;
     'animal-evaluations': AnimalEvaluation;
     'animal-exteriors': AnimalExterior;
@@ -137,6 +138,7 @@ export interface Config {
     inseminations: InseminationsSelect<false> | InseminationsSelect<true>;
     'milk-tests': MilkTestsSelect<false> | MilkTestsSelect<true>;
     weighings: WeighingsSelect<false> | WeighingsSelect<true>;
+    'ade-tombstones': AdeTombstonesSelect<false> | AdeTombstonesSelect<true>;
     'health-events': HealthEventsSelect<false> | HealthEventsSelect<true>;
     'animal-evaluations': AnimalEvaluationsSelect<false> | AnimalEvaluationsSelect<true>;
     'animal-exteriors': AnimalExteriorsSelect<false> | AnimalExteriorsSelect<true>;
@@ -1560,6 +1562,30 @@ export interface Weighing {
   createdAt: string;
 }
 /**
+ * Следы удалённых записей — нужны ленте изменений обмена
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ade-tombstones".
+ */
+export interface AdeTombstone {
+  id: number;
+  /**
+   * Имя раздела стандарта: animals, test-day-results и прочие
+   */
+  dataset: string;
+  /**
+   * Ровно тот, под которым ресурс уезжал в обмен
+   */
+  sourceId: string;
+  /**
+   * Пусто, если определить не удалось: тогда видно всем
+   */
+  location?: (number | null) | Organization;
+  deletedAt: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "health-events".
  */
@@ -2585,6 +2611,10 @@ export interface PayloadLockedDocument {
         value: number | Weighing;
       } | null)
     | ({
+        relationTo: 'ade-tombstones';
+        value: number | AdeTombstone;
+      } | null)
+    | ({
         relationTo: 'health-events';
         value: number | HealthEvent;
       } | null)
@@ -3387,6 +3417,18 @@ export interface WeighingsSelect<T extends boolean = true> {
         source?: T;
         sourceId?: T;
       };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "ade-tombstones_select".
+ */
+export interface AdeTombstonesSelect<T extends boolean = true> {
+  dataset?: T;
+  sourceId?: T;
+  location?: T;
+  deletedAt?: T;
   updatedAt?: T;
   createdAt?: T;
 }
