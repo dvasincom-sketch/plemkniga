@@ -48,7 +48,12 @@ function Icon({ children }: { children: React.ReactNode }) {
       strokeWidth={1.6}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="h-7 w-7 flex-none text-forest-500"
+      /*
+         Сорок два пиксела — высота двух строк заголовка карточки.
+         Значок стоит слева от заголовка, и меньший терялся бы рядом
+         с двумя строками текста, а больший перевешивал бы их.
+      */
+      className="h-[42px] w-[42px] flex-none text-forest-500"
       aria-hidden="true"
     >
       {children}
@@ -148,15 +153,26 @@ export function LayersArt({ labels, title }: { labels: string[]; title: string }
   ]
 
   return (
+    /*
+       Пирамида тянется на всю высоту соседнего блока.
+
+       Три полосы занимали половину высоты карточек справа, и под ними
+       оставалось пустое поле — читалось это не как «схема кончилась»,
+       а как «что-то не догрузилось». Полосы делят высоту поровну
+       и упираются в те же края, что и текст рядом.
+
+       Ширина при этом по-прежнему разная, и она-то и несёт смысл:
+       охват. Тянется высота, а не ширина.
+    */
     <div
       role="img"
       aria-label={`${title}: ${labels.join(', ')}`}
-      className="flex w-full max-w-[320px] flex-col items-center gap-2"
+      className="flex h-full w-full max-w-[320px] flex-col items-center gap-2"
     >
       {rows.map((row, i) => (
         <div
           key={row.width}
-          className={`${row.width} ${row.box} rounded-lg px-3 py-2.5 text-center`}
+          className={`${row.width} ${row.box} flex flex-1 items-center justify-center rounded-lg px-3 py-2.5 text-center`}
         >
           {/*
              Настоящий текст, а не подпись внутри рисунка: он переносится
@@ -196,37 +212,17 @@ function Arrow() {
 }
 
 /**
- * Узел схемы, при желании с подписью под ним.
+ * Узел схемы — плашка с названием.
  *
- * Подпись — не пояснение узла, а его **исход**: то, что бывает с записью
- * в этом месте и о чём схема иначе умалчивает. У проверок исход бывает
- * обратный — запись возвращается в хозяйство, — и без этой подписи схема
- * читалась как труба, по которой всё едет в одну сторону и всегда
- * доезжает. Это неправда, и неправда в нашу пользу, что хуже вдвойне.
+ * Подпись-исход жила здесь и переехала к месту вызова: у проверок она
+ * стоит сбоку, у книги под ней, и общего правила «подпись снизу»
+ * не осталось. Держать в узле то, чем пользуется один случай из шести,
+ * значит прятать разницу между случаями.
  */
-function Node({
-  label,
-  accent = false,
-  note,
-}: {
-  label?: string
-  accent?: boolean
-  note?: string
-}) {
+function Node({ label }: { label?: string }) {
   return (
-    <div className="flex-none lg:w-[136px]">
-      <div
-        className={`rounded-xl px-4 py-3 text-center text-[13px] leading-snug ${
-          accent
-            ? 'bg-forest-500 font-medium text-white'
-            : 'border border-ink-100 bg-white text-ink-700'
-        }`}
-      >
-        {label}
-      </div>
-      {note && (
-        <p className="mt-2 text-center text-[11px] leading-snug text-ink-400">{note}</p>
-      )}
+    <div className="w-full rounded-xl border border-ink-100 bg-white px-4 py-3 text-center text-[13px] leading-snug text-ink-700">
+      {label}
     </div>
   )
 }
@@ -252,66 +248,93 @@ export function FlowArt({
 }: {
   nodes: string[]
   title: string
-  /** Исходы у проверок и у книги — см. `Node`. */
+  /** Исходы у проверок и у книги. */
   marks?: { checks: string; book: string }
 }) {
   const [farm, checks, book, registry, buyer, exchange] = nodes
 
   return (
-    <div role="img" aria-label={`${title}: ${nodes.join(' → ')}`}>
-      <div className="flex flex-col items-stretch gap-2 lg:flex-row lg:items-start lg:gap-3">
+    <div role="img" aria-label={`${title}: ${nodes.join(' → ')}`} className="mx-auto max-w-[560px]">
+      {/*
+         Схема идёт сверху вниз, а не слева направо.
+
+         ## Почему пересобрана
+
+         Горизонтальная редакция ломалась о собственный замысел. Возврат
+         от проверок к хозяйству рисовался чертой под первыми двумя
+         узлами, и черта эта жила отдельной жизнью: на широком экране
+         висела пустым прямоугольником, на узком исчезала вместе
+         со смыслом. Три адресата справа при этом оказывались втрое выше
+         остальных узлов, и строка разъезжалась по вертикали.
+
+         ## Почему сверху вниз лучше
+
+         Развилка внизу — естественная фигура: одно расходится
+         на несколько, и рисовать её не надо, она получается сама
+         из ряда. Возврат становится боковой пометкой у своего узла,
+         а не отдельной чертой через всю схему. И главное: узкий экран
+         больше не отдельный случай — порядок один и тот же, меняются
+         только отступы.
+
+         Книга посередине во всю ширину, потому что через неё проходит
+         всё: это единственный узел, который нельзя обойти.
+      */}
+      <div className="flex flex-col items-center gap-1">
         <Node label={farm} />
-        <Arrow />
-        <Node label={checks} note={marks?.checks} />
-        <Arrow />
-        <Node label={book} accent note={marks?.book} />
-        <Arrow />
+        <Down />
+
+        <div className="flex w-full items-center justify-center gap-3">
+          <div className="w-[136px] flex-none">
+            <Node label={checks} />
+          </div>
+          {marks?.checks && (
+            <p className="max-w-[22ch] text-[11px] leading-snug text-ink-400">
+              <span aria-hidden="true">↩ </span>
+              {marks.checks}
+            </p>
+          )}
+        </div>
+
+        <Down />
+
+        <div className="w-full rounded-xl bg-forest-500 px-4 py-3 text-center text-[14px] font-medium text-white">
+          {book}
+        </div>
+        {marks?.book && (
+          <p className="mt-1 text-[11px] leading-snug text-ink-400">{marks.book}</p>
+        )}
+
+        <Down />
 
         {/*
-           Адресатов три, а не два, и это не расширение списка ради полноты.
-           Первый экран страницы обещает ровно три стороны — реестр,
-           покупатель, международный обмен, — а схема ниже показывала две.
-           Расхождение между обещанием и картинкой читатель списывает
-           не на невнимательность вёрстки, а на невнимательность продукта.
-
-           Черта слева и есть раздвоение. Рисовать настоящую вилку линиями
-           пришлось бы в SVG — и вернуться к фиксированной ширине, из-за
-           которой схема и переехала в вёрстку.
+           Три адресата в ряд, а не столбцом: столбец читался бы как
+           очередь, а они получают запись одновременно и независимо.
         */}
-        <div className="flex flex-col gap-2 border-ink-100 pl-4 lg:border-l">
+        <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-3">
           <Node label={registry} />
           <Node label={buyer} />
           <Node label={exchange} />
         </div>
       </div>
-
-      {/*
-         Возврат нарисован, а не только назван словами.
-
-         Подпись под проверками говорит, что несошедшаяся запись уходит
-         обратно, но глаз читает стрелки, а все стрелки шли вправо. Черта
-         с наконечником влево, стоящая под первыми двумя узлами, замыкает
-         путь: видно, что дорога не в одну сторону.
-
-         На узком экране черты нет — там узлы стоят столбцом, и «влево»
-         не значит ничего. Подпись при этом остаётся, и смысл не теряется.
-      */}
-      <div className="mt-2 hidden lg:block" aria-hidden="true">
-        <div className="w-[292px] rounded-b-xl border-b border-l border-r border-ink-100 pb-1">
-          <svg
-            viewBox="0 0 12 10"
-            className="ml-1 h-2.5 w-3 -translate-y-[5px] text-ink-300"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={1.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M6 1L1 5l5 4" />
-          </svg>
-        </div>
-      </div>
     </div>
+  )
+}
+
+/** Стрелка вниз между ярусами схемы. */
+function Down() {
+  return (
+    <svg
+      viewBox="0 0 12 24"
+      className="my-1 h-5 w-3 flex-none text-ink-300"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M6 1v20M1 16l5 5 5-5" />
+    </svg>
   )
 }
 

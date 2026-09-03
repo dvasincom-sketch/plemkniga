@@ -327,7 +327,7 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
             {s.layers.lead}
           </p>
 
-          <div className="mt-8 grid grid-cols-1 items-start gap-10 lg:grid-cols-[320px_1fr]">
+          <div className="mt-8 grid grid-cols-1 items-stretch gap-10 lg:grid-cols-[320px_1fr]">
             <LayersArt
               title={s.layers.title}
               labels={s.layers.items.map((i) => i.title)}
@@ -399,9 +399,24 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
                   key={item.title}
                   className="rounded-2xl bg-white p-6 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)]"
                 >
-                  {Glyph && <Glyph />}
-                  <h3 className="mt-4 text-[17px] font-medium leading-tight">{item.title}</h3>
-                  <p className="mt-2 text-[14px] leading-relaxed text-ink-500">{item.body}</p>
+                  {/*
+                     Значок слева от заголовка, а не над ним.
+
+                     Сверху он съедал строку высоты у всех шести карточек
+                     разом и отодвигал заголовок от верхнего края: взгляд
+                     шёл через пустое поле. Рядом с заголовком он читается
+                     вместе с ним, одним движением.
+
+                     Высота значка равна двум строкам заголовка — той
+                     мере, по которой карточки и различаются: у одних
+                     заголовок в строку, у других в две, и значок держит
+                     общую высоту шапки.
+                  */}
+                  <div className="flex items-center gap-4">
+                    {Glyph && <Glyph />}
+                    <h3 className="text-[17px] font-medium leading-tight">{item.title}</h3>
+                  </div>
+                  <p className="mt-4 text-[14px] leading-relaxed text-ink-500">{item.body}</p>
                 </div>
               )
             })}
@@ -601,40 +616,51 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
               */
               <div
                 key={who.title}
-                className="flex items-start gap-5 rounded-2xl border border-ink-100 bg-white p-6"
+                className="rounded-2xl bg-white p-6 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] sm:p-8"
               >
                 {/*
+                   Карточка собрана как карточки возможностей: рисунок
+                   слева, заголовок справа, текст под ними во всю ширину.
+
+                   Прежняя редакция ставила рисунок и текст в две колонки
+                   целиком, и текст сжимался до сорока знаков в строке —
+                   вдвое уже меры, принятой на странице. Читать такой
+                   столбец тяжело, а рисунок при этом висел на уровне
+                   первой строки и с остальными четырьмя не соотносился.
+
                    Рисунки разные не для украшения: у хозяйства один лист,
                    и в нём видна каждая корова; у объединения листов много,
-                   и они сходятся в один. Разница рисунков и есть содержание
-                   раздела: два читателя с разными вопросами.
+                   и они сходятся в один. Разница рисунков и есть
+                   содержание раздела.
                 */}
-                <div className="shrink-0">
-                  {i === 0 ? <FarmArt title={who.title} /> : <AssociationArt title={who.title} />}
+                <div className="flex items-center gap-5">
+                  <div className="shrink-0">
+                    {i === 0 ? <FarmArt title={who.title} /> : <AssociationArt title={who.title} />}
+                  </div>
+                  <h3 className="text-[19px] font-medium leading-tight sm:text-[21px]">
+                    {who.title}
+                  </h3>
                 </div>
 
-                <div>
-                  <h3 className="text-[17px] font-medium leading-tight">{who.title}</h3>
-                  <p className="mt-2 text-[15px] leading-relaxed text-ink-500">{who.body}</p>
-                </div>
+                <p className="mt-5 text-[15px] leading-relaxed text-ink-500">{who.body}</p>
               </div>
             ))}
           </div>
         </section>
 
-        {/* --------------------------- На чём построено ------------------------ */}
-        <section className="mt-20 max-w-[70ch]">
-          <h2 className="text-[26px] font-medium leading-tight sm:text-[30px]">
-            {m.standards.title}
-          </h2>
-          <p className="mt-4 text-[16px] leading-relaxed text-ink-700">{m.standards.body}</p>
-          <a
-            href={`${base}/${locale}/compliance`}
-            className="mt-4 inline-block text-[15px] underline underline-offset-4 hover:text-forest-500"
-          >
-            {m.standards.link}
-          </a>
-        </section>
+        {/*
+           Здесь стоял блок «На чём построено» — заголовок, абзац
+           и ссылка на соответствие. Убран как повтор: тот же довод
+           уже сказан полосой о международном стандарте под первым
+           экраном, и она сильнее — стоит раньше, отвечает на возражение
+           «очередной стартап со своим форматом» до того, как оно
+           сформулировано, и ведёт на разбор схем.
+
+           Ссылка на соответствие при этом не потерялась: на него ведут
+           два числа из четырёх на первом экране и подвал витрины.
+           Третий вход в одну и ту же дверь ничего не добавляет, а место
+           между «кому это» и действующей книгой занимает.
+        */}
 
         {/*
            Действующая книга — предпоследним блоком, а не первым.
@@ -699,36 +725,49 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
            Ответ дан числами, а не прилагательными: пород столько-то,
            книг у них ноль.
         */}
-        <section className="mt-20 max-w-[75ch]">
-          <h2 className="text-[26px] font-medium leading-tight sm:text-[30px]">
-            {s.purpose.title}
-          </h2>
-          <p className="mt-4 text-[16px] leading-relaxed text-ink-700">
-            {s.purpose.body
-              .replace(/\{all\}/g, breedNumbers.all)
-              .replace(/\{ready\}/g, breedNumbers.ready)
-              .replace(/\{own\}/g, breedNumbers.own)}
-          </p>
-          <a
-            href={`${base}/${locale}/breeds`}
-            className="mt-4 inline-block text-[15px] font-medium text-forest-600 underline underline-offset-4 hover:text-forest-500"
-          >
-            {s.breeds.link} →
-          </a>
-        </section>
+        {/*
+           Цель работы и приглашение — в одну строку.
 
-        {/* ------------------------------ Как начать --------------------------- */}
-        <section className="mt-20 max-w-[70ch]">
-          <h2 className="text-[26px] font-medium leading-tight sm:text-[30px]">
-            {m.contact.title}
-          </h2>
-          <p className="mt-4 text-[16px] leading-relaxed text-ink-700">{m.contact.body}</p>
-          <a
-            href={`mailto:${PRODUCT_MAIL}`}
-            className="mt-6 inline-block rounded-xl bg-forest-500 px-6 py-3 text-[15px] text-white transition-colors hover:bg-forest-600"
-          >
-            {m.contact.action}
-          </a>
+           Стояли они друг под другом, и между ними на широком экране
+           оставалась пустая половина полотна: оба блока держат меру
+           строки и занимают левую часть. Хуже пустоты был порядок
+           чтения — дочитав «зачем», человек прокручивал дальше
+           и встречал ещё один заголовок там, где ждал конца страницы.
+
+           Рядом они читаются как одно: вот зачем это делается — вот как
+           начать. На узком экране столбец возвращается сам.
+        */}
+        <section className="mt-20 grid grid-cols-1 gap-10 lg:grid-cols-2">
+          <div>
+            <h2 className="text-[26px] font-medium leading-tight sm:text-[30px]">
+              {s.purpose.title}
+            </h2>
+            <p className="mt-4 text-[16px] leading-relaxed text-ink-700">
+              {s.purpose.body
+                .replace(/\{all\}/g, breedNumbers.all)
+                .replace(/\{ready\}/g, breedNumbers.ready)
+                .replace(/\{own\}/g, breedNumbers.own)}
+            </p>
+            <a
+              href={`${base}/${locale}/breeds`}
+              className="mt-4 inline-block text-[15px] font-medium text-forest-600 underline underline-offset-4 hover:text-forest-500"
+            >
+              {s.breeds.link} →
+            </a>
+          </div>
+
+          <div>
+            <h2 className="text-[26px] font-medium leading-tight sm:text-[30px]">
+              {m.contact.title}
+            </h2>
+            <p className="mt-4 text-[16px] leading-relaxed text-ink-700">{m.contact.body}</p>
+            <a
+              href={`mailto:${PRODUCT_MAIL}`}
+              className="mt-6 inline-block rounded-xl bg-forest-500 px-6 py-3 text-[15px] text-white transition-colors hover:bg-forest-600"
+            >
+              {m.contact.action}
+            </a>
+          </div>
         </section>
 
         {!info.reviewed && (
