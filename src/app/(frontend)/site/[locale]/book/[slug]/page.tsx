@@ -5,6 +5,7 @@ import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
 import { BOOK_FEATURES, featureBySlug } from '@/lib/book-features'
+import { CertificateArt } from '@/components/site/CertificateArt'
 import { BOOK_URL, PRODUCT_MAIL } from '@/lib/hosts'
 
 export const metadata: Metadata = { title: 'Раздел книги' }
@@ -70,6 +71,26 @@ export default async function BookFeaturePage({
             </p>
           ))}
         </section>
+
+        {/*
+           Документ — единственное, что уходит из книги наружу и попадает
+           в руки покупателю. Про него спрашивают первым, и словами
+           («выдаём свидетельство») этот вопрос не закрывается: выдают все.
+           Показанный бланк отвечает сразу — что в нём есть, по какой форме
+           он сделан и чем проверяется.
+        */}
+        {feature.slug === 'documents' && (
+          <section className="mt-10">
+            <div className="max-w-[75ch]">
+              <CertificateArt />
+            </div>
+            <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
+              Разделы, подписи и единицы — из настоящего бланка; значения показаны для примера.
+              Рисунок, а не снимок: в выпущенном документе стоят настоящие животные
+              и настоящие хозяйства, и на витрине им не место.
+            </p>
+          </section>
+        )}
 
         {/*
            Пределы — отдельным блоком и другим цветом. Смешанные с общим
