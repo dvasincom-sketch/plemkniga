@@ -28,13 +28,28 @@ import type { Locale } from '@/lib/i18n/locales'
  * правило, по которому построена главная (`site-messages.ts`).
  */
 
-export type PageKey = 'compliance' | 'icar' | 'ade' | 'breeds' | 'api'
+export type PageKey = 'compliance' | 'icar' | 'ade' | 'breeds' | 'api' | 'org'
 
 export type PageFrame = { eyebrow: string; title: string; lead: string }
 
 export type PageMessages = {
   /** Подписи разделов продукта — в шапке и подвале. */
-  nav: { about: string; breeds: string; compliance: string; api: string; language: string }
+  /**
+   * Подписи разделов продукта — в шапке и подвале.
+   *
+   * `org` и `evolution` появились, когда четыре витринных раздела ушли
+   * из подвала книги. Подписи переведены, содержание — нет, и это
+   * то же честное состояние, что у разборов ниже.
+   */
+  nav: {
+    about: string
+    breeds: string
+    compliance: string
+    api: string
+    org: string
+    evolution: string
+    language: string
+  }
   /** Пометка о языке разбора. У русского её нет. */
   notice: string | null
   /**
@@ -55,6 +70,8 @@ const ru: PageMessages = {
     breeds: 'Породы',
     compliance: 'Соответствие',
     api: 'API',
+    org: 'Об организации',
+    evolution: 'Эволюция продукта',
     language: 'Язык',
   },
   notice: null,
@@ -89,11 +106,16 @@ const ru: PageMessages = {
       title: 'REST API книги',
       lead: 'Описание собирается из тех же настроек, из которых работает сам интерфейс: разойтись им негде.',
     },
+    org: {
+      eyebrow: 'Организация',
+      title: 'Кто содержит платформу',
+      lead: 'Автономная некоммерческая организация: какая цель записана в уставе, почему у неё нет членства и на что она живёт.',
+    },
   },
 }
 
 const en: PageMessages = {
-  nav: { about: 'About', breeds: 'Breeds', compliance: 'Compliance', api: 'API', language: 'Language' },
+  nav: { about: 'About', breeds: 'Breeds', compliance: 'Compliance', api: 'API', org: 'Organisation', evolution: 'Product evolution', language: 'Language' },
   notice:
     'The detailed analysis below is in Russian. Translating regulatory prose without a native speaker would do more harm than an honest note.',
   trust: {
@@ -127,11 +149,16 @@ const en: PageMessages = {
       title: 'The book’s REST API',
       lead: 'The description is generated from the same configuration the API itself runs on, so the two cannot drift apart.',
     },
+    org: {
+      eyebrow: 'Organisation',
+      title: 'Who runs the platform',
+      lead: 'An autonomous non-profit organisation: the purpose written into its charter, why it has no membership, and what it lives on.',
+    },
   },
 }
 
 const kk: PageMessages = {
-  nav: { about: 'Өнім туралы', breeds: 'Тұқымдар', compliance: 'Сәйкестік', api: 'API', language: 'Тіл' },
+  nav: { about: 'Өнім туралы', breeds: 'Тұқымдар', compliance: 'Сәйкестік', api: 'API', org: 'Ұйым туралы', evolution: 'Өнім эволюциясы', language: 'Тіл' },
   notice:
     'Төмендегі толық талдау орыс тілінде. Нормативтік мәтінді ана тілі иесінсіз аудару — адал ескертуден гөрі зияндырақ.',
   trust: {
@@ -165,11 +192,16 @@ const kk: PageMessages = {
       title: 'Кітаптың REST API-і',
       lead: 'Сипаттама интерфейстің өзі жұмыс істейтін баптаулардан жиналады: олардың арасы ажырамайды.',
     },
+    org: {
+      eyebrow: 'Ұйым',
+      title: 'Платформаны кім ұстайды',
+      lead: 'Автономды коммерциялық емес ұйым: жарғысында қандай мақсат жазылған, неге мүшелігі жоқ және немен күн көреді.',
+    },
   },
 }
 
 const hy: PageMessages = {
-  nav: { about: 'Ապրանքի մասին', breeds: 'Ցեղեր', compliance: 'Համապատասխանություն', api: 'API', language: 'Լեզու' },
+  nav: { about: 'Ապրանքի մասին', breeds: 'Ցեղեր', compliance: 'Համապատասխանություն', api: 'API', org: 'Կազմակերպությունը', evolution: 'Ապրանքի զարգացումը', language: 'Լեզու' },
   notice:
     'Ստորև բերված մանրամասն վերլուծությունը ռուսերեն է։ Կարգավորող տեքստը մայրենի լեզվի կրողի մասնակցությամբ չթարգմանելը ավելի վնասակար կլիներ, քան ազնիվ նշումը։',
   trust: {
@@ -203,11 +235,16 @@ const hy: PageMessages = {
       title: 'Մատյանի REST API',
       lead: 'Նկարագրությունը հավաքվում է նույն կարգավորումներից, որոնցով աշխատում է ինտերֆեյսը։',
     },
+    org: {
+      eyebrow: 'Կազմակերպություն',
+      title: 'Ով է պահում հարթակը',
+      lead: 'Ինքնավար ոչ առևտրային կազմակերպություն. ինչ նպատակ է գրված կանոնադրության մեջ, ինչու անդամություն չունի և ինչով է ապրում։',
+    },
   },
 }
 
 const be: PageMessages = {
-  nav: { about: 'Пра прадукт', breeds: 'Пароды', compliance: 'Адпаведнасць', api: 'API', language: 'Мова' },
+  nav: { about: 'Пра прадукт', breeds: 'Пароды', compliance: 'Адпаведнасць', api: 'API', org: 'Пра арганізацыю', evolution: 'Эвалюцыя прадукту', language: 'Мова' },
   notice:
     'Падрабязны разбор ніжэй — па-руску. Перакладаць нарматыўны тэкст без носьбіта мовы шкодней, чым сумленная паметка.',
   trust: {
@@ -241,11 +278,16 @@ const be: PageMessages = {
       title: 'REST API кнігі',
       lead: 'Апісанне збіраецца з тых самых наладаў, з якіх працуе сам інтэрфейс.',
     },
+    org: {
+      eyebrow: 'Арганізацыя',
+      title: 'Хто ўтрымлівае платформу',
+      lead: 'Аўтаномная некамерцыйная арганізацыя: якая мэта запісана ў статуце, чаму ў яе няма сяброўства і на што яна жыве.',
+    },
   },
 }
 
 const ky: PageMessages = {
-  nav: { about: 'Продукт жөнүндө', breeds: 'Тукумдар', compliance: 'Дал келүү', api: 'API', language: 'Тил' },
+  nav: { about: 'Продукт жөнүндө', breeds: 'Тукумдар', compliance: 'Дал келүү', api: 'API', org: 'Уюм жөнүндө', evolution: 'Продукттун эволюциясы', language: 'Тил' },
   notice:
     'Төмөндөгү толук талдоо орус тилинде. Ченемдик текстти эне тилинин ээсисиз которуу адал эскертүүдөн көрө зыяндуу.',
   trust: {
@@ -278,6 +320,11 @@ const ky: PageMessages = {
       eyebrow: 'Интерфейс',
       title: 'Китептин REST API',
       lead: 'Сүрөттөмө интерфейстин өзү иштеген жөндөөлөрдөн чогултулат.',
+    },
+    org: {
+      eyebrow: 'Уюм',
+      title: 'Платформаны ким кармайт',
+      lead: 'Автономдуу коммерциялык эмес уюм: уставда кандай максат жазылган, эмне үчүн мүчөлүгү жок жана эмне менен жашайт.',
     },
   },
 }

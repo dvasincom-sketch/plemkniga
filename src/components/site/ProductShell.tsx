@@ -4,6 +4,7 @@ import { LocaleSwitcher } from '@/components/LocaleSwitcher'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { LOCALE_CODES, type Locale } from '@/lib/i18n/locales'
 import { BOOK_URL, PRODUCT_MAIL } from '@/lib/hosts'
+import { PLATFORM } from '@/lib/platform'
 
 /**
  * Обвязка страниц продукта: шапка и подвал витринного домена.
@@ -125,6 +126,15 @@ export function ProductFooter({ lang = 'ru' }: { lang?: Locale }) {
     { href: `/${lang}/breeds`, label: l.breeds },
     { href: `/${lang}/compliance`, label: l.compliance },
     { href: `/${lang}/api-docs`, label: l.api },
+    { href: `/${lang}/org`, label: l.org },
+    /*
+     * «Эволюция продукта» переехала сюда из подвала книги вместе
+     * с самой страницей. Адрес без языка, в отличие от соседей:
+     * страница написана по-русски и переводить её мы не беремся —
+     * поставить `/kk/evolution` значило бы пообещать казахский текст
+     * и отдать русский.
+     */
+    { href: '/evolution', label: l.evolution },
     /*
      * Ссылка названа доменом, а не словами «Племенная книга».
      *
@@ -178,6 +188,20 @@ export function ProductFooter({ lang = 'ru' }: { lang?: Locale }) {
           {PRODUCT_MAIL}
         </a>
       </nav>
+
+      {/*
+         Кто содержит систему — отдельной строкой под ссылками.
+
+         В строку ссылок это не встаёт: там разделы, а здесь лицо,
+         и уравнивать их значило бы предложить читателю выбирать между
+         «Породами» и организацией как между двумя страницами. Форма
+         указана короткой (`АНО «ПЛЕМ.ОНЛАЙН»`): полная занимает
+         полстроки и вытесняет всё остальное, а полностью она стоит
+         на самой странице организации.
+      */}
+      <p className="container-page mt-6 text-[13px] text-white/40">
+        © {PLATFORM.since} {PLATFORM.legalShort}
+      </p>
     </footer>
   )
 }

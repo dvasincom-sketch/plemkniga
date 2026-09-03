@@ -1,8 +1,7 @@
 import { currentTenant } from '@/lib/tenant-server'
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { SiteHeader } from '@/components/SiteHeader'
-import { SiteFooter } from '@/components/SiteFooter'
+import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import { EvolutionVersions } from '@/components/EvolutionVersions'
 import { EvolutionStages } from '@/components/EvolutionStages'
 import { EvolutionDocs } from '@/components/EvolutionDocs'
@@ -25,6 +24,25 @@ export const metadata: Metadata = {
 
 /**
  * Эволюция продукта — публичная страница о состоянии платформы.
+ *
+ * ## Почему страница живёт на витрине, а не в книге
+ *
+ * Она рассказывает о **системе**: какие версии выходили, насколько
+ * на неё можно опереться, что будет дальше и как она устроена внутри.
+ * Ни один из этих вопросов не про голштинскую книгу — их задаёт тот,
+ * кто решает, ввязываться ли, то есть читатель витрины.
+ *
+ * Пока страница жила на домене книги, у неё была шапка со знаком
+ * Ассоциации и подвал с самарским адресом: рассказ о нашей платформе
+ * выглядел рассказом чужой организации о себе, и авторство системы
+ * молча приписывалось Ассоциации.
+ *
+ * Плата за переезд названа честно: вкладка «Статус» показывала вошедшему
+ * сами находки, а постороннему — только их счёт. На витринном домене
+ * не входит никто, и подробности теперь не видит и свой. Терпимо:
+ * находки целиком читаются прогоном `npm run check:all`, а страница
+ * и раньше была рассчитана на постороннего.
+ *
  *
  * Четыре вкладки отвечают четырём разным читателям, и объединять их в одну
  * простыню было бы ошибкой. «Версии» — что появлялось и в каком порядке;
@@ -164,7 +182,7 @@ export default async function EvolutionPage({
 
   return (
     <>
-      <SiteHeader />
+      <ProductHeader />
 
       <main className="container-page pb-8">
         <h1 className="max-w-[24ch] text-[38px] font-medium leading-tight sm:text-[46px]">
@@ -221,7 +239,7 @@ export default async function EvolutionPage({
         </div>
       </main>
 
-      <SiteFooter />
+      <ProductFooter />
     </>
   )
 }
