@@ -233,18 +233,43 @@ export function influenceShares(
   base: Base,
 ): { key: TraitKey; share: number }[] {
   const bySd = new Map(base.traits.map((t) => [t.key, t.sd]))
+  /*
+   * Направление признака у экономического профиля обязано попасть
+   * в показ. Вес смертности приплода записан положительным числом,
+   * а расчёт разворачивает его сам — и без этого разворота таблица
+   * влияния показывала бы, что смертность приплода прибавляет денег.
+   *
+   * У селекционного профиля разворот не нужен: там знак ставится
+   * прямо в весе (`bodyComposite: -8`), и второй разворот вернул бы
+   * его обратно.
+   */
   const raw = (Object.entries(profile.weights) as [TraitKey, number][]).map(([key, w]) => ({
     key,
-    value: profile.kind === 'economic' ? (w ?? 0) * (bySd.get(key) ?? 1) : (w ?? 0),
+    value:
+      profile.kind === 'economic'
+        ? (w ?? 0) * (bySd.get(key) ?? 1) * directionOf(key)
+        : (w ?? 0),
   }))
   const sum = raw.reduce((a, r) => a + Math.abs(r.value), 0)
   if (!sum) return raw.map((r) => ({ key: r.key, share: 0 }))
   return raw.map((r) => ({ key: r.key, share: (r.value / sum) * 100 }))
 }
 
+/**
+ * Куда смотрит признак: рост значения — улучшение или ухудшение.
+ *
+ * Живёт здесь, а не в каждом месте показа: разворот нужен и весам,
+ * и таблице влияния, и витринной странице разбора, и разойтись им
+ * нельзя — иначе одно и то же число будет с разным знаком на соседних
+ * экранах.
+ */
+const directionOf = (key: TraitKey): number =>
+  TRAIT_BASE.find((t) => t.key === key)?.inverted ? -1 : 1
+
 export function sharesOf(profile: IndexProfile): { key: TraitKey; share: number }[] {
   const entries = Object.entries(profile.weights) as [TraitKey, number][]
-  if (profile.kind === 'economic') return entries.map(([key, w]) => ({ key, share: w }))
+  if (profile.kind === 'economic')
+    return entries.map(([key, w]) => ({ key, share: (w ?? 0) * directionOf(key) }))
   const sum = entries.reduce((a, [, w]) => a + Math.abs(w ?? 0), 0)
   if (!sum) return entries.map(([key]) => ({ key, share: 0 }))
   return entries.map(([key, w]) => ({ key, share: ((w ?? 0) / sum) * 100 }))
