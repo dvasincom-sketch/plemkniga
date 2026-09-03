@@ -11,7 +11,7 @@ import { PRODUCT_MESSAGES } from '@/lib/i18n/product-messages'
 import { SITE_MESSAGES } from '@/lib/i18n/site-messages'
 import { LOCALE_CODES, isLocale, localeInfo, type Locale } from '@/lib/i18n/locales'
 import { BOOK_URL, PRODUCT_MAIL, SITE_PREFIX, isSiteHost } from '@/lib/hosts'
-import { loadBreedCatalog } from '@/lib/breeds-catalog-server'
+import { breedCatalog } from '@/lib/breeds-catalog-server'
 import { countByState, type BreedRow } from '@/lib/breeds-catalog'
 
 /**
@@ -110,7 +110,7 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
    * порознь, они разойдутся, и читатель, сверивший главную со страницей
    * пород, перестанет верить обеим.
    */
-  const breeds = await loadBreedCatalog()
+  const breeds = breedCatalog()
   const breedCount = countByState(breeds)
   const breedNumbers = {
     all: String(breeds.length),
@@ -189,7 +189,7 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
             <strong className="font-medium text-ink-900">{s.standard.title}.</strong>{' '}
             {s.standard.body.replace('{n}', String(ADE_MAP.used))}{' '}
             <a
-              href={`${base}/ade`}
+              href={`${base}/${locale}/ade`}
               className="whitespace-nowrap font-medium text-forest-600 underline underline-offset-4 hover:text-forest-500"
             >
               {s.standard.link} →
@@ -322,7 +322,7 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
                 .replace(/\{own\}/g, breedNumbers.own)}
             </p>
             <a
-              href={`${base}/breeds`}
+              href={`${base}/${locale}/breeds`}
               className="mt-4 inline-block text-[15px] font-medium text-forest-600 underline underline-offset-4 hover:text-forest-500"
             >
               {s.breeds.link} →
@@ -374,6 +374,31 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
           <p className="mt-4 max-w-[70ch] text-[14px] leading-relaxed text-ink-500">
             {s.screen.note}
           </p>
+
+          {/*
+             Перечень разделов идёт сразу за нарисованной карточкой.
+
+             Карточка отвечает на вопрос «как это выглядит» и молчит
+             о том, что в книге есть. Читатель, дошедший сюда, второй
+             вопрос уже задал: он видел шесть возможностей общими
+             словами и хочет знать, из чего книга состоит. Ответ —
+             разделы работающего кабинета, а не достоинства.
+          */}
+          <h3 className="mt-12 text-[20px] font-medium leading-tight sm:text-[22px]">
+            {s.inside.title}
+          </h3>
+          <p className="mt-3 max-w-[70ch] text-[15px] leading-relaxed text-ink-500">
+            {s.inside.lead}
+          </p>
+
+          <div className="mt-6 grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+            {s.inside.items.map((item) => (
+              <div key={item.title} className="border-t border-ink-100 pt-4">
+                <h4 className="text-[15px] font-medium leading-snug">{item.title}</h4>
+                <p className="mt-1.5 text-[14px] leading-relaxed text-ink-500">{item.body}</p>
+              </div>
+            ))}
+          </div>
         </section>
 
         {/* ----------------------- Чего система не делает ---------------------- */}
@@ -419,7 +444,7 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
           </h2>
           <p className="mt-4 text-[16px] leading-relaxed text-ink-700">{m.standards.body}</p>
           <a
-            href={`${base}/compliance`}
+            href={`${base}/${locale}/compliance`}
             className="mt-4 inline-block text-[15px] underline underline-offset-4 hover:text-forest-500"
           >
             {m.standards.link}
@@ -470,7 +495,7 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
               </a>
             )}
             <a
-              href={`${base}/compliance`}
+              href={`${base}/${locale}/compliance`}
               className="text-[15px] text-white/80 underline underline-offset-4 transition-colors hover:text-white"
             >
               {s.footer.note}
@@ -523,13 +548,13 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
             {s.book.cta}
           </a>
           <a
-            href={`${base}/compliance`}
+            href={`${base}/${locale}/compliance`}
             className="text-white/50 underline underline-offset-4 transition-colors hover:text-white"
           >
             {s.footer.note}
           </a>
           <a
-            href={`${base}/api-docs`}
+            href={`${base}/${locale}/api-docs`}
             className="text-white/50 underline underline-offset-4 transition-colors hover:text-white"
           >
             API

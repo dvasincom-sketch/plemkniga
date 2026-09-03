@@ -1,5 +1,8 @@
 import Link from 'next/link'
 import { PlemLogo } from '@/components/PlemLogo'
+import { LocaleSwitcher } from '@/components/LocaleSwitcher'
+import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
+import { LOCALE_CODES, type Locale } from '@/lib/i18n/locales'
 import { BOOK_URL, PRODUCT_MAIL } from '@/lib/hosts'
 
 /**
@@ -40,7 +43,24 @@ import { BOOK_URL, PRODUCT_MAIL } from '@/lib/hosts'
  * которых не существует.
  */
 
-export function ProductHeader({ children }: { children?: React.ReactNode }) {
+export function ProductHeader({
+  children,
+  locale = 'ru',
+  path,
+}: {
+  children?: React.ReactNode
+  locale?: Locale
+  /**
+   * Адрес этой же страницы без языка: `/compliance`, `/breeds`.
+   *
+   * Переключатель обязан вести на **ту же** страницу на другом языке,
+   * а не на главную. Уводить на главную значит терять место, куда
+   * человек шёл, — и он уходит совсем, а не переключает язык.
+   */
+  path?: string
+}) {
+  const l = PAGE_MESSAGES[locale]
+
   return (
     <header className="container-page flex flex-wrap items-center justify-between gap-x-8 gap-y-4 py-8">
       {/*
@@ -52,7 +72,32 @@ export function ProductHeader({ children }: { children?: React.ReactNode }) {
         <PlemLogo />
       </Link>
 
-      {children}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        {children}
+
+        {/*
+           Переключатель языка стоит на каждой странице продукта,
+           а не только на главной.
+
+           Человек, выбравший язык на первом экране и ушедший
+           в «Соответствие», прежде оказывался на русской странице
+           без всякой возможности вернуться к своему языку иначе,
+           чем через главную. Язык — свойство посетителя, а не одной
+           страницы.
+        */}
+        {path && (
+          <LocaleSwitcher
+            active={locale}
+            label={l.nav.language}
+            hrefs={
+              Object.fromEntries(LOCALE_CODES.map((c) => [c, `/${c}${path}`])) as Record<
+                Locale,
+                string
+              >
+            }
+          />
+        )}
+      </div>
     </header>
   )
 }
@@ -72,19 +117,14 @@ export function ProductHeader({ children }: { children?: React.ReactNode }) {
  * Как только страниц продукта на английском станет больше двух, это
  * перерастёт в общий набор — а пока лишний слой только мешал бы читать.
  */
-const FOOTER_LABELS = {
-  ru: { about: 'О продукте', breeds: 'Породы', compliance: 'Соответствие', api: 'API' },
-  en: { about: 'About', breeds: 'Breeds', compliance: 'Compliance', api: 'API' },
-} as const
-
-export function ProductFooter({ lang = 'ru' }: { lang?: 'ru' | 'en' }) {
-  const l = FOOTER_LABELS[lang]
+export function ProductFooter({ lang = 'ru' }: { lang?: Locale }) {
+  const l = PAGE_MESSAGES[lang].nav
 
   const links: { href: string; label: string }[] = [
-    { href: '/', label: l.about },
-    { href: '/breeds', label: l.breeds },
-    { href: '/compliance', label: l.compliance },
-    { href: '/api-docs', label: l.api },
+    { href: lang === 'ru' ? '/' : `/${lang}`, label: l.about },
+    { href: `/${lang}/breeds`, label: l.breeds },
+    { href: `/${lang}/compliance`, label: l.compliance },
+    { href: `/${lang}/api-docs`, label: l.api },
     /*
      * Ссылка названа доменом, а не словами «Племенная книга».
      *
@@ -103,7 +143,7 @@ export function ProductFooter({ lang = 'ru' }: { lang?: 'ru' | 'en' }) {
   return (
     <footer style={{ marginTop: 'var(--footer-air)' }} className="bg-basement py-10 text-white">
       <nav
-        aria-label={lang === 'en' ? 'Product sections' : 'Разделы продукта'}
+        aria-label={lang === 'ru' ? 'Разделы продукта' : 'Product sections'}
         className="container-page flex flex-wrap items-center gap-x-8 gap-y-3 text-[14px]"
       >
         {links.map((l) =>

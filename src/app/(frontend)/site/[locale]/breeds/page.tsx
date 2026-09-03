@@ -1,0 +1,281 @@
+import type { Metadata } from 'next'
+import { notFound } from 'next/navigation'
+import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
+import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
+import { isLocale, type Locale } from '@/lib/i18n/locales'
+import { demoUrl, PRODUCT_MAIL } from '@/lib/hosts'
+import { breedCatalog } from '@/lib/breeds-catalog-server'
+import {
+  ICAR_BREEDS,
+  ICAR_FETCHED_AT,
+  ICAR_NOTE,
+  ICAR_SOURCE,
+  STATE_CLASS,
+  STATE_HINT,
+  STATE_LABEL,
+  countByState,
+  type BreedRow,
+  type BreedState,
+} from '@/lib/breeds-catalog'
+import { plural } from '@/lib/format'
+
+export const metadata: Metadata = { title: 'Породы' }
+export const dynamic = 'force-dynamic'
+
+/**
+ * Какие породы книга умеет вести.
+ *
+ * ## Почему страница, а не строчка на главной
+ *
+ * «Система не привязана к породе» — заявление, которое нечем
+ * подтвердить: его говорит любой, у кого в базе есть поле «порода».
+ * Список из пятидесяти пяти пород реестра с честно названным
+ * состоянием каждой подтверждает то же самое и проверяется читателем
+ * за минуту.
+ *
+ * ## Почему домен только у действующей книги
+ *
+ * У голштинской книги свой адрес, и соблазн выдать такой каждой породе
+ * велик — вышло бы полсотни поддоменов, за которыми нет ни одного
+ * животного. Пустая книга под своим доменом хуже её отсутствия: она
+ * выглядит заброшенной, а не готовой. Поэтому адрес заводится вместе
+ * с объединением, а до тех пор порода ведёт на показательную книгу,
+ * где видно устройство на демонстрационных данных.
+ *
+ * ## Откуда числа
+ *
+ * Строки — выписка из реестра ФГИАС ПР (`sync:fgias-breeds`), коды —
+ * копия списка Interbull в дереве. Состояние вычисляется на каждом
+ * показе из того, что есть в базе, а не проставлено руками: заведённая
+ * книга появляется здесь сама, без правки страницы.
+ */
+export default async function BreedsPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}) {
+  const { locale: raw } = await params
+  if (!isLocale(raw)) notFound()
+
+  const locale: Locale = raw
+  const frame = PAGE_MESSAGES[locale].pages.breeds
+  const notice = PAGE_MESSAGES[locale].notice
+
+  const rows = breedCatalog()
+
+  /*
+   * Показательная книга показывается только тогда, когда она есть.
+   * Пока её нет, породе без своей книги честнее предложить разговор,
+   * чем ссылку в пустоту (`lib/hosts.ts`).
+   */
+  const demo = demoUrl()
+
+  const count = countByState(rows)
+  const withIcar = rows.filter((r) => r.icar).length
+  const own = rows.length - withIcar
+
+  const STATES: BreedState[] = ['book', 'ready', 'listed']
+
+  return (
+    <>
+      <ProductHeader locale={locale} path="/breeds" />
+
+      <main className="container-page pb-16">
+        <section className="max-w-[75ch] pt-6">
+          <p className="text-[14px] uppercase tracking-wide text-forest-500">{frame.eyebrow}</p>
+
+          <h1 className="mt-3 text-[34px] font-medium leading-tight sm:text-[44px]">
+            {frame.title}
+          </h1>
+
+          {notice && (
+            <p className="mt-5 rounded-xl bg-ink-50 px-4 py-3 text-[14px] leading-relaxed text-ink-500">
+              {notice}
+            </p>
+          )}
+
+          <p className="mt-6 text-[17px] leading-relaxed text-ink-700">
+            Книга не привязана к одной породе. Порода берётся из справочника государственного
+            реестра, кровность считается по улучшающей, а профиль индекса настраивается под то,
+            за что платит объединение. Ниже — все {rows.length} пород молочного направления
+            из реестра и состояние каждой у нас.
+          </p>
+        </section>
+
+        {/* ------------------------------- Числа ------------------------------ */}
+        <section className="mt-12 grid grid-cols-2 gap-x-6 gap-y-8 border-y border-ink-100 py-8 lg:grid-cols-4">
+          {[
+            { value: String(rows.length), label: 'пород молочного направления в реестре' },
+            { value: String(count.book), label: 'книга ведётся сегодня' },
+            { value: String(withIcar), label: 'сопоставлено с кодом ICAR' },
+            { value: String(own), label: 'без международного кода — отечественные и редкие' },
+          ].map((n) => (
+            <div key={n.label}>
+              <div className="text-[28px] font-medium leading-none tabular-nums text-forest-600 sm:text-[32px]">
+                {n.value}
+              </div>
+              <p className="mt-2 max-w-[24ch] text-[13px] leading-snug text-ink-500">{n.label}</p>
+            </div>
+          ))}
+        </section>
+
+        {/* --------------------------- Что значит ----------------------------- */}
+        <section className="mt-12">
+          <h2 className="text-[24px] font-medium leading-tight sm:text-[28px]">
+            Что значит «поддерживаем»
+          </h2>
+
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {STATES.map((st) => (
+              <div key={st} className="rounded-2xl border border-ink-100 bg-white p-6">
+                <span
+                  className={`inline-block rounded-md px-2.5 py-1 text-[13px] ${STATE_CLASS[st]}`}
+                >
+                  {STATE_LABEL[st]}
+                </span>
+                <p className="mt-3 text-[14px] leading-relaxed text-ink-500">{STATE_HINT[st]}</p>
+                <p className="mt-3 text-[13px] tabular-nums text-ink-400">
+                  {count[st]} {plural(count[st], 'порода', 'породы', 'пород')}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ----------------------- Отечественные породы ----------------------- */}
+        <section className="mt-12 rounded-2xl border border-brand-100 bg-brand-50 p-8 sm:p-10">
+          <h2 className="max-w-[60ch] text-[24px] font-medium leading-tight sm:text-[28px]">
+            У {own} пород из {rows.length} нет международного кода вовсе
+          </h2>
+          <p className="mt-4 max-w-[75ch] text-[16px] leading-relaxed text-ink-700">
+            Ярославская, холмогорская, истобенская, красная горбатовская — их нет в списке
+            Interbull, потому что в международной торговле семенем они не участвуют. Именно
+            им племенная книга нужнее всего: пока книги нет, сохранять генофонд формально
+            нечем, а численность у таких пород считается тысячами голов, где контроль родства
+            важнее прибавки удоя.
+          </p>
+        </section>
+
+        {/* ------------------------------ Таблица ----------------------------- */}
+        <section className="mt-12">
+          <h2 className="text-[24px] font-medium leading-tight sm:text-[28px]">Список</h2>
+          <p className="mt-3 max-w-[75ch] text-[15px] leading-relaxed text-ink-500">
+            Порядок алфавитный. «Код ICAR» — трёхбуквенный код Interbull, тот же, что уезжает
+            в обмен и входит в международный номер животного; прочерк означает, что в списке
+            Interbull породы нет.
+          </p>
+
+          <div className="mt-6 overflow-x-auto">
+            <table className="data-table w-full min-w-[720px]">
+              <thead>
+                <tr>
+                  <th className="text-left">Порода</th>
+                  <th className="w-[110px] text-left">Код ICAR</th>
+                  <th className="w-[190px] text-left">Состояние</th>
+                  <th className="text-left">Где посмотреть</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r: BreedRow) => (
+                  <tr key={String(r.id)}>
+                    <td>{r.name}</td>
+                    <td className="tabular-nums text-ink-500">{r.icar ?? '—'}</td>
+                    <td>
+                      <span
+                        className={`inline-block rounded-md px-2 py-0.5 text-[13px] ${STATE_CLASS[r.state]}`}
+                      >
+                        {STATE_LABEL[r.state]}
+                      </span>
+                    </td>
+                    <td>
+                      {r.bookUrl ? (
+                        <a
+                          href={r.bookUrl}
+                          className="underline underline-offset-4 hover:text-forest-500"
+                        >
+                          действующая книга
+                        </a>
+                      ) : demo ? (
+                        <a
+                          href={demo}
+                          className="text-ink-500 underline underline-offset-4 hover:text-forest-500"
+                        >
+                          показательная книга
+                        </a>
+                      ) : (
+                        <a
+                          href={`mailto:${PRODUCT_MAIL}`}
+                          className="text-ink-500 underline underline-offset-4 hover:text-forest-500"
+                        >
+                          обсудить книгу
+                        </a>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        {/* ------------------------------ Источники --------------------------- */}
+        <section className="mt-12 max-w-[75ch]">
+          <h2 className="text-[24px] font-medium leading-tight sm:text-[28px]">Откуда список</h2>
+
+          <p className="mt-4 text-[16px] leading-relaxed text-ink-700">
+            Строки — выписка из справочника пород государственного реестра ФГИАС ПР: {' '}
+            {rows.length} пород молочного направления, у каждой свой идентификатор, по которому
+            принимаются выгрузки.
+          </p>
+
+          <p className="mt-4 text-[16px] leading-relaxed text-ink-700">
+            Коды — список Interbull из {ICAR_BREEDS.length} строк, копия снята {ICAR_FETCHED_AT}
+            . {ICAR_NOTE}
+          </p>
+
+          <p className="mt-4 text-[15px] leading-relaxed text-ink-500">
+            Источник кодов:{' '}
+            <a
+              href={ICAR_SOURCE}
+              className="underline underline-offset-4 hover:text-forest-500"
+              rel="noreferrer"
+              target="_blank"
+            >
+              interbull.org
+            </a>
+          </p>
+        </section>
+
+        {/* -------------------------------- Как ------------------------------- */}
+        <section className="mt-12 max-w-[75ch] rounded-2xl bg-forest-500 p-8 text-white sm:p-10">
+          <h2 className="text-[24px] font-medium leading-tight sm:text-[28px]">
+            Завести книгу под свою породу
+          </h2>
+          <p className="mt-4 text-[16px] leading-relaxed text-white/85">
+            Напишите, какая порода, сколько голов и чем ведёте учёт сейчас. Книга открывается
+            по своему адресу, с проверками, правами доступа и выгрузками в реестр.
+          </p>
+
+          <div className="mt-8 flex flex-wrap items-center gap-4">
+            <a
+              href={`mailto:${PRODUCT_MAIL}`}
+              className="rounded-xl bg-white px-6 py-3 text-[15px] text-forest-600 transition-colors hover:bg-white/90"
+            >
+              Написать нам
+            </a>
+            {demo && (
+              <a
+                href={demo}
+                className="text-[15px] text-white/80 underline underline-offset-4 transition-colors hover:text-white"
+              >
+                Показательная книга
+              </a>
+            )}
+          </div>
+        </section>
+      </main>
+
+      <ProductFooter lang={locale} />
+    </>
+  )
+}
