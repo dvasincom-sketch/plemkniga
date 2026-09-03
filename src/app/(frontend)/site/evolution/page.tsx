@@ -1,4 +1,3 @@
-import { currentTenant } from '@/lib/tenant-server'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
@@ -10,7 +9,6 @@ import { EvolutionRoadmap } from '@/components/EvolutionRoadmap'
 import { EvolutionBench } from '@/components/EvolutionBench'
 import { EvolutionChecks } from '@/components/EvolutionChecks'
 import { EvolutionVisualCode } from '@/components/EvolutionVisualCode'
-import { EvolutionFgias } from '@/components/EvolutionFgias'
 import { loadBenchReports } from '@/lib/bench-report'
 import { loadCheckRuns } from '@/lib/check-report'
 import { getClient, getCurrentUser } from '@/lib/payload'
@@ -88,16 +86,19 @@ const TABS = [
   */
   { key: 'processes', label: 'Бизнес-процессы' },
   /*
-     «ФГИАС ПР» стоит рядом с бизнес-процессами и перед документацией:
-     это тоже ответ на вопрос «что система делает и чего не делает»,
-     только заданный государственным реестром. И читатель тот же —
-     хозяйство, а не инженер.
+     Вкладки «ФГИАС ПР» здесь больше нет: разбор двадцати шаблонов
+     переехал на витрину отдельной страницей.
 
-     Отдельной вкладкой, а не разделом документации, потому что вопрос
-     задают отдельно и часто: сдавать данные в реестр обязаны все,
-     и выбирая, где вести учёт, спрашивают в первую очередь про это.
+     Причина в читателе. Сюда приходят узнать, как система менялась;
+     про реестр спрашивают раньше и по другому поводу — выбирая, где
+     вести учёт. Число «20 из 20» стоит на первом экране витрины,
+     и нажимающий на него ждёт разбора, а не оглавления чужого раздела.
+
+     Заодно ушёл отбор вкладок по книге: раздел про российский реестр
+     не должен был появляться в книге, которая ему не подчиняется,
+     и ради одной вкладки страница спрашивала у арендатора, кто он.
+     Витринная страница не принадлежит ни одной книге, и вопрос отпал.
   */
-  { key: 'fgias', label: 'ФГИАС ПР' },
   { key: 'docs', label: 'Документация' },
 ] as const
 
@@ -132,11 +133,6 @@ const LEAD: Record<TabKey, string> = {
     'сделать в системе и что из этого выйдет. У каждого сценария отдельно названо, чего ' +
     'он не даст: ограничение, названное заранее, стоит дешевле разочарования, которое ' +
     'приходит, когда на систему уже положились.',
-  fgias:
-    'Все хозяйства обязаны передавать данные в государственный реестр, и вопрос к книге ' +
-    'у них один: что из этого она отдаст, а чего не хватит. Здесь ответ по каждому ' +
-    'из двадцати шаблонов — с числами, сосчитанными по живой базе, и с честно названным ' +
-    'тем, чего система пока не ведёт вовсе.',
   docs:
     'Техническое описание системы для тех, кому предстоит с ней работать: модель данных, ' +
     'процессы, архитектура, контракты обмена, развёртывание и — отдельно — ограничения.',
@@ -149,18 +145,7 @@ export default async function EvolutionPage({
 }) {
   const { tab: tabParam, change } = await searchParams
 
-  /*
-   * Вкладка государственного реестра существует не у всякой книги.
-   * Убирается она из самого списка, а не прячется при отрисовке: иначе
-   * адрес `?tab=fgias` открывался бы напрямую, и посторонний получил бы
-   * раздел про российский реестр в книге, которая ему не подчиняется.
-   *
-   * Из отсеянного списка вкладка не выбирается и подстановкой в адрес:
-   * `tab` сверяется по этому же списку и неизвестное значение падает
-   * на «Версии».
-   */
-  const { state } = await currentTenant()
-  const tabs = TABS.filter((t) => t.key !== 'fgias' || state === 'fgias')
+  const tabs = TABS
 
   const tab: TabKey = tabs.some((t) => t.key === tabParam) ? (tabParam as TabKey) : 'versions'
 
@@ -234,7 +219,6 @@ export default async function EvolutionPage({
           )}
           {tab === 'visual' && <EvolutionVisualCode />}
           {tab === 'processes' && <EvolutionProcesses />}
-          {tab === 'fgias' && <EvolutionFgias />}
           {tab === 'docs' && <EvolutionDocs />}
         </div>
       </main>

@@ -28,7 +28,16 @@ import type { Locale } from '@/lib/i18n/locales'
  * правило, по которому построена главная (`site-messages.ts`).
  */
 
-export type PageKey = 'compliance' | 'icar' | 'ade' | 'breeds' | 'api' | 'org'
+export type PageKey =
+  | 'compliance'
+  | 'icar'
+  | 'ade'
+  | 'breeds'
+  | 'api'
+  | 'org'
+  | 'fgias'
+  | 'rules'
+  | 'economics'
 
 export type PageFrame = { eyebrow: string; title: string; lead: string }
 
@@ -106,6 +115,21 @@ const ru: PageMessages = {
       title: 'REST API книги',
       lead: 'Описание собирается из тех же настроек, из которых работает сам интерфейс: разойтись им негде.',
     },
+    fgias: {
+      eyebrow: 'Государственный реестр',
+      title: 'Двадцать шаблонов ФГИАС ПР из двадцати',
+      lead: 'Шаблон за шаблоном: сколько в нём колонок, сколько книга заполнит и чего не хватает. Числа посчитаны прогоном по живой базе, а не обещаны.',
+    },
+    rules: {
+      eyebrow: 'Проверки данных',
+      title: 'Правила, по которым книга спорит с записью',
+      lead: 'Открытый список: что именно проверяется, почему это ошибка и что с ней делать. Правила названы заранее — как программа экзамена, а не как замечание после подачи.',
+    },
+    economics: {
+      eyebrow: 'Экономический индекс',
+      title: 'Сколько корова принесёт, а не насколько она лучше',
+      lead: 'Веса в рублях на единицу признака и цены, из которых они собраны. Индекс верен ровно настолько, насколько верны цены под ним, и потому цены показаны целиком.',
+    },
     org: {
       eyebrow: 'Организация',
       title: 'Кто содержит платформу',
@@ -148,6 +172,21 @@ const en: PageMessages = {
       eyebrow: 'Interface',
       title: 'The book’s REST API',
       lead: 'The description is generated from the same configuration the API itself runs on, so the two cannot drift apart.',
+    },
+    fgias: {
+      eyebrow: 'State registry',
+      title: 'Twenty registry templates out of twenty',
+      lead: 'Template by template: how many columns it has, how many the book fills, and what is missing. The numbers come from a run against the live database, not from a promise.',
+    },
+    rules: {
+      eyebrow: 'Data validation',
+      title: 'The rules by which the book argues with a record',
+      lead: 'An open list: what is checked, why it is an error, and what to do about it. Rules are stated in advance — like an exam syllabus, not a remark after submission.',
+    },
+    economics: {
+      eyebrow: 'Economic index',
+      title: 'What a cow will earn, not how much better she is',
+      lead: 'Weights in money per unit of trait, and the prices they are built from. The index is exactly as sound as the prices beneath it, so the prices are shown in full.',
     },
     org: {
       eyebrow: 'Organisation',
@@ -192,6 +231,21 @@ const kk: PageMessages = {
       title: 'Кітаптың REST API-і',
       lead: 'Сипаттама интерфейстің өзі жұмыс істейтін баптаулардан жиналады: олардың арасы ажырамайды.',
     },
+    fgias: {
+      eyebrow: 'Мемлекеттік тізілім',
+      title: 'Жиырма үлгінің жиырмасы',
+      lead: 'Үлгі сайын: онда қанша баған бар, кітап нешеуін толтырады және не жетіспейді. Сандар тірі дерекқор бойынша жүгіріспен есептелген.',
+    },
+    rules: {
+      eyebrow: 'Деректерді тексеру',
+      title: 'Кітап жазбамен дауласатын ережелер',
+      lead: 'Ашық тізім: не тексеріледі, неге бұл қате және онымен не істеу керек. Ережелер алдын ала аталған.',
+    },
+    economics: {
+      eyebrow: 'Экономикалық индекс',
+      title: 'Сиыр қанша әкеледі, қаншалықты жақсы емес',
+      lead: 'Белгі бірлігіне ақшамен өлшенген салмақтар және олар жиналған бағалар. Индекс астындағы бағалар қаншалықты дұрыс болса, соншалықты дұрыс.',
+    },
     org: {
       eyebrow: 'Ұйым',
       title: 'Платформаны кім ұстайды',
@@ -234,6 +288,21 @@ const hy: PageMessages = {
       eyebrow: 'Ինտերֆեյս',
       title: 'Մատյանի REST API',
       lead: 'Նկարագրությունը հավաքվում է նույն կարգավորումներից, որոնցով աշխատում է ինտերֆեյսը։',
+    },
+    fgias: {
+      eyebrow: 'Պետական ռեգիստր',
+      title: 'Քսան ձևանմուշից քսանը',
+      lead: 'Ձևանմուշ առ ձևանմուշ. քանի սյունակ ունի, քանիսը կլրացնի մատյանը և ինչ է պակասում։ Թվերը հաշվված են կենդանի շտեմարանով։',
+    },
+    rules: {
+      eyebrow: 'Տվյալների ստուգում',
+      title: 'Կանոնները, որոնցով մատյանը վիճում է գրառման հետ',
+      lead: 'Բաց ցանկ. ինչ է ստուգվում, ինչու է դա սխալ և ինչ անել դրա հետ։ Կանոնները հայտարարված են նախապես։',
+    },
+    economics: {
+      eyebrow: 'Տնտեսական ինդեքս',
+      title: 'Որքան կբերի կովը, ոչ թե որքան լավն է',
+      lead: 'Կշիռները՝ փողով, հատկանիշի միավորի հաշվով, և գները, որոնցից դրանք հավաքված են։',
     },
     org: {
       eyebrow: 'Կազմակերպություն',
@@ -278,6 +347,21 @@ const be: PageMessages = {
       title: 'REST API кнігі',
       lead: 'Апісанне збіраецца з тых самых наладаў, з якіх працуе сам інтэрфейс.',
     },
+    fgias: {
+      eyebrow: 'Дзяржаўны рэестр',
+      title: 'Дваццаць шаблонаў з дваццаці',
+      lead: 'Шаблон за шаблонам: колькі ў ім слупкоў, колькі кніга запоўніць і чаго не хапае. Лічбы палічаны прагонам па жывой базе.',
+    },
+    rules: {
+      eyebrow: 'Праверкі даных',
+      title: 'Правілы, паводле якіх кніга спрачаецца з запісам',
+      lead: 'Адкрыты спіс: што правяраецца, чаму гэта памылка і што з ёй рабіць. Правілы названы загадзя.',
+    },
+    economics: {
+      eyebrow: 'Эканамічны індэкс',
+      title: 'Колькі карова прынясе, а не наколькі яна лепшая',
+      lead: 'Вагі ў грошах на адзінку прыкметы і цэны, з якіх яны сабраны.',
+    },
     org: {
       eyebrow: 'Арганізацыя',
       title: 'Хто ўтрымлівае платформу',
@@ -320,6 +404,21 @@ const ky: PageMessages = {
       eyebrow: 'Интерфейс',
       title: 'Китептин REST API',
       lead: 'Сүрөттөмө интерфейстин өзү иштеген жөндөөлөрдөн чогултулат.',
+    },
+    fgias: {
+      eyebrow: 'Мамлекеттик реестр',
+      title: 'Жыйырма үлгүнүн жыйырмасы',
+      lead: 'Үлгү сайын: канча тилке бар, китеп канчасын толтурат жана эмне жетишпейт. Сандар тирүү базадан эсептелген.',
+    },
+    rules: {
+      eyebrow: 'Маалымат текшерүү',
+      title: 'Китеп жазуу менен талашкан эрежелер',
+      lead: 'Ачык тизме: эмне текшерилет, эмне үчүн бул ката жана аны менен эмне кылуу керек. Эрежелер алдын ала аталган.',
+    },
+    economics: {
+      eyebrow: 'Экономикалык индекс',
+      title: 'Уй канча алып келет, канчалык жакшы эмес',
+      lead: 'Белгинин бирдигине акча менен салмактар жана алар чогултулган баалар.',
     },
     org: {
       eyebrow: 'Уюм',

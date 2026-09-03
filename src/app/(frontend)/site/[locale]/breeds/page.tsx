@@ -18,6 +18,7 @@ import {
   type BreedState,
 } from '@/lib/breeds-catalog'
 import { plural } from '@/lib/format'
+import { unbounded } from '@/lib/fonts'
 
 export const metadata: Metadata = { title: 'Породы' }
 export const dynamic = 'force-dynamic'
@@ -111,7 +112,14 @@ export default async function BreedsPage({
             { value: String(own), label: 'без международного кода — отечественные и редкие' },
           ].map((n) => (
             <div key={n.label}>
-              <div className="text-[28px] font-medium leading-none tabular-nums text-forest-600 sm:text-[32px]">
+              {/*
+                 Числа набраны той же гарнитурой, что и на первом экране
+                 витрины. Разные шрифты у одинаковых по смыслу чисел
+                 читаются как разные по весу утверждения, а они равные.
+              */}
+              <div
+                className={`${unbounded.className} text-[28px] font-medium leading-none tabular-nums text-forest-600 sm:text-[32px]`}
+              >
                 {n.value}
               </div>
               <p className="mt-2 max-w-[24ch] text-[13px] leading-snug text-ink-500">{n.label}</p>

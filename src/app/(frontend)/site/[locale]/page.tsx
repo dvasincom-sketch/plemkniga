@@ -21,6 +21,7 @@ import { AnimalScreen } from '@/components/site/ScreenArt'
 import { ADE_MAP } from '@/lib/ade-schema-map'
 import { PRODUCT_MESSAGES } from '@/lib/i18n/product-messages'
 import { SITE_MESSAGES } from '@/lib/i18n/site-messages'
+import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { LOCALE_CODES, isLocale, localeInfo, type Locale } from '@/lib/i18n/locales'
 import { BOOK_URL, PRODUCT_MAIL, SITE_PREFIX, demoUrl, isSiteHost } from '@/lib/hosts'
 import { breedCatalog } from '@/lib/breeds-catalog-server'
@@ -117,7 +118,18 @@ export async function generateMetadata({
  * страница. Порядок здесь тот же, что у чисел в наборе строк, и это
  * единственное место, где они связаны, — потому и стоит рядом.
  */
-const PROOF_LINKS: (string | null)[] = ['/compliance', '/ade', '/compliance', '/breeds']
+/*
+ * Куда ведёт каждое из четырёх чисел.
+ *
+ * Прежде два числа из четырёх вели на одну и ту же страницу
+ * соответствия: и «20 из 20 шаблонов реестра», и «50+ правил проверки».
+ * Обещание при этом давалось разное, а страница открывалась одна,
+ * и разбора ни того ни другого на ней не было — только строка в общей
+ * таблице. Нажавший второй раз убеждался, что ссылки декоративные.
+ *
+ * Теперь у каждого числа своя страница с разбором.
+ */
+const PROOF_LINKS: (string | null)[] = ['/fgias', '/ade', '/rules', '/breeds']
 
 export default async function SitePage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: raw } = await params
@@ -126,6 +138,8 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
   const locale: Locale = raw
   const m = PRODUCT_MESSAGES[locale]
   const s = SITE_MESSAGES[locale]
+  /* Рамки внутренних страниц — для подписей ссылок «кому это». */
+  const pages = PAGE_MESSAGES[locale].pages
   const info = localeInfo(locale)
 
   /*
@@ -334,31 +348,58 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
             />
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-              {s.layers.items.map((item, i) => (
-                <div
-                  key={item.title}
-                  /*
-                     Третий слой выделен: он и есть предмет разговора.
-                     Остальные два у хозяйства обычно уже есть, и делать
-                     вид, что мы их изобрели, значило бы соврать первому же
-                     зоотехнику.
-                  */
-                  className={`rounded-2xl p-6 ${
-                    i === 2
-                      ? 'bg-forest-500 text-white'
-                      : 'border border-ink-100 bg-white text-ink-700'
-                  }`}
-                >
-                  <h3 className="text-[16px] font-medium leading-snug">{item.title}</h3>
-                  <p
-                    className={`mt-2 text-[14px] leading-relaxed ${
-                      i === 2 ? 'text-white/80' : 'text-ink-500'
-                    }`}
+              {s.layers.items.map((item, i) => {
+                /*
+                   Третий слой выделен: он и есть предмет разговора.
+                   Остальные два у хозяйства обычно уже есть, и делать
+                   вид, что мы их изобрели, значило бы соврать первому же
+                   зоотехнику.
+
+                   Он же единственный ведёт на разбор. Названный вершиной
+                   и оставленный без продолжения, он был обещанием
+                   в две строки: «экономика коровы» — и всё. Теперь
+                   за словами стоит страница с весами в рублях и ценами,
+                   из которых они собраны, а два нижних слоя ссылок
+                   не получают: у хозяйства они и так есть, вести
+                   их некуда.
+                */
+                const inner = (
+                  <>
+                    <h3 className="text-[16px] font-medium leading-snug">{item.title}</h3>
+                    <p
+                      className={`mt-2 text-[14px] leading-relaxed ${
+                        i === 2 ? 'text-white/80' : 'text-ink-500'
+                      }`}
+                    >
+                      {item.body}
+                    </p>
+                  </>
+                )
+
+                if (i !== 2) {
+                  return (
+                    <div
+                      key={item.title}
+                      className="rounded-2xl border border-ink-100 bg-white p-6 text-ink-700"
+                    >
+                      {inner}
+                    </div>
+                  )
+                }
+
+                return (
+                  <Link
+                    key={item.title}
+                    href={`${base}/${locale}/economics`}
+                    className="group block rounded-2xl bg-forest-500 p-6 text-white transition-colors hover:bg-forest-600"
                   >
-                    {item.body}
-                  </p>
-                </div>
-              ))}
+                    {inner}
+                    <span className="mt-4 inline-block text-[13px] text-white/70 transition-colors group-hover:text-white">
+                      {s.economics.link} →
+                    </span>
+                  </Link>
+                )
+              })}
             </div>
           </div>
         </section>
@@ -468,19 +509,32 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
         {/* ---------------------------- Путь данных ---------------------------- */}
         <section className="mt-20">
           <h2 className="text-[26px] font-medium leading-tight sm:text-[30px]">{s.flow.title}</h2>
-          <p className="mt-4 max-w-[70ch] text-[16px] leading-relaxed text-ink-700">{s.flow.lead}</p>
 
           {/*
-             Прокрутки нет: схема собрана вёрсткой и на узком экране
-             разворачивается в столбец сама. Прежняя редакция рисовала
-             её в SVG фиксированной ширины и ездила вбок — на телефоне
-             это худшее, что можно сделать со страницей.
-          */}
-          <div className="mt-8 rounded-2xl bg-white p-6 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] sm:p-8">
-            <FlowArt title={s.flow.title} nodes={s.flow.nodes} marks={s.flow.marks} />
-          </div>
+             Схема слева, объяснение справа.
 
-          <p className="mt-4 max-w-[70ch] text-[14px] leading-relaxed text-ink-500">{s.flow.note}</p>
+             Сама по себе она узкая — ярусы держат меру плашки, — и вширь
+             её не растянуть: растянутая, она превращается в четыре
+             далеко разнесённых прямоугольника, между которыми глаз
+             ищет связь. Оставленная одна посреди полотна, она сидела
+             в белой карточке с пустыми полями в треть экрана с каждой
+             стороны.
+
+             Поэтому ширину забирает текст: подводка и вывод переехали
+             из-под заголовка вправо, к самой схеме. Тот же приём,
+             что у трёх контуров учёта выше, и читается он так же —
+             картинка и слова об одном, рядом.
+          */}
+          <div className="mt-8 grid grid-cols-1 items-center gap-10 lg:grid-cols-[minmax(0,1fr)_360px]">
+            <div className="rounded-2xl bg-white p-6 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] sm:p-8">
+              <FlowArt title={s.flow.title} nodes={s.flow.nodes} marks={s.flow.marks} />
+            </div>
+
+            <div>
+              <p className="text-[16px] leading-relaxed text-ink-700">{s.flow.lead}</p>
+              <p className="mt-4 text-[14px] leading-relaxed text-ink-500">{s.flow.note}</p>
+            </div>
+          </div>
         </section>
 
         {/* --------------------- Как выглядит внутри --------------------- */}
@@ -592,57 +646,64 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
         <section className="mt-20">
           <h2 className="text-[26px] font-medium leading-tight sm:text-[30px]">{m.who.title}</h2>
 
+          {/*
+             Две карточки, и каждая ведёт дальше.
+
+             ## Что было не так
+
+             Рисунок стоял в строке с заголовком и висел на его уровне
+             сам по себе: заголовок в одну строку, рисунок в четыре —
+             и между ними полполосы воздуха. Текст шёл ниже во всю
+             ширину, так что связи «рисунок про это» не возникало вовсе.
+             Карточка кончалась абзацем, и читатель, которого раздел
+             только что назвал по имени, упирался в тупик.
+
+             ## Что стало
+
+             Рисунок ушёл в подложку своего цвета и встал над заголовком
+             как знак раздела, а не как иллюстрация к строке. Обе
+             подложки одного размера, поэтому карточки выровнены по всей
+             высоте — прежде они разъезжались из-за разной длины текста.
+
+             И у каждой появилось продолжение: хозяйству — разбор
+             экономического индекса, объединению — каталог правил,
+             по которым книга спорит с записью. Это не украшение:
+             раздел отвечает на вопрос «кому это», и ответ без «а дальше
+             что» обрывается на полуслове.
+
+             Подписи ссылок берутся из рамок самих страниц — переводить
+             их второй раз незачем.
+          */}
           <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {[m.who.farms, m.who.associations].map((who, i) => (
-              /*
-                 Рисунок слева от текста, а не над ним.
-
-                 Стоя сверху, он съедал целую строку высоты и отодвигал
-                 заголовок от края карточки: взгляд шёл сверху вниз через
-                 пустое поле и только потом добирался до слов. Слева
-                 рисунок читается вместе с заголовком, одним движением,
-                 и карточка становится ниже на ту же строку.
-
-                 Такой же порядок — рисунок слева, текст справа — уже
-                 у полосы о международном стандарте, и это единственная
-                 причина, по которой две карточки перестроены именно так:
-                 два одинаковых по смыслу блока не должны собираться
-                 по-разному на одной странице.
-
-                 Рисунок не сжимается (`shrink-0`) и на узком экране
-                 остаётся слева: перенос его наверх вернул бы ту же
-                 потерянную строку, а уменьшение сделало бы строки листа
-                 неразличимыми.
-              */
+            {[
+              { who: m.who.farms, href: '/economics', label: pages.economics.eyebrow },
+              { who: m.who.associations, href: '/rules', label: pages.rules.eyebrow },
+            ].map(({ who, href, label }, i) => (
               <div
                 key={who.title}
-                className="rounded-2xl bg-white p-6 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] sm:p-8"
+                className="flex flex-col rounded-2xl bg-white p-6 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] sm:p-8"
               >
-                {/*
-                   Карточка собрана как карточки возможностей: рисунок
-                   слева, заголовок справа, текст под ними во всю ширину.
-
-                   Прежняя редакция ставила рисунок и текст в две колонки
-                   целиком, и текст сжимался до сорока знаков в строке —
-                   вдвое уже меры, принятой на странице. Читать такой
-                   столбец тяжело, а рисунок при этом висел на уровне
-                   первой строки и с остальными четырьмя не соотносился.
-
-                   Рисунки разные не для украшения: у хозяйства один лист,
-                   и в нём видна каждая корова; у объединения листов много,
-                   и они сходятся в один. Разница рисунков и есть
-                   содержание раздела.
-                */}
-                <div className="flex items-center gap-5">
-                  <div className="shrink-0">
-                    {i === 0 ? <FarmArt title={who.title} /> : <AssociationArt title={who.title} />}
-                  </div>
-                  <h3 className="text-[19px] font-medium leading-tight sm:text-[21px]">
-                    {who.title}
-                  </h3>
+                <div className="flex h-[104px] w-[152px] items-center justify-center rounded-2xl bg-ink-50">
+                  {i === 0 ? <FarmArt title={who.title} /> : <AssociationArt title={who.title} />}
                 </div>
 
-                <p className="mt-5 text-[15px] leading-relaxed text-ink-500">{who.body}</p>
+                <h3 className="mt-6 text-[19px] font-medium leading-tight sm:text-[21px]">
+                  {who.title}
+                </h3>
+
+                {/*
+                   Абзац растёт, а ссылка прижата к низу: иначе она
+                   вставала на разной высоте в двух соседних карточках
+                   и читалась как часть текста, а не как выход из него.
+                */}
+                <p className="mt-4 grow text-[15px] leading-relaxed text-ink-500">{who.body}</p>
+
+                <Link
+                  href={`${base}/${locale}${href}`}
+                  className="mt-6 inline-block text-[15px] font-medium text-forest-600 underline underline-offset-4 hover:text-forest-500"
+                >
+                  {label} →
+                </Link>
               </div>
             ))}
           </div>
@@ -737,7 +798,12 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
            Рядом они читаются как одно: вот зачем это делается — вот как
            начать. На узком экране столбец возвращается сам.
         */}
-        <section className="mt-20 grid grid-cols-1 gap-10 lg:grid-cols-2">
+        {/*
+           Колонки неравные: слева текста втрое больше, и на равных
+           половинах он тянулся вниз, оставляя под приглашением пустоту
+           в полполотна. Ширина отдана по количеству слов, а не поровну.
+        */}
+        <section className="mt-20 grid grid-cols-1 items-start gap-12 lg:grid-cols-[7fr_5fr]">
           <div>
             <h2 className="text-[26px] font-medium leading-tight sm:text-[30px]">
               {s.purpose.title}
