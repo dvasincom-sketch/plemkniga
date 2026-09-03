@@ -537,56 +537,69 @@ export function HeroArt({ title }: { title: string }) {
   const CELL = 20
   const SIZE = 12
 
-  /* Своё стадо — четыре на три, смещённое от середины: ровно посередине
-     оно читалось бы как мишень, а не как одно из многих. */
-  const herd = { w: 4, h: 3 }
-  const base = { col: 4, row: 3 }
-  /** Животное внутри плашки — не в углу и не по центру. */
-  const at = { col: 2, row: 1 }
-
   /*
-   * Остановки заданы смещением в клетках, а не в точках: клетка —
-   * единица этого рисунка, и в клетках видно, что плашка не вылезает
-   * за поле. В точках это пришлось бы пересчитывать в уме при каждой
-   * правке размера.
+   * Стада разные не для разнообразия.
+   *
+   * Хозяйства разные: у одного сорок голов, у другого шестьсот, и книга
+   * держит и тех и других. Одинаковый прямоугольник, прыгающий по полю,
+   * говорил обратное — что хозяйства на одно лицо и отличаются только
+   * местом. Поэтому меняется и размер, и пропорция: четыре головы,
+   * восемнадцать, вытянутое стадо, приземистое.
+   *
+   * Животное задано смещением внутри стада, а не клеткой поля: при
+   * правке стада оно остаётся внутри само, и промахнуться мимо плашки
+   * нечем.
    */
   const stops = [
-    [0, 0],
-    [8, -2],
-    [-3, 4],
-    [9, 3],
+    { col: 4, row: 3, w: 4, h: 3, at: { c: 2, r: 1 } },
+    { col: 12, row: 1, w: 2, h: 2, at: { c: 1, r: 0 } },
+    { col: 1, row: 6, w: 6, h: 3, at: { c: 4, r: 2 } },
+    { col: 9, row: 5, w: 3, h: 5, at: { c: 1, r: 3 } },
+    { col: 14, row: 6, w: 4, h: 2, at: { c: 0, r: 1 } },
   ]
 
   const field: { c: number; r: number }[] = []
   for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) field.push({ c, r })
 
-  const herdCells: { c: number; r: number }[] = []
-  for (let r = 0; r < herd.h; r++) for (let c = 0; c < herd.w; c++) herdCells.push({ c, r })
-
   /*
-   * Ключевые кадры пишутся строкой, а не собираются набором утилит:
-   * утилиты не умеют ни ступенчатых остановок, ни гашения между ними.
-   * Проценты считаются из числа остановок, чтобы добавленная пятая
-   * не потребовала пересчёта вручную.
+   * Остановки — отдельные группы, гаснущие по очереди, а не одна
+   * переезжающая.
+   *
+   * Переезжающая группа умеет менять только место: размер и форма у неё
+   * одни на весь показ. А главное — плавный переезд читается как «одна
+   * корова ходит по книге», то есть ровно наоборот сказанному. Гашение
+   * до нуля связать в одно движущееся животное нечем, и каждая остановка
+   * читается как «а вот другое хозяйство».
+   *
+   * Доля видимости считается из числа остановок: добавленная шестая
+   * не потребует пересчёта процентов руками.
    */
-  const step = 100 / stops.length
-  const frames = stops
-    .map(([dc, dr], i) => {
-      const t = `translate(${dc * CELL}px, ${dr * CELL}px)`
-      const a = i * step
-      return [
-        `${(a + 1).toFixed(2)}% { transform: ${t}; opacity: 0 }`,
-        `${(a + 4).toFixed(2)}% { transform: ${t}; opacity: 1 }`,
-        `${(a + step - 4).toFixed(2)}% { transform: ${t}; opacity: 1 }`,
-        `${(a + step - 1).toFixed(2)}% { transform: ${t}; opacity: 0 }`,
-      ].join('\n')
-    })
-    .join('\n')
-
+  const SECONDS = 5
+  const share = 100 / stops.length
+  /*
+   * Видимость задана снаружи медиавыражения, а движение внутри.
+   *
+   * Первая редакция спрятала и то и другое внутрь, и рисунок ломался
+   * ровно у тех, ради кого выражение написано: правила не действуют —
+   * значит, не действует и «показывать одно стадо», и все пять
+   * оказываются на поле разом. Ошибка из тех, которых не видно вовсе:
+   * у себя движение включено, и посмотреть на неё можно только нарочно
+   * переключив настройку.
+   */
   const css = `
+    .plem-hero-stop { opacity: 0 }
+    .plem-hero-stop:first-of-type { opacity: 1 }
+
     @media (prefers-reduced-motion: no-preference) {
-      @keyframes plemHeroHerd { ${frames} }
-      .plem-hero-herd { animation: plemHeroHerd ${stops.length * 5}s infinite; }
+      @keyframes plemHeroStop {
+        0% { opacity: 0 }
+        ${(share * 0.08).toFixed(2)}% { opacity: 1 }
+        ${(share * 0.92).toFixed(2)}% { opacity: 1 }
+        ${share.toFixed(2)}%, 100% { opacity: 0 }
+      }
+      .plem-hero-stop {
+        animation: plemHeroStop ${stops.length * SECONDS}s infinite both;
+      }
     }
   `
 
@@ -612,49 +625,60 @@ export function HeroArt({ title }: { title: string }) {
         />
       ))}
 
-      {/*
-         Стадо, животное и обводка едут одной группой. Порознь они
-         разъехались бы: плашка оказалась бы вокруг чужих клеток,
-         а обводка — вокруг пустого места.
-      */}
-      <g className="plem-hero-herd">
-        <rect
-          x={base.col * CELL - 4}
-          y={base.row * CELL - 4}
-          width={herd.w * CELL + 8 - (CELL - SIZE)}
-          height={herd.h * CELL + 8 - (CELL - SIZE)}
-          rx="10"
-          fill="#EAF3EE"
-          stroke="#BFD9C9"
-        />
+      {stops.map((st, i) => {
+        const cells: { c: number; r: number }[] = []
+        for (let r = 0; r < st.h; r++) for (let c = 0; c < st.w; c++) cells.push({ c, r })
 
-        {herdCells.map(({ c, r }) => {
-          const it = c === at.col && r === at.row
-          return (
+        return (
+          <g
+            key={i}
+            className="plem-hero-stop"
+            /*
+             * Задержка ставится здесь, а не классом: остановок пять,
+             * и пять почти одинаковых правил в разметке стиля пришлось бы
+             * держать в согласии с массивом руками.
+             */
+            style={{ animationDelay: `${i * SECONDS}s` }}
+          >
             <rect
-              key={`${c}-${r}`}
-              x={(base.col + c) * CELL}
-              y={(base.row + r) * CELL}
-              width={SIZE}
-              height={SIZE}
-              rx="3"
-              fill={it ? '#2E7D52' : '#b9b9b9'}
+              x={st.col * CELL - 4}
+              y={st.row * CELL - 4}
+              width={st.w * CELL + 8 - (CELL - SIZE)}
+              height={st.h * CELL + 8 - (CELL - SIZE)}
+              rx="10"
+              fill="#EAF3EE"
+              stroke="#BFD9C9"
             />
-          )
-        })}
 
-        {/* обводка: одного цвета мало, когда метка того же размера, что соседние */}
-        <rect
-          x={(base.col + at.col) * CELL - 4}
-          y={(base.row + at.row) * CELL - 4}
-          width={SIZE + 8}
-          height={SIZE + 8}
-          rx="6"
-          fill="none"
-          stroke="#2E7D52"
-          strokeWidth="2"
-        />
-      </g>
+            {cells.map(({ c, r }) => {
+              const it = c === st.at.c && r === st.at.r
+              return (
+                <rect
+                  key={`${c}-${r}`}
+                  x={(st.col + c) * CELL}
+                  y={(st.row + r) * CELL}
+                  width={SIZE}
+                  height={SIZE}
+                  rx="3"
+                  fill={it ? '#2E7D52' : '#b9b9b9'}
+                />
+              )
+            })}
+
+            {/* обводка: одного цвета мало, когда метка того же размера, что соседние */}
+            <rect
+              x={(st.col + st.at.c) * CELL - 4}
+              y={(st.row + st.at.r) * CELL - 4}
+              width={SIZE + 8}
+              height={SIZE + 8}
+              rx="6"
+              fill="none"
+              stroke="#2E7D52"
+              strokeWidth="2"
+            />
+          </g>
+        )
+      })}
     </svg>
   )
 }
