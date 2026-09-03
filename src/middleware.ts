@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { isSiteHost, redirectToSite, rewriteToSite } from '@/lib/hosts'
+import { DEMO_HOST, DEMO_READY, isSiteHost, redirectToSite, rewriteToSite } from '@/lib/hosts'
 
 /**
  * Разведение двух доменов по одному приложению.
@@ -31,6 +31,29 @@ import { isSiteHost, redirectToSite, rewriteToSite } from '@/lib/hosts'
  */
 export function middleware(request: NextRequest) {
   const host = request.headers.get('host')
+
+  /*
+   * Показательный домен, пока за ним нет своих данных.
+   *
+   * Приложение одно, база одна: арендатор меняет имя и реквизиты,
+   * но не записи. В день, когда `demo.plem.online` заработал,
+   * он немедленно начал показывать двести восемьдесят тысяч настоящих
+   * голштинских животных под словом «демонстрация» — чужие данные,
+   * выданные за примерные.
+   *
+   * Заслонка стоит здесь, а не в каждой странице: обработчик видит
+   * все адреса разом, и забыть его в одном месте нельзя. Снимается
+   * переменной `DEMO_READY=1` на том развёртывании, где стенд поднят
+   * со своей базой.
+   */
+  if (!DEMO_READY && host && host.toLowerCase().split(':')[0] === DEMO_HOST) {
+    const url = request.nextUrl.clone()
+    if (url.pathname !== '/demo-soon') {
+      url.pathname = '/demo-soon'
+      return NextResponse.rewrite(url)
+    }
+    return NextResponse.next()
+  }
 
   /*
    * На домене книги сквозные страницы больше не живут: «Соответствие»,
