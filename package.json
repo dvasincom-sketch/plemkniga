@@ -103,7 +103,8 @@
     "smoke": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/smoke.ts",
     "sync:fgias-breeds": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/sync-fgias-breeds.ts",
     "ade:map": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/map-ade-schemas.ts",
-    "check:ade-filters": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-ade-filters.ts"
+    "check:ade-filters": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-ade-filters.ts",
+    "check:ade-live": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-ade-live.ts"
   },
   "dependencies": {
     "@e965/xlsx": "0.20.3",
