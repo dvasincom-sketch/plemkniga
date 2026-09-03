@@ -368,3 +368,54 @@ export const adeClean = <T extends Record<string, unknown>>(obj: T): T => {
   }
   return obj
 }
+
+/**
+ * Из какой коллекции книги берётся каждый раздел стандарта.
+ *
+ * ## Почему это лежит здесь, а не там, где используется
+ *
+ * Пар «имя снаружи — имя внутри» три потребителя: выдача по локациям,
+ * лента изменений и ревизия индексов, которой надо знать, по каким
+ * таблицам ходит обмен. Пока таблица жила в двух файлах, она была
+ * двумя таблицами: расходятся такие копии молча и в худшую сторону —
+ * лента начинает возить не то, что отдаёт выборка.
+ *
+ * Тот же вид ошибки, что уже стоил нам неработающих фильтров: там
+ * внутреннее имя попало туда, где ждали имя стандарта, и отбор по дате
+ * перестал действовать без единого сообщения.
+ *
+ * Глубина связей — часть той же пары. У проверки стельности она двойка:
+ * результат теста лежит справочником, и без второго уровня оттуда
+ * приедет номер вместо названия.
+ */
+export const ADE_SOURCE_COLLECTION: Record<
+  AdeCollectionName,
+  { collection: string; depth: number }
+> = {
+  animals: { collection: 'animals', depth: 1 },
+  'test-day-results': { collection: 'milk-tests', depth: 1 },
+  parturitions: { collection: 'calvings', depth: 1 },
+  inseminations: { collection: 'inseminations', depth: 1 },
+  'type-classifications': { collection: 'animal-exteriors', depth: 1 },
+  weights: { collection: 'weighings', depth: 1 },
+  'breeding-values': { collection: 'index-values', depth: 1 },
+  'pregnancy-checks': { collection: 'inseminations', depth: 2 },
+  /*
+   * У перемещений владелец берётся не от животного, а от самой записи,
+   * и это единственное место, где так.
+   *
+   * Причина в том, что перемещение — событие про смену владельца.
+   * Спросив «чьё животное», мы получили бы нового владельца и отдали
+   * бы продажу только покупателю: у продавца в книге не осталось бы
+   * следа, что корова у него была. Спрашивать надо стороны сделки,
+   * а их две, и каждая видит свою.
+   */
+  arrivals: { collection: 'movements', depth: 1 },
+  departures: { collection: 'movements', depth: 1 },
+  deaths: { collection: 'movements', depth: 1 },
+}
+
+/** Таблицы, по которым ходит лента изменений, — без повторов. */
+export const ADE_FEED_TABLES: string[] = [
+  ...new Set(Object.values(ADE_SOURCE_COLLECTION).map((v) => v.collection.replace(/-/g, '_'))),
+]

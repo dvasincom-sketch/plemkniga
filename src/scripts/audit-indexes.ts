@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import { Pool } from 'pg'
 import { maskUri, resolveDatabase } from '../lib/db-url'
+import { ADE_FEED_TABLES } from '../lib/ade/core'
 
 /**
  * Аудит индексов: какие работают, какие лежат мёртвым грузом, каких не хватает.
@@ -29,7 +30,19 @@ import { maskUri, resolveDatabase } from '../lib/db-url'
  *    устроена предметная область, и сколько раз по нему искали — неважно;
  *  - индексы внешних ключей. По ним ходит не приложение, а сама база —
  *    при проверке ссылок и при удалении родителя, и в счётчик обращений
- *    это попадает не всегда.
+ *    это попадает не всегда;
+ *  - индексы, на которых стоит известный редкий сценарий. Первым таким
+ *    стала лента изменений обмена: она сортирует по времени правки,
+ *    то есть ровно по `*_updated_at_idx` восьми коллекций. Счётчик у них
+ *    нулевой не потому, что они лишние, а потому, что ленту по этой базе
+ *    ещё никто не тянул. Удалив их, мы узнали бы об ошибке от партнёра,
+ *    у которого полная выгрузка стала занимать часы.
+ *
+ *    Это ровно тот случай, о котором скрипт и предупреждает словами
+ *    «редкие сценарии могли не случиться ни разу», — но предупреждение,
+ *    которое нужно помнить самому, работает хуже списка. Список берётся
+ *    из кода обмена (`ADE_FEED_TABLES`), а не переписан сюда руками:
+ *    появится двенадцатая коллекция — она попадёт в защиту сама.
  *
  * Скрипт только читает и печатает готовые команды. Выполнять их — решение
  * человека: индекс, ненужный сегодня, может понадобиться завтрашней странице.
@@ -142,8 +155,28 @@ async function main() {
   const domain = rows.filter((r) => !r.table.startsWith('payload_'))
   const used = domain.filter((r) => Number(r.scans) > 0)
   const idle = domain.filter((r) => Number(r.scans) === 0)
-  const removable = idle.filter((r) => !r.is_primary && !r.is_unique && !r.is_fk)
+  /*
+   * Индексы, которых ждёт известный сценарий, — по имени таблицы и поля.
+   * Имя вида `<таблица>_updated_at_idx` собирает Payload, и здесь оно
+   * повторяется; расхождение поймает сам прогон — защищённого индекса
+   * просто не найдётся в базе, и он не пропадёт из кандидатов, что видно.
+   */
+  const scenarioNames = new Map<string, string>()
+  for (const table of ADE_FEED_TABLES) {
+    scenarioNames.set(`${table}_updated_at_idx`, 'лента изменений: порядок по времени правки')
+  }
+  scenarioNames.set('ade_tombstones_deleted_at_idx', 'лента изменений: порядок удалений')
+  scenarioNames.set('ade_tombstones_dataset_idx', 'лента изменений: отбор надгробий по набору')
+
+  const isScenario = (name: string) => scenarioNames.has(name)
+
+  const removable = idle.filter(
+    (r) => !r.is_primary && !r.is_unique && !r.is_fk && !isScenario(r.index),
+  )
   const protectedIdle = idle.filter((r) => r.is_primary || r.is_unique || r.is_fk)
+  const scenarioIdle = idle.filter(
+    (r) => !r.is_primary && !r.is_unique && !r.is_fk && isScenario(r.index),
+  )
 
   const mb = (bytes: number) => (bytes / 1024 / 1024).toFixed(1)
   const totalIdleSize = removable.reduce((a, r) => a + Number(r.size), 0)
@@ -177,6 +210,20 @@ async function main() {
       console.log(`  ${pad(r.index, 52)} ${why}`)
     }
     if (protectedIdle.length > 10) console.log(`  … и ещё ${ru(protectedIdle.length - 10)}`)
+  }
+
+  if (scenarioIdle.length) {
+    console.log(
+      `\nПростаивают, но их ждёт известный сценарий: ${ru(scenarioIdle.length)}\n` + '─'.repeat(78),
+    )
+    console.log(
+      'Счётчик нулевой потому, что сценарий ещё не случился, а не потому, что\n' +
+        'индекс лишний. Удалять нельзя: беда всплывёт у того, кто этот сценарий\n' +
+        'запустит первым, и выглядеть будет как наша поломка.\n',
+    )
+    for (const r of scenarioIdle) {
+      console.log(`  ${pad(r.index, 52)} ${scenarioNames.get(r.index)}`)
+    }
   }
 
   console.log(`\nКандидаты на удаление: ${ru(removable.length)}, ${mb(totalIdleSize)} МБ\n` + '─'.repeat(78))

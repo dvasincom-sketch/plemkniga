@@ -1,7 +1,7 @@
 import type { Payload, Where } from 'payload'
 import { isAssociationUser } from '@/lib/association'
 import { checkRfid } from '@/lib/aiid'
-import { SCHEME, type AdeCollection } from '@/lib/ade/core'
+import { ADE_SOURCE_COLLECTION, SCHEME, type AdeCollection } from '@/lib/ade/core'
 import {
   adeAnimal,
   adeArrival,
@@ -381,7 +381,7 @@ export async function serveAdeCollection(
    */
   if (q.animal && animalId === null) return page([], 0)
 
-  const [collection, depth] = SOURCE_OF[name]
+  const { collection, depth } = ADE_SOURCE_COLLECTION[name]
 
   const { docs, total } =
     name === 'arrivals' || name === 'departures' || name === 'deaths'
@@ -404,30 +404,6 @@ export async function serveAdeCollection(
  * результат теста лежит справочником, и без второго уровня оттуда
  * приедет номер вместо названия.
  */
-const SOURCE_OF: Record<AdeCollectionName, [collection: string, depth: number]> = {
-  animals: ['animals', 1],
-  'test-day-results': ['milk-tests', 1],
-  parturitions: ['calvings', 1],
-  inseminations: ['inseminations', 1],
-  'type-classifications': ['animal-exteriors', 1],
-  weights: ['weighings', 1],
-  'breeding-values': ['index-values', 1],
-  'pregnancy-checks': ['inseminations', 2],
-  /*
-   * У перемещений владелец берётся не от животного, а от самой записи,
-   * и это единственное место, где так.
-   *
-   * Причина в том, что перемещение — событие про смену владельца.
-   * Спросив «чьё животное», мы получили бы нового владельца и отдали
-   * бы продажу только покупателю: у продавца в книге не осталось бы
-   * следа, что корова у него была. Спрашивать надо стороны сделки,
-   * а их две, и каждая видит свою.
-   */
-  arrivals: ['movements', 1],
-  departures: ['movements', 1],
-  deaths: ['movements', 1],
-}
-
 const MOVEMENT_SIDE = { arrivals: 'in', departures: 'out', deaths: 'death' } as const
 
 /**

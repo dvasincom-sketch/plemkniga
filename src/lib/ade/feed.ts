@@ -1,6 +1,6 @@
 import type { Payload, Where } from 'payload'
 import type { AdeCollectionName } from '@/lib/ade/core'
-import { ADE_SOURCE } from '@/lib/ade/core'
+import { ADE_SOURCE, ADE_SOURCE_COLLECTION } from '@/lib/ade/core'
 import { adeMapDocs, allowedLocations } from '@/lib/ade/serve'
 import {
   FEED_CONTEXT,
@@ -86,20 +86,6 @@ const after = (field: string, c: Cursor): Where => ({
  */
 export const feedLocations = (payload: Payload, user: User) => allowedLocations(payload, user)
 
-const SOURCE_OF: Record<AdeCollectionName, string> = {
-  animals: 'animals',
-  'test-day-results': 'milk-tests',
-  parturitions: 'calvings',
-  inseminations: 'inseminations',
-  'type-classifications': 'animal-exteriors',
-  weights: 'weighings',
-  'breeding-values': 'index-values',
-  'pregnancy-checks': 'inseminations',
-  arrivals: 'movements',
-  departures: 'movements',
-  deaths: 'movements',
-}
-
 /**
  * Отбор по хозяйствам для ленты.
  *
@@ -148,10 +134,10 @@ export async function adeFeed(
     return { items: [FEED_CONTEXT, feedContinuation(same)], token: same, drained: true }
   }
 
-  const depth = dataset === 'pregnancy-checks' ? 2 : 1
+  const { collection, depth } = ADE_SOURCE_COLLECTION[dataset]
 
   const live = await payload.find({
-    collection: SOURCE_OF[dataset] as never,
+    collection: collection as never,
     where: { and: [ownerIn(dataset, orgs), ...kindWhere(dataset), after('updatedAt', token.r)] },
     sort: ['updatedAt', 'id'],
     limit,
