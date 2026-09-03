@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { ADE_VERSION } from '@/lib/ade/core'
-import { parseAdeQuery, serveAdeCollection } from '@/lib/ade/serve'
+import { halfAnimalPair, parseAdeQuery, serveAdeCollection } from '@/lib/ade/serve'
 import { isAdeWritable } from '@/lib/ade/parse'
 import { ADE_CODE, adeError, adeErrors } from '@/lib/ade/errors'
 import { adeAcceptMany, adeBatchResult, adeBody, adeGate, adeReadOnly } from '@/lib/ade/gate'
@@ -38,12 +38,49 @@ export async function GET(
 
   const { payload, orgId, collection } = gate
 
-  const query = parseAdeQuery(new URL(request.url))
+  const url = new URL(request.url)
+
+  /*
+   * Половина пары «идентификатор + схема» — отказ, а не догадка.
+   * `animal-id` без `animal-scheme` означает «найди по номеру, а в какой
+   * системе — догадайся»: выбор между племенным номером, учётным
+   * и номером метки, и ошибка вернёт события чужого животного.
+   */
+  if (halfAnimalPair(url)) {
+    return NextResponse.json(
+      adeErrors(
+        adeError(
+          400,
+          ADE_CODE.fieldValue,
+          'animal-id и animal-scheme присылаются только вместе',
+          'Номер без схемы не определяет животное однозначно: один и тот же номер бывает племенным, учётным и номером радиометки.',
+        ),
+      ),
+      { status: 400 },
+    )
+  }
+
+  const query = parseAdeQuery(url)
   const body = await serveAdeCollection(payload, collection, orgId, query)
 
   return NextResponse.json(body, {
     headers: {
       'Content-Type': 'application/json',
+      /*
+       * Незнакомые фильтры названы в заголовке.
+       *
+       * Стандарт разрешает их игнорировать и предупреждает клиента,
+       * что данных придёт больше, чем он просил. Разрешает — но молча
+       * отдать лишнее значит оставить интегратора гадать, работает
+       * его фильтр или нет; проверять это ему пришлось бы счётом строк.
+       *
+       * Заголовок, а не поле в теле: тело задано схемой стандарта,
+       * и дописывать в него своё поле — то самое отклонение, за которым
+       * мы следим у других.
+       */
+      ...(query.unknown.length
+        ? { 'X-ICAR-ADE-Ignored-Filters': query.unknown.join(',') }
+        : {}),
       /*
        * Версия стандарта — заголовком, а не в теле. Потребитель должен
        * узнать её до разбора ответа: если завтра выйдет ADE 2.0, где

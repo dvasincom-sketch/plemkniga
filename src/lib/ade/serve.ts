@@ -61,39 +61,24 @@ export { ADE_COLLECTIONS, isAdeCollection, type AdeCollectionName } from '@/lib/
 /* Для собственного употребления в этом файле — переизлучение типа не вводит имя. */
 import type { AdeCollectionName } from '@/lib/ade/core'
 
-/**
- * Сколько отдаём за раз.
+
+/*
+ * Разбор строки запроса переехал в `query.ts` и отсюда переизлучается.
  *
- * Двести — не «сколько влезет», а величина, при которой страница ответа
- * остаётся в разумных мегабайтах даже у животного с полной родословной
- * и двумя десятками альтернативных идентификаторов. Потолок жёсткий:
- * `pageSize=100000` в запросе не должен превращаться в выгрузку всей книги
- * одним ответом — для этого есть постраничный обход.
+ * Причина не в опрятности, а та же, что у списка коллекций: этот файл
+ * тянет весь Payload, а разбор адреса нужен и прогону, и описанию
+ * интерфейса, которым база незачем.
  */
-export const ADE_PAGE_DEFAULT = 100
-export const ADE_PAGE_MAX = 200
+export {
+  ADE_PAGE_DEFAULT,
+  ADE_PAGE_MAX,
+  DATE_FIELD,
+  halfAnimalPair,
+  parseAdeQuery,
+  type AdeQuery,
+} from '@/lib/ade/query'
 
-export type AdeQuery = {
-  page: number
-  pageSize: number
-  /** Синхронизация: отдать только изменённое после указанного момента. */
-  modifiedSince?: string
-}
-
-export const parseAdeQuery = (url: URL): AdeQuery => {
-  const page = Math.max(1, Number.parseInt(url.searchParams.get('page') ?? '1', 10) || 1)
-  const raw = Number.parseInt(url.searchParams.get('pageSize') ?? '', 10)
-  const pageSize = Math.min(ADE_PAGE_MAX, raw > 0 ? raw : ADE_PAGE_DEFAULT)
-
-  const since = url.searchParams.get('modifiedSince')
-  const parsed = since ? new Date(since) : null
-
-  return {
-    page,
-    pageSize,
-    modifiedSince: parsed && !Number.isNaN(parsed.getTime()) ? parsed.toISOString() : undefined,
-  }
-}
+import { DATE_FIELD, type AdeQuery } from '@/lib/ade/query'
 
 /** Плоское животное из документа Payload — вход для отображения. */
 type Rel = { id?: number; identNumber?: string | null; name?: string | null } | number | null | undefined
@@ -172,15 +157,89 @@ const ownerWhere = (collection: string, orgId: number): Where =>
 
 type Loaded = { docs: Record<string, unknown>[]; total: number }
 
+/**
+ * Условия отбора, общие для всех коллекций.
+ *
+ * Одна функция на все коллекции, а не по условию в каждой ветке: фильтр,
+ * забытый в одной из одиннадцати, — это молча отданные лишние данные,
+ * и заметит это не тот, кто писал, а партнёр, у которого выборка
+ * не сходится.
+ *
+ * `from` включается, `to` — нет: так задано стандартом, и на границе
+ * суток соседние отрезки не перекрываются.
+ */
+function filters(collection: string, q: AdeQuery, animalId: number | null): Where[] {
+  const and: Where[] = []
+
+  if (q.modifiedFrom) and.push({ updatedAt: { greater_than_equal: q.modifiedFrom } })
+  if (q.modifiedTo) and.push({ updatedAt: { less_than: q.modifiedTo } })
+
+  const dateField = DATE_FIELD[collection]
+  if (dateField) {
+    if (q.dateFrom) and.push({ [dateField]: { greater_than_equal: q.dateFrom } })
+    if (q.dateTo) and.push({ [dateField]: { less_than: q.dateTo } })
+  }
+
+  /*
+   * Отбор по животному ложится на разные поля: у самого животного это
+   * его собственный ключ, у события — связь. Промах здесь означал бы
+   * пустую выдачу вместо событий, и клиент решил бы, что записей нет.
+   */
+  if (animalId !== null) {
+    and.push(collection === 'animals' ? { id: { equals: animalId } } : { animal: { equals: animalId } })
+  }
+
+  return and
+}
+
+/**
+ * Наш номер животного по паре «схема + идентификатор».
+ *
+ * Схемы ровно те, под которыми мы животных отдаём: иначе получилось бы,
+ * что забрать данные можно, а отобрать по тому же номеру нельзя.
+ * Две находки — отказ, а не «возьмём первую»: одинаковый номер у двух
+ * животных одного хозяйства значит, что книга уже противоречива,
+ * и выбирать за человека здесь нельзя.
+ */
+export async function findAnimalId(
+  payload: Payload,
+  ident: { scheme: string; id: string },
+  orgId: number,
+): Promise<number | null> {
+  const field =
+    ident.scheme === SCHEME.animal
+      ? 'identNumber'
+      : ident.scheme === SCHEME.accounting
+        ? 'accountingNumber'
+        : ident.scheme === SCHEME.iso11785
+          ? 'altIds.chipNumber'
+          : ident.scheme === SCHEME.fgias
+            ? 'fgias.baseUuid'
+            : null
+
+  if (!field) return null
+
+  const { docs } = await payload.find({
+    collection: 'animals',
+    where: { and: [{ [field]: { equals: ident.id } }, { owner: { equals: orgId } }] },
+    limit: 2,
+    depth: 0,
+    overrideAccess: true,
+  })
+
+  return docs.length === 1 ? Number(docs[0]!.id) : null
+}
+
+
 async function load(
   payload: Payload,
   collection: string,
   orgId: number,
   q: AdeQuery,
   depth: number,
+  animalId: number | null = null,
 ): Promise<Loaded> {
-  const and: Where[] = [ownerWhere(collection, orgId)]
-  if (q.modifiedSince) and.push({ updatedAt: { greater_than: q.modifiedSince } })
+  const and: Where[] = [ownerWhere(collection, orgId), ...filters(collection, q, animalId)]
 
   const res = await payload.find({
     collection: collection as never,
@@ -218,6 +277,7 @@ async function loadMovements(
   orgId: number,
   q: AdeQuery,
   side: 'in' | 'out' | 'death',
+  animalId: number | null = null,
 ): Promise<Loaded> {
   const and: Where[] = [
     side === 'in'
@@ -227,7 +287,13 @@ async function loadMovements(
         : { and: [{ from: { equals: orgId } }, { kind: { equals: 'death' } }] },
   ]
 
-  if (q.modifiedSince) and.push({ updatedAt: { greater_than: q.modifiedSince } })
+  /*
+   * Коллекция перемещений одна на три вида событий, и `collection`
+   * в фильтрах поэтому подставляется по стороне: у поступления,
+   * выбытия и падежа поле даты одно и то же, но пусть это будет видно
+   * из вызова, а не подразумевается.
+   */
+  and.push(...filters(side === 'death' ? 'deaths' : side === 'in' ? 'arrivals' : 'departures', q, animalId))
 
   const res = await payload.find({
     collection: 'movements',
@@ -274,6 +340,20 @@ export async function serveAdeCollection(
   orgId: number,
   q: AdeQuery,
 ): Promise<AdeCollection<Record<string, unknown>>> {
+  /*
+   * Животное разрешается один раз на запрос, а не в каждой ветке.
+   *
+   * `animal-id` приходит номером в чужой системе счисления, и превратить
+   * его в наш ключ — отдельный запрос к базе. Сделать это внутри ветки
+   * значило бы повторить его одиннадцать раз в коде и один раз
+   * в каждом ответе.
+   *
+   * `null` при заданном фильтре означает «такого животного здесь нет»,
+   * и выдача будет пустой — это верно: спросили о животном, которого
+   * в этой локации не существует.
+   */
+  const animalId = q.animal ? await findAnimalId(payload, q.animal, orgId) : null
+
   const page = <T>(items: T[], total: number): AdeCollection<T> => ({
     view: {
       totalItems: total,
@@ -286,12 +366,12 @@ export async function serveAdeCollection(
 
   switch (name) {
     case 'animals': {
-      const { docs, total } = await load(payload, 'animals', orgId, q, 1)
+      const { docs, total } = await load(payload, 'animals', orgId, q, 1, animalId)
       return page(docs.map((d) => adeAnimal(animalInput(d))), total)
     }
 
     case 'test-day-results': {
-      const { docs, total } = await load(payload, 'milk-tests', orgId, q, 1)
+      const { docs, total } = await load(payload, 'milk-tests', orgId, q, 1, animalId)
       const out = docs.flatMap((d) => {
         const animal = animalOf(d)
         if (!animal) return []
@@ -312,7 +392,7 @@ export async function serveAdeCollection(
     }
 
     case 'parturitions': {
-      const { docs, total } = await load(payload, 'calvings', orgId, q, 1)
+      const { docs, total } = await load(payload, 'calvings', orgId, q, 1, animalId)
       const out = docs.flatMap((d) => {
         const animal = animalOf(d)
         /*
@@ -339,7 +419,7 @@ export async function serveAdeCollection(
     }
 
     case 'inseminations': {
-      const { docs, total } = await load(payload, 'inseminations', orgId, q, 1)
+      const { docs, total } = await load(payload, 'inseminations', orgId, q, 1, animalId)
       const out = docs.flatMap((d) => {
         const animal = animalOf(d)
         if (!animal) return []
@@ -362,7 +442,7 @@ export async function serveAdeCollection(
     }
 
     case 'type-classifications': {
-      const { docs, total } = await load(payload, 'animal-exteriors', orgId, q, 1)
+      const { docs, total } = await load(payload, 'animal-exteriors', orgId, q, 1, animalId)
       const out = docs.flatMap((d) => {
         const animal = animalOf(d)
         if (!animal) return []
@@ -382,7 +462,7 @@ export async function serveAdeCollection(
     }
 
     case 'weights': {
-      const { docs, total } = await load(payload, 'weighings', orgId, q, 1)
+      const { docs, total } = await load(payload, 'weighings', orgId, q, 1, animalId)
       const out = docs.flatMap((d) => {
         const animal = animalOf(d)
         if (!animal || typeof d.weight !== 'number') return []
@@ -400,7 +480,7 @@ export async function serveAdeCollection(
     }
 
     case 'breeding-values': {
-      const { docs, total } = await load(payload, 'index-values', orgId, q, 1)
+      const { docs, total } = await load(payload, 'index-values', orgId, q, 1, animalId)
       const out = docs.flatMap((d) => {
         const animal = animalOf(d)
         if (!animal) return []
@@ -433,17 +513,17 @@ export async function serveAdeCollection(
      * а их две, и каждая видит свою.
      */
     case 'arrivals': {
-      const { docs, total } = await loadMovements(payload, orgId, q, 'in')
+      const { docs, total } = await loadMovements(payload, orgId, q, 'in', animalId)
       return page(docs.flatMap((d) => movementOf(d, (m) => adeArrival(m))), total)
     }
 
     case 'departures': {
-      const { docs, total } = await loadMovements(payload, orgId, q, 'out')
+      const { docs, total } = await loadMovements(payload, orgId, q, 'out', animalId)
       return page(docs.flatMap((d) => movementOf(d, (m) => adeDeparture(m))), total)
     }
 
     case 'deaths': {
-      const { docs, total } = await loadMovements(payload, orgId, q, 'death')
+      const { docs, total } = await loadMovements(payload, orgId, q, 'death', animalId)
       return page(docs.flatMap((d) => movementOf(d, (m) => adeDeath(m))), total)
     }
 
@@ -458,7 +538,7 @@ export async function serveAdeCollection(
      * с неизвестным исходом, а проверка, которой не было.
      */
     case 'pregnancy-checks': {
-      const { docs, total } = await load(payload, 'inseminations', orgId, q, 2)
+      const { docs, total } = await load(payload, 'inseminations', orgId, q, 2, animalId)
       const out = docs.flatMap((d) => {
         const animal = animalOf(d)
         if (!animal || !d.pregnancyCheckDate) return []

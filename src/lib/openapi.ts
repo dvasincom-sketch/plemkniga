@@ -695,7 +695,44 @@ export function buildOpenApi(payload: Payload, serverUrl: string): OpenApiDocume
           in: 'query',
           required: false,
           schema: { type: 'string', format: 'date-time' },
-          description: 'Отдать только изменённое с этого момента.',
+          description: 'Изменённое начиная с этого момента; конец включается.',
+        },
+        {
+          name: 'meta-modified-to',
+          in: 'query',
+          required: false,
+          schema: { type: 'string', format: 'date-time' },
+          description: 'И до этого момента; конец не включается.',
+        },
+        {
+          name: 'date-from',
+          in: 'query',
+          required: false,
+          schema: { type: 'string', format: 'date' },
+          description: 'По дате самого события, а не записи. Начало включается.',
+        },
+        {
+          name: 'date-to',
+          in: 'query',
+          required: false,
+          schema: { type: 'string', format: 'date' },
+          description: 'По дате события; конец не включается.',
+        },
+        {
+          name: 'animal-id',
+          in: 'query',
+          required: false,
+          schema: { type: 'string' },
+          description: 'События одного животного. Присылается только вместе с animal-scheme.',
+        },
+        {
+          name: 'animal-scheme',
+          in: 'query',
+          required: false,
+          schema: { type: 'string' },
+          description:
+            'Система, в которой выдан номер. Без неё номер не определяет животное: ' +
+            'один и тот же бывает племенным, учётным и номером радиометки.',
         },
       ],
       responses: {
