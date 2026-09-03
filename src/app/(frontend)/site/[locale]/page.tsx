@@ -647,63 +647,64 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
           <h2 className="text-[26px] font-medium leading-tight sm:text-[30px]">{m.who.title}</h2>
 
           {/*
-             Две карточки, и каждая ведёт дальше.
+             Две полосы одна под другой, а не две карточки рядом.
 
-             ## Что было не так
+             ## Почему не рядом
 
-             Рисунок стоял в строке с заголовком и висел на его уровне
-             сам по себе: заголовок в одну строку, рисунок в четыре —
-             и между ними полполосы воздуха. Текст шёл ниже во всю
-             ширину, так что связи «рисунок про это» не возникало вовсе.
-             Карточка кончалась абзацем, и читатель, которого раздел
-             только что назвал по имени, упирался в тупик.
+             Рядом они делят полотно пополам, и каждой достаётся колонка
+             в сорок знаков — вдвое уже меры, принятой на этой странице.
+             Текст в ней тянется вниз на шесть строк, рисунок висит
+             сверху в пустом квадрате, и обе половины выглядят
+             недоделанными. Мы перебрали три раскладки и каждый раз
+             упирались в одно: содержания на две колонки здесь нет,
+             а места мало.
 
-             ## Что стало
+             ## Почему полосой
 
-             Рисунок ушёл в подложку своего цвета и встал над заголовком
-             как знак раздела, а не как иллюстрация к строке. Обе
-             подложки одного размера, поэтому карточки выровнены по всей
-             высоте — прежде они разъезжались из-за разной длины текста.
+             Потому что такая полоса на странице уже есть и работает —
+             «Международный стандарт отрасли»: рисунок слева, текст
+             справа, во всю ширину. Читатель к этому строю привык
+             к третьему экрану, и заводить ради двух абзацев четвёртую
+             раскладку значило бы просить его разбираться заново.
 
-             И у каждой появилось продолжение: хозяйству — разбор
-             экономического индекса, объединению — каталог правил,
-             по которым книга спорит с записью. Это не украшение:
-             раздел отвечает на вопрос «кому это», и ответ без «а дальше
-             что» обрывается на полуслове.
+             Друг под другом они ещё и читаются по очереди, а это верно
+             по существу: хозяйство и объединение — два разных читателя
+             с разными вопросами, а не две колонки одного сравнения.
 
-             Подписи ссылок берутся из рамок самих страниц — переводить
-             их второй раз незачем.
+             ## Про рисунок без подложки
+
+             Серый квадрат вокруг него убран. Он ставился, чтобы
+             выровнять две карточки по высоте; в полосе выравнивать
+             нечего, а пустая подложка вокруг рисунка читалась как
+             не загрузившаяся картинка.
           */}
-          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="mt-8 space-y-4">
             {[
               { who: m.who.farms, href: '/economics', label: pages.economics.eyebrow },
               { who: m.who.associations, href: '/rules', label: pages.rules.eyebrow },
             ].map(({ who, href, label }, i) => (
               <div
                 key={who.title}
-                className="flex flex-col rounded-2xl bg-white p-6 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] sm:p-8"
+                className="flex flex-wrap items-start gap-x-8 gap-y-5 rounded-2xl border border-ink-100 bg-white px-6 py-6 sm:px-8 sm:py-8"
               >
-                <div className="flex h-[104px] w-[152px] items-center justify-center rounded-2xl bg-ink-50">
+                <div className="shrink-0">
                   {i === 0 ? <FarmArt title={who.title} /> : <AssociationArt title={who.title} />}
                 </div>
 
-                <h3 className="mt-6 text-[19px] font-medium leading-tight sm:text-[21px]">
-                  {who.title}
-                </h3>
-
-                {/*
-                   Абзац растёт, а ссылка прижата к низу: иначе она
-                   вставала на разной высоте в двух соседних карточках
-                   и читалась как часть текста, а не как выход из него.
-                */}
-                <p className="mt-4 grow text-[15px] leading-relaxed text-ink-500">{who.body}</p>
-
-                <Link
-                  href={`${base}/${locale}${href}`}
-                  className="mt-6 inline-block text-[15px] font-medium text-forest-600 underline underline-offset-4 hover:text-forest-500"
-                >
-                  {label} →
-                </Link>
+                <div className="min-w-[280px] flex-1">
+                  <h3 className="text-[19px] font-medium leading-tight sm:text-[21px]">
+                    {who.title}
+                  </h3>
+                  <p className="mt-3 max-w-[70ch] text-[16px] leading-relaxed text-ink-700">
+                    {who.body}
+                  </p>
+                  <Link
+                    href={`${base}/${locale}${href}`}
+                    className="mt-4 inline-block text-[15px] font-medium text-forest-600 underline underline-offset-4 hover:text-forest-500"
+                  >
+                    {label} →
+                  </Link>
+                </div>
               </div>
             ))}
           </div>
