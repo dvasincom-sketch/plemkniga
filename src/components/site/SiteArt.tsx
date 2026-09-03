@@ -195,16 +195,38 @@ function Arrow() {
   )
 }
 
-function Node({ label, accent = false }: { label?: string; accent?: boolean }) {
+/**
+ * Узел схемы, при желании с подписью под ним.
+ *
+ * Подпись — не пояснение узла, а его **исход**: то, что бывает с записью
+ * в этом месте и о чём схема иначе умалчивает. У проверок исход бывает
+ * обратный — запись возвращается в хозяйство, — и без этой подписи схема
+ * читалась как труба, по которой всё едет в одну сторону и всегда
+ * доезжает. Это неправда, и неправда в нашу пользу, что хуже вдвойне.
+ */
+function Node({
+  label,
+  accent = false,
+  note,
+}: {
+  label?: string
+  accent?: boolean
+  note?: string
+}) {
   return (
-    <div
-      className={`flex-none rounded-xl px-4 py-3 text-center text-[13px] leading-snug lg:w-[136px] ${
-        accent
-          ? 'bg-forest-500 font-medium text-white'
-          : 'border border-ink-100 bg-white text-ink-700'
-      }`}
-    >
-      {label}
+    <div className="flex-none lg:w-[136px]">
+      <div
+        className={`rounded-xl px-4 py-3 text-center text-[13px] leading-snug ${
+          accent
+            ? 'bg-forest-500 font-medium text-white'
+            : 'border border-ink-100 bg-white text-ink-700'
+        }`}
+      >
+        {label}
+      </div>
+      {note && (
+        <p className="mt-2 text-center text-[11px] leading-snug text-ink-400">{note}</p>
+      )}
     </div>
   )
 }
@@ -223,7 +245,16 @@ function Node({ label, accent = false }: { label?: string; accent?: boolean }) {
  * Прежняя редакция рисовала схему в SVG фиксированной ширины и
  * прокручивалась вбок — на телефоне это худшее, что можно сделать.
  */
-export function FlowArt({ nodes, title }: { nodes: string[]; title: string }) {
+export function FlowArt({
+  nodes,
+  title,
+  marks,
+}: {
+  nodes: string[]
+  title: string
+  /** Исходы у проверок и у книги — см. `Node`. */
+  marks?: { checks: string; book: string }
+}) {
   const [farm, checks, book, registry, market] = nodes
 
   return (
@@ -234,9 +265,9 @@ export function FlowArt({ nodes, title }: { nodes: string[]; title: string }) {
     >
       <Node label={farm} />
       <Arrow />
-      <Node label={checks} />
+      <Node label={checks} note={marks?.checks} />
       <Arrow />
-      <Node label={book} accent />
+      <Node label={book} accent note={marks?.book} />
       <Arrow />
 
       {/*
@@ -442,6 +473,144 @@ export function AssociationArt({ title }: { title: string }) {
       {[0, 1, 2].map((i) => (
         <rect key={i} x="75" y={22 + i * 17} width="34" height="4" rx="2" fill="#2E7D52" />
       ))}
+    </svg>
+  )
+}
+
+/* ------------------------------------------------------------------ *
+ *  Первый экран и книга под ключ                                      *
+ * ------------------------------------------------------------------ */
+
+/**
+ * Большой рисунок первого экрана: разворот книги.
+ *
+ * ## Что он говорит
+ *
+ * Что это книга, а не таблица. Слева страница записей, одна выбрана;
+ * справа — её происхождение, разложенное по поколениям; ниже — документ,
+ * который из этой записи выпускается. Три вещи, из-за которых книга
+ * и заводится, показаны разом, и ни одна не названа словом.
+ *
+ * ## Почему только на широком экране
+ *
+ * На узком он встал бы между заголовком и кнопкой, отодвинув действие
+ * за нижний край. Первый экран существует ради кнопки, а не ради
+ * рисунка, и уступать место рисунку он не должен.
+ *
+ * ## Почему линии родословной сплошные
+ *
+ * Пунктир у нас уже значит «неизвестно» — так помечен пропущенный
+ * предок. Соединить им известных предков значило бы сказать обратное
+ * тем же знаком.
+ */
+export function HeroArt({ title }: { title: string }) {
+  const rows = [0, 1, 2, 3, 4, 5]
+
+  return (
+    <svg
+      viewBox="0 0 420 340"
+      className="h-auto w-full max-w-[420px]"
+      role="img"
+      aria-label={title}
+    >
+      {/* разворот: две страницы и корешок между ними */}
+      <rect x="8" y="8" width="404" height="228" rx="14" fill="#efefef" stroke="#d0d0d0" />
+      <path d="M210 8v228" stroke="#d0d0d0" />
+
+      {/* левая страница: записи книги */}
+      {rows.map((i) => (
+        <g key={i}>
+          {i === 2 && <rect x="24" y={40 + i * 28 - 8} width="170" height="26" rx="6" fill="#EAF3EE" />}
+          <rect
+            x="32"
+            y={40 + i * 28}
+            width={i % 2 ? 108 : 138}
+            height="5"
+            rx="2.5"
+            fill={i === 2 ? '#2E7D52' : '#c9c9c9'}
+          />
+          <rect x="32" y={40 + i * 28 + 11} width="64" height="4" rx="2" fill="#d6d6d6" />
+        </g>
+      ))}
+
+      {/* правая страница: происхождение выбранной записи */}
+      <path
+        d="M240 118h22M262 118V70M262 118v48M262 70h20M262 166h20M292 70V48M292 70v44M292 166v-22M292 166v44M292 48h18M292 114h18M292 144h18M292 210h18"
+        fill="none"
+        stroke="#d0d0d0"
+        strokeWidth="1.5"
+      />
+      <rect x="226" y="108" width="16" height="20" rx="3" fill="#2E7D52" />
+      {[62, 158].map((y) => (
+        <rect key={y} x="282" y={y} width="14" height="18" rx="3" fill="#c9c9c9" />
+      ))}
+      {[40, 106, 136, 202].map((y) => (
+        <rect key={y} x="310" y={y} width="12" height="16" rx="3" fill="#dcdcdc" />
+      ))}
+
+      {/* выпущенный документ */}
+      <rect x="132" y="248" width="156" height="84" rx="10" fill="#fff" stroke="#d0d0d0" />
+      <rect x="148" y="266" width="86" height="5" rx="2.5" fill="#2E7D52" />
+      <rect x="148" y="282" width="112" height="4" rx="2" fill="#c9c9c9" />
+      <rect x="148" y="294" width="94" height="4" rx="2" fill="#c9c9c9" />
+      <circle cx="256" cy="308" r="14" fill="#EAF3EE" stroke="#BFD9C9" />
+      <path
+        d="M250 308l4 4 8-8"
+        fill="none"
+        stroke="#2E7D52"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+
+      {/* запись → документ */}
+      <path
+        d="M118 200v36h14"
+        fill="none"
+        stroke="#9a9a9a"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M126 230l6 6-6 6"
+        fill="none"
+        stroke="#9a9a9a"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+/**
+ * Порода, у которой книги нет: пустой лист становится заполненным.
+ *
+ * Пунктирный контур здесь на месте — он и в родословной значит
+ * «этого нет». Слева порода, о которой известно только имя; справа
+ * та же порода с записями. Между ними стрелка, и это всё содержание
+ * раздела: книга заводится, а не появляется сама.
+ */
+export function BreedBookArt({ title }: { title: string }) {
+  return (
+    <svg viewBox="0 0 184 88" className="h-[88px] w-full max-w-[184px]" role="img" aria-label={title}>
+      <rect
+        x="6"
+        y="11"
+        width="52"
+        height="66"
+        rx="6"
+        fill="none"
+        stroke="#c9c9c9"
+        strokeDasharray="5 4"
+      />
+      <rect x="18" y="24" width="28" height="4" rx="2" fill="#d6d6d6" />
+
+      <SheetArrow x={70} y={44} />
+
+      <rect x="110" y="5" width="52" height="66" rx="6" fill="#d6d6d6" />
+      <Sheet x={118} y={11} accent />
     </svg>
   )
 }

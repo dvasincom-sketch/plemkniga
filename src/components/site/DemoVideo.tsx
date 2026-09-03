@@ -1,4 +1,5 @@
 import { findPublicAsset } from '@/lib/media'
+import { BOOK_HOST } from '@/lib/hosts'
 import { DemoPlayer } from './DemoPlayer'
 
 /**
@@ -20,9 +21,14 @@ import { DemoPlayer } from './DemoPlayer'
  *
  * ## Как поставить запись
  *
- * Положите файл в `public/` под именем `demo` — подхватятся `.mp4`,
- * `.webm` или `.mov`. Рядом ложится `demo-poster` (`.jpg`, `.png`,
- * `.webp`) — первый кадр, который виден до нажатия.
+ * Положите файл в `public/product/` под именем `demo` — подхватятся
+ * `.mp4`, `.webm` или `.mov`. Рядом ложится `demo-poster` (`.jpg`,
+ * `.png`, `.webp`) — первый кадр, который виден до нажатия.
+ *
+ * Папка `product/` не для порядка: всё в ней принадлежит витрине
+ * и на домене книги не отдаётся вовсе (`lib/hosts.ts`). Запись работы,
+ * лежащая рядом со знаком Ассоциации, отдавалась бы с её домена —
+ * рассказ о продукте под именем организации, которая его не продаёт.
  *
  * ## Почему заставка обязательна, а не желательна
  *
@@ -61,6 +67,22 @@ import { DemoPlayer } from './DemoPlayer'
  * и слой, написанный под один файл, всё равно придётся переписать, когда
  * файлов станет много. Две переменные честнее выдуманной абстракции.
  *
+ * ## Про рамку окна
+ *
+ * Запись обведена окном браузера: три кружка и строка адреса. Это
+ * не украшение и не подражание чужим витринам.
+ *
+ * Без рамки движущийся прямоугольник посреди страницы читается как
+ * рекламный ролик — то есть как что-то снятое **про** продукт. Рамка
+ * говорит другое: это тот же браузер, в котором человек сейчас читает,
+ * и внутри него работающий кабинет. Разница между «нам показали ролик»
+ * и «я вижу, как это работает» — вся ценность записи.
+ *
+ * Адрес в строке настоящий и подставляется из настроек, а не написан
+ * буквами. Нарисованный адрес разошёлся бы с доменом при первом же
+ * переезде, и рамка, которая ручается за подлинность, начала бы врать
+ * первой.
+ *
  * ## Про автозапуск
  *
  * Первая редакция стояла на заставке и ждала нажатия — из соображения,
@@ -89,9 +111,9 @@ export function DemoVideo({
    * значит файл уже переехал, и локальная копия — остаток, который
    * иначе продолжал бы показываться вместо новой записи.
    */
-  const video = process.env.DEMO_VIDEO_URL || findPublicAsset('demo', ['mp4', 'webm', 'mov'])
+  const video = process.env.DEMO_VIDEO_URL || findPublicAsset('product/demo', ['mp4', 'webm', 'mov'])
   const poster =
-    process.env.DEMO_POSTER_URL || findPublicAsset('demo-poster', ['jpg', 'jpeg', 'png', 'webp'])
+    process.env.DEMO_POSTER_URL || findPublicAsset('product/demo-poster', ['jpg', 'jpeg', 'png', 'webp'])
 
   return (
     <section className="mt-20">
@@ -99,6 +121,22 @@ export function DemoVideo({
       <p className="mt-4 max-w-[70ch] text-[16px] leading-relaxed text-ink-700">{lead}</p>
 
       <div className="mt-8 overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-[0_1px_3px_rgb(23_24_26_/_0.08)]">
+        {/*
+           Верх окна: кружки и строка адреса. Кружки серые, а не красный
+           с жёлтым и зелёным, — цветные читались бы как состояние, а тут
+           это просто оконная рамка, и цвет ей нечего сообщать.
+        */}
+        <div className="flex items-center gap-3 border-b border-ink-100 bg-ink-50 px-4 py-2.5">
+          <div className="flex gap-1.5">
+            {[0, 1, 2].map((i) => (
+              <span key={i} className="h-2.5 w-2.5 rounded-full bg-ink-200" />
+            ))}
+          </div>
+          <div className="flex-1 truncate rounded-md bg-white px-3 py-1 text-[11px] text-ink-400">
+            {BOOK_HOST}
+          </div>
+        </div>
+
         {video ? (
           /*
              Показ идёт сам и без кнопок: разбор — в `DemoPlayer`.

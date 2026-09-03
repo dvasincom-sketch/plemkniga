@@ -9,6 +9,7 @@ import {
   SITE_PREFIX,
   isSharedPath,
   isSiteHost,
+  isProductAsset,
   redirectToSite,
   rewriteToSite,
 } from '@/lib/hosts'
@@ -110,8 +111,8 @@ const REWRITE: [from: string, to: string | null, why: string][] = [
    * показывала, а сервер не отдавал.
    */
   ['/logo.svg', null, 'знак — файл, а не страница'],
-  ['/demo.mp4', null, 'запись работы'],
-  ['/demo-poster.jpg', null, 'заставка записи'],
+  ['/product/demo.mp4', null, 'запись работы'],
+  ['/product/demo-poster.jpg', null, 'заставка записи'],
   ['/scalar-theme.css', null, 'оформление справочника'],
   ['/scalar/standalone.js', null, 'файл во вложенной папке'],
   /*
@@ -146,6 +147,30 @@ if (rewriteToSite('/sitemap.xml') !== '/site/sitemap.xml') {
 }
 if (rewriteToSite('/sites') !== '/site/sites') {
   fail('«/sites» принят за витринный путь')
+}
+
+/*
+ * Материалы витрины. Их отличие от прочей статики в том, что на домене
+ * книги они не отдаются вовсе: запись работы в кабинете — рассказ
+ * о продукте, и под именем Ассоциации она выглядит чужой.
+ *
+ * Отдельно проверяется похожее начало: «/products/…» — не наша папка,
+ * и наивная проверка вхождения увела бы такой адрес с домена книги
+ * неизвестно куда.
+ */
+const PRODUCT: [path: string, yes: boolean, why: string][] = [
+  ['/product/demo.mp4', true, 'запись работы'],
+  ['/product/demo-poster.jpg', true, 'заставка записи'],
+  ['/product/', true, 'сама папка'],
+  ['/products/cow.jpg', false, 'другое слово, начинается так же'],
+  ['/logo.svg', false, 'знак книги — общий'],
+  ['/product', false, 'без косой черты это уже не папка'],
+]
+
+for (const [path, yes, why] of PRODUCT) {
+  if (isProductAsset(path) !== yes) {
+    fail(`«${path}»: материал витрины ${isProductAsset(path)}, ожидалось ${yes} (${why})`)
+  }
 }
 
 console.log(`Проверено превращений адреса: ${REWRITE.length + 3}`)

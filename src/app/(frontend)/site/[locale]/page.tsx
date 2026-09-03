@@ -7,7 +7,9 @@ import { unbounded } from '@/lib/fonts'
 import { LocaleSwitcher } from '@/components/LocaleSwitcher'
 import {
   AssociationArt,
+  BreedBookArt,
   FarmArt,
+  HeroArt,
   FEATURE_ICONS,
   FlowArt,
   LayersArt,
@@ -172,6 +174,19 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
 
       <main className="container-page pb-8">
         {/* ---------------------------- Первый экран --------------------------- */}
+        {/*
+           Рисунок справа, и только на широком экране.
+
+           На узком он встал бы между заголовком и кнопкой и отодвинул
+           действие за нижний край. Первый экран существует ради кнопки,
+           а не ради рисунка, и уступать ей место он должен первым.
+
+           Ширина колонки задана числом, а не долей: текст первого экрана
+           держит меру строки в 70 знаков, и доля растянула бы его на
+           широком мониторе до нечитаемой длины ровно тогда, когда места
+           стало больше.
+        */}
+        <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-[1fr_420px]">
         <section className="max-w-[70ch] pt-6">
           <p className="text-[14px] uppercase tracking-wide text-forest-500">{s.eyebrow}</p>
 
@@ -204,6 +219,11 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
             </a>
           </div>
         </section>
+
+          <div className="hidden lg:block">
+            <HeroArt title={m.hero.title} />
+          </div>
+        </div>
 
         {/* --------------------- Международный стандарт --------------------- */}
         {/*
@@ -244,7 +264,7 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
            проверяемо прогоном; круглое непроверяемое число здесь было бы
            хуже отсутствия числа.
         */}
-        <section className="mt-14 grid grid-cols-2 gap-x-6 gap-y-8 border-y border-ink-100 py-8 lg:grid-cols-4">
+        <section className="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {s.proof.map((p, i) => {
             const href = PROOF_LINKS[i]
             const inner = (
@@ -258,19 +278,35 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
               </>
             )
 
+            /*
+               Признак нажимаемости виден в покое, а не только при наведении.
+
+               Прежняя редакция прятала «Разобрать →» до наведения, и число
+               выглядело просто числом: указатель на него никто не наводил,
+               потому что не за чем. С пальца этого признака не было вовсе —
+               наведения там не существует, и подсказка не появлялась
+               никогда.
+
+               Поэтому плашка обведена, надпись видна всегда и приглушена,
+               а наведение добавляет заливку и цвет. Три состояния вместо
+               двух: «сюда можно», «сюда сейчас» и «сюда нельзя» у числа
+               без разбора.
+            */
             return href ? (
               <Link
                 key={p.label}
                 href={`${base}/${locale}${href}`}
-                className="group block transition-colors"
+                className="group block rounded-2xl border border-ink-100 p-5 transition-colors hover:border-forest-500 hover:bg-white"
               >
                 {inner}
-                <span className="mt-2 inline-block text-[12px] text-forest-600 opacity-0 transition-opacity group-hover:opacity-100">
+                <span className="mt-3 inline-block text-[12px] text-ink-400 transition-colors group-hover:text-forest-600">
                   Разобрать →
                 </span>
               </Link>
             ) : (
-              <div key={p.label}>{inner}</div>
+              <div key={p.label} className="p-5">
+                {inner}
+              </div>
             )
           })}
         </section>
@@ -374,7 +410,18 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
            продукт говорит не про удой.
         */}
         <section className="mt-20">
-          <div className="rounded-2xl border border-brand-100 bg-brand-50 p-8 sm:p-10">
+          {/*
+             Рисунок слева, как у полосы о стандарте: пустой пунктирный
+             лист превращается в заполненный. Пунктир здесь не украшение —
+             он и в родословной значит «этого нет», и порода без книги
+             показана тем же знаком, что неизвестный предок.
+          */}
+          <div className="flex flex-col gap-8 rounded-2xl border border-brand-100 bg-brand-50 p-8 sm:p-10 lg:flex-row lg:items-start lg:gap-10">
+            <div className="shrink-0">
+              <BreedBookArt title={s.breeds.title} />
+            </div>
+
+            <div>
             <h2 className="max-w-[60ch] text-[26px] font-medium leading-tight sm:text-[30px]">
               {s.breeds.title}
             </h2>
@@ -390,6 +437,7 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
             >
               {s.breeds.link} →
             </a>
+            </div>
           </div>
         </section>
 
@@ -405,7 +453,7 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
              это худшее, что можно сделать со страницей.
           */}
           <div className="mt-8 rounded-2xl bg-white p-6 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] sm:p-8">
-            <FlowArt title={s.flow.title} nodes={s.flow.nodes} />
+            <FlowArt title={s.flow.title} nodes={s.flow.nodes} marks={s.flow.marks} />
           </div>
 
           <p className="mt-4 max-w-[70ch] text-[14px] leading-relaxed text-ink-500">{s.flow.note}</p>
@@ -544,7 +592,7 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
               */
               <div
                 key={who.title}
-                className="flex items-start gap-5 rounded-2xl border border-ink-100 p-6"
+                className="flex items-start gap-5 rounded-2xl border border-ink-100 bg-white p-6"
               >
                 {/*
                    Рисунки разные не для украшения: у хозяйства один лист,

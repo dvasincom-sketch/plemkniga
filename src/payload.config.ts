@@ -1,4 +1,5 @@
 import path from 'path'
+import { trustedOrigins } from '@/lib/hosts'
 import { fileURLToPath } from 'url'
 import { buildConfig } from 'payload'
 import { postgresAdapter } from '@payloadcms/db-postgres'
@@ -245,8 +246,16 @@ export default buildConfig({
     prodMigrations: migrations,
   }),
   sharp,
-  cors: [process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'],
-  csrf: [process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'],
+  /*
+   * Доверенные источники берутся из тех же настроек, что и разведение
+   * доменов (`lib/hosts.ts`). Здесь стоял один адрес из переменной
+   * `NEXT_PUBLIC_SERVER_URL`, и это тихо ломало вход со всякого другого
+   * домена, на котором приложение работает: служебное имя площадки,
+   * `www`, показательная книга. Отказ выглядел как поломка входа вообще,
+   * а не как незнакомый источник.
+   */
+  cors: trustedOrigins(),
+  csrf: trustedOrigins(),
   i18n: {
     supportedLanguages: { ru },
     fallbackLanguage: 'ru',

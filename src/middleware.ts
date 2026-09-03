@@ -1,5 +1,13 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { DEMO_HOST, DEMO_READY, isSiteHost, redirectToSite, rewriteToSite } from '@/lib/hosts'
+import {
+  DEMO_HOST,
+  DEMO_READY,
+  SITE_HOSTS,
+  isProductAsset,
+  isSiteHost,
+  redirectToSite,
+  rewriteToSite,
+} from '@/lib/hosts'
 
 /**
  * Разведение двух доменов по одному приложению.
@@ -65,6 +73,19 @@ export function middleware(request: NextRequest) {
    * способом, каким его запросили.
    */
   if (!isSiteHost(host)) {
+    /*
+     * Материалы витрины на домене книги не отдаются: запись работы
+     * в кабинете — рассказ о продукте, и под именем Ассоциации она
+     * выглядит чужой. Перенаправление, а не «не найдено»: файл
+     * существует, просто живёт по другому адресу.
+     */
+    if (isProductAsset(request.nextUrl.pathname)) {
+      return NextResponse.redirect(
+        new URL(`https://${SITE_HOSTS[0]}${request.nextUrl.pathname}`),
+        308,
+      )
+    }
+
     const away = redirectToSite(request.nextUrl.pathname)
     if (away) return NextResponse.redirect(new URL(away), 308)
     return NextResponse.next()
