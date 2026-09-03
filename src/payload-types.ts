@@ -1521,6 +1521,26 @@ export interface MilkTest {
   laboratory?: (number | null) | Organization;
   source?: ('lab' | 'owner' | 'import' | 'api') | null;
   /**
+   * Буква привычного обозначения: A4, B4
+   */
+  recordingProtocol?: ('A-OfficialMRORepresentative' | 'B-HerdOwnerOrNominee' | 'C-Both') | null;
+  /**
+   * Цифра привычного обозначения: 4 — раз в квартал, 12 — ежемесячно
+   */
+  recordingPerYear?: number | null;
+  recordingScheme?: ('AllMilkingsAtTestday' | 'AllMilkingsInPeriod' | 'OneMilkingAtTestday') | null;
+  samplingMoment?: ('Composite' | 'Morning' | 'Evening') | null;
+  samplingScheme?:
+    | (
+        | 'ProportionalSizeSamplingOfAllMilkings'
+        | 'ConstantSizeSamplingOfAllMilkings'
+        | 'AlternateSampling'
+        | 'CorrectedSampling'
+        | 'OneMilkingSampleInAMS'
+        | 'MulitpleMilkingSampleInAMS'
+      )
+    | null;
+  /**
    * Заполняется только у записей, принятых обменом
    */
   ade?: {
@@ -3394,6 +3414,11 @@ export interface MilkTestsSelect<T extends boolean = true> {
   somaticCells?: T;
   laboratory?: T;
   source?: T;
+  recordingProtocol?: T;
+  recordingPerYear?: T;
+  recordingScheme?: T;
+  samplingMoment?: T;
+  samplingScheme?: T;
   ade?:
     | T
     | {

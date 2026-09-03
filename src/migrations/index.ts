@@ -7,7 +7,8 @@ import * as migration_20260901_090000_gradings_and_calving_event from './2026090
 import * as migration_20260901_150000_exterior_scales_and_semen_stock from './20260901_150000_exterior_scales_and_semen_stock';
 import * as migration_20260902_120000_origin_identity from './20260902_120000_origin_identity'
 import * as migration_20260902_200000_ade_origin from './20260902_200000_ade_origin'
-import * as migration_20260903_100000_breed_direction from './20260903_100000_breed_direction';
+import * as migration_20260903_100000_breed_direction from './20260903_100000_breed_direction'
+import * as migration_20260903_130000_milk_recording_method from './20260903_130000_milk_recording_method';
 import * as migration_20260814_195548 from './20260814_195548';
 import * as migration_20260815_061539 from './20260815_061539';
 import * as migration_20260815_075706 from './20260815_075706';
@@ -383,5 +384,10 @@ export const migrations = [
     up: migration_20260903_100000_breed_direction.up,
     down: migration_20260903_100000_breed_direction.down,
     name: '20260903_100000_breed_direction',
+  },
+  {
+    up: migration_20260903_130000_milk_recording_method.up,
+    down: migration_20260903_130000_milk_recording_method.down,
+    name: '20260903_130000_milk_recording_method',
   },
 ];

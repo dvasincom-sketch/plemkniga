@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { findPublicAsset } from '@/lib/media'
 import { currentTenant } from '@/lib/tenant-server'
+import { PlemLogo } from '@/components/PlemLogo'
 
 /**
  * Знак организации, ведущей книгу.
@@ -48,8 +49,31 @@ export async function Logo({
   href?: string
   label?: string
 }) {
-  const custom = findPublicAsset('logo')
   const t = await currentTenant()
+
+  /*
+   * Показательная книга не носит чужой знак.
+   *
+   * Логотип берётся из файла в `public/`, а файл там один — тот,
+   * который загрузила Ассоциация. Приложение одно, значит и знак
+   * подхватывался бы один: показательная книга открывалась бы
+   * под знаком голштинской ассоциации, к которой она не имеет
+   * отношения. Это не оформление, а подпись под содержимым:
+   * страница со знаком организации читается как её страница.
+   *
+   * Поэтому у показательной книги свой знак — знак продукта.
+   * Он ничей в отраслевом смысле и никого не представляет,
+   * а значит не может сказать неправду.
+   */
+  const custom = t.key === 'demo' ? null : findPublicAsset('logo')
+
+  if (t.key === 'demo') {
+    return (
+      <Link href={href} className={`flex items-center ${className}`} aria-label={label}>
+        <PlemLogo />
+      </Link>
+    )
+  }
 
   return (
     <Link

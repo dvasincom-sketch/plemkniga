@@ -86,6 +86,7 @@ export default async function CompliancePage({
   const locale: Locale = raw
   const frame = PAGE_MESSAGES[locale].pages.compliance
   const notice = PAGE_MESSAGES[locale].notice
+  const trust = PAGE_MESSAGES[locale].trust
 
   const counts = countByState()
 
@@ -107,6 +108,17 @@ export default async function CompliancePage({
             {notice}
           </p>
         )}
+
+        {/*
+           Довод о доверии стоит на первом экране страницы соответствия,
+           потому что именно здесь читатель ищет печать и не находит её.
+           Неназванная слабость додумывается в худшую сторону; названная
+           становится частью разговора, которым управляем мы.
+        */}
+        <div className="mt-8 max-w-[75ch] rounded-2xl border border-brand-100 bg-brand-50 p-6 sm:p-7">
+          <h2 className="text-[18px] font-medium leading-tight">{trust.title}</h2>
+          <p className="mt-3 text-[15px] leading-relaxed text-ink-700">{trust.body}</p>
+        </div>
 
         <div className="mt-6 max-w-[80ch] space-y-4 text-[15px] leading-relaxed text-ink-700">
           <p>
