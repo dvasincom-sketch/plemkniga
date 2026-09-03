@@ -543,6 +543,24 @@
   .data-table tbody tr:not(.is-empty):hover td .ipc-negative {
     color: #fff;
   }
+  /*
+   * Ссылки и подписи внутри подсвеченной строки тоже белеют.
+   *
+   * Без этого строка красилась зелёным, а ссылка оставалась тёмно-серой
+   * и подпись состояния — на светлой плашке: получалась рябь, в которой
+   * не читается ни то ни другое. Цвет здесь ставится жёстко, потому что
+   * у самих ссылок он задан утилитами, а те лежат вне слоя и иначе
+   * перебивают подсветку.
+   */
+  .data-table tbody tr:not(.is-empty):hover td a,
+  .data-table tbody tr:not(.is-empty):hover td .row-chip {
+    color: #fff !important;
+    background: transparent;
+    border-color: rgb(255 255 255 / 0.4);
+  }
+  .data-table tbody tr:not(.is-empty):hover td a {
+    text-decoration-color: rgb(255 255 255 / 0.6);
+  }
 
   /*
    * Выделенная колонка таблицы сравнения.

@@ -13,6 +13,7 @@ import { LOCALE_CODES, isLocale, localeInfo, type Locale } from '@/lib/i18n/loca
 import { BOOK_URL, PRODUCT_MAIL, SITE_PREFIX, isSiteHost } from '@/lib/hosts'
 import { breedCatalog } from '@/lib/breeds-catalog-server'
 import { countByState, type BreedRow } from '@/lib/breeds-catalog'
+import { BOOK_FEATURES } from '@/lib/book-features'
 
 /**
  * Витрина продукта — то, что видно на `plem.online`.
@@ -391,13 +392,43 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
             {s.inside.lead}
           </p>
 
-          <div className="mt-6 grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
-            {s.inside.items.map((item) => (
-              <div key={item.title} className="border-t border-ink-100 pt-4">
-                <h4 className="text-[15px] font-medium leading-snug">{item.title}</h4>
-                <p className="mt-1.5 text-[14px] leading-relaxed text-ink-500">{item.body}</p>
-              </div>
-            ))}
+          {/*
+             Каждая подпись — ссылка на разбор своего раздела.
+
+             Порядок подписей и порядок разборов один и тот же список
+             (`lib/book-features.ts`), поэтому пара не может разъехаться:
+             подпись без страницы или страница без подписи невозможны
+             по устройству, а не по внимательности.
+          */}
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {s.inside.items.map((item, i) => {
+              const feature = BOOK_FEATURES[i]
+              const card = (
+                <>
+                  <h4 className="text-[15px] font-medium leading-snug">{item.title}</h4>
+                  <p className="mt-2 text-[14px] leading-relaxed text-ink-500">{item.body}</p>
+                  {feature && (
+                    <span className="mt-3 inline-block text-[13px] font-medium text-forest-600">
+                      Подробнее →
+                    </span>
+                  )}
+                </>
+              )
+
+              return feature ? (
+                <Link
+                  key={item.title}
+                  href={`${base}/${locale}/book/${feature.slug}`}
+                  className="group rounded-2xl border border-ink-100 bg-white p-5 transition-colors hover:border-forest-500"
+                >
+                  {card}
+                </Link>
+              ) : (
+                <div key={item.title} className="rounded-2xl border border-ink-100 bg-white p-5">
+                  {card}
+                </div>
+              )
+            })}
           </div>
         </section>
 
@@ -501,6 +532,35 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
               {s.footer.note}
             </a>
           </div>
+        </section>
+
+        {/* ------------------------------- Зачем ------------------------------- */}
+        {/*
+           Стоит предпоследним, перед приглашением написать.
+
+           Раньше здесь не было ничего: страница рассказывала, что книга
+           умеет, и молчала о том, зачем эта работа делается. Читатель,
+           дочитавший до конца, второй вопрос задаёт сам — и не получив
+           ответа, достраивает его сам, обычно неверно: «продают софт».
+           Ответ дан числами, а не прилагательными: пород столько-то,
+           книг у них ноль.
+        */}
+        <section className="mt-20 max-w-[75ch]">
+          <h2 className="text-[26px] font-medium leading-tight sm:text-[30px]">
+            {s.purpose.title}
+          </h2>
+          <p className="mt-4 text-[16px] leading-relaxed text-ink-700">
+            {s.purpose.body
+              .replace(/\{all\}/g, breedNumbers.all)
+              .replace(/\{ready\}/g, breedNumbers.ready)
+              .replace(/\{own\}/g, breedNumbers.own)}
+          </p>
+          <a
+            href={`${base}/${locale}/breeds`}
+            className="mt-4 inline-block text-[15px] font-medium text-forest-600 underline underline-offset-4 hover:text-forest-500"
+          >
+            {s.breeds.link} →
+          </a>
         </section>
 
         {/* ------------------------------ Как начать --------------------------- */}

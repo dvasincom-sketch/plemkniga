@@ -1,4 +1,7 @@
 import registry from '@/data/fgias-dairy-breeds.json'
+import { BOOK_FEATURES } from '@/lib/book-features'
+import { SITE_MESSAGES } from '@/lib/i18n/site-messages'
+import { LOCALE_CODES } from '@/lib/i18n/locales'
 import {
   ICAR_BREEDS,
   ICAR_BY_CODE,
@@ -157,6 +160,38 @@ console.log(`Состояния на живой книге: ${STATE_LABEL.book} 
 console.log(
   `Готово к ведению: ${holsteinCount.ready}, в справочнике: ${holsteinCount.listed}`,
 )
+
+/* ------------------------------------------------------------------ *
+ *  Разделы книги: подпись и страница ходят парой                     *
+ * ------------------------------------------------------------------ */
+
+/*
+ * Перечень на витрине и разборы разделов — два списка, идущие в паре
+ * по порядку. Разъехавшись, они дают худшее: подпись «Родословная»
+ * ведёт на страницу про документы, и заметит это не разработчик,
+ * а посетитель.
+ */
+for (const code of LOCALE_CODES) {
+  const items = SITE_MESSAGES[code].inside.items
+  if (items.length !== BOOK_FEATURES.length) {
+    fails.push(
+      `у языка «${code}» ${items.length} подписей разделов, а разборов ${BOOK_FEATURES.length} — ` +
+        'подпись поведёт не на свою страницу',
+    )
+  }
+}
+
+const slugs = new Set(BOOK_FEATURES.map((f) => f.slug))
+if (slugs.size !== BOOK_FEATURES.length) fails.push('у разделов книги повторяются адреса')
+
+for (const f of BOOK_FEATURES) {
+  if (!f.limits.length) {
+    fails.push(`у раздела «${f.title}» не названы пределы — он читается как реклама`)
+  }
+  if (!f.body.length) fails.push(`у раздела «${f.title}» нет разбора`)
+}
+
+console.log(`Разделов книги: ${BOOK_FEATURES.length}, у каждого названы пределы`)
 
 /* ------------------------------------------------------------------ */
 
