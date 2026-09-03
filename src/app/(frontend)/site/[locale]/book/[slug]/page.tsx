@@ -157,12 +157,27 @@ export default async function BookFeaturePage({
         <section className="mt-12">
           <h2 className="text-[20px] font-medium leading-tight">Другие разделы</h2>
 
-          <div className="mt-5 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+          {/*
+             Подсвечивается вся плашка, а не черта над ней.
+
+             Раньше наведение окрашивало верхнюю границу — полоску
+             в один пиксель, отделявшую строку от предыдущей. Отклик
+             появлялся не там, куда смотрит человек: указатель стоит
+             на слове, а загорается край, причём край **над** словом,
+             то есть визуально ближе к соседней строке сверху. В среднем
+             столбце это читалось как подчёркивание чужого пункта.
+
+             Плашка с заливкой отвечает на другой вопрос: не «где
+             проходит граница», а «что откроется, если нажать». Граница
+             остаётся, но перестаёт быть единственным признаком —
+             и служит только разделителем, каким и была.
+          */}
+          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {others.map((f) => (
               <Link
                 key={f.slug}
                 href={`/${locale}/book/${f.slug}`}
-                className="border-t border-ink-100 pt-3 transition-colors hover:border-forest-500"
+                className="rounded-xl border border-ink-100 px-4 py-3 transition-colors hover:border-forest-500 hover:bg-white"
               >
                 <span className="text-[15px] font-medium">{f.title}</span>
               </Link>
