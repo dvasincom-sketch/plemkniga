@@ -168,13 +168,13 @@ type Loaded = { docs: Record<string, unknown>[]; total: number }
  * `from` включается, `to` — нет: так задано стандартом, и на границе
  * суток соседние отрезки не перекрываются.
  */
-function filters(collection: string, q: AdeQuery, animalId: number | null): Where[] {
+function filters(name: AdeCollectionName, q: AdeQuery, animalId: number | null): Where[] {
   const and: Where[] = []
 
   if (q.modifiedFrom) and.push({ updatedAt: { greater_than_equal: q.modifiedFrom } })
   if (q.modifiedTo) and.push({ updatedAt: { less_than: q.modifiedTo } })
 
-  const dateField = DATE_FIELD[collection]
+  const dateField = DATE_FIELD[name]
   if (dateField) {
     if (q.dateFrom) and.push({ [dateField]: { greater_than_equal: q.dateFrom } })
     if (q.dateTo) and.push({ [dateField]: { less_than: q.dateTo } })
@@ -186,7 +186,7 @@ function filters(collection: string, q: AdeQuery, animalId: number | null): Wher
    * пустую выдачу вместо событий, и клиент решил бы, что записей нет.
    */
   if (animalId !== null) {
-    and.push(collection === 'animals' ? { id: { equals: animalId } } : { animal: { equals: animalId } })
+    and.push(name === 'animals' ? { id: { equals: animalId } } : { animal: { equals: animalId } })
   }
 
   return and
@@ -233,13 +233,14 @@ export async function findAnimalId(
 
 async function load(
   payload: Payload,
+  name: AdeCollectionName,
   collection: string,
   orgId: number,
   q: AdeQuery,
   depth: number,
   animalId: number | null = null,
 ): Promise<Loaded> {
-  const and: Where[] = [ownerWhere(collection, orgId), ...filters(collection, q, animalId)]
+  const and: Where[] = [ownerWhere(collection, orgId), ...filters(name, q, animalId)]
 
   const res = await payload.find({
     collection: collection as never,
@@ -364,14 +365,30 @@ export async function serveAdeCollection(
     member: items,
   })
 
+  /*
+   * Спросили о животном, которого здесь нет, — отдаём пусто.
+   *
+   * Раньше это подразумевалось: `animalId` оставался `null`, а `null`
+   * ниже означает «фильтра по животному нет». Два разных обстоятельства
+   * — «не спрашивали» и «спрашивали, не нашли» — сходились в одно
+   * значение, и второе молча превращалось в первое: на вопрос о единственном
+   * животном отдавалось всё стадо.
+   *
+   * Живой прогон это и показал: отбор по выдуманному номеру вернул
+   * 8947 записей вместо нуля. Ошибки не было ни у кого — ответ верный
+   * по форме, просто не о том, о чём спросили; клиент, доверившийся ему,
+   * приписал бы чужие удои своей корове.
+   */
+  if (q.animal && animalId === null) return page([], 0)
+
   switch (name) {
     case 'animals': {
-      const { docs, total } = await load(payload, 'animals', orgId, q, 1, animalId)
+      const { docs, total } = await load(payload, 'animals', 'animals', orgId, q, 1, animalId)
       return page(docs.map((d) => adeAnimal(animalInput(d))), total)
     }
 
     case 'test-day-results': {
-      const { docs, total } = await load(payload, 'milk-tests', orgId, q, 1, animalId)
+      const { docs, total } = await load(payload, 'test-day-results', 'milk-tests', orgId, q, 1, animalId)
       const out = docs.flatMap((d) => {
         const animal = animalOf(d)
         if (!animal) return []
@@ -392,7 +409,7 @@ export async function serveAdeCollection(
     }
 
     case 'parturitions': {
-      const { docs, total } = await load(payload, 'calvings', orgId, q, 1, animalId)
+      const { docs, total } = await load(payload, 'parturitions', 'calvings', orgId, q, 1, animalId)
       const out = docs.flatMap((d) => {
         const animal = animalOf(d)
         /*
@@ -419,7 +436,7 @@ export async function serveAdeCollection(
     }
 
     case 'inseminations': {
-      const { docs, total } = await load(payload, 'inseminations', orgId, q, 1, animalId)
+      const { docs, total } = await load(payload, 'inseminations', 'inseminations', orgId, q, 1, animalId)
       const out = docs.flatMap((d) => {
         const animal = animalOf(d)
         if (!animal) return []
@@ -442,7 +459,7 @@ export async function serveAdeCollection(
     }
 
     case 'type-classifications': {
-      const { docs, total } = await load(payload, 'animal-exteriors', orgId, q, 1, animalId)
+      const { docs, total } = await load(payload, 'type-classifications', 'animal-exteriors', orgId, q, 1, animalId)
       const out = docs.flatMap((d) => {
         const animal = animalOf(d)
         if (!animal) return []
@@ -462,7 +479,7 @@ export async function serveAdeCollection(
     }
 
     case 'weights': {
-      const { docs, total } = await load(payload, 'weighings', orgId, q, 1, animalId)
+      const { docs, total } = await load(payload, 'weights', 'weighings', orgId, q, 1, animalId)
       const out = docs.flatMap((d) => {
         const animal = animalOf(d)
         if (!animal || typeof d.weight !== 'number') return []
@@ -480,7 +497,7 @@ export async function serveAdeCollection(
     }
 
     case 'breeding-values': {
-      const { docs, total } = await load(payload, 'index-values', orgId, q, 1, animalId)
+      const { docs, total } = await load(payload, 'breeding-values', 'index-values', orgId, q, 1, animalId)
       const out = docs.flatMap((d) => {
         const animal = animalOf(d)
         if (!animal) return []
@@ -538,7 +555,7 @@ export async function serveAdeCollection(
      * с неизвестным исходом, а проверка, которой не было.
      */
     case 'pregnancy-checks': {
-      const { docs, total } = await load(payload, 'inseminations', orgId, q, 2, animalId)
+      const { docs, total } = await load(payload, 'pregnancy-checks', 'inseminations', orgId, q, 2, animalId)
       const out = docs.flatMap((d) => {
         const animal = animalOf(d)
         if (!animal || !d.pregnancyCheckDate) return []

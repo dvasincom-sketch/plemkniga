@@ -1,3 +1,5 @@
+import type { AdeCollectionName } from '@/lib/ade/core'
+
 /**
  * Разбор строки запроса обмена — без базы и без Payload.
  *
@@ -143,7 +145,7 @@ export const halfAnimalPair = (url: URL): boolean => {
  * события вовсе, а у племенной ценности дата расчёта — свойство расчёта,
  * а не наблюдения.
  */
-export const DATE_FIELD: Record<string, string | null> = {
+export const DATE_FIELD: Record<AdeCollectionName, string | null> = {
   animals: null,
   'breeding-values': null,
   'test-day-results': 'date',

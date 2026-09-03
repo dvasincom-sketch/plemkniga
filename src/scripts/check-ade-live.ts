@@ -241,11 +241,16 @@ async function main() {
   const narrow = await ask(`${base}?pageSize=200&date-from=${first}&date-to=${to}`)
 
   if (narrow.total === 0) fail(`отбор по date-from=${first}&date-to=${to} отдал пусто`)
-  if (narrow.total >= all.total && all.total > narrow.total) {
-    fail('отбор по дате ничего не сузил')
-  }
-  if (last > to && narrow.total === all.total) {
-    fail(`date-to не подействовал: в книге есть запись за ${last}, а отдано всё`)
+
+  /*
+   * Главное здесь — не «что-то вернулось», а «вернулось меньше».
+   * Фильтр, который не сузил выдачу при том, что в книге есть записи
+   * за пределами отрезка, не работает вовсе; именно так и оказалось
+   * при первом прогоне, и отличить это от «просто все записи в отрезке»
+   * можно только сравнением с полной выдачей.
+   */
+  if (last >= to && narrow.total >= all.total) {
+    fail(`date-to не подействовал: в книге есть запись за ${last}, а отдано ${narrow.total} из ${all.total}`)
   }
 
   for (const m of narrow.member) {
@@ -284,6 +289,16 @@ async function main() {
   )
 
   if (byAnimal.total === 0) fail(`отбор по животному ${ident} отдал пусто`)
+
+  /*
+   * Одно животное не может дать столько же записей, сколько всё
+   * хозяйство, — если только в хозяйстве нет ровно одного животного.
+   * Без этого сравнения не работающий фильтр выглядит как работающий:
+   * записи в ответе есть, и все они, разумеется, «подходят».
+   */
+  if (byAnimal.total >= all.total && all.total > 0) {
+    fail(`отбор по животному ${ident} отдал ${byAnimal.total} из ${all.total} — не сузил`)
+  }
 
   for (const m of byAnimal.member) {
     const a = m.animal as { id?: string } | undefined
