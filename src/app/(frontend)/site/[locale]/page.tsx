@@ -222,6 +222,15 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
 
           <div className="hidden lg:block">
             <HeroArt title={m.hero.title} />
+            {/*
+               Подпись под рисунком, а не внутри него: надпись в разметке
+               рисунка не переводится. Приглушена и мелка намеренно —
+               она объясняет картинку тому, кто на неё посмотрел,
+               и не спорит с вводным абзацем слева.
+            */}
+            <p className="mt-4 max-w-[46ch] text-[13px] leading-snug text-ink-400">
+              {m.hero.art}
+            </p>
           </div>
         </div>
 
