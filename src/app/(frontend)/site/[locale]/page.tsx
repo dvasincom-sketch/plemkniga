@@ -199,12 +199,6 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
           ))}
         </section>
 
-        {/* ------------------------------ Проблема ----------------------------- */}
-        <section className="mt-16 max-w-[70ch]">
-          <h2 className="text-[26px] font-medium leading-tight sm:text-[30px]">{m.problem.title}</h2>
-          <p className="mt-4 text-[16px] leading-relaxed text-ink-700">{m.problem.body}</p>
-        </section>
-
         {/* --------------------------- Три контура ----------------------------- */}
         <section className="mt-16">
           <h2 className="text-[26px] font-medium leading-tight sm:text-[30px]">{s.layers.title}</h2>
@@ -248,6 +242,26 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
           </div>
         </section>
 
+        {/* ------------------------------ Проблема ----------------------------- */}
+        <section className="mt-16 max-w-[70ch]">
+          <h2 className="text-[26px] font-medium leading-tight sm:text-[30px]">{m.problem.title}</h2>
+          <p className="mt-4 text-[16px] leading-relaxed text-ink-700">{m.problem.body}</p>
+        </section>
+
+        {/* ------------------------------ Рейтинг ------------------------------ */}
+        <section className="mt-20">
+          <div className="grid grid-cols-1 items-center gap-10 rounded-2xl bg-white p-8 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] lg:grid-cols-[1fr_320px]">
+            <div className="max-w-[60ch]">
+              <h2 className="text-[26px] font-medium leading-tight sm:text-[30px]">
+                {s.ranking.title}
+              </h2>
+              <p className="mt-4 text-[16px] leading-relaxed text-ink-700">{s.ranking.body}</p>
+            </div>
+
+            <RankArt title={s.ranking.title} />
+          </div>
+        </section>
+
         {/* ---------------------------- Возможности ---------------------------- */}
         <section className="mt-20">
           <h2 className="text-[26px] font-medium leading-tight sm:text-[30px]">
@@ -268,6 +282,27 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
                 </div>
               )
             })}
+          </div>
+        </section>
+
+        {/* --------------------- Порода без своей книги ------------------------ */}
+        {/*
+           Стоит после перечня возможностей и до пути данных.
+
+           Довод адресован не хозяйству, а породному объединению
+           и государству: сохранение малочисленной породы упирается
+           не в геномику, а в учёт — пока у породы нет книги, сохранять
+           формально нечего. Это единственное место на странице, где
+           продукт говорит не про удой.
+        */}
+        <section className="mt-20">
+          <div className="rounded-2xl border border-brand-100 bg-brand-50 p-8 sm:p-10">
+            <h2 className="max-w-[60ch] text-[26px] font-medium leading-tight sm:text-[30px]">
+              {s.breeds.title}
+            </h2>
+            <p className="mt-4 max-w-[75ch] text-[16px] leading-relaxed text-ink-700">
+              {s.breeds.body}
+            </p>
           </div>
         </section>
 
@@ -317,17 +352,25 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
           </p>
         </section>
 
-        {/* ------------------------------ Рейтинг ------------------------------ */}
+        {/* ----------------------- Чего система не делает ---------------------- */}
+        {/*
+           Блок стоит перед «кому это», и это осознанный порядок:
+           сперва читатель узнаёт, чем система не является, и только
+           потом решает, он ли это. Недостающее люди достраивают сами
+           и достраивают неверно — «племенной учёт» читается как
+           «программа для фермы», после чего страницу закрывают,
+           решив, что такая уже есть.
+        */}
         <section className="mt-20">
-          <div className="grid grid-cols-1 items-center gap-10 rounded-2xl bg-white p-8 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)] lg:grid-cols-[1fr_320px]">
-            <div className="max-w-[60ch]">
-              <h2 className="text-[26px] font-medium leading-tight sm:text-[30px]">
-                {s.ranking.title}
-              </h2>
-              <p className="mt-4 text-[16px] leading-relaxed text-ink-700">{s.ranking.body}</p>
-            </div>
+          <h2 className="text-[26px] font-medium leading-tight sm:text-[30px]">{s.limits.title}</h2>
 
-            <RankArt title={s.ranking.title} />
+          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {s.limits.items.map((item) => (
+              <div key={item.title} className="rounded-2xl border border-ink-100 bg-white p-6">
+                <h3 className="text-[16px] font-medium leading-snug">{item.title}</h3>
+                <p className="mt-2 text-[14px] leading-relaxed text-ink-500">{item.body}</p>
+              </div>
+            ))}
           </div>
         </section>
 

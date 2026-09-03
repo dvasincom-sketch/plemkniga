@@ -70,9 +70,9 @@ export type Messages = {
 
 const ru: Messages = {
   meta: {
-    title: 'ПЛЕМ online — племенной учёт молочного скота',
+    title: 'ПЛЕМ online — племенная книга молочного скота',
     description:
-      'Готовая система племенного учёта молочного скота: племенная книга, контроль продуктивности, оценка экстерьера и племенная ценность. Построена по руководствам ICAR.',
+      'Племенная книга для породы и хозяйства: сдача в государственный реестр без двойного ввода, племенная ценность с настраиваемыми профилями, контроль родства и подбор пар, международный обмен по стандарту ICAR.',
   },
   nav: { home: 'На главную', language: 'Язык' },
   draft: {
@@ -81,8 +81,8 @@ const ru: Messages = {
   },
   hero: {
     eyebrow: 'Страны Евразийского экономического союза',
-    title: 'Готовая система племенного учёта молочного скота',
-    lead: 'Племенная книга, контроль продуктивности, родословные, оценка экстерьера и расчёт племенной ценности — в одной системе, с проверками данных и обменом с государственными реестрами.',
+    title: 'Племенная книга, а не программа для фермы',
+    lead: 'Сдать сведения в государственный реестр без двойного ввода, сравнить животное со всей популяцией, а не только со своим стадом, и подтвердить происхождение документом. Международный стандарт обмена ICAR, контроль родства, полсотни проверок данных.',
     cta: 'Запросить демонстрацию',
     ctaSecondary: 'Соответствие руководствам ICAR',
   },
@@ -98,24 +98,24 @@ const ru: Messages = {
         body: 'Регистрация животных, родословные до пяти поколений, подтверждение происхождения по ДНК, выпуск племенных свидетельств.',
       },
       {
-        title: 'Контроль продуктивности',
-        body: 'Контрольные доения, жир, белок, соматические клетки. Лактация считается из доений, а не вводится числом.',
+        title: 'Сдача в государственный реестр',
+        body: 'Двадцать шаблонов ФГИАС ПР из двадцати: выгрузка, обратная загрузка присвоенных идентификаторов и проверка файла до отправки, а не после отказа.',
       },
       {
-        title: 'Оценка экстерьера',
-        body: 'Линейные признаки, сводная оценка и оценка молодняка. У каждой записи сохранён оценщик и дата.',
+        title: 'Племенная ценность и профили индекса',
+        body: 'Веса настраиваются: свой профиль у хозяйства, свой у ассоциации, база сравнения версионируется и хранится вместе с результатом. Национальный индекс, когда он появится, войдёт ещё одним профилем — без переделки книги.',
       },
       {
-        title: 'Племенная ценность',
-        body: 'Индекс с настраиваемыми весами, достоверность по каждому признаку и место животного среди всей книги.',
+        title: 'Родство и подбор пар',
+        body: 'Коэффициент инбридинга по родословной, подбор быков с учётом родства и предупреждение о близком родстве до осеменения. Для малочисленной породы это важнее прибавки удоя.',
+      },
+      {
+        title: 'Продуктивность и экстерьер',
+        body: 'Контрольные доения с жиром, белком и соматикой, линейная оценка экстерьера с оценщиком и датой. Это исходные данные для лактации, класса и индекса — управление стадом остаётся за программами фермы.',
       },
       {
         title: 'Проверки данных',
         body: 'Более пятидесяти правил ищут противоречия: отец моложе потомка, осеменение раньше отёла, приплод, не сходящийся с типом рождения.',
-      },
-      {
-        title: 'Обмен с реестрами',
-        body: 'Выгрузка и обратная загрузка по формам государственного реестра, REST-интерфейс и поддержка открытых спецификаций обмена.',
       },
     ],
   },
@@ -128,11 +128,11 @@ const ru: Messages = {
     title: 'Кому это',
     farms: {
       title: 'Хозяйствам',
-      body: 'Тем, кто ведёт молочное стадо и хочет знать экономику каждой коровы, а не только валовой надой по ферме.',
+      body: 'Тем, кто ведёт молочное стадо: экономика каждой коровы, сдача в реестр без двойного ввода и место животного среди всей популяции, а не только в своём стаде. Программу управления фермой это не заменяет и не пытается.',
     },
     associations: {
-      title: 'Ассоциациям',
-      body: 'Породным объединениям, которым нужна племенная книга, а не таблица: с проверками, правами доступа, верификацией записей и выпуском документов.',
+      title: 'Ассоциациям и породным объединениям',
+      body: 'Тем, кому нужна книга, а не таблица: проверки, права доступа, верификация записей, выпуск документов и собственный профиль индекса. Книга заводится под любую породу из реестра — в том числе малочисленную, у которой своей книги нет вовсе.',
     },
   },
   contact: {
@@ -144,9 +144,9 @@ const ru: Messages = {
 
 const en: Messages = {
   meta: {
-    title: 'PLEM online — dairy cattle breeding records',
+    title: 'PLEM online — a herdbook for dairy cattle',
     description:
-      'A working dairy cattle recording system: herdbook, milk recording, conformation assessment and breeding values. Built on the ICAR Guidelines.',
+      'A herdbook for a breed and a farm: registry filing without double entry, breeding value with configurable index profiles, relationship control and mating, and exchange on the ICAR standard.',
   },
   nav: { home: 'Home', language: 'Language' },
   draft: {
@@ -155,8 +155,8 @@ const en: Messages = {
   },
   hero: {
     eyebrow: 'Eurasian Economic Union',
-    title: 'A working herd recording system for dairy cattle',
-    lead: 'Herdbook, milk recording, pedigrees, conformation assessment and breeding value — in one system, with data validation and exchange with national registries.',
+    title: 'A herdbook, not herd management software',
+    lead: 'File to the national registry without entering anything twice, rank an animal against the whole population rather than your own barn, and back its pedigree with a document. Built on the ICAR exchange standard, with relationship control and fifty-odd validation rules.',
     cta: 'Request a demonstration',
     ctaSecondary: 'How it follows the ICAR Guidelines',
   },
@@ -172,24 +172,24 @@ const en: Messages = {
         body: 'Animal registration, pedigrees up to five generations, DNA parentage verification, issuing of pedigree certificates.',
       },
       {
-        title: 'Milk recording',
-        body: 'Test-day records with fat, protein and somatic cell count. Lactation is computed from the test days, not typed in as a number.',
+        title: 'Breeding value and index profiles',
+        body: 'Weights are configurable: one profile for the farm, another for the association, with a versioned comparison base stored alongside every result. A national index, once published, joins as one more profile — no rebuild of the book.',
       },
       {
-        title: 'Conformation',
-        body: 'Linear traits, composite scores and young stock assessment. Every record keeps its classifier and date.',
+        title: 'Relationship and mating',
+        body: 'Inbreeding coefficients from the pedigree, bull selection that accounts for relationship, and a warning about close kinship before insemination. For a small population this matters more than extra milk.',
       },
       {
-        title: 'Breeding value',
-        body: 'An index with configurable weights, reliability for each trait, and the animal’s rank across the whole book.',
+        title: 'Recording and conformation',
+        body: 'Test days with fat, protein and somatic cells; linear conformation with classifier and date. These are inputs for lactation, class and index — day-to-day herd management stays with farm software.',
       },
       {
         title: 'Data validation',
         body: 'More than fifty rules look for contradictions: a sire younger than its offspring, insemination before calving, litter counts that disagree with the birth type.',
       },
       {
-        title: 'Registry exchange',
-        body: 'Export and return-file import in the state registry’s own templates, a REST interface, and support for open exchange specifications.',
+        title: 'Registry and standard exchange',
+        body: 'Export and return-file import in the registry’s own templates, plus the ICAR ADE standard: eleven collections and both exchange styles — per-location queries and a changes feed.',
       },
     ],
   },
@@ -202,11 +202,11 @@ const en: Messages = {
     title: 'Who it is for',
     farms: {
       title: 'Farms',
-      body: 'Those running a dairy herd who want to know the economics of each cow, not just the total yield of the barn.',
+      body: 'Those running a dairy herd: the economics of each cow, filing to the registry without double entry, and an animal’s standing across the whole population rather than the barn. It does not replace farm management software and does not try to.',
     },
     associations: {
-      title: 'Associations',
-      body: 'Breed organisations that need a herdbook rather than a spreadsheet: with validation, access rights, record verification and document issuing.',
+      title: 'Associations and breed societies',
+      body: 'Those who need a herdbook rather than a spreadsheet: validation, access rights, record verification, document issuing and an index profile of their own. A book can be opened for any breed — including a small local one that has none at all.',
     },
   },
   contact: {
@@ -229,8 +229,8 @@ const kk: Messages = {
   },
   hero: {
     eyebrow: 'Еуразиялық экономикалық одақ елдері',
-    title: 'Сүтті мал шаруашылығына арналған дайын асыл тұқым есебі жүйесі',
-    lead: 'Асыл тұқым кітабы, өнімділікті бақылау, шежіре, экстерьер бағасы және асыл тұқымдық құндылықты есептеу — деректерді тексеру және мемлекеттік тізілімдермен алмасу мүмкіндігі бар бір жүйеде.',
+    title: 'Асыл тұқым кітабы — ферма бағдарламасы емес',
+    lead: 'Деректерді екі рет енгізбей тізілімге тапсыру, малды өз отарыңызбен емес, бүкіл популяциямен салыстыру және шығу тегін құжатпен растау. ICAR халықаралық алмасу стандарты, туыстықты бақылау, елуден астам тексеру ережесі.',
     cta: 'Көрсетілім сұрау',
     ctaSecondary: 'ICAR нұсқаулықтарына сәйкестік',
   },
@@ -246,8 +246,8 @@ const kk: Messages = {
         body: 'Малды тіркеу, бес ұрпаққа дейінгі шежіре, ДНҚ бойынша тегін растау, асыл тұқым куәліктерін беру.',
       },
       {
-        title: 'Өнімділікті бақылау',
-        body: 'Бақылау сауымдары, май, ақуыз, соматикалық жасушалар. Лактация сауымдардан есептеледі, санмен енгізілмейді.',
+        title: 'Туыстық және жұп таңдау',
+        body: 'Шежіре бойынша инбридинг коэффициенті, туыстықты ескеретін бұқа таңдау және ұрықтандыру алдында жақын туыстық туралы ескерту. Аз санды тұқым үшін бұл сүт қосымшасынан маңыздырақ.',
       },
       {
         title: 'Экстерьер бағасы',
@@ -303,8 +303,8 @@ const hy: Messages = {
   },
   hero: {
     eyebrow: 'Եվրասիական տնտեսական միության երկրներ',
-    title: 'Կաթնատու անասունների ցեղային հաշվառման պատրաստի համակարգ',
-    lead: 'Ցեղային մատյան, մթերատվության հսկողություն, տոհմածառ, էքստերիերի գնահատում և ցեղային արժեքի հաշվարկ՝ մեկ համակարգում, տվյալների ստուգումներով և պետական ռեգիստրների հետ փոխանակմամբ։',
+    title: 'Ցեղային մատյան, ոչ թե ֆերմայի ծրագիր',
+    lead: 'Ներկայացնել ռեգիստրին առանց կրկնակի մուտքագրման, կենդանին համեմատել ամբողջ պոպուլյացիայի, այլ ոչ միայն սեփական հոտի հետ, և ծագումը հաստատել փաստաթղթով։ ICAR միջազգային փոխանակման ստանդարտ, ազգակցության վերահսկում, ավելի քան հիսուն ստուգման կանոն։',
     cta: 'Պահանջել ցուցադրություն',
     ctaSecondary: 'Համապատասխանությունը ICAR ուղեցույցներին',
   },
@@ -320,8 +320,8 @@ const hy: Messages = {
         body: 'Կենդանիների գրանցում, մինչև հինգ սերնդի տոհմածառ, ծագման հաստատում ԴՆԹ-ով, ցեղային վկայականների տրամադրում։',
       },
       {
-        title: 'Մթերատվության հսկողություն',
-        body: 'Հսկիչ կթեր, ճարպ, սպիտակուց, սոմատիկ բջիջներ։ Կաթնարտադրությունը հաշվարկվում է կթերից, ոչ թե մուտքագրվում թվով։',
+        title: 'Ազգակցություն և զուգավորման ընտրություն',
+        body: 'Ինբրիդինգի գործակիցը՝ տոհմածառից, ցլերի ընտրություն՝ ազգակցությունը հաշվի առնելով, և զգուշացում մերձավոր ազգակցության մասին՝ սերմնավորումից առաջ։ Փոքրաթիվ ցեղի համար սա ավելի կարևոր է, քան կաթի հավելումը։'
       },
       {
         title: 'Էքստերիերի գնահատում',
@@ -377,8 +377,8 @@ const be: Messages = {
   },
   hero: {
     eyebrow: 'Краіны Еўразійскага эканамічнага саюза',
-    title: 'Гатовая сістэма пляменнага ўліку малочнай жывёлы',
-    lead: 'Пляменная кніга, кантроль прадукцыйнасці, радаводы, ацэнка экстэр’еру і разлік пляменнай каштоўнасці — у адной сістэме, з праверкамі даных і абменам з дзяржаўнымі рэестрамі.',
+    title: 'Пляменная кніга, а не праграма для фермы',
+    lead: 'Здаць звесткі ў рэестр без двойчы ўведзеных даных, параўнаць жывёлу з усёй папуляцыяй, а не толькі са сваім статкам, і пацвердзіць паходжанне дакументам. Міжнародны стандарт абмену ICAR, кантроль сваяцтва, паўсотні праверак даных.',
     cta: 'Запытаць дэманстрацыю',
     ctaSecondary: 'Адпаведнасць кіраўніцтвам ICAR',
   },
@@ -394,8 +394,8 @@ const be: Messages = {
         body: 'Рэгістрацыя жывёл, радаводы да пяці пакаленняў, пацвярджэнне паходжання па ДНК, выдача пляменных пасведчанняў.',
       },
       {
-        title: 'Кантроль прадукцыйнасці',
-        body: 'Кантрольныя доі, тлушч, бялок, саматычныя клеткі. Лактацыя лічыцца з доеў, а не ўводзіцца лікам.',
+        title: 'Сваяцтва і падбор пар',
+        body: 'Каэфіцыент інбрыдынгу па радаводзе, падбор быкоў з улікам сваяцтва і папярэджанне пра блізкае сваяцтва да асемянення. Для малалікавай пароды гэта важней за прыбаўку надою.',
       },
       {
         title: 'Ацэнка экстэр’еру',
@@ -451,8 +451,8 @@ const ky: Messages = {
   },
   hero: {
     eyebrow: 'Евразия экономикалык бирлигинин өлкөлөрү',
-    title: 'Сүт багытындагы малдын асыл тукум эсебинин даяр тутуму',
-    lead: 'Асыл тукум китеби, өндүрүмдүүлүктү көзөмөлдөө, тукум санжырасы, экстерьер баасы жана асыл тукумдук баалуулукту эсептөө — маалыматтарды текшерүү жана мамлекеттик реестрлер менен алмашуу мүмкүнчүлүгү бар бир тутумда.',
+    title: 'Асыл тукум китеби — ферма программасы эмес',
+    lead: 'Маалыматты эки жолу киргизбей реестрге тапшыруу, малды өз үйүрүң менен эмес, бүткүл популяция менен салыштыруу жана теги документ менен ырастоо. ICAR эл аралык алмашуу стандарты, туугандыкты көзөмөлдөө, элүүдөн ашык текшерүү эрежеси.',
     cta: 'Көрсөтүү сурап жазуу',
     ctaSecondary: 'ICAR колдонмолоруна шайкештик',
   },
@@ -468,8 +468,8 @@ const ky: Messages = {
         body: 'Малды каттоо, беш муунга чейинки санжыра, ДНК боюнча теги тастыктоо, асыл тукум күбөлүктөрүн берүү.',
       },
       {
-        title: 'Өндүрүмдүүлүктү көзөмөлдөө',
-        body: 'Көзөмөл саамдары, май, белок, соматикалык клеткалар. Лактация саамдардан эсептелет, сан менен киргизилбейт.',
+        title: 'Туугандык жана жуп тандоо',
+        body: 'Санжыра боюнча инбридинг коэффициенти, туугандыкты эске алган бука тандоо жана уруктандыруудан мурун жакын туугандык тууралуу эскертүү. Аз сандуу тукум үчүн бул сүт кошумчасынан маанилүү.',
       },
       {
         title: 'Экстерьер баасы',
