@@ -6,6 +6,7 @@ import { PlemLogo } from '@/components/PlemLogo'
 import { LocaleSwitcher } from '@/components/LocaleSwitcher'
 import { FEATURE_ICONS, FlowArt, LayersArt, RankArt } from '@/components/site/SiteArt'
 import { AnimalScreen } from '@/components/site/ScreenArt'
+import { ADE_MAP } from '@/lib/ade-schema-map'
 import { PRODUCT_MESSAGES } from '@/lib/i18n/product-messages'
 import { SITE_MESSAGES } from '@/lib/i18n/site-messages'
 import { LOCALE_CODES, isLocale, localeInfo, type Locale } from '@/lib/i18n/locales'
@@ -148,6 +149,38 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
             </a>
           </div>
         </section>
+
+        {/* --------------------- Международный стандарт --------------------- */}
+        {/*
+           Полоса стоит между первым экраном и четырьмя числами, и место
+           это не случайное.
+
+           Довод здесь не про качество данных, а про **происхождение
+           форматов**, и он отвечает на возражение, которое читатель
+           формулирует про себя первым: «очередной стартап со своим
+           форматом». Стартап, придумавший формат, — это риск: завтра
+           он передумает или исчезнет, и данные останутся в том, чего
+           никто больше не читает.
+
+           Поэтому полоса идёт до чисел о продукте: сперва «форматы
+           не наши», потом «и вот сколько мы уже умеем». Обратный порядок
+           читался бы как хвастовство перед незнакомым.
+
+           Число схем подставляется, а не пишется: оно меняется вместе
+           с копией стандарта.
+        */}
+        <div className="mt-10 rounded-2xl border border-brand-100 bg-brand-50 px-5 py-4 sm:px-6">
+          <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
+            <strong className="font-medium text-ink-900">{s.standard.title}.</strong>{' '}
+            {s.standard.body.replace('{n}', String(ADE_MAP.used))}{' '}
+            <a
+              href={`${base}/ade`}
+              className="whitespace-nowrap font-medium text-forest-600 underline underline-offset-4 hover:text-forest-500"
+            >
+              {s.standard.link} →
+            </a>
+          </p>
+        </div>
 
         {/*
            Четыре числа сразу под первым экраном. Числа читают те, кто

@@ -729,6 +729,41 @@ export function buildOpenApi(payload: Payload, serverUrl: string): OpenApiDocume
     },
   }
 
+  paths['/ade/v1/batches/locations/{scheme}/{id}/{collection}'] = {
+    post: {
+      tags: [adeTag],
+      summary: 'Принять пакет событий',
+      description:
+        'Пакетный адрес стандарта. Тело обязано быть массивом ресурсов; одиночная ' +
+        'запись отправляется на /ade/v1/locations/{scheme}/{id}/{collection}. ' +
+        'Ответ — icarBatchResult с разбором по элементам, и всегда 200: код ответа ' +
+        'относится к обработке пакета, а не к его содержимому. ' +
+        'Принимаются: ' +
+        ADE_WRITABLE.join(', ') +
+        '.',
+      parameters: [
+        { name: 'scheme', in: 'path', required: true, schema: { type: 'string' } },
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        {
+          name: 'collection',
+          in: 'path',
+          required: true,
+          schema: { type: 'string', enum: [...ADE_WRITABLE] },
+        },
+      ],
+      requestBody: {
+        content: {
+          'application/json': { schema: { type: 'array', items: { type: 'object' } } },
+        },
+      },
+      responses: {
+        '200': { description: 'icarBatchResult: построчный разбор пакета' },
+        '400': { description: 'icarErrorResource: тело не массив или пакет пуст' },
+        '405': { description: 'icarErrorResource: коллекция только на чтение' },
+      },
+    },
+  }
+
   /*
    * Разделы идут в объявленном порядке, коллекции внутри раздела — в том,
    * в каком они перечислены у него: это порядок по существу, а не
