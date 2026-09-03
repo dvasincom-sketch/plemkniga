@@ -255,30 +255,61 @@ export function FlowArt({
   /** Исходы у проверок и у книги — см. `Node`. */
   marks?: { checks: string; book: string }
 }) {
-  const [farm, checks, book, registry, market] = nodes
+  const [farm, checks, book, registry, buyer, exchange] = nodes
 
   return (
-    <div
-      role="img"
-      aria-label={`${title}: ${nodes.join(' → ')}`}
-      className="flex flex-col items-stretch gap-2 lg:flex-row lg:items-center lg:gap-3"
-    >
-      <Node label={farm} />
-      <Arrow />
-      <Node label={checks} note={marks?.checks} />
-      <Arrow />
-      <Node label={book} accent note={marks?.book} />
-      <Arrow />
+    <div role="img" aria-label={`${title}: ${nodes.join(' → ')}`}>
+      <div className="flex flex-col items-stretch gap-2 lg:flex-row lg:items-start lg:gap-3">
+        <Node label={farm} />
+        <Arrow />
+        <Node label={checks} note={marks?.checks} />
+        <Arrow />
+        <Node label={book} accent note={marks?.book} />
+        <Arrow />
+
+        {/*
+           Адресатов три, а не два, и это не расширение списка ради полноты.
+           Первый экран страницы обещает ровно три стороны — реестр,
+           покупатель, международный обмен, — а схема ниже показывала две.
+           Расхождение между обещанием и картинкой читатель списывает
+           не на невнимательность вёрстки, а на невнимательность продукта.
+
+           Черта слева и есть раздвоение. Рисовать настоящую вилку линиями
+           пришлось бы в SVG — и вернуться к фиксированной ширине, из-за
+           которой схема и переехала в вёрстку.
+        */}
+        <div className="flex flex-col gap-2 border-ink-100 pl-4 lg:border-l">
+          <Node label={registry} />
+          <Node label={buyer} />
+          <Node label={exchange} />
+        </div>
+      </div>
 
       {/*
-         Два адресата в одном столбце с чертой слева: черта и есть
-         раздвоение. Рисовать настоящую вилку линиями пришлось бы
-         в SVG — и вернуться к фиксированной ширине, из-за которой
-         схема и переехала в вёрстку.
+         Возврат нарисован, а не только назван словами.
+
+         Подпись под проверками говорит, что несошедшаяся запись уходит
+         обратно, но глаз читает стрелки, а все стрелки шли вправо. Черта
+         с наконечником влево, стоящая под первыми двумя узлами, замыкает
+         путь: видно, что дорога не в одну сторону.
+
+         На узком экране черты нет — там узлы стоят столбцом, и «влево»
+         не значит ничего. Подпись при этом остаётся, и смысл не теряется.
       */}
-      <div className="flex flex-col gap-2 border-ink-100 pl-4 lg:border-l">
-        <Node label={registry} />
-        <Node label={market} />
+      <div className="mt-2 hidden lg:block" aria-hidden="true">
+        <div className="w-[292px] rounded-b-xl border-b border-l border-r border-ink-100 pb-1">
+          <svg
+            viewBox="0 0 12 10"
+            className="ml-1 h-2.5 w-3 -translate-y-[5px] text-ink-300"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M6 1L1 5l5 4" />
+          </svg>
+        </div>
       </div>
     </div>
   )

@@ -296,15 +296,16 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
                никогда.
 
                Поэтому плашка обведена, надпись видна всегда и приглушена,
-               а наведение добавляет заливку и цвет. Три состояния вместо
-               двух: «сюда можно», «сюда сейчас» и «сюда нельзя» у числа
-               без разбора.
+               а наведение меняет цвет рамки и надписи. Заливку при
+               наведении пробовали и убрали: плашка вспыхивала ярче всего
+               остального на странице, а отклик обязан быть тише
+               содержимого — он подтверждает, что попал, а не зовёт нажать.
             */
             return href ? (
               <Link
                 key={p.label}
                 href={`${base}/${locale}${href}`}
-                className="group block rounded-2xl border border-ink-100 p-5 transition-colors hover:border-forest-500 hover:bg-white"
+                className="group block rounded-2xl border border-ink-100 bg-white p-5 transition-colors hover:border-forest-500"
               >
                 {inner}
                 <span className="mt-3 inline-block text-[12px] text-ink-400 transition-colors group-hover:text-forest-600">
