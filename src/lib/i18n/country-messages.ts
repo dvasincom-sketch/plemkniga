@@ -381,7 +381,7 @@ const int_en: CountryMessages = {
         title: 'ICAR Guidelines',
         body:
           'Data structures and recording procedures follow the ICAR Guidelines — the rules ' +
-          'European herdbooks are built on. Ten sections are mapped, and what is still ' +
+          'recording organisations worldwide are built on. Ten sections are mapped, and what is still ' +
           'missing is listed openly.',
       },
       {
@@ -414,7 +414,7 @@ const int_ru: CountryMessages = {
         title: 'Руководства ICAR',
         body:
           'Структуры данных и порядок учёта следуют руководствам ICAR — тем самым правилам, ' +
-          'на которых построены европейские племенные книги. Разобрано десять разделов, ' +
+          'по которым ведут учёт службы пяти континентов. Разобрано десять разделов, ' +
           'и чего не хватает, сказано открыто.',
       },
       {

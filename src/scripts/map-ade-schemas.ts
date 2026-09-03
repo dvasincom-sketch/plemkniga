@@ -106,9 +106,19 @@ for (const dir of DIRS) {
   }
 }
 
+/*
+ * Дата копии переносится в карту вместе с веткой и коммитом.
+ *
+ * Страница обмена показывает её читателю: сведения о соответствии
+ * стандарту стареют молча, и «на какое число это верно» — первое,
+ * что должен узнать тот, кто пришёл проверять. Брать её со страницы
+ * прямо из `vendor/` нельзя: приложение не должно читать каталог,
+ * который сносится и перезаписывается целиком.
+ */
 const source = JSON.parse(readFileSync(join(VENDOR, 'SOURCE.json'), 'utf8')) as {
   branch: string
   commit: string
+  fetchedAt: string
 }
 
 const used = rows.filter((r) => r.in).length
@@ -121,6 +131,7 @@ writeFileSync(
       source: 'https://github.com/adewg/ICAR',
       branch: source.branch,
       commit: source.commit,
+      fetchedAt: source.fetchedAt,
       total: rows.length,
       used,
       schemas: rows,

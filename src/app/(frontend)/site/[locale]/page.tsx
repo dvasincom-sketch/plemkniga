@@ -11,6 +11,8 @@ import { PRODUCT_MESSAGES } from '@/lib/i18n/product-messages'
 import { SITE_MESSAGES } from '@/lib/i18n/site-messages'
 import { LOCALE_CODES, isLocale, localeInfo, type Locale } from '@/lib/i18n/locales'
 import { BOOK_URL, PRODUCT_MAIL, SITE_PREFIX, isSiteHost } from '@/lib/hosts'
+import { loadBreedCatalog } from '@/lib/breeds-catalog-server'
+import { countByState, type BreedRow } from '@/lib/breeds-catalog'
 
 /**
  * Витрина продукта — то, что видно на `plem.online`.
@@ -102,6 +104,19 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
   const m = PRODUCT_MESSAGES[locale]
   const s = SITE_MESSAGES[locale]
   const info = localeInfo(locale)
+
+  /*
+   * Числа пород берутся из того же места, что и каталог: посчитанные
+   * порознь, они разойдутся, и читатель, сверивший главную со страницей
+   * пород, перестанет верить обеим.
+   */
+  const breeds = await loadBreedCatalog()
+  const breedCount = countByState(breeds)
+  const breedNumbers = {
+    all: String(breeds.length),
+    ready: String(breedCount.ready),
+    own: String(breeds.filter((b: BreedRow) => !b.icar).length),
+  }
 
   const host = (await headers()).get('host')
   const base = isSiteHost(host) ? '' : SITE_PREFIX
@@ -301,8 +316,17 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
               {s.breeds.title}
             </h2>
             <p className="mt-4 max-w-[75ch] text-[16px] leading-relaxed text-ink-700">
-              {s.breeds.body}
+              {s.breeds.body
+                .replace(/\{all\}/g, breedNumbers.all)
+                .replace(/\{ready\}/g, breedNumbers.ready)
+                .replace(/\{own\}/g, breedNumbers.own)}
             </p>
+            <a
+              href={`${base}/breeds`}
+              className="mt-4 inline-block text-[15px] font-medium text-forest-600 underline underline-offset-4 hover:text-forest-500"
+            >
+              {s.breeds.link} →
+            </a>
           </div>
         </section>
 

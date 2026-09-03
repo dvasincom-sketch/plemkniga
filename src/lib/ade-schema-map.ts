@@ -37,6 +37,8 @@ const data = schemas as {
   source: string
   branch: string
   commit: string
+  /** День, когда снята копия схем: страница обмена показывает его читателю. */
+  fetchedAt: string
   total: number
   used: number
   schemas: AdeSchemaRow[]

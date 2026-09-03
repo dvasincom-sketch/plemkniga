@@ -73,8 +73,8 @@ export function ProductHeader({ children }: { children?: React.ReactNode }) {
  * перерастёт в общий набор — а пока лишний слой только мешал бы читать.
  */
 const FOOTER_LABELS = {
-  ru: { about: 'О продукте', compliance: 'Соответствие', api: 'API' },
-  en: { about: 'About', compliance: 'Compliance', api: 'API' },
+  ru: { about: 'О продукте', breeds: 'Породы', compliance: 'Соответствие', api: 'API' },
+  en: { about: 'About', breeds: 'Breeds', compliance: 'Compliance', api: 'API' },
 } as const
 
 export function ProductFooter({ lang = 'ru' }: { lang?: 'ru' | 'en' }) {
@@ -82,6 +82,7 @@ export function ProductFooter({ lang = 'ru' }: { lang?: 'ru' | 'en' }) {
 
   const links: { href: string; label: string }[] = [
     { href: '/', label: l.about },
+    { href: '/breeds', label: l.breeds },
     { href: '/compliance', label: l.compliance },
     { href: '/api-docs', label: l.api },
     /*

@@ -1,0 +1,371 @@
+{
+  "source": "https://interbull.org/ib/icarbreedcodes",
+  "fetchedAt": "2026-09-03",
+  "wikiEdited": "2025-10-29",
+  "note": "Трёхбуквенные коды присваивает Interbull Centre; список входит в руководство ICAR «International Agreement of Recording Practices». Сам источник оговаривает: коды предназначены для маркировки соломинок с семенем в международной торговле и НЕ применяются для идентификации пород в международных генетических оценках Interbull.",
+  "breeds": [
+    {
+      "name": "Abondance",
+      "code": "ABO",
+      "semenCode": "AB"
+    },
+    {
+      "name": "Angus",
+      "code": "AAN",
+      "semenCode": "AN"
+    },
+    {
+      "name": "Aubrac",
+      "code": "AUB",
+      "semenCode": "AU"
+    },
+    {
+      "name": "Ayrshire",
+      "code": "RDC",
+      "semenCode": "AY"
+    },
+    {
+      "name": "Bazadais",
+      "code": "BZD"
+    },
+    {
+      "name": "Belgian Blue",
+      "code": "BBL",
+      "semenCode": "BB"
+    },
+    {
+      "name": "Blonde d'Aquitaine",
+      "code": "BAQ",
+      "semenCode": "BD"
+    },
+    {
+      "name": "Beef Shorthorn",
+      "code": "BSH"
+    },
+    {
+      "name": "Beefmaster",
+      "code": "BMA",
+      "semenCode": "BM"
+    },
+    {
+      "name": "Belgium Red & White",
+      "code": "BER"
+    },
+    {
+      "name": "Braford",
+      "code": "BFD",
+      "semenCode": "BO"
+    },
+    {
+      "name": "Brahman",
+      "code": "BRM",
+      "semenCode": "BR"
+    },
+    {
+      "name": "Brangus",
+      "code": "BRG",
+      "semenCode": "BN"
+    },
+    {
+      "name": "Brand Rood",
+      "code": "BRR"
+    },
+    {
+      "name": "British Frisian",
+      "code": "BRF"
+    },
+    {
+      "name": "Brown Swiss",
+      "code": "BSW",
+      "semenCode": "BS"
+    },
+    {
+      "name": "Chianina",
+      "code": "CIA",
+      "semenCode": "CA"
+    },
+    {
+      "name": "Charolais",
+      "code": "CHA",
+      "semenCode": "CH"
+    },
+    {
+      "name": "Dairy Shorthorn",
+      "code": "MSH"
+    },
+    {
+      "name": "Dutch Frisian",
+      "code": "DFR"
+    },
+    {
+      "name": "Eringer",
+      "code": "ERI"
+    },
+    {
+      "name": "Meuse Rhine Yssel",
+      "code": "MRY"
+    },
+    {
+      "name": "Dexter",
+      "code": "DXT",
+      "semenCode": "DR"
+    },
+    {
+      "name": "Devon",
+      "code": "DEV"
+    },
+    {
+      "name": "Dikbil",
+      "code": "DIK"
+    },
+    {
+      "name": "Eastern Flanders White Red",
+      "code": "BWR"
+    },
+    {
+      "name": "European Red Dairy Breed",
+      "code": "RDC",
+      "semenCode": "RE"
+    },
+    {
+      "name": "Gascon",
+      "code": "GAS"
+    },
+    {
+      "name": "Glan Donnersberg",
+      "code": "GDB"
+    },
+    {
+      "name": "Galloway",
+      "code": "GLW",
+      "semenCode": "GA"
+    },
+    {
+      "name": "Guernsey",
+      "code": "GUE",
+      "semenCode": "GU"
+    },
+    {
+      "name": "Gelbvieh",
+      "code": "GVH",
+      "semenCode": "GV"
+    },
+    {
+      "name": "Groninger",
+      "code": "GRO"
+    },
+    {
+      "name": "Hereford",
+      "code": "HER"
+    },
+    {
+      "name": "Highland Cattle",
+      "code": "HLA",
+      "semenCode": "HI"
+    },
+    {
+      "name": "Hinterwalder",
+      "code": "HWD"
+    },
+    {
+      "name": "Holstein",
+      "code": "HOL",
+      "semenCode": "HO"
+    },
+    {
+      "name": "Holstein, Red and White",
+      "code": "RED",
+      "semenCode": "RW"
+    },
+    {
+      "name": "Jersey",
+      "code": "JER",
+      "semenCode": "JE"
+    },
+    {
+      "name": "Kerry",
+      "code": "KER"
+    },
+    {
+      "name": "Dutch Belted - Lakenvelder",
+      "code": "DBE"
+    },
+    {
+      "name": "Limousin",
+      "code": "LIM",
+      "semenCode": "LM"
+    },
+    {
+      "name": "Lincoln reds",
+      "code": "LIR"
+    },
+    {
+      "name": "Longhorn",
+      "code": "LON"
+    },
+    {
+      "name": "Luing",
+      "code": "LUI"
+    },
+    {
+      "name": "Rouge des Pres",
+      "code": "RDP"
+    },
+    {
+      "name": "Murray-Grey",
+      "code": "MGR",
+      "semenCode": "MG"
+    },
+    {
+      "name": "Montbeliard",
+      "code": "MON",
+      "semenCode": "MO"
+    },
+    {
+      "name": "Marchigiana",
+      "code": "MAR",
+      "semenCode": "MR"
+    },
+    {
+      "name": "Maremmana",
+      "code": "MAE"
+    },
+    {
+      "name": "Nellore",
+      "code": "NEL"
+    },
+    {
+      "name": "Normandy",
+      "code": "NMD",
+      "semenCode": "NO"
+    },
+    {
+      "name": "Norwegian Red",
+      "code": "RDC",
+      "semenCode": "NR"
+    },
+    {
+      "name": "Parthenaise",
+      "code": "PAR"
+    },
+    {
+      "name": "Polish White Backed",
+      "code": "PBG",
+      "semenCode": "BG"
+    },
+    {
+      "name": "Piedmont",
+      "code": "PIE",
+      "semenCode": "PI"
+    },
+    {
+      "name": "Pinzgau",
+      "code": "PIN",
+      "semenCode": "PZ"
+    },
+    {
+      "name": "Polish Black and White",
+      "code": "PZB",
+      "semenCode": "ZB"
+    },
+    {
+      "name": "Polish Red and White",
+      "code": "PZR",
+      "semenCode": "ZR"
+    },
+    {
+      "name": "Red Angus",
+      "code": "RAN"
+    },
+    {
+      "name": "Romagnola",
+      "code": "ROM",
+      "semenCode": "RN"
+    },
+    {
+      "name": "Salers",
+      "code": "SAL",
+      "semenCode": "SL"
+    },
+    {
+      "name": "Santa Gertrudis",
+      "code": "SGE",
+      "semenCode": "SG"
+    },
+    {
+      "name": "South Devon",
+      "code": "SDE",
+      "semenCode": "SD"
+    },
+    {
+      "name": "Sussex",
+      "code": "SUS"
+    },
+    {
+      "name": "Simmental/Fleckvieh",
+      "code": "SIM",
+      "semenCode": "SM"
+    },
+    {
+      "name": "Speckle Park",
+      "code": "SPK"
+    },
+    {
+      "name": "Stabiliser",
+      "code": "STA"
+    },
+    {
+      "name": "Swedish Red",
+      "code": "RDC",
+      "semenCode": "SR"
+    },
+    {
+      "name": "Sahiwal",
+      "code": "SAH",
+      "semenCode": "SW"
+    },
+    {
+      "name": "Tarentaise",
+      "code": "TAR",
+      "semenCode": "TA"
+    },
+    {
+      "name": "Tux",
+      "code": "TUX"
+    },
+    {
+      "name": "Tyrol Grey",
+      "code": "TGR",
+      "semenCode": "AL"
+    },
+    {
+      "name": "Verbeter Roodbont",
+      "code": "VRB"
+    },
+    {
+      "name": "Wagyu",
+      "code": "WAG"
+    },
+    {
+      "name": "Belgium Blue Mixte",
+      "code": "WBM"
+    },
+    {
+      "name": "Welsh Black",
+      "code": "WBL",
+      "semenCode": "WB"
+    },
+    {
+      "name": "Western Flanders Meat",
+      "code": "BRV"
+    },
+    {
+      "name": "West-Vlaams Rood",
+      "code": "BRD"
+    },
+    {
+      "name": "Witrik",
+      "code": "WRI"
+    }
+  ]
+}

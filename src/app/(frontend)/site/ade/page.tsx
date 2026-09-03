@@ -8,7 +8,7 @@ import {
   themeCounts,
   usedByDir,
 } from '@/lib/ade-schema-map'
-import { ADE_COLLECTIONS } from '@/lib/ade/core'
+import { ADE_COLLECTIONS, ADE_VERSION } from '@/lib/ade/core'
 import { ADE_WRITABLE } from '@/lib/ade/parse'
 import { plural } from '@/lib/format'
 
@@ -70,6 +70,22 @@ export default function AdePage() {
   const themes = themeCounts()
   const outside = ADE_SCHEMAS.length - ADE_MAP.used
 
+  /*
+   * Дата и версия того, о чём страница говорит.
+   *
+   * Страница про соответствие стандарту стареет молча: стандарт правят
+   * в чужом репозитории, наша копия обновляется отдельной командой,
+   * а числа на странице считаются из копии. Читатель, поймавший здесь
+   * прошлогоднее состояние, дальше проверяет каждое наше число — и правильно
+   * делает. Поэтому версия стандарта, ветка, коммит и день, когда копия
+   * снята, стоят на самой странице, а не в истории изменений.
+   */
+  const copied = new Date(ADE_MAP.fetchedAt).toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+
   return (
     <>
       <ProductHeader />
@@ -87,6 +103,29 @@ export default function AdePage() {
             ни реестра внедрений у стандарта нет. Единственное, что отличает утверждение от слов, —
             показать, чем именно оно проверяется.
           </p>
+        {/*
+           Полоса версий стоит сразу под заголовком: это первое, что
+           обязан узнать человек, пришедший проверять наше соответствие.
+        */}
+        <dl className="mt-8 grid grid-cols-2 gap-x-6 gap-y-4 rounded-2xl border border-ink-100 bg-white p-5 text-[14px] sm:grid-cols-4 sm:p-6">
+          <div>
+            <dt className="text-ink-500">Версия стандарта</dt>
+            <dd className="mt-1 font-medium tabular-nums">ICAR ADE {ADE_VERSION}</dd>
+          </div>
+          <div>
+            <dt className="text-ink-500">Ветка репозитория</dt>
+            <dd className="mt-1 font-medium">{ADE_MAP.branch}</dd>
+          </div>
+          <div>
+            <dt className="text-ink-500">Копия снята</dt>
+            <dd className="mt-1 font-medium tabular-nums">{copied}</dd>
+          </div>
+          <div>
+            <dt className="text-ink-500">Коммит</dt>
+            <dd className="mt-1 font-medium tabular-nums">{ADE_MAP.commit.slice(0, 10)}</dd>
+          </div>
+        </dl>
+
           <p>
             Схемы стандарта лежат копией в дереве проекта, и каждый прогон сверяет с ними то,
             что книга отдаёт наружу. Ниже — что участвует в этой сверке, что не участвует

@@ -873,6 +873,10 @@ export interface Breed {
    */
   whffCode?: string | null;
   isImprover?: boolean | null;
+  /**
+   * Берётся из реестра ФГИАС ПР при синхронизации. Каталог пород на витрине показывает молочные и универсальные: только их книга умеет вести целиком
+   */
+  direction?: ('dairy' | 'dual' | 'beef' | 'other') | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -4092,6 +4096,7 @@ export interface BreedsSelect<T extends boolean = true> {
   isActive?: T;
   whffCode?: T;
   isImprover?: T;
+  direction?: T;
   updatedAt?: T;
   createdAt?: T;
 }
