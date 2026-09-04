@@ -1,10 +1,12 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
 import { demoUrl, PRODUCT_MAIL } from '@/lib/hosts'
 import { breedCatalog } from '@/lib/breeds-catalog-server'
+import { BREED_PAGES } from '@/lib/breed-pages'
 import {
   ICAR_BREEDS,
   ICAR_FETCHED_AT,
@@ -76,6 +78,13 @@ export default async function BreedsPage({
   const own = rows.length - withIcar
 
   const STATES: BreedState[] = ['book', 'ready', 'listed']
+
+  /*
+   * У каких пород есть свой разбор. Восьми из пятидесяти пяти —
+   * и ссылка ставится только им: ссылка на несуществующую страницу
+   * хуже её отсутствия, а «скоро будет» на витрине означает «никогда».
+   */
+  const pageOf = new Map(BREED_PAGES.map((b) => [b.registryName, b.slug]))
 
   /*
    * Чего породе не хватает до следующего состояния.
@@ -288,7 +297,18 @@ export default async function BreedsPage({
               <tbody>
                 {rows.map((r: BreedRow) => (
                   <tr key={String(r.id)}>
-                    <td>{r.name}</td>
+                    <td>
+                      {pageOf.has(r.name) ? (
+                        <Link
+                          href={`/${locale}/breeds/${pageOf.get(r.name)}`}
+                          className="underline underline-offset-4 hover:text-forest-500"
+                        >
+                          {r.name}
+                        </Link>
+                      ) : (
+                        r.name
+                      )}
+                    </td>
                     <td className="tabular-nums text-ink-500">{r.icar ?? '—'}</td>
                     <td className="text-ink-500">{r.fgiasUuid ? 'есть' : '—'}</td>
                     <td>

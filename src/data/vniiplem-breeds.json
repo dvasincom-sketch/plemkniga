@@ -1,0 +1,138 @@
+{
+  "source": {
+    "name": "ФГБНУ ВНИИплем, ГИСЦ",
+    "url": "https://vniiplem.ru/l/gisc/breeds/mol-krs/",
+    "readAt": "2026-09-04",
+    "note": "Год, к которому относятся значения, на страницах источника не указан. Приводим их как данные ВНИИплем на дату чтения и не выдаём за показатели конкретного года."
+  },
+  "breeds": [
+    {
+      "slug": "golshtinskaya",
+      "name": "Голштинская",
+      "url": "https://vniiplem.ru/l/gisc/breeds/mol-krs/golsht/",
+      "stock": 1445.84,
+      "cows": 901.68,
+      "milk": 9914,
+      "fat": 3.9,
+      "protein": 3.32,
+      "variants": [
+        {
+          "name": "красно-пёстрой масти",
+          "stock": 41.2,
+          "cows": 25.3,
+          "milk": 8384,
+          "fat": 4.0,
+          "protein": 3.26
+        }
+      ]
+    },
+    {
+      "slug": "cherno-pestraya",
+      "name": "Чёрно-пёстрая",
+      "url": "https://vniiplem.ru/l/gisc/breeds/mol-krs/chpestr/",
+      "stock": 110.4,
+      "cows": 56.42,
+      "milk": 6990,
+      "fat": 4.01,
+      "protein": 3.26
+    },
+    {
+      "slug": "ayrshirskaya",
+      "name": "Айрширская",
+      "url": "https://vniiplem.ru/l/gisc/breeds/mol-krs/airsh/",
+      "stock": 56.81,
+      "cows": 36.94,
+      "milk": 8087,
+      "fat": 4.23,
+      "protein": 3.42,
+      "variants": [
+        {
+          "name": "карельский тип",
+          "stock": 6.25,
+          "cows": 4.01,
+          "milk": 9258,
+          "fat": 4.01,
+          "protein": 3.29
+        }
+      ]
+    },
+    {
+      "slug": "simmentalskaya",
+      "name": "Симментальская",
+      "url": "https://vniiplem.ru/l/gisc/breeds/mol-krs/simmental/",
+      "stock": 41.79,
+      "cows": 25.02,
+      "milk": 6652,
+      "fat": 4.05,
+      "protein": 3.28,
+      "variants": [
+        {
+          "name": "николаевский тип",
+          "stock": 0.51,
+          "cows": 0.36,
+          "milk": 7925,
+          "fat": 4.02,
+          "protein": 3.37
+        }
+      ]
+    },
+    {
+      "slug": "kholmogorskaya",
+      "name": "Холмогорская",
+      "url": "https://vniiplem.ru/l/gisc/breeds/mol-krs/kholmogor/",
+      "stock": 26.15,
+      "cows": 14.88,
+      "milk": 7875,
+      "fat": 3.9,
+      "protein": 3.22,
+      "variants": [
+        {
+          "name": "татарстанский тип",
+          "stock": 16.08,
+          "cows": 8.46,
+          "milk": 9191,
+          "fat": 3.87,
+          "protein": 3.24
+        },
+        {
+          "name": "печорский тип",
+          "stock": 0.18,
+          "cows": 0.14,
+          "milk": 3158,
+          "fat": 3.72,
+          "protein": 3.19
+        }
+      ]
+    },
+    {
+      "slug": "yaroslavskaya",
+      "name": "Ярославская",
+      "url": "https://vniiplem.ru/l/gisc/breeds/mol-krs/yarosl/",
+      "stock": 23.13,
+      "cows": 14.71,
+      "milk": 6989,
+      "fat": 4.1,
+      "protein": 3.33
+    },
+    {
+      "slug": "istobenskaya",
+      "name": "Истобенская",
+      "url": "https://vniiplem.ru/l/gisc/breeds/mol-krs/istob/",
+      "stock": 0.75,
+      "cows": 0.46,
+      "milk": 4588,
+      "fat": 3.83,
+      "protein": 3.41
+    },
+    {
+      "slug": "krasnaya-gorbatovskaya",
+      "name": "Красная горбатовская",
+      "url": "https://vniiplem.ru/l/gisc/breeds/mol-krs/krasgorb/",
+      "stock": 0.28,
+      "cows": 0.21,
+      "milk": 5342,
+      "fat": 4.22,
+      "protein": 3.4
+    }
+  ]
+}
