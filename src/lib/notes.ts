@@ -134,6 +134,45 @@ export const NOTES: Note[] = [
       },
     ],
   },
+  {
+    slug: 'indeks-i-nm-tpi',
+    title: 'Почему наш индекс нельзя сравнивать с NM$ и TPI',
+    lead:
+      'У быка в каталоге TPI 3050, а в книге +512 — и это не спор о том, кто прав. ' +
+      'Разбираем четыре причины расхождения: шкала, набор признаков, происхождение оценок ' +
+      'и база; и то, как международное сравнение делается на самом деле.',
+    date: '2026-09-04',
+    author: NOTE_AUTHOR,
+    authorUrl: NOTE_AUTHOR_URL,
+    passport: [
+      { label: 'Что разбирается', value: 'Сопоставимость нашего ИПЦ с американскими индексами' },
+      { label: 'Что сравнивается', value: 'NM$ 2025 (CDCB) и TPI редакции апреля 2026 (HAUSA)' },
+      { label: 'Признаков в NM$', value: '12 отдельных и 5 композитов; шести из них у нас нет' },
+      { label: 'Короткий ответ', value: 'Разные шкалы, признаки, оценки и базы' },
+    ],
+    sources: [
+      {
+        title: 'VanRaden P. M. et al. Net merit as a measure of lifetime profit: 2025 revision (ARR NM$9)',
+        url: 'https://uscdcb.com/wp-content/uploads/2025/02/nmcalc-2025_ARR-NM9_without-type_composites.pdf',
+        what: 'Состав NM$ 2025, относительные веса признаков и стандартное отклонение индекса',
+      },
+      {
+        title: 'Holstein Association USA. TPI Formula — April 2026',
+        url: 'https://www.holsteinusa.com/genetic_evaluations/ss_tpi_formula.html',
+        what: 'Состав TPI, веса групп признаков и постоянная 2845 в формуле',
+      },
+      {
+        title: 'CDCB. National Dairy Genetic Index Update, Base Change Set for April 2025',
+        url: 'https://uscdcb.com/national-dairy-genetic-index-update-base-change-set-for-april-2025/',
+        what: 'Смена генетической базы на коров рождения 2020 года и её величина',
+      },
+      {
+        title: 'Interbull. Multiple Across Country Evaluation (MACE)',
+        url: 'https://interbull.org/ib/mace',
+        what: 'Как оценки быков переводятся на шкалу другой страны',
+      },
+    ],
+  },
 ]
 
 export const noteBySlug = (slug: string): Note | undefined => NOTES.find((n) => n.slug === slug)

@@ -13,6 +13,7 @@ import { CreateProfile } from '@/components/CreateProfile'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { denyAssociation } from '@/lib/association'
 import { ASSOCIATION_PROFILE, type IndexProfile } from '@/lib/breeding-index'
+import { SITE_URL } from '@/lib/hosts'
 import { loadActiveBase } from '@/lib/index-base'
 import { PROFILE_GROUPS, loadOwnProfiles, ownKey, profileOfDoc } from '@/lib/index-profiles'
 import { setDefaultProfileAction } from '@/actions/index-profiles'
@@ -345,6 +346,20 @@ export default async function IndexProfilesPage() {
                   Сравнивать по ним животных между собой можно, сверять число с официальным —
                   нет. Настоящее значение по импортированному животному правильнее привозить
                   вместе с остальными его данными.
+                </p>
+                {/*
+                   Ссылка на разбор стоит здесь, а не в подводке страницы:
+                   вопрос «а почему у быка в каталоге другое число» приходит
+                   к человеку, который уже увидел знакомое имя профиля.
+                */}
+                <p>
+                  <a
+                    href={`${SITE_URL}/ru/razbory/indeks-i-nm-tpi`}
+                    className="underline underline-offset-4 hover:text-forest-500"
+                  >
+                    Разбор: четыре причины, по которым числа не сходятся
+                  </a>
+                  .
                 </p>
               </Note>
             )}
