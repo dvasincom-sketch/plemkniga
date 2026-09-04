@@ -74,6 +74,16 @@ export type PageMessages = {
    */
   notice: string | null
   /**
+   * Хвост заголовка вкладки: «Родословная — Племенная книга».
+   *
+   * Лежит здесь, а не развилкой в раскладке, потому что развилка там
+   * и стояла — «английский или русский» — и пережила перевод витрины
+   * на шесть языков: казахская страница получала русский хвост
+   * во вкладке и в поисковой выдаче. Набор строк такого не переживёт:
+   * язык в нём не забудешь, без него не соберётся.
+   */
+  suffix: string
+  /**
    * На чём держится доверие, когда заверить документ некому.
    *
    * Стоит на странице соответствия, потому что именно там читатель
@@ -86,6 +96,7 @@ export type PageMessages = {
 }
 
 const ru: PageMessages = {
+  suffix: 'Племенная книга',
   nav: {
     about: 'О продукте',
     breeds: 'Породы',
@@ -152,6 +163,7 @@ const ru: PageMessages = {
 }
 
 const en: PageMessages = {
+  suffix: 'Herdbook',
   nav: { about: 'About', breeds: 'Breeds', compliance: 'Compliance', api: 'API', org: 'Organisation', evolution: 'Product evolution', language: 'Language', sections: 'Product sections' },
   notice:
     'This page has not been proofread by a native speaker of the language you are reading. Terms of the trade may be off; the figures and the sources under them are the same in every language.',
@@ -210,6 +222,7 @@ const en: PageMessages = {
 }
 
 const kk: PageMessages = {
+  suffix: 'Асыл тұқым кітабы',
   nav: { about: 'Өнім туралы', breeds: 'Тұқымдар', compliance: 'Сәйкестік', api: 'API', org: 'Ұйым туралы', evolution: 'Өнім эволюциясы', language: 'Тіл', sections: 'Өнім бөлімдері' },
   notice:
     'Бұл бетті сіз оқып отырған тілдің иесі тексерген жоқ. Сала терминдері дәл берілмеуі мүмкін; сандар мен олардың астындағы дереккөздер барлық тілде бірдей.',
@@ -268,6 +281,7 @@ const kk: PageMessages = {
 }
 
 const hy: PageMessages = {
+  suffix: 'Ցեղային մատյան',
   nav: { about: 'Ապրանքի մասին', breeds: 'Ցեղեր', compliance: 'Համապատասխանություն', api: 'API', org: 'Կազմակերպությունը', evolution: 'Ապրանքի զարգացումը', language: 'Լեզու', sections: 'Ապրանքի բաժինները' },
   notice:
     'Այս էջը չի սրբագրվել ձեր կարդացած լեզվի կրողի կողմից։ Ոլորտային եզրույթները կարող են ոչ ճշգրիտ լինել; թվերը և դրանց հիմքում ընկած աղբյուրները նույնն են բոլոր լեզուներում։',
@@ -326,6 +340,7 @@ const hy: PageMessages = {
 }
 
 const be: PageMessages = {
+  suffix: 'Пляменная кніга',
   nav: { about: 'Пра прадукт', breeds: 'Пароды', compliance: 'Адпаведнасць', api: 'API', org: 'Пра арганізацыю', evolution: 'Эвалюцыя прадукту', language: 'Мова', sections: 'Раздзелы прадукту' },
   notice:
     'Гэтая старонка не вычытана носьбітам мовы, на якой вы яе чытаеце. Галіновыя тэрміны могуць быць перададзены недакладна; лічбы і крыніцы пад імі аднолькавыя на ўсіх мовах.',
@@ -384,6 +399,7 @@ const be: PageMessages = {
 }
 
 const ky: PageMessages = {
+  suffix: 'Асыл тукум китеби',
   nav: { about: 'Продукт жөнүндө', breeds: 'Тукумдар', compliance: 'Дал келүү', api: 'API', org: 'Уюм жөнүндө', evolution: 'Продукттун эволюциясы', language: 'Тил', sections: 'Продукттун бөлүмдөрү' },
   notice:
     'Бул бет сиз окуп жаткан тилдин ээси тарабынан текшерилген эмес. Тармактык терминдер так эмес берилиши мүмкүн; сандар жана алардын астындагы булактар бардык тилде бирдей.',

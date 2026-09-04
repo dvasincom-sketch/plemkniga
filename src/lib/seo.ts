@@ -77,19 +77,54 @@ export function siteMetadata(locale: string, key: PageKey, path: string): Metada
 export function pageMetadata(opts: {
   title: string
   description: string
+  /**
+   * Адрес страницы.
+   *
+   * Без `locale` — готовый адрес страницы, у которой языковых копий нет:
+   * разбор, страница породы. Вместе с `locale` — адрес **без языка**
+   * (`/book/pedigree`), и тогда сюда же встают шесть языковых копий.
+   */
   path?: string
+  /**
+   * Язык страницы, у которой есть копии на всех шести.
+   *
+   * Появился после того, как обнаружилось, что двенадцать разделов книги
+   * объявляют основной адрес и молчат про языковые копии, — а карта сайта
+   * эти копии обещает. Семьдесят два адреса из ста пятидесяти трёх, то
+   * есть почти половина сайта, отдавали поисковой системе два разных
+   * ответа на один вопрос.
+   *
+   * Ошибка была не в странице, а здесь: `siteMetadata` копии перечисляет,
+   * `pageMetadata` не умела, и разница между ними ничем не объявлялась.
+   * Забыть про копии было проще, чем вспомнить.
+   */
+  locale?: Locale
   /** Страницы за входом поисковой системе не нужны и ей не отдаются. */
   private?: boolean
 }): Metadata {
+  const url = opts.locale && opts.path ? `/${opts.locale}${opts.path}` : opts.path
+
+  const alternates =
+    opts.locale && opts.path
+      ? {
+          canonical: url,
+          languages: Object.fromEntries(
+            LOCALE_CODES.map((c) => [c, `/${c}${opts.path}`]),
+          ),
+        }
+      : url
+        ? { canonical: url }
+        : undefined
+
   return {
     title: opts.title,
     description: clamp(opts.description),
-    ...(opts.path ? { alternates: { canonical: opts.path } } : {}),
+    ...(alternates ? { alternates } : {}),
     ...(opts.private ? { robots: { index: false, follow: false } } : {}),
     openGraph: {
       title: opts.title,
       description: clamp(opts.description),
-      ...(opts.path ? { url: opts.path } : {}),
+      ...(url ? { url } : {}),
     },
   }
 }

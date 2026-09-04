@@ -49,8 +49,14 @@ export async function generateMetadata({
   const page = breedPageBySlug(slug)
   if (!page) return { title: 'Порода' }
 
+  /*
+   * «Племенная книга» в заголовке не пишется: её приклеивает раскладка,
+   * и выходило «Голштинская порода — характеристика, поголовье,
+   * племенная книга — Племенная книга». Выдача показывает около
+   * шестидесяти знаков, и половина их уходила на повтор.
+   */
   return {
-    title: `${page.title} — характеристика, поголовье, племенная книга`,
+    title: `${page.title}: характеристика и поголовье`,
     description: page.lead,
     alternates: { canonical: `/ru/breeds/${slug}` },
   }

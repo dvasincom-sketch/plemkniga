@@ -198,7 +198,53 @@ for (const r of debt.slice(0, 15)) console.log(`  ${String(r.russian).padStart(4
 console.log(`  ${'—'.repeat(4)}`)
 console.log(`  ${String(debt.reduce((s, r) => s + r.russian, 0)).padStart(4)}  всего`)
 
-const failed = noTitle.length + noDescription.length + noCanonical.length
+/* ------------------- Заголовок не повторяет свой хвост --------------------- */
+
+/**
+ * Хвост заголовка вкладки приклеивает раскладка ко всякому заголовку
+ * страницы. Написать то же слово ещё и в самом заголовке — значит
+ * получить «Голштинская порода — характеристика, поголовье, племенная
+ * книга — Племенная книга»: выдача показывает около шестидесяти знаков,
+ * и половина их уходит на повтор.
+ *
+ * Ошибка не видна ни при какой правке: страница открывается, заголовок
+ * осмысленный, а склеенную строку целиком видно только в выдаче.
+ *
+ * Законный способ обойтись без хвоста — объявить заголовок целиком своим
+ * (`title: { absolute: … }`). Так стоят главная и английская экскурсия:
+ * там имя продукта, и повторять за ним нечего.
+ */
+const SUFFIXES = [
+  'Племенная книга',
+  'племенная книга',
+  'племенной книги',
+  'Herdbook',
+  'herdbook',
+  'Асыл тұқым кітабы',
+  'Ցեղային մատյան',
+  'Пляменная кніга',
+  'Асыл тукум китеби',
+]
+
+const repeated: string[] = []
+
+for (const file of walk(ROOT)) {
+  const src = stripComments(readFileSync(file, 'utf8'))
+  if (!routeOf(file).startsWith('/site')) continue
+
+  for (const m of src.matchAll(/title:\s*(`[^`]*`|'[^']*')/g)) {
+    const value = m[1]!
+    if (!SUFFIXES.some((s) => value.includes(s))) continue
+    repeated.push(`${routeOf(file)} — ${value.slice(0, 70)}`)
+  }
+}
+
+if (repeated.length > 0) {
+  console.log('\nЗаголовки, повторяющие хвост, который приклеит раскладка:')
+  for (const r of repeated) console.log(`  ✗ ${r}`)
+}
+
+const failed = noTitle.length + noDescription.length + noCanonical.length + repeated.length
 console.log(
   failed === 0
     ? '\n  ✓ метатеги на месте у всех страниц'

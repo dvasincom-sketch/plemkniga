@@ -47,8 +47,6 @@ export type BookPageText = {
   ctaLead: string
   ctaOpen: string
   ctaMail: string
-  /** Заголовок вкладки браузера: имя раздела плюс это. */
-  titleSuffix: string
   /** Заголовок вкладки, когда раздела с таким адресом нет. */
   unknown: string
   /** Подпись под рисунком, по слугу раздела. */
@@ -65,7 +63,6 @@ const RU: BookPageText = {
   ctaLead: 'Голштинская книга открыта: разделы можно открыть и прочитать на живых данных.',
   ctaOpen: 'Открыть племенную книгу',
   ctaMail: 'Написать нам',
-  titleSuffix: 'что внутри племенной книги',
   unknown: 'Раздел книги',
   note: {
     animal:
@@ -112,7 +109,6 @@ const EN: BookPageText = {
   ctaLead: 'The Holstein book is open: every section can be opened and read on live data.',
   ctaOpen: 'Open the herdbook',
   ctaMail: 'Write to us',
-  titleSuffix: 'inside the herdbook',
   unknown: 'Book section',
   note: {
     animal:
@@ -179,7 +175,6 @@ const KK: BookPageText = {
   ctaLead: 'Голштин кітабы ашық: бөлімдерді ашып, тірі деректерде оқуға болады.',
   ctaOpen: 'Асыл тұқым кітабын ашу',
   ctaMail: 'Бізге жазу',
-  titleSuffix: 'асыл тұқым кітабының ішінде не бар',
   unknown: 'Кітап бөлімі',
   note: {
     animal:
@@ -231,7 +226,6 @@ const HY: BookPageText = {
   ctaLead: 'Հոլշտայն մատյանը բաց է. բաժինները կարելի է բացել և կարդալ կենդանի տվյալների վրա։',
   ctaOpen: 'Բացել ցեղային մատյանը',
   ctaMail: 'Գրել մեզ',
-  titleSuffix: 'ինչ կա ցեղային մատյանի ներսում',
   unknown: 'Մատյանի բաժին',
   note: {
     animal:
@@ -278,7 +272,6 @@ const BE: BookPageText = {
   ctaLead: 'Галштынская кніга адкрыта: раздзелы можна адкрыць і прачытаць на жывых даных.',
   ctaOpen: 'Адкрыць пляменную кнігу',
   ctaMail: 'Напісаць нам',
-  titleSuffix: 'што ўнутры пляменнай кнігі',
   unknown: 'Раздзел кнігі',
   note: {
     animal:
@@ -325,7 +318,6 @@ const KY: BookPageText = {
   ctaLead: 'Голштин китеби ачык: бөлүмдөрдү ачып, тирүү маалыматтардан окууга болот.',
   ctaOpen: 'Асыл тукум китебин ачуу',
   ctaMail: 'Бизге жазуу',
-  titleSuffix: 'асыл тукум китебинин ичинде эмне бар',
   unknown: 'Китептин бөлүмү',
   note: {
     animal:

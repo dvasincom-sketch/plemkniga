@@ -105,5 +105,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     })),
     { url: `${base}/evolution`, lastModified: now, priority: 0.4 },
+    /*
+     * Английская экскурсия. В карте её не было вовсе, хотя ссылка с первого
+     * экрана на неё стоит: страница, которую зовут читать и не показывают
+     * роботу, обходится последней или не обходится совсем. Языковых копий
+     * у неё нет — она английская по замыслу, и адрес у неё без языка.
+     */
+    { url: `${base}/tour`, lastModified: now, priority: 0.6 },
   ]
 }

@@ -42,8 +42,18 @@ import { PRODUCT_MAIL } from '@/lib/hosts'
  * а сайт нет.
  */
 
+/*
+ * Заголовок целиком свой, а не с хвостом от раскладки.
+ *
+ * Хвост раскладка берёт по языку, который ставит промежуточный
+ * обработчик при переписывании витринного адреса. У этой страницы языка
+ * в адресе нет, обработчику взять его неоткуда, и к английскому
+ * заголовку приклеивалось русское «Племенная книга» — во вкладке
+ * и в поисковой выдаче сразу. Страница английская целиком, и хвост
+ * у неё английский.
+ */
 export const metadata: Metadata = {
-  title: 'How the herdbook works',
+  title: { absolute: 'How the herdbook works — PLEM online' },
   description:
     'A guided tour of PLEM: animal identity, pedigree, milk recording, conformation, breeding values and data quality checks — built to ICAR guidelines.',
   alternates: { canonical: '/tour' },
