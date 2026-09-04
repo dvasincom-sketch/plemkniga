@@ -565,3 +565,298 @@ export function MatingScreen() {
     </div>
   )
 }
+
+/**
+ * Отчёты: число, раскрытое в список животных.
+ *
+ * ## Что здесь визуальный код
+ *
+ * «За каждым числом стоит список» — обещание, которое словами звучит
+ * одинаково у всех и потому не значит ничего. Показать его можно
+ * единственным способом: раскрыть одну строку и показать под ней те
+ * самые записи, из которых число получилось.
+ *
+ * Раскрыта нарочно средняя строка, а не первая. Раскрытая первая
+ * читалась бы как «здесь так устроен заголовок»; раскрытая средняя —
+ * как «раскрывается любая».
+ *
+ * ## Почему числа в списке хуже, чем в итоге
+ *
+ * Средний возраст первого отёла 25,4 месяца выглядит благополучно,
+ * а в списке под ним стоят 26,8 и 27,2. Это и есть довод в пользу
+ * списка: среднее прячет тех, ради кого отчёт открывают. Поставить
+ * под хорошим средним три хороших животных значило бы нарисовать
+ * возможность, которой незачем пользоваться.
+ *
+ * ## Почему нет даты пересчёта
+ *
+ * Отчёт считается при открытии, и приписка «на 4 сентября, 14:20»
+ * говорила бы обратное — что число собрано заранее. К тому же
+ * нарисованная дата стареет молча: через год рисунок утверждал бы,
+ * что книга остановилась.
+ */
+export function ReportsScreen() {
+  const rows: { name: string; value: string; count: string; open?: boolean }[] = [
+    { name: 'Средний сервис-период', value: '118 дн.', count: '231 гол.' },
+    { name: 'Возраст первого отёла', value: '25,4 мес.', count: '64 гол.', open: true },
+    { name: 'Соматика выше 400 тыс.', value: '7,4 %', count: '17 гол.' },
+  ]
+
+  const behind: [номер: string, кличка: string, значение: string][] = [
+    ['RU 4512 087', 'Ромашка', '24,1 мес.'],
+    ['RU 4512 130', 'Зорька', '26,8 мес.'],
+    ['RU 4511 902', 'Ласка', '27,2 мес.'],
+  ]
+
+  return (
+    <div className="p-4">
+      <div className="flex items-baseline justify-between gap-3 border-b border-ink-100 pb-2">
+        <span className="text-[12px] font-medium">Воспроизводство</span>
+        <span className="text-[11px] text-ink-400">пересчитано при открытии</span>
+      </div>
+
+      <div className="mt-2">
+        {rows.map((r) => (
+          <div key={r.name}>
+            <div
+              className={`flex items-baseline justify-between gap-3 rounded-lg px-2 py-2 text-[11px] ${
+                r.open ? 'bg-ink-50' : ''
+              }`}
+            >
+              <span>{r.name}</span>
+              <span className="flex items-baseline gap-3 tabular-nums">
+                <span className="text-[12px] font-medium">{r.value}</span>
+                <span className="text-forest-600 underline underline-offset-2">{r.count}</span>
+              </span>
+            </div>
+
+            {r.open && (
+              /*
+                 Список смещён вправо и набран мельче: он подчинён строке,
+                 а не стоит с ней рядом. Вровень он читался бы как ещё три
+                 показателя отчёта.
+              */
+              <div className="ml-2 border-l border-ink-200 pl-3">
+                {behind.map(([number, name, value]) => (
+                  <div
+                    key={number}
+                    className="flex items-baseline justify-between gap-3 py-1 text-[11px]"
+                  >
+                    <span className="flex items-baseline gap-2">
+                      <span className="tabular-nums text-ink-500">{number}</span>
+                      <span>{name}</span>
+                    </span>
+                    <span className="tabular-nums text-ink-500">{value}</span>
+                  </div>
+                ))}
+                <div className="py-1 text-[11px] text-ink-400">ещё 61 животное</div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <p className="mt-3 border-t border-ink-100 pt-2 text-[11px] leading-snug text-ink-400">
+        Число раскрывается в список: под средним возрастом 25,4 месяца стоят и 26,8, и 27,2.
+        Среднее прячет тех, ради кого отчёт и открывают.
+      </p>
+    </div>
+  )
+}
+
+/**
+ * Доступы: выдача на одно животное и запись о ней.
+ *
+ * ## Что здесь визуальный код
+ *
+ * Не роли — про них говорит карточка животного в трёх прочтениях
+ * (`AnimalStates`), и рисовать их второй раз значит повторяться.
+ * Здесь другое: **точечный доступ**, то есть выдача на одно животное
+ * и на срок, и журнал, в котором эта выдача записана.
+ *
+ * Рядом стоят два перечня — что откроется и что не откроется. Один
+ * без другого бесполезен: «покупатель увидит происхождение и оценку»
+ * оставляет открытым вопрос «а надои?», из-за которого разговор
+ * и заходит о доступах.
+ *
+ * ## Почему в журнале есть строка о будущем
+ *
+ * Последняя запись — «доступ закроется сам». Это ответ на возражение,
+ * которое иначе останется невысказанным: выданный доступ не приходится
+ * вспоминать и отзывать руками, он кончается сам. Строка о том, чего
+ * ещё не произошло, помечена серым — иначе она читалась бы как
+ * случившееся.
+ */
+export function AccessScreen() {
+  const shown = ['происхождение', 'линейная оценка', 'индекс', 'документы']
+  const hidden = ['события и здоровье', 'экономика', 'остальное стадо']
+
+  const log: [когда: string, что: string, кто: string, будущее?: boolean][] = [
+    ['12.04, 10:20', 'доступ открыт', 'Иванов А., ООО «Рассвет»'],
+    ['14.04, 09:05', 'просмотр карточки', 'ООО «Заря»'],
+    ['30.09', 'доступ закроется сам', 'по сроку выдачи', true],
+  ]
+
+  return (
+    <div className="p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-ink-100 pb-2">
+        <span className="text-[12px] font-medium">Доступ открыт ООО «Заря»</span>
+        <span className="text-[11px] text-ink-400">до 30 сентября</span>
+      </div>
+
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="rounded-lg border border-ink-100 px-3 py-2">
+          <div className="text-[11px] text-ink-500">Что видно</div>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {shown.map((s) => (
+              <span key={s} className="rounded-md bg-brand-50 px-2 py-0.5 text-[11px] text-forest-600">
+                {s}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-ink-100 px-3 py-2">
+          <div className="text-[11px] text-ink-500">Что не видно</div>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {hidden.map((s) => (
+              <span key={s} className="rounded-md bg-ink-50 px-2 py-0.5 text-[11px] text-ink-400">
+                {s}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4">
+        <div className="text-[11px] text-ink-500">Журнал</div>
+        <div className="mt-1.5 space-y-1">
+          {log.map(([when, what, who, future]) => (
+            <div key={when} className="flex items-baseline gap-3 text-[11px]">
+              <span className="w-[86px] shrink-0 tabular-nums text-ink-400">{when}</span>
+              <span className={future ? 'text-ink-400' : ''}>{what}</span>
+              <span className="ml-auto truncate text-right text-ink-400">{who}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <p className="mt-3 border-t border-ink-100 pt-2 text-[11px] leading-snug text-ink-400">
+        Доступ выдан на одно животное и на срок, и запись о нём видит и владелец,
+        и Ассоциация. Закроется он сам — отзывать руками нечего.
+      </p>
+    </div>
+  )
+}
+
+/**
+ * Заявки: пакет, принятый частями.
+ *
+ * ## Что здесь визуальный код
+ *
+ * «Принять можно частями» — фраза, за которой не видно устройства.
+ * Рисунок показывает его целиком: пакет разложен на три исхода,
+ * у каждого сомнения названа причина, а на кнопке стоят оба числа —
+ * сто восемнадцать из ста двадцати двух. Кнопка «Принять» без чисел
+ * означала бы ровно обратное: «залить файл как есть».
+ *
+ * ## Почему причины разные по строгости
+ *
+ * Одна запись отклонена, три отправлены на решение, и это не оттенки
+ * одного и того же. Отца, которого нет в книге, дописать нельзя —
+ * а осеменение раньше отёла бывает и правдой при редком стечении дат.
+ * Разница между «нельзя» и «странно» есть в правилах и должна быть
+ * видна на экране.
+ *
+ * ## Почему цепочка достоверности внизу
+ *
+ * Она отвечает на следующий вопрос — «и что, теперь этому верить?».
+ * Уровень не назначается галочкой: он поднимается протоколом
+ * лаборатории и закрепляется подписью с именем и датой. Последнее
+ * звено показано неисполненным, потому что подпись это отдельное
+ * действие человека, а не итог загрузки.
+ */
+export function SubmissionsScreen() {
+  const outcomes: { count: string; what: string; tone: 'ok' | 'doubt' | 'no' }[] = [
+    { count: '118', what: 'проверки пройдены — в книгу', tone: 'ok' },
+    { count: '3', what: 'осеменение раньше отёла — на решение', tone: 'doubt' },
+    { count: '1', what: 'отца нет в книге — отклонить', tone: 'no' },
+  ]
+
+  const chain: [шаг: string, готово: boolean][] = [
+    ['заявлено хозяйством', true],
+    ['протокол лаборатории', true],
+    ['подпись Ассоциации', false],
+  ]
+
+  return (
+    <div className="p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-ink-100 pb-2">
+        <span className="text-[12px] font-medium">Пакет от ООО «Заря»</span>
+        <span className="text-[11px] tabular-nums text-ink-400">122 записи</span>
+      </div>
+
+      <div className="mt-3 space-y-1.5">
+        {outcomes.map((o) => {
+          const tone =
+            o.tone === 'ok'
+              ? 'border-ink-100'
+              : o.tone === 'doubt'
+                ? 'border-amber-200 bg-amber-50'
+                : 'border-[#e3c4bb] bg-[#fdf3f0]'
+          const number =
+            o.tone === 'ok' ? 'text-forest-600' : o.tone === 'doubt' ? 'text-amber-800' : 'text-[#9e3520]'
+
+          return (
+            <div
+              key={o.what}
+              className={`flex items-baseline gap-3 rounded-lg border px-3 py-2 text-[11px] ${tone}`}
+            >
+              <span className={`w-8 shrink-0 text-[13px] font-medium tabular-nums ${number}`}>
+                {o.count}
+              </span>
+              <span>{o.what}</span>
+            </div>
+          )
+        })}
+      </div>
+
+      {/*
+         Кнопка нарисованная и не нажимается — как кружки оконной рамки.
+         Числа на ней стоят оба, потому что в них и заключено утверждение:
+         принимается часть, а остальное остаётся в заявке, а не пропадает.
+      */}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="rounded-md bg-forest-500 px-2.5 py-1 text-[11px] text-white">
+          Принять 118 из 122
+        </span>
+        <span className="text-[11px] text-ink-400">остальное остаётся в заявке</span>
+      </div>
+
+      <div className="mt-4 border-t border-ink-100 pt-3">
+        <div className="text-[11px] text-ink-500">Достоверность записи</div>
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          {chain.map(([step, done], i) => (
+            <span key={step} className="flex items-center gap-1.5">
+              {i > 0 && <span className="text-[11px] text-ink-300">→</span>}
+              <span
+                className={`rounded-md px-2 py-0.5 text-[11px] ${
+                  done
+                    ? 'bg-brand-50 text-forest-600'
+                    : 'border border-dashed border-ink-200 text-ink-400'
+                }`}
+              >
+                {step}
+              </span>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <p className="mt-3 border-t border-ink-100 pt-2 text-[11px] leading-snug text-ink-400">
+        Уровень достоверности не назначается: его поднимает протокол, а подпись Ассоциации —
+        отдельное действие с именем и датой.
+      </p>
+    </div>
+  )
+}

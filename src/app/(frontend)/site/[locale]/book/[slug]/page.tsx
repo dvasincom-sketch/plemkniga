@@ -8,6 +8,7 @@ import { BOOK_FEATURES, featureBySlug } from '@/lib/book-features'
 import { pageMetadata } from '@/lib/seo'
 import { CertificateArt } from '@/components/site/CertificateArt'
 import {
+  AccessScreen,
   AnimalStates,
   ConformationScreen,
   ExchangeScreen,
@@ -16,6 +17,8 @@ import {
   MilkScreen,
   PedigreeScreen,
   QualityScreen,
+  ReportsScreen,
+  SubmissionsScreen,
 } from '@/components/site/BookScreens'
 import { WindowFrame } from '@/components/site/WindowFrame'
 import { BOOK_URL, PRODUCT_MAIL } from '@/lib/hosts'
@@ -115,11 +118,23 @@ export default async function BookFeaturePage({
         {/*
            Экран раздела там, где у раздела есть визуальный код.
 
-           Не у всех он есть, и рисовать «что-нибудь» ради полноты
-           не следует: пустой рисунок обесценивает те, что несут смысл.
-           Карточка животного, родословная и качество данных показывают
-           то, чего текст не передаёт, — чем своё отличается от чужого,
-           где книга предупреждает, а где утверждает.
+           Долгое время три раздела — отчёты, доступы и заявки — стояли
+           без рисунка, и довод был такой: рисовать «что-нибудь» ради
+           полноты значит обесценить те рисунки, которые несут смысл.
+           Довод верный, но вывод из него был сделан поспешный: у всех
+           трёх визуальный код нашёлся, просто он не в том, о чём раздел
+           говорит первой строкой.
+
+           У отчётов это не показатели, а раскрытая строка: число,
+           под которым лежат те самые животные. У доступов — не роли
+           (их уже показывает карточка в трёх прочтениях), а выдача
+           на одно животное с записью в журнале. У заявок — не загрузка,
+           а разбор пакета на три исхода и кнопка с двумя числами.
+
+           Правило от этого не отменяется, а уточняется: сначала ищется
+           утверждение, которого нет в тексте, и только потом рисунок.
+           Раздел, у которого такого утверждения не нашлось, остаётся
+           без картинки — но искать надо не в заголовке.
         */}
         {feature.slug === 'animal' && (
           <section className="mt-10">
@@ -212,6 +227,51 @@ export default async function BookFeaturePage({
               по числу бык здесь и есть худший выбор. В каталоге поставщика этого не видно
               вовсе — там у быка одно число, — а видно только там, где обе родословные лежат
               рядом и инбридинг считается для потомка, которого ещё нет.
+            </p>
+          </section>
+        )}
+
+        {feature.slug === 'reports' && (
+          <section className="mt-10">
+            <div className="max-w-[75ch]">
+              <WindowFrame title="Стадо ООО «Рассвет» · 231 корова" subtitle="отчёт">
+                <ReportsScreen />
+              </WindowFrame>
+            </div>
+            <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
+              Строка раскрыта, и под средним возрастом первого отёла стоят те животные,
+              из которых оно сложилось, — включая тех, кто среднее и портит. Число без списка
+              нечем проверить и нечего с ним делать: ради этих животных отчёт и открывают.
+            </p>
+          </section>
+        )}
+
+        {feature.slug === 'access' && (
+          <section className="mt-10">
+            <div className="max-w-[75ch]">
+              <WindowFrame title="Ромашка · RU 4512 087" subtitle="доступ">
+                <AccessScreen />
+              </WindowFrame>
+            </div>
+            <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
+              Показан не перечень ролей, а точечная выдача: одно животное, срок, два списка —
+              что откроется и что нет. Первый вопрос при разговоре о доступах звучит именно так
+              («а надои покупатель увидит?»), и отвечать на него надо обеими половинами сразу.
+            </p>
+          </section>
+        )}
+
+        {feature.slug === 'submissions' && (
+          <section className="mt-10">
+            <div className="max-w-[75ch]">
+              <WindowFrame title="Заявка № 3184 · ООО «Заря»" subtitle="разбор пакета">
+                <SubmissionsScreen />
+              </WindowFrame>
+            </div>
+            <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
+              Пакет разложен на три исхода, у каждого сомнения названа причина, а на кнопке
+              стоят оба числа. «Принять» без чисел означало бы обратное — залить файл как есть
+              и разбираться потом.
             </p>
           </section>
         )}
