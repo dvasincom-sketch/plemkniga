@@ -104,7 +104,7 @@ export default async function OrgPage({ params }: { params: Promise<{ locale: st
       <ProductHeader locale={locale} path="/org" />
 
       <main className="container-page pb-16">
-        <section className="max-w-[75ch] pt-6">
+        <section className="max-w-[75ch]">
           <p className="text-[14px] uppercase tracking-wide text-forest-500">{frame.eyebrow}</p>
 
           <h1 className="mt-3 text-[34px] font-medium leading-tight sm:text-[44px]">

@@ -218,7 +218,7 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
            стало больше.
         */}
         <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-[1fr_420px]">
-        <section className="max-w-[70ch] pt-6">
+        <section className="max-w-[70ch]">
           <p className="text-[14px] uppercase tracking-wide text-forest-500">{s.eyebrow}</p>
 
           <h1 className="mt-3 text-[38px] font-medium leading-tight sm:text-[54px]">

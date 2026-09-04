@@ -43,7 +43,7 @@ export default async function NotesPage({ params }: { params: Promise<{ locale: 
       <ProductHeader locale={locale} />
 
       <main className="container-page pb-16">
-        <section className="max-w-[75ch] pt-6">
+        <section className="max-w-[75ch]">
           <p className="text-[14px] uppercase tracking-wide text-forest-500">Разборы</p>
 
           <h1 className="mt-3 text-[34px] font-medium leading-tight sm:text-[44px]">

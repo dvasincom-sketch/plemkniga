@@ -94,7 +94,7 @@ export default async function BreedPage({
       <ProductHeader locale={locale} />
 
       <main className="container-page pb-16">
-        <nav className="pt-2 text-[14px] text-ink-500">
+        <nav className="text-[14px] text-ink-500">
           <Link
             href={`/${locale}/breeds`}
             className="underline underline-offset-4 hover:text-forest-500"

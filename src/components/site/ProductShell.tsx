@@ -3,7 +3,7 @@ import { PlemLogo } from '@/components/PlemLogo'
 import { LocaleSwitcher } from '@/components/LocaleSwitcher'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { LOCALE_CODES, type Locale } from '@/lib/i18n/locales'
-import { BOOK_URL, PRODUCT_MAIL } from '@/lib/hosts'
+import { PRODUCT_MAIL } from '@/lib/hosts'
 import { PLATFORM } from '@/lib/platform'
 
 /**
@@ -103,59 +103,59 @@ export function ProductHeader({
     */
     <>
       <header className="bg-basement">
-      <div className="container-page flex flex-wrap items-center justify-between gap-x-8 gap-y-4 py-6">
-        {/*
-           Знак ведёт на корень витринного домена. Сам он ссылкой
-           не является — в отличие от знака Ассоциации, — и обёртка здесь
-           не создаёт вложенных ссылок.
-        */}
-        <Link href="/" aria-label="ПЛЕМ online">
-          <PlemLogo on="dark" />
-        </Link>
-
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-          <nav
-            aria-label={l.nav.sections}
-            className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[15px]"
-          >
-            {menu.map((m) => (
-              <Link
-                key={m.href}
-                href={m.href}
-                className="text-white/70 transition-colors hover:text-white"
-              >
-                {m.label}
-              </Link>
-            ))}
-          </nav>
-
-          {children}
-
+        <div className="container-page flex flex-wrap items-center justify-between gap-x-8 gap-y-4 py-6">
           {/*
-             Переключатель языка стоит на каждой странице продукта,
-             а не только на главной.
-
-             Человек, выбравший язык на первом экране и ушедший
-             в «Соответствие», прежде оказывался на русской странице
-             без всякой возможности вернуться к своему языку иначе,
-             чем через главную. Язык — свойство посетителя, а не одной
-             страницы.
+             Знак ведёт на корень витринного домена. Сам он ссылкой
+             не является — в отличие от знака Ассоциации, — и обёртка здесь
+             не создаёт вложенных ссылок.
           */}
-          {path !== undefined && (
-            <LocaleSwitcher
-              active={locale}
-              label={l.nav.language}
-              on="dark"
-              hrefs={
-                Object.fromEntries(LOCALE_CODES.map((c) => [c, `/${c}${path}`])) as Record<
-                  Locale,
-                  string
+          <Link href="/" aria-label="ПЛЕМ online">
+            <PlemLogo on="dark" />
+          </Link>
+
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+            <nav
+              aria-label={l.nav.sections}
+              className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[15px]"
+            >
+              {menu.map((m) => (
+                <Link
+                  key={m.href}
+                  href={m.href}
+                  className="text-white/70 transition-colors hover:text-white"
                 >
-              }
-            />
-          )}
+                  {m.label}
+                </Link>
+              ))}
+            </nav>
+
+            {children}
+
+            {/*
+               Переключатель языка стоит на каждой странице продукта,
+               а не только на главной.
+
+               Человек, выбравший язык на первом экране и ушедший
+               в «Соответствие», прежде оказывался на русской странице
+               без всякой возможности вернуться к своему языку иначе,
+               чем через главную. Язык — свойство посетителя, а не одной
+               страницы.
+            */}
+            {path !== undefined && (
+              <LocaleSwitcher
+                active={locale}
+                label={l.nav.language}
+                on="dark"
+                hrefs={
+                  Object.fromEntries(LOCALE_CODES.map((c) => [c, `/${c}${path}`])) as Record<
+                    Locale,
+                    string
+                  >
+                }
+              />
+            )}
+          </div>
         </div>
-      </div>
       </header>
 
       {/*
@@ -177,19 +177,24 @@ export function ProductHeader({
 }
 
 /**
- * Подвал продукта: четыре ссылки и почта.
+ * Подвал продукта: разделы витрины и почта.
  *
  * Ни адреса, ни телефона, ни правовых документов Ассоциации: они
  * называют другое лицо. Подписи разработчика тоже нет — последнее,
  * что видит уходящий, должно вести к системе.
- */
-/**
- * Подписи подвала на двух языках.
  *
- * Полноценного набора строк здесь нет намеренно: подписей четыре, и заводить
- * ради них механику перевода значило бы построить дорогу к одному дому.
- * Как только страниц продукта на английском станет больше двух, это
- * перерастёт в общий набор — а пока лишний слой только мешал бы читать.
+ * ## Почему здесь больше нет ссылки на голштинскую книгу
+ *
+ * Стояла она домом — `holstein.plem.online`, — и довод был такой: домен
+ * сам показывает, что уходишь в другое место. Довод верный, а место
+ * неверное. Подвал перечисляет разделы витрины, и одна книга среди них
+ * читается как раздел продукта, то есть ровно как то, чего мы избегали:
+ * будто продукт и есть эта книга.
+ *
+ * Место для книг в подвале будет — когда их станет несколько и появится
+ * список. Одна ссылка вместо списка — не начало списка, а лишнее
+ * действие: открыть книгу зовут первый экран и конец каждой страницы
+ * раздела, и звать оттуда честнее — там сказано, что именно откроется.
  */
 export function ProductFooter({ lang = 'ru' }: { lang?: Locale }) {
   const l = PAGE_MESSAGES[lang].nav
@@ -218,19 +223,6 @@ export function ProductFooter({ lang = 'ru' }: { lang?: Locale }) {
      * знают, сюда же читателя зовут читать.
      */
     ...(lang === 'ru' ? [{ href: '/ru/razbory', label: 'Разборы' }] : []),
-    /*
-     * Ссылка названа доменом, а не словами «Племенная книга».
-     *
-     * Разница смысловая. «Племенная книга» рядом с «О продукте»
-     * и «Соответствием» читается как раздел этого же сайта — то есть
-     * будто продукт и есть та самая книга. А это разные вещи:
-     * `plem.online` — система, `holstein.plem.online` — одна конкретная
-     * книга одной ассоциации, ведущаяся на ней.
-     *
-     * Домен снимает двусмысленность сам: видно, что уходишь в другое
-     * место, ещё до нажатия.
-     */
-    { href: BOOK_URL, label: BOOK_URL.replace('https://', '') },
   ]
 
   return (

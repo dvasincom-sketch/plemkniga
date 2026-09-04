@@ -147,7 +147,7 @@ export default async function BookFeaturePage({
       <ProductHeader locale={locale} path={`/book/${feature.slug}`} />
 
       <main className="container-page pb-16">
-        <nav className="pt-2 text-[14px] text-ink-500">
+        <nav className="text-[14px] text-ink-500">
           <Link href={`/${locale}`} className="underline underline-offset-4 hover:text-forest-500">
             {text.crumb}
           </Link>
