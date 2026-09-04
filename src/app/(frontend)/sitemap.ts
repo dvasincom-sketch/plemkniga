@@ -5,6 +5,8 @@ import { LOCALE_CODES } from '@/lib/i18n/locales'
 import { BOOK_FEATURES } from '@/lib/book-features'
 import { BREED_PAGES } from '@/lib/breed-pages'
 import { NOTES } from '@/lib/notes'
+import { STUDIES } from '@/lib/studies'
+import { TERM_PAGES } from '@/lib/terms'
 
 /**
  * Карта сайта.
@@ -103,6 +105,30 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       url: `${base}/ru/razbory/${n.slug}`,
       lastModified: new Date(n.date),
       priority: 0.7,
+    })),
+    /*
+     * Исследования — по тому же правилу, что и разборы: по-русски,
+     * без языковых копий, с датой из реестра. Дата здесь особенно
+     * важна: страница утверждает, что у нас есть сегодня, и объявлять
+     * такое утверждение свежим каждую ночь значило бы обещать роботу
+     * пересчёт, которого не было.
+     */
+    { url: `${base}/ru/issledovaniya`, lastModified: now, priority: 0.7 },
+    ...STUDIES.map((s) => ({
+      url: `${base}/ru/issledovaniya/${s.slug}`,
+      lastModified: new Date(s.date),
+      priority: 0.7,
+    })),
+    /*
+     * Словарь: указатель и статьи с отдельным адресом. Строки-определения
+     * без своей статьи сюда не попадают — у них нет адреса, и звать
+     * на них робота некуда.
+     */
+    { url: `${base}/ru/slovar`, lastModified: now, priority: 0.8 },
+    ...TERM_PAGES.map((t) => ({
+      url: `${base}/ru/slovar/${t.slug}`,
+      lastModified: now,
+      priority: 0.6,
     })),
     { url: `${base}/evolution`, lastModified: now, priority: 0.4 },
     /*

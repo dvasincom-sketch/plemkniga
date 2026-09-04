@@ -2,6 +2,7 @@ import { PLATFORM } from '@/lib/platform'
 import { PRODUCT_MAIL, SITE_URL } from '@/lib/hosts'
 import { LOCALE_CODES, type Locale } from '@/lib/i18n/locales'
 import type { Note } from '@/lib/notes'
+import type { Study } from '@/lib/studies'
 
 /**
  * Разметка для поисковых систем: то же самое, что показано читателю,
@@ -136,6 +137,111 @@ export function noteLd(note: Note): JsonLd {
       name: s.title,
       ...(s.url ? { url: s.url } : {}),
     })),
+  }
+}
+
+/**
+ * Страница исследования.
+ *
+ * `TechArticle`, как у разбора, и по той же причине: это не новость
+ * и не колонка, а описание того, что нужно, чтобы работу повторить.
+ *
+ * Разница с разбором одна, и она существенная. У разбора `citation`
+ * собирается из списка источников; здесь первым звеном стоит сама
+ * работа — отдельным `ScholarlyArticle` с журналом, годом и авторами,
+ * потому что страница заведена ради неё, а не ради опоры на неё.
+ * Дальше идут остальные источники: молчать о них значило бы показать
+ * роботу более бедную опору, чем читателю.
+ *
+ * Чего здесь нет — оценки самой работы и её выводов. В разметке
+ * повторено ровно то, что стоит в паспорте на экране: название, авторы,
+ * журнал, год, адрес. Страница, у которой прочитана только аннотация,
+ * и в разметке не утверждает о работе ничего сверх этого.
+ */
+export function studyLd(study: Study): JsonLd {
+  const url = abs(`/ru/issledovaniya/${study.slug}`)
+
+  const work: JsonLd = {
+    '@type': 'ScholarlyArticle',
+    name: study.work.title,
+    url: study.work.url,
+    author: study.work.authors,
+    isPartOf: { '@type': 'Periodical', name: study.work.journal },
+    datePublished: String(study.work.year),
+  }
+
+  return {
+    '@type': 'TechArticle',
+    '@id': `${url}#article`,
+    mainEntityOfPage: url,
+    url,
+    headline: study.title,
+    description: study.lead,
+    inLanguage: 'ru',
+    datePublished: study.date,
+    isAccessibleForFree: true,
+    articleSection: 'Исследования',
+    image: abs('/og-plem.png'),
+    author: {
+      '@type': 'Person',
+      name: study.author,
+      ...(study.authorUrl ? { url: study.authorUrl } : {}),
+    },
+    publisher: { '@id': `${SITE_URL}/#organization` },
+    citation: [
+      work,
+      ...study.sources
+        /*
+         * Работа уже стоит первым звеном. В списке источников она
+         * названа ещё раз — там она нужна читателю, — и звать робота
+         * на один адрес дважды значило бы объявить две разные работы
+         * с одинаковой ссылкой.
+         */
+        .filter((s) => s.url !== study.work.url)
+        .map((s) => ({
+          '@type': 'CreativeWork',
+          name: s.title,
+          ...(s.url ? { url: s.url } : {}),
+        })),
+    ],
+  }
+}
+
+/**
+ * Статья словаря.
+ *
+ * `DefinedTerm` в наборе `DefinedTermSet` — тот случай, когда словарь
+ * предметной области описан в схеме прямо и точно, и придумывать вместо
+ * него `Article` было бы хуже: статья про термин и определение термина
+ * для поисковой системы разные вещи.
+ *
+ * `inDefinedTermSet` ссылается на указатель, а не повторяет его: набор
+ * объявлен один раз на своей странице.
+ */
+export function termLd(input: { slug: string; title: string; short: string }): JsonLd {
+  const url = abs(`/ru/slovar/${input.slug}`)
+
+  return {
+    '@type': 'DefinedTerm',
+    '@id': `${url}#term`,
+    name: input.title,
+    description: input.short,
+    url,
+    inDefinedTermSet: { '@id': `${SITE_URL}/ru/slovar#set` },
+    inLanguage: 'ru',
+  }
+}
+
+/** Сам словарь как набор терминов. Объявляется на указателе. */
+export function glossaryLd(input: { name: string; description: string }): JsonLd {
+  return {
+    '@type': 'DefinedTermSet',
+    '@id': `${SITE_URL}/ru/slovar#set`,
+    name: input.name,
+    description: input.description,
+    url: abs('/ru/slovar'),
+    inLanguage: 'ru',
+    publisher: { '@id': `${SITE_URL}/#organization` },
   }
 }
 

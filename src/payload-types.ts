@@ -507,6 +507,9 @@ export interface Animal {
   };
   evaluationDate?: string | null;
   production?: {
+    /**
+     * Ставит расчётный центр по своим правилам: 1 — оценка предварительная, 5 — подтверждена большим массивом данных. Не наш расчёт и в индексе не используется. Это не надёжность R и не уровень достоверности данных
+     */
     reliabilityLevel?: number | null;
     milk?: {
       forecast?: number | null;
@@ -574,6 +577,9 @@ export interface Animal {
     };
   };
   health?: {
+    /**
+     * Ставит расчётный центр по своим правилам: 1 — оценка предварительная, 5 — подтверждена большим массивом данных. Не наш расчёт и в индексе не используется. Это не надёжность R и не уровень достоверности данных
+     */
     reliabilityLevel?: number | null;
     productiveLongevity?: {
       forecast?: number | null;
@@ -1373,6 +1379,9 @@ export interface Calving {
   milkingDays?: number | null;
   dryOffDate?: string | null;
   ease?: ('easy' | 'assisted' | 'hard') | null;
+  /**
+   * При рождении. Повторные взвешивания живут в «Взвешиваниях»
+   */
   calfWeight?: number | null;
   liveHeifers?: number | null;
   liveBulls?: number | null;
@@ -1404,7 +1413,7 @@ export interface Insemination {
   ownerOrg?: (number | null) | Organization;
   animal: number | Animal;
   /**
-   * К какому отёлу относится осеменение
+   * Отёл, в счёт которого осеменяют, — тот, который ещё наступит: у тёлки это 1. Не «номер лактации» из доек и взвешиваний: там идущая сейчас, число на единицу меньше
    */
   lactationNumber?: number | null;
   date: string;
@@ -1513,6 +1522,9 @@ export interface MilkTest {
   ownerOrg?: (number | null) | Organization;
   animal: number | Animal;
   date: string;
+  /**
+   * Лактация, идущая на день замера, — она же число состоявшихся отёлов. Пусто — система возьмёт их количество сама
+   */
   lactationNumber?: number | null;
   dailyYield: number;
   fatPercent?: number | null;
@@ -1571,7 +1583,7 @@ export interface Weighing {
    */
   sign?: ('birth' | 'age' | 'firstInsemination' | 'averageLactation' | 'highestLactation' | 'sale' | 'disposal') | null;
   /**
-   * Только для самок при наличии лактации
+   * Лактация, идущая на день взвешивания, — она же число состоявшихся отёлов. Только для самок при наличии лактации
    */
   lactationNumber?: number | null;
   note?: string | null;

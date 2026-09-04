@@ -113,6 +113,7 @@
     "check:seo": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-seo.ts",
     "check:english": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-english.ts",
     "check:languages": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-languages.ts",
+    "check:terms": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-terms.ts",
     "check:jsonld": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-jsonld.ts",
     "audit:slow": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/audit-slow.ts"
   },

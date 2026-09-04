@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 
 import { NOTES } from '@/lib/notes'
+import { STUDIES } from '@/lib/studies'
 import { SITE_URL } from '@/lib/hosts'
 import { ICAR_FETCHED_AT, ICAR_SOURCE } from '@/lib/breeds-catalog'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
@@ -10,6 +11,7 @@ import {
   graph,
   noteLd,
   organizationLd,
+  studyLd,
   websiteLd,
   type JsonLd,
 } from '@/lib/jsonld'
@@ -85,6 +87,16 @@ const blocks: { where: string; data: JsonLd }[] = [
       breadcrumbLd([
         { name: 'Разборы', path: '/ru/razbory' },
         { name: n.title, path: `/ru/razbory/${n.slug}` },
+      ]),
+    ),
+  })),
+  ...STUDIES.map((s) => ({
+    where: `исследование ${s.slug}`,
+    data: graph(
+      studyLd(s),
+      breadcrumbLd([
+        { name: 'Исследования', path: '/ru/issledovaniya' },
+        { name: s.title, path: `/ru/issledovaniya/${s.slug}` },
       ]),
     ),
   })),
@@ -203,6 +215,58 @@ for (const note of NOTES) {
 }
 
 console.log(`Разборов: ${NOTES.length}`)
+
+/* ------------------------- 4. Исследования --------------------------------- */
+
+/*
+ * У страницы исследования проверяется то же самое, что у разбора, плюс
+ * своё: адрес самой работы. Он в разметке стоит первым звеном `citation`
+ * и уводит робота на чужой сайт — относительный или пустой адрес там
+ * означал бы ссылку в никуда из блока, который заведён ровно ради того,
+ * чтобы связать нашу страницу с работой.
+ */
+for (const study of STUDIES) {
+  const ld = studyLd(study) as Record<string, unknown>
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(study.date)) {
+    fail(`исследование ${study.slug} — дата «${study.date}» не читается роботом`)
+  } else if (study.date > today) {
+    fail(`исследование ${study.slug} — дата из будущего: ${study.date}`)
+  }
+
+  const headline = ld.headline
+  if (typeof headline !== 'string' || headline.trim() === '') {
+    fail(`исследование ${study.slug} — пустой заголовок в разметке`)
+  }
+
+  if (!/^https?:\/\//.test(study.work.url)) {
+    fail(`исследование ${study.slug} — адрес работы не абсолютный: ${study.work.url}`)
+  }
+
+  if (study.sources.length === 0) {
+    fail(`исследование ${study.slug} — ни одного источника`)
+  }
+
+  for (const s of study.sources) {
+    if (s.title.trim() === '') fail(`исследование ${study.slug} — источник без названия`)
+    if (s.url && !/^https?:\/\//.test(s.url)) {
+      fail(`исследование ${study.slug} — адрес источника не абсолютный: ${s.url}`)
+    }
+  }
+
+  /*
+   * Работа, которую мы читали только по аннотации, не вправе стоять
+   * в разметке с выводами — но выводов в разметке нет вовсе, там только
+   * паспорт. Проверить остаётся одно: что паспорт заполнен. Пустое поле
+   * авторов означало бы не «авторов нет», а «мы не посмотрели», и
+   * в разметке эти два случая неразличимы.
+   */
+  if (study.work.authors.trim() === '' || study.work.sample.trim() === '') {
+    fail(`исследование ${study.slug} — в паспорте работы пустое поле`)
+  }
+}
+
+console.log(`Исследований: ${STUDIES.length}`)
 
 console.log(
   failures === 0
