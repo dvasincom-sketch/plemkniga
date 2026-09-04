@@ -73,29 +73,53 @@ async function main() {
   console.log('─'.repeat(78))
 
   let loud = 0
+  let measured = 0
 
   for (const trait of TRAIT_BASE) {
     /*
      * Путь признака — вложенное поле карточки вида `health.calfMortality`;
-     * в базе оно лежит колонкой с подчёркиванием и суффиксом прогноза.
-     * Собирается имя здесь, а не хранится вторым списком: второй список
-     * разошёлся бы с `TRAIT_BASE` на первом же новом признаке.
+     * в базе оно лежит колонкой с подчёркиванием.
+     *
+     * Форм две, и это не мелочь оформления. У восьми признаков хранится
+     * пара «прогноз и надёжность», и колонка называется с суффиксом
+     * `_forecast`. У трёх композитов экстерьера надёжности нет вовсе,
+     * и лежат они голым числом — отсюда и то, что композиты не входят
+     * в надёжность индекса. Первая редакция прогона знала одну форму
+     * и объявила три признака несуществующими; на деле несуществующим
+     * было её представление о модели.
+     *
+     * Поэтому пробуются обе, и то, какая сработала, печатается: разница
+     * между ними — факт о данных, а не подробность запроса.
      */
-    const column = `${trait.path.replace('.', '_')}_forecast`
-      .replace(/([a-z])([A-Z])/g, '$1_$2')
-      .toLowerCase()
+    const base = trait.path.replace('.', '_').replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase()
 
     let row: { sd: number | null; n: number } | null = null
+    let bare = false
 
-    try {
+    const measure = async (column: string) => {
       const res = await pool.query(
+        /*
+         * Хозяйство у животного — `owner_id`. Колонки `organization_id`
+         * у животных нет: первая редакция спрашивала её и получала отказ
+         * по восьми признакам разом, а прогон отвечал зелёным, потому что
+         * считать было нечего. Так же фильтруют отчёты по стаду.
+         */
         `select stddev_samp("${column}")::float as sd, count("${column}")::int as n
            from animals
           where archived is not true
-            ${ORG ? 'and organization_id = $1' : ''}`,
+            ${ORG ? 'and owner_id = $1' : ''}`,
         ORG ? [ORG] : [],
       )
-      row = (res.rows?.[0] ?? null) as { sd: number | null; n: number } | null
+      return (res.rows?.[0] ?? null) as { sd: number | null; n: number } | null
+    }
+
+    try {
+      try {
+        row = await measure(`${base}_forecast`)
+      } catch {
+        row = await measure(base)
+        bare = true
+      }
     } catch (e) {
       /*
        * Причина печатается, а не проглатывается.
@@ -111,7 +135,7 @@ async function main() {
        * не с ней, а с придуманным объяснением.
        */
       const why = e instanceof Error ? e.message : String(e)
-      console.log(`${trait.label.padEnd(28)}${column}: ${why}`)
+      console.log(`${trait.label.padEnd(28)}${base}: ${why}`)
       continue
     }
 
@@ -126,14 +150,17 @@ async function main() {
       continue
     }
 
+    measured += 1
+
     const ratio = sd > trait.sd ? sd / trait.sd : trait.sd / sd
     const shout = ratio >= LOUD ? '  ← смотреть' : ''
     if (ratio >= LOUD) loud += 1
+    const mark = bare ? '  без надёжности' : ''
 
     console.log(
       `${trait.label.padEnd(28)}${String(trait.sd).padStart(8)}   ` +
         `${sd.toFixed(2).padStart(8)}   ${String(n).padStart(7)}   ` +
-        `${ratio.toFixed(1).padStart(6)}${shout}`,
+        `${ratio.toFixed(1).padStart(6)}${shout}${mark}`,
     )
   }
 
@@ -148,14 +175,28 @@ async function main() {
   )
 
   /*
-   * Прогон не падает. Расхождение σ — не поломка, а повод принять решение,
-   * и решение это меняет рейтинг всех животных: валить им выкладку значило
-   * бы требовать спешки там, где нужна осторожность.
+   * Ничего не измерено — красный ответ, а не зелёный.
+   *
+   * Первая редакция на живой базе не посчитала ни одного признака
+   * и написала «ни один не разошёлся втрое». Формально верно, по существу
+   * ложь: не разошлись они потому, что их не сравнивали. Проверка,
+   * которая молчит о том, что ничего не проверила, хуже отсутствующей —
+   * ровно та же беда, что была у обхода витрины.
+   */
+  if (measured === 0) {
+    console.log('\n  ✗ ни один признак не измерен: сравнивать было нечего')
+    process.exit(1)
+  }
+
+  /*
+   * Расхождение σ прогон не валит. Это не поломка, а повод принять
+   * решение, и решение меняет рейтинг всех животных: требовать спешки
+   * там, где нужна осторожность, не годится.
    */
   console.log(
     loud === 0
-      ? '\n  ✓ ни один признак не разошёлся с измеренным втрое'
-      : `\n  ! признаков, разошедшихся втрое и больше: ${loud}`,
+      ? `\n  ✓ измерено признаков: ${measured}, ни один не разошёлся с заявленным втрое`
+      : `\n  ! измерено признаков: ${measured}, разошлись втрое и больше: ${loud}`,
   )
   process.exit(0)
 }
