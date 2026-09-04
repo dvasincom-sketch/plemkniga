@@ -102,7 +102,7 @@ export default async function IcarGapsPage({
           ]}
         />
 
-        <h1 className="text-[38px] font-medium sm:text-[46px]">{text.title}</h1>
+        <h1 className="mt-3 text-[34px] font-medium leading-tight sm:text-[44px]">{text.title}</h1>
 
         {notice && (
           <p className="mt-5 max-w-[75ch] rounded-xl bg-ink-50 px-4 py-3 text-[14px] leading-relaxed text-ink-500">

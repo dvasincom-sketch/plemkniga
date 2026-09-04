@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { PlemLogo } from '@/components/PlemLogo'
 import { LocaleSwitcher } from '@/components/LocaleSwitcher'
+import { HeaderMenu } from '@/components/site/HeaderMenu'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { LOCALE_CODES, type Locale } from '@/lib/i18n/locales'
 import { PRODUCT_MAIL } from '@/lib/hosts'
@@ -102,8 +103,8 @@ export function ProductHeader({
        как разные сущности.
     */
     <>
-      <header className="bg-basement">
-        <div className="container-page flex flex-wrap items-center justify-between gap-x-8 gap-y-4 py-6">
+      <header className="relative bg-basement">
+        <div className="container-page flex items-center justify-between gap-x-8 py-6">
           {/*
              Знак ведёт на корень витринного домена. Сам он ссылкой
              не является — в отличие от знака Ассоциации, — и обёртка здесь
@@ -113,47 +114,36 @@ export function ProductHeader({
             <PlemLogo on="dark" />
           </Link>
 
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-            <nav
-              aria-label={l.nav.sections}
-              className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[15px]"
-            >
-              {menu.map((m) => (
-                <Link
-                  key={m.href}
-                  href={m.href}
-                  className="text-white/70 transition-colors hover:text-white"
-                >
-                  {m.label}
-                </Link>
-              ))}
-            </nav>
-
+          <div className="flex items-center gap-x-6">
             {children}
 
             {/*
-               Переключатель языка стоит на каждой странице продукта,
-               а не только на главной.
+               Разделы и язык живут в одном месте: на широком экране
+               строкой, на телефоне под кнопкой
+               (`components/site/HeaderMenu.tsx`).
 
-               Человек, выбравший язык на первом экране и ушедший
-               в «Соответствие», прежде оказывался на русской странице
-               без всякой возможности вернуться к своему языку иначе,
-               чем через главную. Язык — свойство посетителя, а не одной
-               страницы.
+               Переключатель языка стоит на каждой странице продукта,
+               а не только на главной: человек, выбравший язык на первом
+               экране и ушедший в «Соответствие», прежде оказывался
+               на русской странице без всякой возможности вернуться
+               к своему языку иначе, чем через главную. Язык — свойство
+               посетителя, а не одной страницы.
             */}
-            {path !== undefined && (
-              <LocaleSwitcher
-                active={locale}
-                label={l.nav.language}
-                on="dark"
-                hrefs={
-                  Object.fromEntries(LOCALE_CODES.map((c) => [c, `/${c}${path}`])) as Record<
-                    Locale,
-                    string
-                  >
-                }
-              />
-            )}
+            <HeaderMenu links={menu} label={l.nav.sections}>
+              {path !== undefined && (
+                <LocaleSwitcher
+                  active={locale}
+                  label={l.nav.language}
+                  on="dark"
+                  hrefs={
+                    Object.fromEntries(LOCALE_CODES.map((c) => [c, `/${c}${path}`])) as Record<
+                      Locale,
+                      string
+                    >
+                  }
+                />
+              )}
+            </HeaderMenu>
           </div>
         </div>
       </header>

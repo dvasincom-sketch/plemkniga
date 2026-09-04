@@ -28,7 +28,7 @@ export function NoteHeader({ note }: { note: Note }) {
       </nav>
 
       <section className="mt-6 max-w-[75ch]">
-        <h1 className="text-[32px] font-medium leading-tight sm:text-[42px]">{note.title}</h1>
+        <h1 className="text-[34px] font-medium leading-tight sm:text-[44px]">{note.title}</h1>
 
         <p className="mt-5 text-[17px] leading-relaxed text-ink-700">{note.lead}</p>
 

@@ -137,9 +137,9 @@ export default async function CompliancePage({
       <ProductHeader locale={locale} path="/compliance" />
 
       <main className="container-page pb-8">
-        <p className="text-[13px] uppercase tracking-[0.09em] text-ink-500">{frame.eyebrow}</p>
+        <p className="text-[14px] uppercase tracking-wide text-forest-500">{frame.eyebrow}</p>
 
-        <h1 className="mt-3 max-w-[26ch] text-[38px] font-medium leading-tight sm:text-[46px]">
+        <h1 className="max-w-[26ch] mt-3 text-[34px] font-medium leading-tight sm:text-[44px]">
           {frame.title}
         </h1>
 

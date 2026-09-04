@@ -149,7 +149,17 @@ export function AnimalStates({ locale = DEFAULT_LOCALE }: ScreenProps) {
   )
 }
 
-/** Родословная: сколько поколений видно и что помечено. */
+/**
+ * Родословная: сколько поколений видно и что помечено.
+ *
+ * ## Почему номера ломаются посреди
+ *
+ * Международный номер — `HODEU000360023959` — для браузера одно слово,
+ * и на телефоне он вылезал за плашку предка, ложась поверх соседней.
+ * Перенос по любому знаку (`break-all`) здесь безопаснее переноса
+ * по словам: у номера нет пробелов и дефисов, а разорванный номер
+ * читается как номер, тогда как вылезший за рамку читается как поломка.
+ */
 export function PedigreeScreen({ locale = DEFAULT_LOCALE }: ScreenProps) {
   const t = screensText(locale).pedigree
 
@@ -161,7 +171,7 @@ export function PedigreeScreen({ locale = DEFAULT_LOCALE }: ScreenProps) {
         <div className="space-y-2">
           <div className="rounded-lg border border-ink-100 px-2 py-1.5">
             <div className="font-medium">{t.self.name}</div>
-            <div className="tabular-nums text-ink-500">{t.self.number}</div>
+            <div className="break-all tabular-nums text-ink-500">{t.self.number}</div>
           </div>
         </div>
 
@@ -176,7 +186,7 @@ export function PedigreeScreen({ locale = DEFAULT_LOCALE }: ScreenProps) {
                   </span>
                 )}
               </div>
-              <div className="tabular-nums text-ink-500">{num}</div>
+              <div className="break-all tabular-nums text-ink-500">{num}</div>
             </div>
           ))}
         </div>

@@ -184,9 +184,9 @@ export default async function ApiDocsPage({
 
       <main className="container-page pb-8">
         <div className="min-w-0">
-          <p className="text-[13px] uppercase tracking-[0.09em] text-ink-500">{frame.eyebrow}</p>
+          <p className="text-[14px] uppercase tracking-wide text-forest-500">{frame.eyebrow}</p>
 
-          <h1 className="mt-3 text-[30px] font-medium leading-tight sm:text-[36px]">
+          <h1 className="mt-3 text-[34px] font-medium leading-tight sm:text-[44px]">
             {frame.title}
           </h1>
 

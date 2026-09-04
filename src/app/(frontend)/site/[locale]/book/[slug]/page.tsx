@@ -154,7 +154,7 @@ export default async function BookFeaturePage({
         </nav>
 
         <section className="mt-6 max-w-[75ch]">
-          <h1 className="text-[34px] font-medium leading-tight sm:text-[42px]">{feature.title}</h1>
+          <h1 className="text-[34px] font-medium leading-tight sm:text-[44px]">{feature.title}</h1>
 
           <p className="mt-5 text-[17px] leading-relaxed text-ink-700">{feature.short}</p>
 

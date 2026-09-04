@@ -180,7 +180,15 @@ export function LayersArt({ labels, title }: { labels: string[]; title: string }
     <div
       role="img"
       aria-label={`${title}: ${labels.join(', ')}`}
-      className="flex h-full w-full max-w-[320px] flex-col items-center gap-2 rounded-2xl bg-white p-6"
+      /*
+         На широком экране пирамида стоит в колонке 320 пикселей рядом
+         с карточками, и `max-w` держит её в этой колонке. На телефоне
+         колонка одна, и тот же `max-w` оставлял плашку уже экрана —
+         посреди страницы, где всё остальное во всю ширину, она читалась
+         как обрезанная. Ограничение поэтому включается вместе с сеткой,
+         а не действует всегда.
+      */
+      className="flex h-full w-full flex-col items-center gap-2 rounded-2xl bg-white p-6 lg:max-w-[320px]"
     >
       {rows.map((row, i) => (
         <div
@@ -301,9 +309,28 @@ export function FlowArt({
             <Node label={checks} />
           </div>
           {marks?.checks && (
-            <p className="max-w-[22ch] text-[11px] leading-snug text-ink-400">
-              <span aria-hidden="true">↩ </span>
-              {marks.checks}
+            /*
+               Стрелка нарисована, а не набрана знаком «↩».
+               У этого знака есть эмодзи-начертание, и телефон рисовал
+               его цветной картинкой посреди серой схемы — крупнее
+               соседнего текста и совсем другого настроения.
+               Нарисованная стрелка берёт цвет у строки и стоит на месте.
+            */
+            <p className="flex max-w-[22ch] items-start gap-1.5 text-[11px] leading-snug text-ink-400">
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 12 12"
+                className="mt-[3px] h-3 w-3 flex-none"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.4}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M10.5 2v3.5a2 2 0 0 1-2 2H2" />
+                <path d="M4.5 5.5 2 7.5l2.5 2" />
+              </svg>
+              <span>{marks.checks}</span>
             </p>
           )}
         </div>
