@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import type { Note } from '@/lib/notes'
+import { JsonLd } from '@/components/JsonLd'
+import { breadcrumbLd, graph, noteLd } from '@/lib/jsonld'
 
 /**
  * Обвязка разбора: заголовок, паспорт, подпись автора и список источников.
@@ -21,6 +23,25 @@ import type { Note } from '@/lib/notes'
 export function NoteHeader({ note }: { note: Note }) {
   return (
     <>
+      {/*
+         Разметка для поисковых систем стоит здесь, а не на одиннадцати
+         страницах разборов по отдельности. Довод тот же, по которому
+         паспорт и источники рисует общая обвязка: разбор, добавленный
+         завтра, получает её вместе с заголовком и не может её забыть.
+         Собирается она из той же записи `Note`, из которой напечатаны
+         заголовок, подпись автора и список источников ниже, — второй
+         правды об одном разборе не заводится.
+      */}
+      <JsonLd
+        data={graph(
+          noteLd(note),
+          breadcrumbLd([
+            { name: 'Разборы', path: '/ru/razbory' },
+            { name: note.title, path: `/ru/razbory/${note.slug}` },
+          ]),
+        )}
+      />
+
       <nav className="text-[14px] text-ink-500">
         <Link href="/ru/razbory" className="underline underline-offset-4 hover:text-forest-500">
           Разборы

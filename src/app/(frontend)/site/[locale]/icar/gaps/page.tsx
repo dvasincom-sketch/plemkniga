@@ -6,6 +6,8 @@ import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, LOCALE_CODES, type Locale } from '@/lib/i18n/locales'
 import { noticeFor, pick } from '@/lib/i18n/translated'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
+import { JsonLd } from '@/components/JsonLd'
+import { breadcrumbLd, graph } from '@/lib/jsonld'
 import { ICAR_WIKI, ICAR_WITH_GAPS } from '@/lib/icar-map'
 import { icarText } from '@/lib/i18n/data/icar-map'
 import { ICAR_PAGE_TEXT } from '@/lib/icar-page-text'
@@ -96,16 +98,34 @@ export default async function IcarGapsPage({
    */
   const data = icarText(picked.shown)
 
+  /** Путь до страницы: один список и для читателя, и для робота. */
+  const crumbs = [
+    { name: text.breadcrumbs.map, path: `/${locale}/icar` },
+    { name: text.breadcrumbs.here, path: `/${locale}/icar/gaps` },
+  ]
+
   return (
     <>
       <ProductHeader locale={locale} path="/icar/gaps" />
 
       <main className="container-page pb-8">
+        {/*
+           Путь объявлен роботу и нарисован читателю из одного списка.
+           Разложить его на два значило бы завести две правды о том,
+           где страница находится, — а расходятся они молча: на экране
+           одно, в выдаче другое, и сверить их некому.
+
+           Звенья тут разной природы, отсюда и перекладка: рисованному
+           пути последнее звено ссылкой не нужно (читатель на нём
+           и стоит), а разметке нужен адрес у каждого.
+        */}
+        <JsonLd data={graph(breadcrumbLd(crumbs))} />
+
         <Breadcrumbs
-          items={[
-            { label: text.breadcrumbs.map, href: `/${locale}/icar` },
-            { label: text.breadcrumbs.here },
-          ]}
+          items={crumbs.map((c, i) => ({
+            label: c.name,
+            href: i < crumbs.length - 1 ? c.path : undefined,
+          }))}
         />
 
         <h1 className="mt-3 text-[34px] font-medium leading-tight sm:text-[44px]">{text.title}</h1>

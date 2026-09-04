@@ -9,6 +9,8 @@ import { noticeFor, pick } from '@/lib/i18n/translated'
 import { demoUrl, PRODUCT_MAIL } from '@/lib/hosts'
 import { breedCatalog } from '@/lib/breeds-catalog-server'
 import { BREED_PAGES } from '@/lib/breed-pages'
+import { JsonLd } from '@/components/JsonLd'
+import { breedsLd, graph } from '@/lib/jsonld'
 import {
   ICAR_BREEDS,
   ICAR_FETCHED_AT,
@@ -169,6 +171,26 @@ export default async function BreedsPage({
 
   return (
     <>
+      {/*
+         Каталог объявлен набором данных: это и есть таблица со своим
+         источником и своей датой сверки, а не рассказ о ней. Имя
+         и описание берутся из той же рамки, из которой напечатаны
+         заголовок и подводка, источник и дата — те же, что показаны
+         под таблицей. Ни одного своего слова здесь нет намеренно
+         (`lib/jsonld.ts`).
+      */}
+      <JsonLd
+        data={graph(
+          breedsLd({
+            locale: picked.shown,
+            name: frame.title,
+            description: frame.lead,
+            icarSource: ICAR_SOURCE,
+            icarFetchedAt: ICAR_FETCHED_AT,
+          }),
+        )}
+      />
+
       <ProductHeader locale={locale} path="/breeds" />
 
       <main className="container-page pb-16">

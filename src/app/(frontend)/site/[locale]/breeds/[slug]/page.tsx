@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
+import { JsonLd } from '@/components/JsonLd'
+import { breadcrumbLd, graph } from '@/lib/jsonld'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
 import {
   BREED_PAGES,
@@ -100,6 +102,24 @@ export default async function BreedPage({
       <ProductHeader locale={locale} />
 
       <main className="container-page pb-16">
+        {/*
+           Путь до страницы для поисковой системы. Страница породы лежит
+           на два шага от корня, и без пути в выдаче она стоит сиротой:
+           по строке «Голштинская порода» не видно, что это раздел
+           каталога, а не отдельный сайт.
+
+           Адрес разбора всегда русский: страницы пород написаны
+           по-русски и на других языках не существуют (`lib/breed-pages.ts`).
+        */}
+        <JsonLd
+          data={graph(
+            breadcrumbLd([
+              { name: 'Породы', path: '/ru/breeds' },
+              { name: page.title, path: `/ru/breeds/${slug}` },
+            ]),
+          )}
+        />
+
         <nav className="text-[14px] text-ink-500">
           <Link
             href={`/${locale}/breeds`}

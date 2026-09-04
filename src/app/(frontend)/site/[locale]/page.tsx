@@ -18,6 +18,8 @@ import { DemoVideo } from '@/components/site/DemoVideo'
 import { AnimalScreen } from '@/components/site/ScreenArt'
 import { ScreenSlider } from '@/components/site/ScreenSlider'
 import { WindowFrame } from '@/components/site/WindowFrame'
+import { JsonLd } from '@/components/JsonLd'
+import { graph, organizationLd, websiteLd } from '@/lib/jsonld'
 import { IndexScreen, PedigreeScreen } from '@/components/site/BookScreens'
 import { screensText } from '@/lib/book-screens-text'
 import { ADE_MAP } from '@/lib/ade-schema-map'
@@ -209,6 +211,19 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
          `path=''` — это и есть главная: переключатель ведёт на `/en`,
          `/kk` и так далее, то есть на ту же страницу на другом языке.
       */}
+      {/*
+         Кто ведёт сайт и что это за сайт — один раз, на главной,
+         а не на каждой странице. Заявление о лице и о сайте касается
+         всего домена, и повторять его полторы сотни раз значило бы
+         повторять на каждой странице подпись в подвале: смысла
+         не прибавится, а расходиться копии начнут сразу.
+
+         Остальные страницы ссылаются на эти же два узла через `@id`
+         (`lib/jsonld.ts`), и потому обязаны иметь на что ссылаться
+         именно здесь.
+      */}
+      <JsonLd data={graph(organizationLd(), websiteLd(locale))} />
+
       <ProductHeader locale={locale} path="" />
 
       <main className="container-page pb-8">
