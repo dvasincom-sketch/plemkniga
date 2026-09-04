@@ -170,7 +170,7 @@ export function IndexBreakdown({
           <div className="text-right">
             {/* Само число индекса — первое, что читают, и первое, что нужно
                 уметь проверить: под пунктиром формула целиком */}
-            <p className={`text-[30px] font-medium leading-none tabular-nums ${value < 0 ? 'text-[#c0392b]' : 'text-forest-600'}`}>
+            <p className={`stat-value text-[30px] leading-none ${value < 0 ? 'text-[#c0392b]' : 'text-forest-600'}`}>
               <Computed formula="index">{signed(Math.round(value))}</Computed>
             </p>
             <p className="mt-1 text-[12px] text-ink-500">{economic ? '₽ за жизнь' : 'очков индекса'}</p>
@@ -238,7 +238,7 @@ export function IndexBreakdown({
                 {m.label}
                 {m.tip && <InfoTip>{m.tip}</InfoTip>}
               </p>
-              <p className="mt-1.5 text-[24px] font-medium leading-none tabular-nums">{m.value}</p>
+              <p className="mt-1.5 stat-value text-[24px] leading-none">{m.value}</p>
               {m.note && <p className="mt-1.5 text-[12px] leading-tight text-ink-500">{m.note}</p>}
             </div>
           ))}

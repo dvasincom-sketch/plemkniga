@@ -79,25 +79,25 @@ export default async function AssociationAfcPage() {
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               <div className="card">
                 <p className="text-[13px] text-ink-500">Быков в сводке</p>
-                <p className="mt-1 text-[28px] font-medium leading-none tabular-nums">
+                <p className="mt-1 stat-value text-[28px] leading-none">
                   {book.rows.length}
                 </p>
               </div>
               <div className="card">
                 <p className="text-[13px] text-ink-500">Коров с известным возрастом</p>
-                <p className="mt-1 text-[28px] font-medium leading-none tabular-nums">
+                <p className="mt-1 stat-value text-[28px] leading-none">
                   {book.cows.toLocaleString('ru-RU')}
                 </p>
               </div>
               <div className="card">
                 <p className="text-[13px] text-ink-500">Порог по дочерям</p>
-                <p className="mt-1 text-[28px] font-medium leading-none tabular-nums">
+                <p className="mt-1 stat-value text-[28px] leading-none">
                   {AFC_SIRE_MIN_DAUGHTERS}
                 </p>
               </div>
               <div className="card">
                 <p className="text-[13px] text-ink-500">Быков не прошло порог</p>
-                <p className="mt-1 text-[28px] font-medium leading-none tabular-nums">
+                <p className="mt-1 stat-value text-[28px] leading-none">
                   {book.hidden}
                 </p>
               </div>

@@ -183,7 +183,13 @@ export type SiteMessages = {
    * достоинствами. Каждая строка — то, что открывается щелчком
    * в работающей книге, и это проверяется по ссылке рядом.
    */
-  inside: { title: string; lead: string; items: { title: string; body: string }[] }
+  inside: {
+    title: string
+    lead: string
+    /** Подпись-приглашение на карточке: ведёт к разбору раздела. */
+    more: string
+    items: { title: string; body: string }[]
+  }
   /**
    * Подписи полей у нарисованной карточки животного.
    *
@@ -356,6 +362,7 @@ standard: {
     ],
   },
   inside: {
+    more: 'Подробнее',
     title: 'Что внутри книги',
     lead:
       'Разделы работающей книги, а не список достоинств. Каждый открывается щелчком ' +
@@ -568,6 +575,7 @@ standard: {
     ],
   },
   inside: {
+    more: 'Read more',
     title: 'What is inside the book',
     lead: 'Sections of a working herdbook rather than a list of merits. Each one opens with a click.',
     items: [
@@ -775,6 +783,7 @@ standard: {
     ],
   },
   inside: {
+    more: 'Толығырақ',
     title: 'Кітаптың ішінде не бар',
     lead: 'Жұмыс істеп тұрған кітаптың бөлімдері, артықшылықтар тізімі емес.',
     items: [
@@ -980,6 +989,7 @@ standard: {
     ],
   },
   inside: {
+    more: 'Մանրամասն',
     title: 'Ինչ կա մատյանի ներսում',
     lead: 'Աշխատող մատյանի բաժինները, ոչ թե առավելությունների ցանկ։',
     items: [
@@ -1185,6 +1195,7 @@ standard: {
     ],
   },
   inside: {
+    more: 'Падрабязна',
     title: 'Што ўнутры кнігі',
     lead: 'Раздзелы працоўнай кнігі, а не спіс вартасцей.',
     items: [
@@ -1390,6 +1401,7 @@ standard: {
     ],
   },
   inside: {
+    more: 'Толугураак',
     title: 'Китептин ичинде эмне бар',
     lead: 'Иштеп жаткан китептин бөлүмдөрү, артыкчылыктардын тизмеси эмес.',
     items: [

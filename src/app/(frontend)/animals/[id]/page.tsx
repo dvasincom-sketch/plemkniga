@@ -96,13 +96,66 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]['key']
 
+/**
+ * Метатеги карточки животного.
+ *
+ * ## Почему запрет на показ в поиске зависит от записи
+ *
+ * Открытость животного решает хозяйство, а не система. Пустить робота
+ * на все карточки значило бы решить за него: закрытая запись отдаёт
+ * гостю только замок, и в выдаче она была бы страницей без содержимого.
+ * Запретить все — тоже решить за него, но в другую сторону: карточка,
+ * открытая нарочно, ради того чтобы покупатель нашёл животное, перестала
+ * бы находиться.
+ *
+ * Поэтому метка следует за флажком: `publicVisible` — показываем,
+ * нет — не показываем. Это то же правило, по которому карточки не попали
+ * в карту сайта: приглашать робота списком нельзя, потому что список
+ * устареет за день, а спросить у самой записи можно всегда.
+ *
+ * ## Почему описание не пересказывает продуктивность
+ *
+ * Удой и оценки — закрытая область даже у видимого животного
+ * (`docs/dostup-i-vidimost.md`). В описании стоит только то, что и так
+ * видно постороннему: номер, порода, пол, год рождения.
+ */
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ id: string }>
 }): Promise<Metadata> {
   const { id } = await params
-  return { title: `Животное № ${id}` }
+
+  const payload = await getClient()
+  /*
+   * `catch` здесь — не проглоченная ошибка: страница ниже на том же
+   * несуществующем идентификаторе покажет «не найдено», и метатеги
+   * не должны ронять её раньше времени со своей стороны.
+   */
+  const animal = await payload
+    .findByID({ collection: 'animals', id, depth: 1, overrideAccess: true })
+    .catch(() => null)
+
+  if (!animal) return { title: `Животное № ${id}`, robots: { index: false, follow: false } }
+
+  const name = typeof animal.name === 'string' && animal.name ? animal.name : null
+  const number = typeof animal.identNumber === 'string' ? animal.identNumber : `№ ${id}`
+  const breed = relName(animal.breed)
+  const year = animal.birthDate ? new Date(animal.birthDate).getFullYear() : null
+  const sex = animal.sex === 'male' ? 'бык' : animal.sex === 'female' ? 'корова' : null
+
+  const facts = [breed !== '—' ? breed : null, sex, year ? `${year} г. р.` : null].filter(Boolean)
+
+  return {
+    title: name ? `${name} · ${number}` : `Животное ${number}`,
+    description: facts.length
+      ? `${facts.join(', ')}. Запись племенной книги: происхождение, документы, племенная ценность.`
+      : 'Запись племенной книги: происхождение, документы, племенная ценность.',
+    alternates: { canonical: `/animals/${id}` },
+    robots: animal.publicVisible
+      ? { index: true, follow: true }
+      : { index: false, follow: false },
+  }
 }
 
 /** Имя связанной записи справочника. */

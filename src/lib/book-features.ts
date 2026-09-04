@@ -26,6 +26,9 @@
  * до вопроса (`docs/golos.md`, правило четвёртое).
  */
 
+import { BOOK_FEATURES_EN } from '@/lib/book-features-en'
+import type { Locale } from '@/lib/i18n/locales'
+
 export type BookFeature = {
   slug: string
   title: string
@@ -214,3 +217,33 @@ export const BOOK_FEATURES: BookFeature[] = [
 
 export const featureBySlug = (slug: string): BookFeature | undefined =>
   BOOK_FEATURES.find((f) => f.slug === slug)
+
+/**
+ * Те же разделы на языке читателя.
+ *
+ * ## Почему порядок задаёт русский набор, а не английский
+ *
+ * Порядок разделов — утверждение: карточка животного первой, документы
+ * ближе к концу. Утверждение одно на всех языках, и держать его в двух
+ * местах значит однажды получить два разных порядка. Русский набор
+ * остаётся источником, перевод подставляется по слугу.
+ *
+ * Раздел, для которого перевода нет, показывается по-русски — а страница
+ * говорит об этом читателю (`lib/i18n/translated.ts`). Молчаливая подмена
+ * языка посреди списка и есть та беда, ради которой всё затевалось.
+ */
+export const featuresFor = (locale: Locale): BookFeature[] =>
+  BOOK_FEATURES.map((f) => (locale === 'en' ? (BOOK_FEATURES_EN[f.slug] ?? f) : f))
+
+export const featureFor = (slug: string, locale: Locale): BookFeature | undefined => {
+  const base = featureBySlug(slug)
+  if (!base) return undefined
+  return locale === 'en' ? (BOOK_FEATURES_EN[slug] ?? base) : base
+}
+
+/** Показан ли раздел не на том языке, который просили. */
+export const featureIsFallback = (slug: string, locale: Locale): boolean => {
+  if (locale === 'ru') return false
+  if (locale === 'en') return BOOK_FEATURES_EN[slug] === undefined
+  return true
+}

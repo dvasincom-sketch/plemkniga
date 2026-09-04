@@ -3,7 +3,6 @@ import Link from 'next/link'
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { PlemLogo } from '@/components/PlemLogo'
-import { unbounded } from '@/lib/fonts'
 import { LocaleSwitcher } from '@/components/LocaleSwitcher'
 import {
   AssociationArt,
@@ -295,7 +294,7 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
             const inner = (
               <>
                 <div
-                  className={`${unbounded.className} text-[34px] font-medium leading-none tabular-nums text-forest-600 sm:text-[40px]`}
+                  className={`stat-value text-[34px] leading-none text-forest-600 sm:text-[40px]`}
                 >
                   {p.value}
                 </div>
@@ -672,7 +671,7 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
                   <p className="mt-2 text-[14px] leading-relaxed text-ink-500">{item.body}</p>
                   {feature && (
                     <span className="mt-3 inline-block text-[13px] font-medium text-forest-600">
-                      Подробнее →
+                      {s.inside.more} →
                     </span>
                   )}
                 </>

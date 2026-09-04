@@ -51,7 +51,7 @@ function Stat({ label, value, note }: { label: string; value: string; note?: str
   return (
     <div className="card">
       <p className="text-[13px] text-ink-500">{label}</p>
-      <p className="mt-1 text-[28px] font-medium leading-none tabular-nums">{value}</p>
+      <p className="mt-1 stat-value text-[28px] leading-none">{value}</p>
       {note && <p className="mt-2 text-[12px] leading-snug text-ink-500">{note}</p>}
     </div>
   )

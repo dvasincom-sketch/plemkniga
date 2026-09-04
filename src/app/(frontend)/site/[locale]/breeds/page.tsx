@@ -21,7 +21,6 @@ import {
   type BreedState,
 } from '@/lib/breeds-catalog'
 import { plural } from '@/lib/format'
-import { unbounded } from '@/lib/fonts'
 
 /*
  * Заголовок, описание и указание основной страницы — из одного места
@@ -157,7 +156,7 @@ export default async function BreedsPage({
                  читаются как разные по весу утверждения, а они равные.
               */}
               <div
-                className={`${unbounded.className} text-[28px] font-medium leading-none tabular-nums text-forest-600 sm:text-[32px]`}
+                className={`stat-value text-[28px] leading-none text-forest-600 sm:text-[32px]`}
               >
                 {n.value}
               </div>

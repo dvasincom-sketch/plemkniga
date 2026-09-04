@@ -4,7 +4,9 @@ import { notFound } from 'next/navigation'
 import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
-import { BOOK_FEATURES, featureBySlug } from '@/lib/book-features'
+import { BOOK_FEATURES, featureFor, featureIsFallback, featuresFor } from '@/lib/book-features'
+import { BOOK_PAGE_TEXT } from '@/lib/book-page-text'
+import { FALLBACK_NOTICE, pick } from '@/lib/i18n/translated'
 import { pageMetadata } from '@/lib/seo'
 import { CertificateArt } from '@/components/site/CertificateArt'
 import {
@@ -36,11 +38,19 @@ export async function generateMetadata({
   params: Promise<{ locale: string; slug: string }>
 }): Promise<Metadata> {
   const { locale, slug } = await params
-  const feature = featureBySlug(slug)
+  const safe: Locale = isLocale(locale) ? locale : 'ru'
+  const feature = featureFor(slug, safe)
   if (!feature) return { title: 'Раздел книги' }
 
+  /*
+   * Заголовок в выдаче — на языке страницы. Русский заголовок
+   * у английской страницы означал бы, что в поиске её не найдут вовсе:
+   * искать будут по английским словам, а стоять будет русское.
+   */
+  const text = pick(BOOK_PAGE_TEXT, safe).value
+
   return pageMetadata({
-    title: `${feature.title} — что внутри племенной книги`,
+    title: `${feature.title} — ${text.titleSuffix}`,
     description: feature.short,
     path: `/${locale}/book/${slug}`,
   })
@@ -72,10 +82,53 @@ export default async function BookFeaturePage({
 
   const locale: Locale = raw
   const notice = PAGE_MESSAGES[locale].notice
-  const feature = featureBySlug(slug)
+  const feature = featureFor(slug, locale)
   if (!feature) notFound()
 
-  const others = BOOK_FEATURES.filter((f) => f.slug !== feature.slug)
+  /*
+   * Слова страницы и текст раздела берутся по языку читателя, а откат
+   * на русский не прячется: строка о нём стоит там же, где оговорка
+   * о непроверенном переводе. Молчаливая подмена языка и есть та беда,
+   * из-за которой страницы выглядели «переведёнными наполовину».
+   */
+  const text = pick(BOOK_PAGE_TEXT, locale).value
+  const fallback = featureIsFallback(slug, locale)
+
+  const others = featuresFor(locale).filter((f) => f.slug !== feature.slug)
+
+  /*
+     Рисунок раздела — там, где у раздела есть визуальный код.
+
+     Прежде каждый рисунок стоял своей веткой `feature.slug === '…'`
+     с собственной вёрсткой и собственной подписью. Двенадцать почти
+     одинаковых кусков разъезжались оформлением на первой же правке,
+     а подписи — русские, набранные прямо здесь — не переводились
+     никогда: перевод их попросту не видел.
+
+     Теперь здесь только сами рисунки, а подписи и заголовки окон живут
+     в наборе строк по языкам (`lib/book-page-text.ts`).
+
+     `wide` — рисунок шире колонки текста: карточка животного в трёх
+     прочтениях и две формы одного доения ставятся рядом, и в семьдесят
+     пять знаков они не помещаются.
+  */
+  const SCREENS: Record<string, { node: React.ReactNode; wide?: boolean }> = {
+    animal: { node: <AnimalStates />, wide: true },
+    pedigree: { node: <PedigreeScreen /> },
+    quality: { node: <QualityScreen /> },
+    milk: { node: <MilkScreen /> },
+    index: { node: <IndexScreen /> },
+    conformation: { node: <ConformationScreen /> },
+    mating: { node: <MatingScreen /> },
+    reports: { node: <ReportsScreen /> },
+    access: { node: <AccessScreen /> },
+    submissions: { node: <SubmissionsScreen /> },
+    exchange: { node: <ExchangeScreen />, wide: true },
+    documents: { node: <CertificateArt /> },
+  }
+
+  const screen = SCREENS[feature.slug]
+  const frame = text.frame[feature.slug]
 
   return (
     <>
@@ -84,7 +137,7 @@ export default async function BookFeaturePage({
       <main className="container-page pb-16">
         <nav className="pt-2 text-[14px] text-ink-500">
           <Link href={`/${locale}`} className="underline underline-offset-4 hover:text-forest-500">
-            Что внутри книги
+            {text.crumb}
           </Link>
         </nav>
 
@@ -96,6 +149,18 @@ export default async function BookFeaturePage({
           {notice && (
             <p className="mt-5 rounded-xl bg-ink-50 px-4 py-3 text-[14px] leading-relaxed text-ink-500">
               {notice}
+            </p>
+          )}
+
+          {/*
+             Откат на русский назван вслух и стоит там же, где оговорка
+             о непроверенном переводе, — то есть до текста, а не после.
+             Читатель, увидевший кириллицу на английской странице, должен
+             узнать причину раньше, чем решит, что мы неряшливы.
+          */}
+          {fallback && (
+            <p className="mt-3 rounded-xl bg-ink-50 px-4 py-3 text-[14px] leading-relaxed text-ink-500">
+              {FALLBACK_NOTICE}
             </p>
           )}
         </section>
@@ -136,166 +201,20 @@ export default async function BookFeaturePage({
            Раздел, у которого такого утверждения не нашлось, остаётся
            без картинки — но искать надо не в заголовке.
         */}
-        {feature.slug === 'animal' && (
+        {screen && (
           <section className="mt-10">
-            <AnimalStates />
-            <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
-              Одна карточка, три прочтения. Разница не в оформлении, а в правах: посторонний
-              видит то, что хозяйство открыло, владелец — работу, а у быка другой предмет
-              разговора. Нарисовано вёрсткой; значения показаны для примера.
-            </p>
-          </section>
-        )}
-
-        {feature.slug === 'pedigree' && (
-          <section className="mt-10">
-            <div className="max-w-[75ch]">
-              <WindowFrame title="Ромашка · RU 4512 087" subtitle="происхождение">
-                <PedigreeScreen />
-              </WindowFrame>
+            <div className={screen.wide ? undefined : 'max-w-[75ch]'}>
+              {frame ? (
+                <WindowFrame title={frame.title} subtitle={frame.subtitle}>
+                  {screen.node}
+                </WindowFrame>
+              ) : (
+                screen.node
+              )}
             </div>
-            <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
-              Подтверждённое ДНК помечено, неизвестный предок показан пунктиром. Скрывать
-              пропуск нельзя: он меняет смысл коэффициента родства.
-            </p>
-          </section>
-        )}
 
-        {feature.slug === 'quality' && (
-          <section className="mt-10">
-            <div className="max-w-[75ch]">
-              <QualityScreen />
-            </div>
             <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
-              Находка называет животное и поле — иначе её нельзя исправить. Отказ реестра
-              приходит через неделю и говорит про файл.
-            </p>
-          </section>
-        )}
-
-        {feature.slug === 'milk' && (
-          <section className="mt-10">
-            <div className="max-w-[75ch]">
-              <MilkScreen />
-            </div>
-            <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
-              Метод контроля записан рядом с рядом замеров, а пропуск в ряду назван
-              пропуском. Без метода два одинаковых «9 640 кг» из разных хозяйств
-              несравнимы, а выглядят одинаково.
-            </p>
-          </section>
-        )}
-
-        {feature.slug === 'index' && (
-          <section className="mt-10">
-            <div className="max-w-[75ch]">
-              <WindowFrame title="Ромашка · RU 4512 087" subtitle="профиль Ассоциации">
-                <IndexScreen />
-              </WindowFrame>
-            </div>
-            <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
-              Показано не число, а из чего оно сложилось — включая вклад со знаком минус.
-              Индекс без разбора нечем проверить и не с чем спорить.
-            </p>
-          </section>
-        )}
-
-        {feature.slug === 'conformation' && (
-          <section className="mt-10">
-            <div className="max-w-[75ch]">
-              <WindowFrame title="Ромашка · RU 4512 087" subtitle="линейная оценка">
-                <ConformationScreen />
-              </WindowFrame>
-            </div>
-            <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
-              Линейная шкала описывает, а не хвалит: девятка означает «очень», а не «лучше».
-              У роста желаемое ближе к краю, у постановки ног — посередине, и абзацем это
-              не объясняется так же быстро, как одной полосой.
-            </p>
-          </section>
-        )}
-
-        {feature.slug === 'mating' && (
-          <section className="mt-10">
-            <div className="max-w-[75ch]">
-              <WindowFrame title="Ромашка · RU 4512 087" subtitle="подбор быка">
-                <MatingScreen />
-              </WindowFrame>
-            </div>
-            <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
-              Список отсортирован по индексу, а предупреждение стоит у первой строки: лучший
-              по числу бык здесь и есть худший выбор. В каталоге поставщика этого не видно
-              вовсе — там у быка одно число, — а видно только там, где обе родословные лежат
-              рядом и инбридинг считается для потомка, которого ещё нет.
-            </p>
-          </section>
-        )}
-
-        {feature.slug === 'reports' && (
-          <section className="mt-10">
-            <div className="max-w-[75ch]">
-              <WindowFrame title="Стадо ООО «Рассвет» · 231 корова" subtitle="отчёт">
-                <ReportsScreen />
-              </WindowFrame>
-            </div>
-            <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
-              Строка раскрыта, и под средним возрастом первого отёла стоят те животные,
-              из которых оно сложилось, — включая тех, кто среднее и портит. Число без списка
-              нечем проверить и нечего с ним делать: ради этих животных отчёт и открывают.
-            </p>
-          </section>
-        )}
-
-        {feature.slug === 'access' && (
-          <section className="mt-10">
-            <div className="max-w-[75ch]">
-              <WindowFrame title="Ромашка · RU 4512 087" subtitle="доступ">
-                <AccessScreen />
-              </WindowFrame>
-            </div>
-            <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
-              Показан не перечень ролей, а точечная выдача: одно животное, срок, два списка —
-              что откроется и что нет. Первый вопрос при разговоре о доступах звучит именно так
-              («а надои покупатель увидит?»), и отвечать на него надо обеими половинами сразу.
-            </p>
-          </section>
-        )}
-
-        {feature.slug === 'submissions' && (
-          <section className="mt-10">
-            <div className="max-w-[75ch]">
-              <WindowFrame title="Заявка № 3184 · ООО «Заря»" subtitle="разбор пакета">
-                <SubmissionsScreen />
-              </WindowFrame>
-            </div>
-            <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
-              Пакет разложен на три исхода, у каждого сомнения названа причина, а на кнопке
-              стоят оба числа. «Принять» без чисел означало бы обратное — залить файл как есть
-              и разбираться потом.
-            </p>
-          </section>
-        )}
-
-        {feature.slug === 'exchange' && (
-          <section className="mt-10">
-            <ExchangeScreen />
-            <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
-              Одно и то же доение в двух формах: слева колонки государственного реестра,
-              справа ответ по международному стандарту. Запись при этом одна — вводится
-              она единожды, а форм у неё столько, сколько адресатов.
-            </p>
-          </section>
-        )}
-
-        {feature.slug === 'documents' && (
-          <section className="mt-10">
-            <div className="max-w-[75ch]">
-              <CertificateArt />
-            </div>
-            <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
-              Разделы, подписи и единицы — из настоящего бланка; значения показаны для примера.
-              Рисунок, а не снимок: в выпущенном документе стоят настоящие животные
-              и настоящие хозяйства, и на витрине им не место.
+              {text.note[feature.slug]}
             </p>
           </section>
         )}
@@ -307,7 +226,7 @@ export default async function BookFeaturePage({
            до вопроса.
         */}
         <section className="mt-10 max-w-[75ch] rounded-2xl border border-ink-100 bg-white p-6 sm:p-8">
-          <h2 className="text-[18px] font-medium leading-tight">Пределы</h2>
+          <h2 className="text-[18px] font-medium leading-tight">{text.limits}</h2>
           <ul className="mt-4 space-y-3">
             {feature.limits.map((l) => (
               <li key={l.slice(0, 40)} className="text-[15px] leading-relaxed text-ink-500">
@@ -318,7 +237,7 @@ export default async function BookFeaturePage({
         </section>
 
         <section className="mt-12">
-          <h2 className="text-[20px] font-medium leading-tight">Другие разделы</h2>
+          <h2 className="text-[20px] font-medium leading-tight">{text.others}</h2>
 
           {/*
              Подсвечивается вся плашка, а не черта над ней.
@@ -356,10 +275,10 @@ export default async function BookFeaturePage({
 
         <section className="mt-12 max-w-[75ch] rounded-2xl bg-forest-500 p-8 text-white sm:p-10">
           <h2 className="text-[22px] font-medium leading-tight sm:text-[26px]">
-            Посмотреть, как это работает
+            {text.ctaTitle}
           </h2>
           <p className="mt-3 text-[16px] leading-relaxed text-white/85">
-            Голштинская книга открыта: разделы можно открыть и прочитать на живых данных.
+            {text.ctaLead}
           </p>
 
           <div className="mt-6 flex flex-wrap items-center gap-4">
@@ -367,13 +286,13 @@ export default async function BookFeaturePage({
               href={BOOK_URL}
               className="rounded-xl bg-white px-6 py-3 text-[15px] text-forest-600 transition-colors hover:bg-white/90"
             >
-              Открыть племенную книгу
+              {text.ctaOpen}
             </a>
             <a
               href={`mailto:${PRODUCT_MAIL}`}
               className="text-[15px] text-white/80 underline underline-offset-4 transition-colors hover:text-white"
             >
-              Написать нам
+              {text.ctaMail}
             </a>
           </div>
         </section>

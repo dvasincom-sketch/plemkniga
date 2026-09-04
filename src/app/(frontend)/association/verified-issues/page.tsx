@@ -154,25 +154,25 @@ export default async function VerifiedIssuesPage() {
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               <div className="card">
                 <p className="text-[13px] text-ink-500">Просмотрено записей</p>
-                <p className="mt-1 text-[28px] font-medium leading-none tabular-nums">
+                <p className="mt-1 stat-value text-[28px] leading-none">
                   {animals.length}
                 </p>
               </div>
               <div className="card">
                 <p className="text-[13px] text-ink-500">С замечаниями</p>
-                <p className="mt-1 text-[28px] font-medium leading-none tabular-nums">
+                <p className="mt-1 stat-value text-[28px] leading-none">
                   {rows.length}
                 </p>
               </div>
               <div className="card">
                 <p className="text-[13px] text-ink-500">Хозяйств затронуто</p>
-                <p className="mt-1 text-[28px] font-medium leading-none tabular-nums">
+                <p className="mt-1 stat-value text-[28px] leading-none">
                   {farms.length}
                 </p>
               </div>
               <div className="card">
                 <p className="text-[13px] text-ink-500">Всего подтверждено</p>
-                <p className="mt-1 text-[28px] font-medium leading-none tabular-nums">
+                <p className="mt-1 stat-value text-[28px] leading-none">
                   {found.totalDocs}
                 </p>
               </div>

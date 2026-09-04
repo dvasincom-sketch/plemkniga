@@ -4,7 +4,13 @@ import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { getCurrentUser } from '@/lib/payload'
 
-export const metadata: Metadata = { title: 'Аукционы' }
+export const metadata: Metadata = {
+  title: 'Аукционы племенных животных',
+  description:
+    'Раздел готовится: продажа племенных животных с записью книги — происхождением, ' +
+    'племенной ценностью и документами, проверяемыми покупателем до сделки.',
+  alternates: { canonical: '/auctions' },
+}
 export const dynamic = 'force-dynamic'
 
 export default async function AuctionsPage() {

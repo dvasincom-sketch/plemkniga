@@ -7,7 +7,13 @@ import { RegisterWizard } from '@/components/RegisterWizard'
 import { ImageSlot } from '@/components/ImageSlot'
 import { getCurrentUser } from '@/lib/payload'
 
-export const metadata: Metadata = { title: 'Регистрация' }
+export const metadata: Metadata = {
+  title: 'Регистрация хозяйства',
+  description:
+    'Заведение учётной записи хозяйства в племенной книге: доступ к своему стаду, ' +
+    'выгрузкам в государственный реестр и выпуску документов.',
+  alternates: { canonical: '/register' },
+}
 export const dynamic = 'force-dynamic'
 
 const BENEFITS = [

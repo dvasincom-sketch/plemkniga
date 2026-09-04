@@ -46,6 +46,7 @@ export const metadata: Metadata = {
   title: 'How the herdbook works',
   description:
     'A guided tour of PLEM: animal identity, pedigree, milk recording, conformation, breeding values and data quality checks — built to ICAR guidelines.',
+  alternates: { canonical: '/tour' },
 }
 
 /* ------------------------------------------------------------------ */

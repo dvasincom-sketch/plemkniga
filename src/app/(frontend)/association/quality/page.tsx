@@ -123,7 +123,7 @@ export default async function QualityPage() {
                         className="block rounded-xl bg-[#f6f6f6] px-5 py-4 transition-colors hover:bg-ink-100"
                       >
                         <p className="text-[13px] text-ink-500">{q.label}</p>
-                        <p className="mt-1 text-[28px] font-medium leading-none tabular-nums">
+                        <p className="mt-1 stat-value text-[28px] leading-none">
                           {ru(q.count)}
                         </p>
                         <p className="mt-1 text-[13px]">

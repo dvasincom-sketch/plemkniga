@@ -112,7 +112,7 @@ export function BullStatusNote({ daughters, herds }: { daughters: number; herds:
         ].map((s) => (
           <div key={s.label} className="rounded-xl bg-canvas px-4 py-3.5">
             <p className="text-[13px] leading-snug text-ink-500">{s.label}</p>
-            <p className="mt-1 text-[24px] font-medium leading-none tabular-nums">{s.value}</p>
+            <p className="mt-1 stat-value text-[24px] leading-none">{s.value}</p>
           </div>
         ))}
       </div>
@@ -275,7 +275,7 @@ export function BullProofBlock({ data, bullId }: { data: Proof; bullId?: number 
         ].map((s) => (
           <div key={s.label} className="rounded-xl bg-canvas px-4 py-3.5">
             <p className="text-[13px] leading-snug text-ink-500">{s.label}</p>
-            <p className="mt-1 text-[24px] font-medium leading-none tabular-nums">{s.value}</p>
+            <p className="mt-1 stat-value text-[24px] leading-none">{s.value}</p>
           </div>
         ))}
       </div>
@@ -312,7 +312,7 @@ export function BullProofBlock({ data, bullId }: { data: Proof; bullId?: number 
           </p>
         ) : (
           <div className="mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-2">
-            <span className="text-[34px] font-medium leading-none tabular-nums">
+            <span className="stat-value text-[34px] leading-none">
               <Computed formula="vsMates">{signed(data.vsMates, 0)}</Computed>
             </span>
             <span className="text-[15px] text-ink-700">

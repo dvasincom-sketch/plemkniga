@@ -51,7 +51,15 @@ type Query = { document?: string }
 export async function generateMetadata({ params }: { params: Promise<Params> }): Promise<Metadata> {
   const { kind } = await params
   const meta = CERTIFICATE_KINDS[kind as CertificateKind]
-  return { title: meta ? meta.title : 'Документ' }
+  /*
+   * Бланк не индексируется: он собран для печати, содержит настоящее
+   * животное настоящего хозяйства и открывается по прямой ссылке тем,
+   * у кого есть право. В выдаче ему делать нечего.
+   */
+  return {
+    title: meta ? meta.title : 'Документ',
+    robots: { index: false, follow: false },
+  }
 }
 
 const NOT_IN_MODEL = '—'

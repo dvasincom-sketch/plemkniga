@@ -6,7 +6,11 @@ import { AcceptInvite } from '@/components/AcceptInvite'
 import { getClient } from '@/lib/payload'
 import { resolveInvite } from '@/lib/invitations'
 
-export const metadata: Metadata = { title: 'Приглашение' }
+export const metadata: Metadata = {
+  title: 'Приглашение в хозяйство',
+  /* Адрес одноразовый и именной: в выдаче ему не место. */
+  robots: { index: false, follow: false },
+}
 export const dynamic = 'force-dynamic'
 
 /**

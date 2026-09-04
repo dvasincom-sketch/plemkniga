@@ -311,7 +311,7 @@ export default async function HerdCheckPage() {
                   */}
                   <div className="card">
                     <p className="text-[13px] text-ink-500">Проверено записей</p>
-                    <p className="mt-1 text-[28px] font-medium leading-none tabular-nums">
+                    <p className="mt-1 stat-value text-[28px] leading-none">
                       {animals.length}
                       {found.totalDocs > animals.length && (
                         <span className="text-[18px] text-ink-500"> из {found.totalDocs}</span>
@@ -320,19 +320,19 @@ export default async function HerdCheckPage() {
                   </div>
                   <div className="card">
                     <p className="text-[13px] text-ink-500">Требуют исправления</p>
-                    <p className="mt-1 text-[28px] font-medium leading-none tabular-nums">
+                    <p className="mt-1 stat-value text-[28px] leading-none">
                       {fixCount}
                     </p>
                   </div>
                   <div className="card">
                     <p className="text-[13px] text-ink-500">На усмотрение</p>
-                    <p className="mt-1 text-[28px] font-medium leading-none tabular-nums">
+                    <p className="mt-1 stat-value text-[28px] leading-none">
                       {noteCount}
                     </p>
                   </div>
                   <div className="card">
                     <p className="text-[13px] text-ink-500">Записей с замечаниями</p>
-                    <p className="mt-1 text-[28px] font-medium leading-none tabular-nums">
+                    <p className="mt-1 stat-value text-[28px] leading-none">
                       {touched}
                     </p>
                     {verifiedTouched > 0 && (

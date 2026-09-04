@@ -1,5 +1,3 @@
-import { unbounded } from '@/lib/fonts'
-
 /**
  * Знак продукта: ПЛЕМ и зелёный огонёк «online».
  *
@@ -12,8 +10,9 @@ import { unbounded } from '@/lib/fonts'
  *
  * ## Гарнитура
  *
- * «ПЛЕМ» набран Unbounded — она скачивается во время сборки и отдаётся
- * с нашего домена, разбор в `lib/fonts.ts`. «online» осталось
+ * «ПЛЕМ» набран Unbounded — она лежит в зависимостях пакетом
+ * `@fontsource-variable/unbounded` и подключается общими стилями, а имя
+ * гарнитуры взято из `--font-display`. «online» осталось
  * в интерфейсной гарнитуре: в знаке это не часть имени, а подпись
  * о состоянии, и набранное тем же шрифтом оно читалось бы вторым словом
  * названия, которого нет.
@@ -42,8 +41,21 @@ import { unbounded } from '@/lib/fonts'
  *
  * ## Где смотреть
  *
- * Пульсация — `plem-dot` в `src/app/(frontend)/globals.css`;
- * гарнитура — `src/lib/fonts.ts`.
+ * Пульсация — `plem-dot` в `src/app/(frontend)/globals.css`, там же
+ * объявлена гарнитура (`--font-display`) и класс крупных чисел
+ * `.stat-value`, набранных ею же.
+ *
+ * ## Почему не `next/font`
+ *
+ * Так и было: Unbounded скачивалась во время сборки с Google и отдавалась
+ * с нашего домена. Довод был верный — страница не должна зависеть
+ * от чужого сервиса в момент открытия, — но решение оказалось лишним:
+ * та же гарнитура уже лежала в зависимостях пакетом fontsource
+ * и подключалась общими стилями ради крупных чисел.
+ *
+ * То есть каждая страница тянула Unbounded дважды, двумя разными
+ * способами, и знак был набран одной копией, а числа — другой. Осталась
+ * копия из пакета: она не требует Google даже на сборке.
  */
 export function PlemLogo({
   className = '',
@@ -67,7 +79,7 @@ export function PlemLogo({
     >
       <span
         aria-hidden="true"
-        className={`${unbounded.className} text-[30px] font-extrabold leading-none text-ink-900 sm:text-[34px]`}
+        className="font-display text-[30px] font-extrabold leading-none text-ink-900 sm:text-[34px]"
       >
         ПЛЕМ
       </span>

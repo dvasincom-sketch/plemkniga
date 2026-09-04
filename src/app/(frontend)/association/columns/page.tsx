@@ -219,7 +219,7 @@ export default async function ColumnsPage() {
           ].map((s) => (
             <div key={s.label} className="rounded-xl bg-canvas px-4 py-3.5">
               <p className="text-[13px] leading-snug text-ink-500">{s.label}</p>
-              <p className="mt-1 text-[24px] font-medium leading-none tabular-nums">{s.value}</p>
+              <p className="mt-1 stat-value text-[24px] leading-none">{s.value}</p>
             </div>
           ))}
         </div>

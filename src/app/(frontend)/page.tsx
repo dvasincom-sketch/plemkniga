@@ -1,4 +1,6 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
+import { currentTenant } from '@/lib/tenant-server'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 import { WhyJoin } from '@/components/WhyJoin'
@@ -39,6 +41,40 @@ import type { Animal, Organization } from '@/payload-types'
 import { plural } from '@/lib/format'
 
 export const dynamic = 'force-dynamic'
+
+/**
+ * Метатеги первой страницы книги.
+ *
+ * ## Почему их не было и почему это хуже, чем кажется
+ *
+ * Все внутренние страницы обзавелись заголовками и описаниями, а корень
+ * остался без единого: он же «просто главная». Между тем именно его
+ * показывают в выдаче по названию организации, и без описания поисковая
+ * система собирает его сама — обычно из первых слов, попавшихся в
+ * разметке, то есть из подписей к полям поиска.
+ *
+ * Нашёл это `check:seo`, и ровно за этим он и заведён: страница без
+ * метатегов открывается, выглядит правильно и молчит.
+ *
+ * ## Почему имя книги берётся у книги
+ *
+ * Домен решает, чья это книга (`lib/tenant.ts`). Вписать «голштинская»
+ * строкой значило бы назвать показательный стенд голштинской ассоциацией
+ * на его собственном домене.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const tenant = await currentTenant()
+  const breed = tenant.breed ? `${tenant.breed.name} порода` : 'племенные животные'
+
+  return {
+    title: `Племенная книга: ${breed}`,
+    description:
+      `Открытая племенная книга: ${tenant.org.short} ведёт записи о происхождении, ` +
+      'продуктивности и племенной ценности. Поиск по животным, проверка документов ' +
+      'по коду, сравнение быков.',
+    alternates: { canonical: '/' },
+  }
+}
 
 export default async function HerdbookPage({
   searchParams,

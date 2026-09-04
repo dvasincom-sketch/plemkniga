@@ -11,7 +11,6 @@ import {
 } from '@/lib/breed-pages'
 import { breedCatalog } from '@/lib/breeds-catalog-server'
 import { STATE_CLASS, STATE_HINT, STATE_LABEL } from '@/lib/breeds-catalog'
-import { unbounded } from '@/lib/fonts'
 import { demoUrl, PRODUCT_MAIL } from '@/lib/hosts'
 
 export const dynamic = 'force-dynamic'
@@ -190,7 +189,7 @@ export default async function BreedPage({
             {NUMBERS.map((n) => (
               <div key={n.label} className="rounded-2xl border border-ink-100 bg-white p-5">
                 <div
-                  className={`${unbounded.className} text-[26px] font-medium leading-none tabular-nums text-forest-600 sm:text-[30px]`}
+                  className={`stat-value text-[26px] leading-none text-forest-600 sm:text-[30px]`}
                 >
                   {n.value}
                 </div>

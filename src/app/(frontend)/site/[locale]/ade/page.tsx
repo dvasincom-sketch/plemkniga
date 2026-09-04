@@ -2,7 +2,6 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
-import { unbounded } from '@/lib/fonts'
 import { siteMetadata } from '@/lib/seo'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
@@ -70,7 +69,7 @@ export async function generateMetadata({
 function Num({ value, label }: { value: string; label: string }) {
   return (
     <div>
-      <div className={`${unbounded.className} text-[30px] font-medium leading-none tabular-nums text-forest-600`}>
+      <div className={`stat-value text-[30px] leading-none text-forest-600`}>
         {value}
       </div>
       <p className="mt-2 max-w-[26ch] text-[13px] leading-snug text-ink-500">{label}</p>

@@ -2,7 +2,16 @@ import type { Metadata } from 'next'
 import { PlemLogo } from '@/components/PlemLogo'
 import { BOOK_URL, PRODUCT_MAIL, SITE_HOSTS } from '@/lib/hosts'
 
-export const metadata: Metadata = { title: 'Показательная книга готовится' }
+export const metadata: Metadata = {
+  title: 'Показательная книга готовится',
+  /*
+   * Описание есть, а показывать страницу в поиске незачем: она живёт
+   * до запуска стенда и всё её содержание — «скоро». Найденная в выдаче
+   * через год, она рассказала бы о нас ровно обратное задуманному.
+   */
+  description: 'Показательная книга с вымышленным стадом открывается позже.',
+  robots: { index: false, follow: true },
+}
 
 /**
  * Заглушка показательной книги.

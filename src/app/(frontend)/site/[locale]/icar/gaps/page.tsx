@@ -8,7 +8,18 @@ import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { ICAR_GAP_COUNT, ICAR_WIKI, ICAR_WITH_GAPS } from '@/lib/icar-map'
 import { plural } from '@/lib/format'
 
-export const metadata: Metadata = { title: 'Чего не хватает до руководств ICAR' }
+/*
+ * Единственная страница витрины, у которой не было ни описания,
+ * ни указания основной версии, — нашёл `check:seo`. Заголовок был,
+ * и потому пропажа не бросалась в глаза.
+ */
+export const metadata: Metadata = {
+  title: 'Чего не хватает до руководств ICAR',
+  description:
+    'Разбор пробелов по разделам руководств ICAR: чего в книге нет, чем это грозит ' +
+    'и что нужно, чтобы закрыть. Названо нами, а не найдено проверяющим.',
+  alternates: { canonical: '/ru/icar/gaps' },
+}
 
 /**
  * Разбор пробелов: чего в книге нет, чем это грозит и что для этого нужно.

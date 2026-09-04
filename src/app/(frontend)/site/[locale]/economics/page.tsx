@@ -8,7 +8,6 @@ import { isLocale, type Locale } from '@/lib/i18n/locales'
 import { EconomicAssumptions } from '@/components/EconomicAssumptions'
 import { ECONOMIC_WEIGHTS } from '@/lib/economics'
 import { TRAIT_BASE } from '@/lib/breeding-index'
-import { unbounded } from '@/lib/fonts'
 
 /*
  * Заголовок, описание и указание основной страницы — из одного места
@@ -196,7 +195,7 @@ export default async function EconomicsPage({ params }: { params: Promise<{ loca
                   <tr key={w.key}>
                     <td>{w.label}</td>
                     <td
-                      className={`text-right ${unbounded.className} tabular-nums ${
+                      className={`text-right stat-value ${
                         w.value > 0 ? 'text-forest-600' : 'text-[#9e3520]'
                       }`}
                     >
@@ -204,7 +203,7 @@ export default async function EconomicsPage({ params }: { params: Promise<{ loca
                       <span className="ml-1 text-[12px] text-ink-400">/ {w.unit}</span>
                     </td>
                     <td
-                      className={`text-right ${unbounded.className} tabular-nums ${
+                      className={`text-right stat-value ${
                         w.perStep > 0 ? 'text-forest-600' : 'text-[#9e3520]'
                       }`}
                     >

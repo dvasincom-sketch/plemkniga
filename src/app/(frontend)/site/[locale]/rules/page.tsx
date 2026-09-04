@@ -5,7 +5,6 @@ import { siteMetadata } from '@/lib/seo'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
 import { CHECKS, CHECK_GROUPS, type CheckSpec } from '@/lib/checks-registry'
-import { unbounded } from '@/lib/fonts'
 import { plural } from '@/lib/format'
 
 /*
@@ -121,7 +120,7 @@ export default async function RulesPage({ params }: { params: Promise<{ locale: 
           {NUMBERS.map((n) => (
             <div key={n.label} className="rounded-2xl border border-ink-100 bg-white p-5">
               <div
-                className={`${unbounded.className} text-[30px] font-medium leading-none tabular-nums text-forest-600 sm:text-[34px]`}
+                className={`stat-value text-[30px] leading-none text-forest-600 sm:text-[34px]`}
               >
                 {n.value}
               </div>
@@ -188,7 +187,7 @@ export default async function RulesPage({ params }: { params: Promise<{ locale: 
                         <div className="flex items-start justify-between gap-4">
                           <h4 className="text-[15px] font-medium leading-snug">
                             <span
-                              className={`${unbounded.className} mr-2 tabular-nums text-ink-300`}
+                              className={`stat-value mr-2 text-ink-300`}
                             >
                               {numberOf.get(c.code)}
                             </span>
