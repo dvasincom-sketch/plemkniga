@@ -203,7 +203,7 @@ export default async function EconomicsPage({ params }: { params: Promise<{ loca
                          мы отказались на первом экране.
                       */}
                       {w.sd.toLocaleString('ru-RU')} {w.unit}
-                      <div className="mt-1 h-1.5 w-full rounded-full bg-ink-100">
+                      <div className="row-bar mt-1 h-1.5 w-full rounded-full bg-ink-100">
                         <div
                           className={`h-1.5 rounded-full ${
                             w.perStep > 0 ? 'bg-forest-500' : 'bg-[#c0563c]'

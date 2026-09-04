@@ -217,7 +217,7 @@ export function ProfileEditor({
                       />
                     </td>
                     <td>
-                      <div className="h-[8px] rounded-full bg-ink-100">
+                      <div className="row-bar h-[8px] rounded-full bg-ink-100">
                         <div
                           style={{ width: `${width}%` }}
                           className={`h-full rounded-full ${n < 0 ? 'bg-[#c0392b]' : 'bg-forest-500'}`}
