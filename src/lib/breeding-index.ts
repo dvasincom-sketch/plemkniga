@@ -53,21 +53,22 @@ export type TraitKey =
 
 export type TraitBase = {
   key: TraitKey
+  /**
+   * Название и единица по-русски — и только по-русски.
+   *
+   * Здесь они потому, что здесь же стоят σ, наследуемость и путь к оценке:
+   * русский тут источник, а не перевод. Остальные пять языков лежат
+   * словарями в `i18n/data/traits.<язык>.ts` и полны по типу — признак,
+   * добавленный без перевода, не соберётся ни на одном из них. Раньше
+   * английский стоял парой полей прямо в записи, и страница выбирала
+   * половину пары признаком «страница английская», ложным на четырёх
+   * языках из шести: тело таблицы оставалось русским под переведённой
+   * рамкой. Разбор решения — в шапке `i18n/data-text.ts`.
+   *
+   * Кабинет остаётся русским и берёт эти поля напрямую.
+   */
   label: string
   unit: string
-  /**
-   * Название и единица по-английски — для витрины.
-   *
-   * Полем рядом с русским названием, а не отдельным словарём по ключу.
-   * Словарь живёт в другом файле и разъезжается молча: признак добавили
-   * здесь, перевести забыли, и на английской странице появляется строка
-   * «Композит ног» — ровно та неряшливость, ради которой заведён весь
-   * слой переводов. Обязательное поле нельзя забыть: без него не соберётся.
-   *
-   * Кабинет остаётся русским и этих полей не видит.
-   */
-  labelEn: string
-  unitEn: string
   /** Среднее по референтной группе: у базы племенных ценностей оно нулевое. */
   mean: number
   /** Генетическое стандартное отклонение признака. */
@@ -103,8 +104,6 @@ export const TRAIT_BASE: TraitBase[] = [
     key: 'milk',
     label: 'Удой',
     unit: 'кг',
-    labelEn: 'Milk yield',
-    unitEn: 'kg',
     mean: 0,
     sd: 257.1,
     heritability: 0.3,
@@ -115,8 +114,6 @@ export const TRAIT_BASE: TraitBase[] = [
     key: 'fatKg',
     label: 'Жир',
     unit: 'кг',
-    labelEn: 'Fat',
-    unitEn: 'kg',
     mean: 0,
     sd: 11.29,
     heritability: 0.3,
@@ -127,8 +124,6 @@ export const TRAIT_BASE: TraitBase[] = [
     key: 'proteinKg',
     label: 'Белок',
     unit: 'кг',
-    labelEn: 'Protein',
-    unitEn: 'kg',
     mean: 0,
     sd: 6.93,
     heritability: 0.3,
@@ -139,8 +134,6 @@ export const TRAIT_BASE: TraitBase[] = [
     key: 'productiveLongevity',
     label: 'Продуктивное долголетие',
     unit: 'мес.',
-    labelEn: 'Productive life',
-    unitEn: 'months',
     mean: 0,
     sd: 1.7,
     heritability: 0.085,
@@ -154,8 +147,6 @@ export const TRAIT_BASE: TraitBase[] = [
     key: 'udderHealth',
     label: 'Здоровье вымени',
     unit: 'балл',
-    labelEn: 'Udder health',
-    unitEn: 'point',
     mean: 0,
     sd: 0.14 * 7.14, // шкала признака в системе крупнее логарифмической SCS
     heritability: 0.12,
@@ -166,8 +157,6 @@ export const TRAIT_BASE: TraitBase[] = [
     key: 'fertility',
     label: 'Фертильность',
     unit: '%',
-    labelEn: 'Fertility',
-    unitEn: '%',
     mean: 0,
     sd: 1.37,
     heritability: 0.04,
@@ -178,8 +167,6 @@ export const TRAIT_BASE: TraitBase[] = [
     key: 'calvingEase',
     label: 'Лёгкость отёла',
     unit: 'балл',
-    labelEn: 'Calving ease',
-    unitEn: 'point',
     mean: 0,
     sd: 1.3,
     heritability: 0.08,
@@ -190,8 +177,6 @@ export const TRAIT_BASE: TraitBase[] = [
     key: 'calfMortality',
     label: 'Смертность приплода',
     unit: '%',
-    labelEn: 'Calf mortality',
-    unitEn: '%',
     mean: 0,
     sd: 1.62,
     heritability: 0.02,
@@ -203,8 +188,6 @@ export const TRAIT_BASE: TraitBase[] = [
     key: 'bodyComposite',
     label: 'Композит тела',
     unit: 'балл',
-    labelEn: 'Body weight composite',
-    unitEn: 'point',
     mean: 0,
     sd: 0.76,
     heritability: 0.28,
@@ -215,8 +198,6 @@ export const TRAIT_BASE: TraitBase[] = [
     key: 'udderComposite',
     label: 'Композит вымени',
     unit: 'балл',
-    labelEn: 'Udder composite',
-    unitEn: 'point',
     mean: 0,
     sd: 0.65,
     heritability: 0.28,
@@ -227,8 +208,6 @@ export const TRAIT_BASE: TraitBase[] = [
     key: 'legsComposite',
     label: 'Композит ног',
     unit: 'балл',
-    labelEn: 'Feet and legs composite',
-    unitEn: 'point',
     mean: 0,
     sd: 0.53,
     heritability: 0.15,
@@ -663,7 +642,7 @@ export function computeIndex(
     profile,
     baseVersion: base.version,
     value: Math.round(value * 10) / 10,
-    reliability: indexReliability(contributions, weights, byKey),
+    reliability: indexReliability(contributions, weights, byKey, profile.kind),
     used: contributions.length,
     total,
     contributions,
@@ -680,13 +659,34 @@ export function computeIndex(
  *
  * Строго она выводится из матрицы ковариаций между признаками. На практике
  * берут среднее достоверностей компонентов, взвешенное по их вкладу
- * в дисперсию индекса: признак с большим весом и большим σ определяет
- * итог сильнее, и его достоверность должна весить больше.
+ * в разброс индекса: признак, который сильнее двигает итог, и достоверность
+ * должен весить сильнее.
+ *
+ * ## Почему вес считается по-разному у двух видов профиля
+ *
+ * Здесь стояло `|вес| × σ` для всех профилей разом, и для селекционного
+ * это было неверно. У него вклад признака равен `вес × (EBV − μ) / σ`:
+ * стандартное отклонение уже поделено внутри, и умножать на него второй
+ * раз значит вернуть в расчёт единицы измерения, от которых мы только что
+ * избавились. Получалось, что удой с весом 3 % весил в достоверности
+ * больше жира с весом 27 % — просто потому, что килограммы молока
+ * расходятся на сотни, а килограммы жира на десятки.
+ *
+ * У экономического профиля наоборот: там вес выражен в рублях на единицу
+ * признака и умножается на саму племенную ценность, а не на её
+ * стандартизованное значение. Разброс вклада там и правда пропорционален
+ * `|вес| × σ`.
+ *
+ * Ошибка была тихой: достоверность оставалась правдоподобной, менялась
+ * во втором знаке и не спорила ни с чем на экране. Нашлась она при
+ * написании разбора про достоверность — то есть тогда, когда формулу
+ * пришлось объяснить словами.
  */
 function indexReliability(
   contributions: Contribution[],
   weights: Partial<Record<TraitKey, number>>,
   byKey: Map<TraitKey, TraitBase> = BY_KEY,
+  kind: WeightKind = 'selection',
 ): number {
   let num = 0
   let den = 0
@@ -695,7 +695,8 @@ function indexReliability(
     if (c.reliability === null) continue
     const trait = byKey.get(c.key)
     if (!trait) continue
-    const share = Math.abs(weights[c.key] ?? 0) * trait.sd
+    const weight = Math.abs(weights[c.key] ?? 0)
+    const share = kind === 'economic' ? weight * trait.sd : weight
     num += share * c.reliability
     den += share
   }

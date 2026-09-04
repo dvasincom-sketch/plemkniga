@@ -4,9 +4,10 @@ import Link from 'next/link'
 import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, LOCALE_CODES, type Locale } from '@/lib/i18n/locales'
-import { pick } from '@/lib/i18n/translated'
+import { noticeFor, pick } from '@/lib/i18n/translated'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
 import { ICAR_WIKI, ICAR_WITH_GAPS } from '@/lib/icar-map'
+import { icarText } from '@/lib/i18n/data/icar-map'
 import { ICAR_PAGE_TEXT } from '@/lib/icar-page-text'
 
 /*
@@ -85,10 +86,15 @@ export default async function IcarGapsPage({
   const text = picked.value.gaps
 
   /* Оговорка про русский текст — только там, где он и правда русский. */
-  const notice = picked.fallback ? PAGE_MESSAGES[locale].notice : null
+  const notice = noticeFor(locale, picked.fallback)
 
-  /* Разборы идут за языком показанного текста, а не за языком в адресе. */
-  const english = picked.shown === 'en'
+  /*
+   * Разборы идут за языком показанного текста, а не за языком в адресе.
+   * Раньше здесь стоял признак `english`, и на казахской странице он был
+   * ложен: почти всё тело этой страницы — сами пробелы, и оно оставалось
+   * русским под переведённым заголовком.
+   */
+  const data = icarText(picked.shown)
 
   return (
     <>
@@ -137,58 +143,61 @@ export default async function IcarGapsPage({
               href={`#${s.slug}`}
               className="text-[14px] text-ink-500 underline underline-offset-4 transition-colors hover:text-forest-500"
             >
-              {english ? s.titleEn : s.title}{' '}
+              {data.section(s.slug).title}{' '}
               <span className="tabular-nums text-ink-300">({s.gaps.length})</span>
             </a>
           ))}
         </nav>
 
-        {ICAR_WITH_GAPS.map((s) => (
-          <section key={s.slug} id={s.slug} className="mt-14 scroll-mt-8">
-            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-              <h2 className="text-[26px] font-medium leading-tight">
-                {english ? s.titleEn : s.title}
-              </h2>
-              <a
-                href={`${ICAR_WIKI}${s.wiki}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[13px] tabular-nums text-ink-500 underline underline-offset-4 hover:text-forest-500"
-              >
-                Section {s.section} ↗
-              </a>
-            </div>
+        {ICAR_WITH_GAPS.map((s) => {
+          const about = data.section(s.slug)
 
-            <p className="mt-3 max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
-              {english ? s.aboutEn : s.about}
-            </p>
+          return (
+            <section key={s.slug} id={s.slug} className="mt-14 scroll-mt-8">
+              <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                <h2 className="text-[26px] font-medium leading-tight">{about.title}</h2>
+                <a
+                  href={`${ICAR_WIKI}${s.wiki}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[13px] tabular-nums text-ink-500 underline underline-offset-4 hover:text-forest-500"
+                >
+                  Section {s.section} ↗
+                </a>
+              </div>
 
-            <p className="mt-3 max-w-[80ch] text-[14px] leading-relaxed text-ink-500">
-              <span className="text-ink-700">{text.labels.ours}</span>{' '}
-              {english ? s.oursEn : s.ours}
-            </p>
+              <p className="mt-3 max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
+                {about.about}
+              </p>
 
-            <div className="mt-6 space-y-4">
-              {s.gaps.map((g) => (
-                <div key={g.what} className="rounded-2xl border border-ink-100 p-6">
-                  <h3 className="max-w-[70ch] text-[17px] font-medium leading-snug">
-                    {english ? g.whatEn : g.what}
-                  </h3>
+              <p className="mt-3 max-w-[80ch] text-[14px] leading-relaxed text-ink-500">
+                <span className="text-ink-700">{text.labels.ours}</span> {about.ours}
+              </p>
 
-                  <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-700">
-                    <span className="text-ink-500">{text.labels.why}</span>{' '}
-                    {english ? g.whyEn : g.why}
-                  </p>
+              <div className="mt-6 space-y-4">
+                {s.gaps.map((g) => {
+                  const gap = data.gap(g.key)
 
-                  <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-700">
-                    <span className="text-ink-500">{text.labels.need}</span>{' '}
-                    {english ? g.needEn : g.need}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
-        ))}
+                  return (
+                    <div key={g.key} className="rounded-2xl border border-ink-100 p-6">
+                      <h3 className="max-w-[70ch] text-[17px] font-medium leading-snug">
+                        {gap.what}
+                      </h3>
+
+                      <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-700">
+                        <span className="text-ink-500">{text.labels.why}</span> {gap.why}
+                      </p>
+
+                      <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-700">
+                        <span className="text-ink-500">{text.labels.need}</span> {gap.need}
+                      </p>
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+          )
+        })}
 
         <div className="mt-16 max-w-[80ch] rounded-2xl bg-white p-8 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)]">
           <h2 className="text-[22px] font-medium leading-tight">{text.outro.title}</h2>

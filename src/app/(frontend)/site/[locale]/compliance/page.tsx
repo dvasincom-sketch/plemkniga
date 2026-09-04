@@ -5,25 +5,25 @@ import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import { siteMetadata } from '@/lib/seo'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
-import { pick } from '@/lib/i18n/translated'
+import { noticeFor, pick } from '@/lib/i18n/translated'
 import {
-  AREA_HINT,
-  AREA_HINT_EN,
   AREA_ORDER,
-  AREA_TITLE,
-  AREA_TITLE_EN,
-  COMPLIANCE,
   STATE_CLASS,
-  STATE_HINT,
-  STATE_HINT_EN,
-  STATE_LABEL,
-  STATE_LABEL_EN,
   STATE_ORDER,
   byArea,
   countByState,
   type ComplianceItem,
+  type ComplianceState,
+  type ComplianceText,
   type Evidence,
 } from '@/lib/compliance'
+import {
+  complianceAreaHint,
+  complianceAreaTitle,
+  complianceStateHint,
+  complianceStateLabel,
+  complianceText,
+} from '@/lib/i18n/data/compliance'
 import { COMPLIANCE_PAGE_TEXT, type CompliancePageText } from '@/lib/compliance-page-text'
 import { BOOK_URL, isSharedPath } from '@/lib/hosts'
 
@@ -87,8 +87,8 @@ export async function generateMetadata({
  * не видит — заголовок приходил переведённым, а тело оставалось
  * русским, и страница отвечала на этот вопрос раньше и хуже любого
  * текста. Слова страницы теперь в `lib/compliance-page-text.ts`,
- * а английские описания позиций — полями рядом с русскими
- * в `lib/compliance.ts`.
+ * а описания позиций — в словарях `lib/i18n/data/compliance.<язык>.ts`,
+ * откуда их выдаёт `complianceText` по одному языку для всех шести.
  *
  * ## Где смотреть
  *
@@ -115,20 +115,21 @@ export default async function CompliancePage({
    * она извиняется за то, чего нет, — и обесценивает ту же строку там,
    * где она сказана по делу.
    */
-  const notice = picked.fallback ? PAGE_MESSAGES[locale].notice : null
+  const notice = noticeFor(locale, picked.fallback)
 
   /*
    * Описания позиций идут за языком, на котором показан текст, а не
-   * за языком в адресе: на казахской странице тело русское, и русские
-   * описания рядом с ним на месте, а английские выглядели бы третьим
-   * языком на одной странице.
+   * за языком в адресе. Если проза страницы откатилась на русский,
+   * то и реестр под ней русский: третий язык на одной странице читается
+   * хуже, чем откат, о котором сказано оговоркой.
    */
-  const english = picked.shown === 'en'
+  const shown = picked.shown
 
-  const stateLabel = english ? STATE_LABEL_EN : STATE_LABEL
-  const stateHint = english ? STATE_HINT_EN : STATE_HINT
-  const areaTitle = english ? AREA_TITLE_EN : AREA_TITLE
-  const areaHint = english ? AREA_HINT_EN : AREA_HINT
+  const words = complianceText(shown)
+  const stateLabel = complianceStateLabel(shown)
+  const stateHint = complianceStateHint(shown)
+  const areaTitle = complianceAreaTitle(shown)
+  const areaHint = complianceAreaHint(shown)
 
   const counts = countByState()
 
@@ -229,7 +230,13 @@ export default async function CompliancePage({
 
               <div className="mt-6 space-y-4">
                 {items.map((item) => (
-                  <Item key={item.key} item={item} text={text} english={english} />
+                  <Item
+                    key={item.key}
+                    item={item}
+                    words={words(item.key)}
+                    stateLabel={stateLabel}
+                    text={text}
+                  />
                 ))}
               </div>
             </section>
@@ -250,39 +257,38 @@ export default async function CompliancePage({
 
 function Item({
   item,
+  words,
+  stateLabel,
   text,
-  english,
 }: {
   item: ComplianceItem
+  words: ComplianceText
+  stateLabel: Record<ComplianceState, string>
   text: CompliancePageText
-  english: boolean
 }) {
   return (
     <div className="rounded-2xl border border-ink-100 p-6">
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
         <div className="min-w-0">
-          <h3 className="text-[17px] font-medium leading-snug">
-            {english ? item.titleEn : item.title}
-          </h3>
-          <p className="mt-1 text-[13px] text-ink-500">{english ? item.orgEn : item.org}</p>
+          <h3 className="text-[17px] font-medium leading-snug">{words.title}</h3>
+          <p className="mt-1 text-[13px] text-ink-500">{words.org}</p>
         </div>
         <span className={`flex-none rounded-md px-2 py-0.5 text-[12px] ${STATE_CLASS[item.state]}`}>
-          {(english ? STATE_LABEL_EN : STATE_LABEL)[item.state]}
+          {stateLabel[item.state]}
         </span>
       </div>
 
       <p className="mt-4 max-w-[80ch] text-[14px] leading-relaxed text-ink-700">
-        <span className="text-ink-500">{text.item.what}</span> {english ? item.whatEn : item.what}
+        <span className="text-ink-500">{text.item.what}</span> {words.what}
       </p>
 
       <p className="mt-2 max-w-[80ch] text-[14px] leading-relaxed text-ink-700">
-        <span className="text-ink-500">{text.item.ours}</span> {english ? item.oursEn : item.ours}
+        <span className="text-ink-500">{text.item.ours}</span> {words.ours}
       </p>
 
-      {item.next && (
+      {words.next && (
         <p className="mt-2 max-w-[80ch] text-[14px] leading-relaxed text-ink-700">
-          <span className="text-ink-500">{text.item.next}</span>{' '}
-          {english ? item.nextEn : item.next}
+          <span className="text-ink-500">{text.item.next}</span> {words.next}
         </p>
       )}
 
@@ -292,10 +298,9 @@ function Item({
          она не наша. Обратный порядок читался бы как отговорка вперёд
          объяснения.
       */}
-      {item.external && (
+      {words.external && (
         <p className="mt-2 max-w-[80ch] text-[14px] leading-relaxed text-ink-700">
-          <span className="text-ink-500">{text.item.external}</span>{' '}
-          {english ? item.externalEn : item.external}
+          <span className="text-ink-500">{text.item.external}</span> {words.external}
         </p>
       )}
 
@@ -312,7 +317,7 @@ function Item({
               rel="noopener noreferrer"
               className="text-ink-500 underline underline-offset-4 transition-colors hover:text-forest-500"
             >
-              {english ? item.source.labelEn : item.source.label} ↗
+              {words.source ?? item.source.label} ↗
             </a>
           )}
         </div>

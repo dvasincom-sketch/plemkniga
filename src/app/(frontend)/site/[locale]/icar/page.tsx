@@ -5,14 +5,9 @@ import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import { siteMetadata } from '@/lib/seo'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
-import { pick } from '@/lib/i18n/translated'
-import {
-  ICAR_SECTIONS,
-  ICAR_STATE_CLASS,
-  ICAR_STATE_LABEL,
-  ICAR_STATE_LABEL_EN,
-  ICAR_WIKI,
-} from '@/lib/icar-map'
+import { noticeFor, pick } from '@/lib/i18n/translated'
+import { ICAR_SECTIONS, ICAR_STATE_CLASS, ICAR_WIKI } from '@/lib/icar-map'
+import { icarText } from '@/lib/i18n/data/icar-map'
 import { ICAR_PAGE_TEXT } from '@/lib/icar-page-text'
 
 /*
@@ -65,7 +60,7 @@ export async function generateMetadata({
  * и подводка приходили переведёнными, а тело оставалось русским,
  * и английская страница читалась как брошенная на полпути. Слова
  * страницы теперь в `lib/icar-page-text.ts`, а разборы разделов —
- * английскими полями рядом с русскими в `lib/icar-map.ts`.
+ * словарями по языкам в `lib/i18n/data/icar-map.*.ts`.
  *
  * ## Почему знака ICAR здесь нет
  *
@@ -93,15 +88,19 @@ export default async function IcarPage({
    * в том числе на английском, где переведено уже всё, — и извинялась
    * за то, чего нет.
    */
-  const notice = picked.fallback ? PAGE_MESSAGES[locale].notice : null
+  const notice = noticeFor(locale, picked.fallback)
 
   /*
    * Разборы разделов идут за языком, на котором показан текст страницы,
-   * а не за языком в адресе: на казахской странице тело русское, и русские
-   * разборы рядом с ним на месте, а английские выглядели бы третьим языком
-   * на одной странице.
+   * а не за языком в адресе: где текст откатился на русский, разборы
+   * откатываются вместе с ним, иначе на одной странице окажется два языка.
+   *
+   * Выбор языка здесь и заканчивается. Раньше на его месте стоял признак
+   * `english`, и каждое поле таблицы разворачивалось из него тернарной
+   * строкой; на четырёх языках из шести признак ложен, и таблица молча
+   * оставалась русской под переведённой рамкой.
    */
-  const english = picked.shown === 'en'
+  const data = icarText(picked.shown)
 
   return (
     <>
@@ -149,50 +148,54 @@ export default async function IcarPage({
                 </tr>
               </thead>
               <tbody>
-                {ICAR_SECTIONS.map((r) => (
-                  <tr key={r.section}>
-                    <td className="min-w-[13rem] align-top">
-                      <a
-                        href={`${ICAR_WIKI}${r.wiki}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline underline-offset-4 hover:text-forest-500"
-                      >
-                        {english ? r.titleEn : r.title}
-                      </a>
-                      <span className="block text-[12px] tabular-nums text-ink-500">
-                        Section {r.section}
-                      </span>
-                    </td>
-                    <td className="max-w-[34ch] align-top text-[14px] leading-relaxed text-ink-700">
-                      {english ? r.aboutEn : r.about}
-                    </td>
-                    <td className="max-w-[38ch] align-top text-[14px] leading-relaxed text-ink-700">
-                      {english ? r.oursEn : r.ours}
-                    </td>
-                    <td className="align-top">
-                      <span
-                        className={`inline-block whitespace-nowrap rounded-md px-2 py-0.5 text-[12px] ${ICAR_STATE_CLASS[r.state]}`}
-                      >
-                        {english ? ICAR_STATE_LABEL_EN[r.state] : ICAR_STATE_LABEL[r.state]}
-                      </span>
-                      {/*
-                         Ссылка ведёт к разбору именно этого раздела, а не
-                         к началу страницы пробелов. Состояние «частично»
-                         без объяснения — то же самое, что его отсутствие,
-                         и один клик между ними лишний.
-                      */}
-                      {r.gaps.length > 0 && (
-                        <Link
-                          href={`/${locale}/icar/gaps#${r.slug}`}
-                          className="mt-1.5 block whitespace-nowrap text-[12px] underline underline-offset-4 hover:text-forest-500"
+                {ICAR_SECTIONS.map((r) => {
+                  const s = data.section(r.slug)
+
+                  return (
+                    <tr key={r.section}>
+                      <td className="min-w-[13rem] align-top">
+                        <a
+                          href={`${ICAR_WIKI}${r.wiki}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline underline-offset-4 hover:text-forest-500"
                         >
-                          {text.gapsLink}: {r.gaps.length}
-                        </Link>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                          {s.title}
+                        </a>
+                        <span className="block text-[12px] tabular-nums text-ink-500">
+                          Section {r.section}
+                        </span>
+                      </td>
+                      <td className="max-w-[34ch] align-top text-[14px] leading-relaxed text-ink-700">
+                        {s.about}
+                      </td>
+                      <td className="max-w-[38ch] align-top text-[14px] leading-relaxed text-ink-700">
+                        {s.ours}
+                      </td>
+                      <td className="align-top">
+                        <span
+                          className={`inline-block whitespace-nowrap rounded-md px-2 py-0.5 text-[12px] ${ICAR_STATE_CLASS[r.state]}`}
+                        >
+                          {data.state(r.state)}
+                        </span>
+                        {/*
+                           Ссылка ведёт к разбору именно этого раздела, а не
+                           к началу страницы пробелов. Состояние «частично»
+                           без объяснения — то же самое, что его отсутствие,
+                           и один клик между ними лишний.
+                        */}
+                        {r.gaps.length > 0 && (
+                          <Link
+                            href={`/${locale}/icar/gaps#${r.slug}`}
+                            className="mt-1.5 block whitespace-nowrap text-[12px] underline underline-offset-4 hover:text-forest-500"
+                          >
+                            {text.gapsLink}: {r.gaps.length}
+                          </Link>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

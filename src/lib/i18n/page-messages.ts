@@ -62,6 +62,16 @@ export type PageMessages = {
     sections: string
   }
   /** Пометка о языке разбора. У русского её нет. */
+  /**
+   * Оговорка о переводе.
+   *
+   * Прежде она говорила «текст ниже по-русски» и показывалась там, где
+   * перевода не было. Теперь перевод есть на всех шести языках, и смысл
+   * оговорки другой: перевод не вычитан носителем языка. Показывается
+   * она по признаку `reviewed` в `locales.ts`, а не по факту отката,
+   * и снимается вместе с ним — то есть тогда, когда текст действительно
+   * прочёл человек, знающий, как эти вещи называются в отрасли.
+   */
   notice: string | null
   /**
    * На чём держится доверие, когда заверить документ некому.
@@ -144,7 +154,7 @@ const ru: PageMessages = {
 const en: PageMessages = {
   nav: { about: 'About', breeds: 'Breeds', compliance: 'Compliance', api: 'API', org: 'Organisation', evolution: 'Product evolution', language: 'Language', sections: 'Product sections' },
   notice:
-    'The detailed analysis below is in Russian. Translating regulatory prose without a native speaker would do more harm than an honest note.',
+    'This page has not been proofread by a native speaker of the language you are reading. Terms of the trade may be off; the figures and the sources under them are the same in every language.',
   trust: {
     title: 'What backs it',
     body:
@@ -202,7 +212,7 @@ const en: PageMessages = {
 const kk: PageMessages = {
   nav: { about: 'Өнім туралы', breeds: 'Тұқымдар', compliance: 'Сәйкестік', api: 'API', org: 'Ұйым туралы', evolution: 'Өнім эволюциясы', language: 'Тіл', sections: 'Өнім бөлімдері' },
   notice:
-    'Төмендегі толық талдау орыс тілінде. Нормативтік мәтінді ана тілі иесінсіз аудару — адал ескертуден гөрі зияндырақ.',
+    'Бұл бетті сіз оқып отырған тілдің иесі тексерген жоқ. Сала терминдері дәл берілмеуі мүмкін; сандар мен олардың астындағы дереккөздер барлық тілде бірдей.',
   trust: {
     title: 'Немен расталады',
     body:
@@ -260,7 +270,7 @@ const kk: PageMessages = {
 const hy: PageMessages = {
   nav: { about: 'Ապրանքի մասին', breeds: 'Ցեղեր', compliance: 'Համապատասխանություն', api: 'API', org: 'Կազմակերպությունը', evolution: 'Ապրանքի զարգացումը', language: 'Լեզու', sections: 'Ապրանքի բաժինները' },
   notice:
-    'Ստորև բերված մանրամասն վերլուծությունը ռուսերեն է։ Կարգավորող տեքստը մայրենի լեզվի կրողի մասնակցությամբ չթարգմանելը ավելի վնասակար կլիներ, քան ազնիվ նշումը։',
+    'Այս էջը չի սրբագրվել ձեր կարդացած լեզվի կրողի կողմից։ Ոլորտային եզրույթները կարող են ոչ ճշգրիտ լինել; թվերը և դրանց հիմքում ընկած աղբյուրները նույնն են բոլոր լեզուներում։',
   trust: {
     title: 'Ինչով է հաստատվում',
     body:
@@ -318,7 +328,7 @@ const hy: PageMessages = {
 const be: PageMessages = {
   nav: { about: 'Пра прадукт', breeds: 'Пароды', compliance: 'Адпаведнасць', api: 'API', org: 'Пра арганізацыю', evolution: 'Эвалюцыя прадукту', language: 'Мова', sections: 'Раздзелы прадукту' },
   notice:
-    'Падрабязны разбор ніжэй — па-руску. Перакладаць нарматыўны тэкст без носьбіта мовы шкодней, чым сумленная паметка.',
+    'Гэтая старонка не вычытана носьбітам мовы, на якой вы яе чытаеце. Галіновыя тэрміны могуць быць перададзены недакладна; лічбы і крыніцы пад імі аднолькавыя на ўсіх мовах.',
   trust: {
     title: 'Чым пацвярджаецца',
     body:
@@ -376,7 +386,7 @@ const be: PageMessages = {
 const ky: PageMessages = {
   nav: { about: 'Продукт жөнүндө', breeds: 'Тукумдар', compliance: 'Дал келүү', api: 'API', org: 'Уюм жөнүндө', evolution: 'Продукттун эволюциясы', language: 'Тил', sections: 'Продукттун бөлүмдөрү' },
   notice:
-    'Төмөндөгү толук талдоо орус тилинде. Ченемдик текстти эне тилинин ээсисиз которуу адал эскертүүдөн көрө зыяндуу.',
+    'Бул бет сиз окуп жаткан тилдин ээси тарабынан текшерилген эмес. Тармактык терминдер так эмес берилиши мүмкүн; сандар жана алардын астындагы булактар бардык тилде бирдей.',
   trust: {
     title: 'Эмне менен ырасталат',
     body:

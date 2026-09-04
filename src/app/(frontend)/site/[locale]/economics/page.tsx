@@ -5,11 +5,12 @@ import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import { siteMetadata } from '@/lib/seo'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
-import { pick } from '@/lib/i18n/translated'
+import { noticeFor, pick } from '@/lib/i18n/translated'
 import { EconomicAssumptions } from '@/components/EconomicAssumptions'
 import { ECONOMIC_WEIGHTS } from '@/lib/economics'
 import { ECONOMICS_PAGE_TEXT } from '@/lib/economics-page-text'
 import { TRAIT_BASE } from '@/lib/breeding-index'
+import { traitText } from '@/lib/i18n/data/traits'
 
 /*
  * Заголовок, описание и указание основной страницы — из одного места
@@ -80,15 +81,20 @@ export default async function EconomicsPage({ params }: { params: Promise<{ loca
    * извинялась за то, чего нет. Строка, извиняющаяся напрасно, обесценивает
    * ту же строку там, где она сказана по делу.
    */
-  const notice = picked.fallback ? PAGE_MESSAGES[locale].notice : null
+  const notice = noticeFor(locale, picked.fallback)
 
   /*
    * Названия признаков идут за языком, на котором показан текст, а не
-   * за языком в адресе: на казахской странице тело русское, и русские
-   * названия рядом с ним на месте, а английские выглядели бы третьим
-   * языком на одной странице.
+   * за языком в адресе: если текста на языке страницы нет и показан
+   * русский, русские названия рядом с ним на месте, а чужие выглядели бы
+   * третьим языком на одной странице.
+   *
+   * Словарь берётся по этому языку, а не выбирается признаком «страница
+   * английская». Признак был ложен на казахском, армянском, белорусском
+   * и киргизском, и первый столбец таблицы вместе с единицами оставался
+   * русским под переведённой рамкой.
    */
-  const english = picked.shown === 'en'
+  const traitName = traitText(picked.shown)
 
   /*
    * Веса берутся из того же места, откуда их берёт расчёт. Переписать
@@ -123,6 +129,7 @@ export default async function EconomicsPage({ params }: { params: Promise<{ loca
     .map(([key, value]) => {
       const trait = TRAIT_BASE.find((t) => t.key === key)
       const direction = trait?.inverted ? -1 : 1
+      const named = trait ? traitName(trait.key) : null
       return {
         key,
         /** Рубли за единицу признака так, как их видит зоотехник. */
@@ -133,9 +140,9 @@ export default async function EconomicsPage({ params }: { params: Promise<{ loca
          * в соседнем — на одной строке, про одно и то же.
          */
         perStep: Number(value ?? 0) * (trait?.sd ?? 0) * direction,
-        unit: (english ? trait?.unitEn : trait?.unit) ?? '',
+        unit: named?.unit ?? '',
         sd: trait?.sd ?? 0,
-        label: (english ? trait?.labelEn : trait?.label) ?? key,
+        label: named?.label ?? key,
       }
     })
     .filter((w) => w.value !== 0)

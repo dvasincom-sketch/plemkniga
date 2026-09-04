@@ -5,7 +5,7 @@ import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import { siteMetadata } from '@/lib/seo'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
-import { pick } from '@/lib/i18n/translated'
+import { noticeFor, pick } from '@/lib/i18n/translated'
 import { demoUrl, PRODUCT_MAIL } from '@/lib/hosts'
 import { breedCatalog } from '@/lib/breeds-catalog-server'
 import { BREED_PAGES } from '@/lib/breed-pages'
@@ -19,6 +19,7 @@ import {
   type BreedState,
 } from '@/lib/breeds-catalog'
 import { BREEDS_PAGE_TEXT } from '@/lib/breeds-page-text'
+import { breedName as breedNameIn } from '@/lib/i18n/data/breeds'
 
 /*
  * Заголовок, описание и указание основной страницы — из одного места
@@ -68,15 +69,15 @@ export const dynamic = 'force-dynamic'
  * Набранный прямо в разметке абзац перевода не видит: заголовок
  * и подводка приходили переведёнными, а тело оставалось русским,
  * и английская страница читалась как брошенная на полпути. Слова
- * страницы теперь в `lib/breeds-page-text.ts`, английские имена пород —
- * в `lib/breeds-catalog.ts` рядом с мостом на коды ICAR.
+ * страницы теперь в `lib/breeds-page-text.ts`, имена пород — словарями
+ * по языкам в `lib/i18n/data/breeds.<язык>.ts`.
  *
  * ## Почему имена пород — отдельный словарь, а не перевод на месте
  *
  * Имя породы — не слово, а идентификатор: «Чёрно-пёстрая» это Russian
  * Black Pied, а не Black-motley и не Holstein, хотя переводчик уверенно
- * поставил бы и то и другое. Разбор — в `BREED_NAME_EN`, там же список
- * имён, которые ещё требуют проверки.
+ * поставил бы и то и другое. Разбор — в самих словарях, там же названы
+ * имена, которые ещё требуют проверки носителем языка.
  */
 export default async function BreedsPage({
   params,
@@ -99,20 +100,20 @@ export default async function BreedsPage({
    * извинялась за то, чего нет. Строка, извиняющаяся напрасно,
    * обесценивает ту же строку там, где она сказана по делу.
    */
-  const notice = picked.fallback ? PAGE_MESSAGES[locale].notice : null
+  const notice = noticeFor(locale, picked.fallback)
 
   /*
    * Имена пород идут за языком, на котором показан текст, а не
-   * за языком в адресе: на казахской странице тело русское, и русские
-   * имена рядом с ним на месте, а английские выглядели бы третьим
-   * языком на одной странице.
+   * за языком в адресе: если перевода страницы нет и показан русский
+   * текст, русские имена рядом с ним на месте, а казахские выглядели бы
+   * вторым языком на одной странице.
    */
-  const english = picked.shown === 'en'
+  const nameIn = breedNameIn(picked.shown)
 
   const rows = breedCatalog()
 
-  /** Имя породы на языке текста; без английского имени остаётся русское. */
-  const breedName = (r: BreedRow) => (english ? (r.nameEn ?? r.name) : r.name)
+  /** Имя породы на языке текста; чего нет в словаре, остаётся русским. */
+  const breedName = (r: BreedRow) => nameIn(r.name)
 
   /*
    * Показательная книга показывается только тогда, когда она есть.
@@ -135,14 +136,20 @@ export default async function BreedsPage({
   const pageOf = new Map(BREED_PAGES.map((b) => [b.registryName, b.slug]))
 
   /*
-   * Порядок в таблице — по тому имени, которое читатель видит.
-   * Каталог отсортирован по русскому алфавиту, и на английской странице
+   * Порядок в таблице — по тому имени, которое читатель видит, и с тегом
+   * того языка, на котором он его видит.
+   *
+   * Каталог отсортирован по русскому алфавиту, и на любой другой странице
    * этот порядок выглядит случайным: подпись обещает алфавит, а столбец
-   * его не показывает.
+   * его не показывает. Раньше пересортировка делалась только для
+   * английского — то есть ровно там, где о ней вспомнили; армянская
+   * таблица оставалась в русском порядке под той же подписью.
+   *
+   * Тег языка нужен и сам по себе: «Ё» и «Е» в русском, армянский
+   * и казахский алфавиты сортируются каждый по-своему, и порядок
+   * по чужим правилам читается как отсутствие порядка.
    */
-  const listed = english
-    ? [...rows].sort((a, b) => breedName(a).localeCompare(breedName(b), 'en'))
-    : rows
+  const listed = [...rows].sort((a, b) => breedName(a).localeCompare(breedName(b), picked.shown))
 
   /*
    * Чего породе не хватает до следующего состояния.

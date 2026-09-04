@@ -1525,7 +1525,7 @@ export interface MilkTest {
    */
   recordingProtocol?: ('A-OfficialMRORepresentative' | 'B-HerdOwnerOrNominee' | 'C-Both') | null;
   /**
-   * Цифра привычного обозначения: 4 — раз в квартал, 12 — ежемесячно
+   * Число контролей в год: 12 — ежемесячно, 4 — раз в квартал
    */
   recordingPerYear?: number | null;
   recordingScheme?: ('AllMilkingsAtTestday' | 'AllMilkingsInPeriod' | 'OneMilkingAtTestday') | null;

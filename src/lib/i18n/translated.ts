@@ -1,4 +1,5 @@
-import { DEFAULT_LOCALE, type Locale } from '@/lib/i18n/locales'
+import { DEFAULT_LOCALE, localeInfo, type Locale } from '@/lib/i18n/locales'
+import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 
 /**
  * Длинные тексты, переведённые не на все языки сразу.
@@ -74,3 +75,28 @@ export const translatedLocales = <T,>(map: Translated<T>): Locale[] =>
 export const FALLBACK_NOTICE =
   'This page has not been translated into your language yet, so the Russian original is shown. ' +
   'The English version is available where the section has already been translated.'
+
+
+/**
+ * Какую оговорку показать над текстом страницы.
+ *
+ * Их две, и путать их нельзя.
+ *
+ * **Перевода нет вовсе** — показан русский текст. Об этом говорит
+ * английская строка `FALLBACK_NOTICE`: перевести её на язык, для которого
+ * перевода нет, некому.
+ *
+ * **Перевод есть, но его не читал носитель языка.** Тогда стоит оговорка
+ * из общего набора на языке самой страницы: она признаёт неточность
+ * терминов и тут же говорит, что числа и источники под ними одинаковы
+ * на всех языках.
+ *
+ * Признак вычитки живёт в `locales.ts` рядом с самим языком, и снимается
+ * он ровно тогда, когда текст прочёл человек, знающий, как эти вещи
+ * называются в отрасли. Пока признак не снят, оговорка стоит — и это
+ * дешевле, чем молчаливый машинный перевод зоотехнической прозы.
+ */
+export function noticeFor(locale: Locale, fallback: boolean): string | null {
+  if (fallback) return FALLBACK_NOTICE
+  return localeInfo(locale).reviewed ? null : PAGE_MESSAGES[locale].notice
+}

@@ -5,10 +5,11 @@ import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import { siteMetadata } from '@/lib/seo'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
-import { pick } from '@/lib/i18n/translated'
+import { noticeFor, pick } from '@/lib/i18n/translated'
 import { ADE_MAP, ADE_OURS, ADE_SCHEMAS, themeCounts, usedByDir } from '@/lib/ade-schema-map'
 import { ADE_VERSION } from '@/lib/ade/core'
 import { ADE_PAGE_TEXT } from '@/lib/ade-page-text'
+import { adeDirTitle, adeResourceText, adeThemeText } from '@/lib/i18n/data/ade-schema'
 
 /**
  * Чем проверяется наш обмен.
@@ -48,7 +49,9 @@ import { ADE_PAGE_TEXT } from '@/lib/ade-page-text'
  * и подводка приходили переведёнными, а тело оставалось русским,
  * и английская страница читалась как брошенная на полпути. Слова
  * страницы теперь в `lib/ade-page-text.ts`, а подписи, приходящие
- * из данных обмена, — парными полями рядом с русскими.
+ * из данных обмена, — словарями по языкам
+ * в `lib/i18n/data/ade-schema.<язык>.ts`. Имена самих схем при этом
+ * не переводятся ни на один из шести: это идентификаторы стандарта.
  */
 
 /*
@@ -94,15 +97,17 @@ export default async function AdePage({ params }: { params: Promise<{ locale: st
    * извинялась за то, чего нет. Строка, извиняющаяся напрасно, обесценивает
    * ту же строку там, где она сказана по делу.
    */
-  const notice = picked.fallback ? PAGE_MESSAGES[locale].notice : null
+  const notice = noticeFor(locale, picked.fallback)
 
   /*
    * Подписи, приходящие из данных обмена, идут за языком, на котором
-   * показан текст, а не за языком в адресе: на казахской странице тело
-   * русское, и русские подписи рядом с ним на месте, а английские
-   * выглядели бы третьим языком на одной странице.
+   * показан текст, а не за языком в адресе: если перевода страницы нет
+   * и показан русский текст, русские подписи рядом с ним на месте,
+   * а казахские выглядели бы вторым языком на одной странице.
    */
-  const english = picked.shown === 'en'
+  const resource = adeResourceText(picked.shown)
+  const theme = adeThemeText(picked.shown)
+  const dirTitle = adeDirTitle(picked.shown)
 
   const used = usedByDir()
   const themes = themeCounts()
@@ -220,10 +225,15 @@ export default async function AdePage({ params }: { params: Promise<{ locale: st
                 {ADE_OURS.map((r) => (
                   <tr key={r.schema} className="border-b border-ink-100 align-top">
                     <td className="py-2.5 pr-4 font-medium text-ink-900">
-                      {english ? r.titleEn : r.title}
+                      {resource(r.schema).title}
                     </td>
+                    {/*
+                       Имя схемы стоит как есть на всех шести языках:
+                       по нему партнёр ищет в репозитории стандарта,
+                       и переведённое оно не нашлось бы ничем.
+                    */}
                     <td className="py-2.5 pr-4 font-mono text-[13px] text-ink-500">{r.schema}</td>
-                    <td className="py-2.5 pr-4 text-ink-700">{english ? r.whatEn : r.what}</td>
+                    <td className="py-2.5 pr-4 text-ink-700">{resource(r.schema).what}</td>
                     <td className="py-2.5 whitespace-nowrap">
                       {r.write ? (
                         <span className="text-forest-600">{text.ours.accepted}</span>
@@ -251,7 +261,7 @@ export default async function AdePage({ params }: { params: Promise<{ locale: st
           {used.map((g) => (
             <div key={g.dir} className="mt-8">
               <h3 className="text-[15px] font-medium">
-                {english ? g.titleEn : g.title}{' '}
+                {dirTitle(g.dir)}{' '}
                 <span className="font-normal tabular-nums text-ink-400">— {g.names.length}</span>
               </h3>
 
@@ -287,12 +297,10 @@ export default async function AdePage({ params }: { params: Promise<{ locale: st
               </thead>
               <tbody>
                 {themes.map((t) => (
-                  <tr key={t.title} className="border-b border-ink-100 align-top">
-                    <td className="py-2.5 pr-4 font-medium text-ink-900">
-                      {english ? t.titleEn : t.title}
-                    </td>
+                  <tr key={t.key} className="border-b border-ink-100 align-top">
+                    <td className="py-2.5 pr-4 font-medium text-ink-900">{theme(t.key).title}</td>
                     <td className="py-2.5 pr-4 tabular-nums text-ink-500">{t.count}</td>
-                    <td className="py-2.5 text-ink-700">{english ? t.whyEn : t.why}</td>
+                    <td className="py-2.5 text-ink-700">{theme(t.key).why}</td>
                   </tr>
                 ))}
               </tbody>

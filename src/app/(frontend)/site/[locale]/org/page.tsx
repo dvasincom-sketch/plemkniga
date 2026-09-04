@@ -5,7 +5,7 @@ import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import { siteMetadata } from '@/lib/seo'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
-import { pick } from '@/lib/i18n/translated'
+import { noticeFor, pick } from '@/lib/i18n/translated'
 import { PLATFORM } from '@/lib/platform'
 import { ORG_PAGE_TEXT } from '@/lib/org-page-text'
 import { BOOK_URL, PRODUCT_MAIL } from '@/lib/hosts'
@@ -77,7 +77,7 @@ export default async function OrgPage({ params }: { params: Promise<{ locale: st
    * извинялась за то, чего нет. Строка, извиняющаяся напрасно,
    * обесценивает ту же строку там, где она сказана по делу.
    */
-  const notice = picked.fallback ? PAGE_MESSAGES[locale].notice : null
+  const notice = noticeFor(locale, picked.fallback)
 
   /*
    * Название организации идёт за языком, на котором показан текст,

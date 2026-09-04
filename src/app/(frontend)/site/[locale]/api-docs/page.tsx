@@ -5,7 +5,7 @@ import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import { siteMetadata } from '@/lib/seo'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
-import { pick } from '@/lib/i18n/translated'
+import { noticeFor, pick } from '@/lib/i18n/translated'
 import { API_DOCS_PAGE_TEXT, type CodeParts } from '@/lib/api-docs-page-text'
 import { ApiReference } from '@/components/ApiReference'
 
@@ -176,7 +176,7 @@ export default async function ApiDocsPage({
    * относится к тексту страницы. Перевод описания — отдельная работа,
    * и до неё честнее не обещать ничего.
    */
-  const notice = picked.fallback ? PAGE_MESSAGES[locale].notice : null
+  const notice = noticeFor(locale, picked.fallback)
 
   return (
     <>

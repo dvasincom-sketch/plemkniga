@@ -4,8 +4,9 @@ import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import { siteMetadata } from '@/lib/seo'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
-import { pick } from '@/lib/i18n/translated'
-import { CHECKS, CHECK_GROUPS, type CheckSpec } from '@/lib/checks-registry'
+import { noticeFor, pick } from '@/lib/i18n/translated'
+import { ALL_CHECKS, CHECK_GROUPS } from '@/lib/checks-registry'
+import { checkGroupText, checkText } from '@/lib/i18n/data/checks'
 import { RULES_PAGE_TEXT } from '@/lib/rules-page-text'
 
 /*
@@ -64,8 +65,8 @@ export async function generateMetadata({
  * написанная по-русски, опровергает себя первым же экраном.
  *
  * Слова страницы теперь в `lib/rules-page-text.ts`, слова правил —
- * английскими полями реестра, и там они обязательные: правило без
- * перевода не соберётся.
+ * в словарях языков (`lib/i18n/data/checks.ts`), и там они обязательные:
+ * правило без перевода не соберётся ни на одном из пяти языков.
  */
 export default async function RulesPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: raw } = await params
@@ -84,17 +85,23 @@ export default async function RulesPage({ params }: { params: Promise<{ locale: 
    * извинялась за то, чего нет. Строка, извиняющаяся напрасно, обесценивает
    * ту же строку там, где она сказана по делу.
    */
-  const notice = picked.fallback ? PAGE_MESSAGES[locale].notice : null
+  const notice = noticeFor(locale, picked.fallback)
 
   /*
    * Сами правила идут за языком, на котором показан текст страницы,
-   * а не за языком в адресе: на казахской странице тело русское,
-   * и русские формулировки правил рядом с ним на месте, а английские
-   * выглядели бы третьим языком на одной странице.
+   * а не за языком в адресе: где текст откатился на русский, откатываются
+   * вместе с ним и правила, иначе на одной странице окажется два языка.
+   *
+   * Раньше здесь стояла одна тернарная строка на признаке `english`, и она
+   * же была ловушкой: на казахском, армянском, белорусском и киргизском
+   * признак ложен, и каталог правил оставался русским под переведённой
+   * рамкой. Теперь страница не знает, какой из шести языков показывает, —
+   * знает только словарь.
    */
-  const english = picked.shown === 'en'
+  const words = checkText(picked.shown)
+  const groupWords = checkGroupText(picked.shown)
 
-  const rules = CHECKS as readonly CheckSpec[]
+  const rules = ALL_CHECKS
 
   /*
    * Номер правила — его место в реестре, считая с единицы.
@@ -192,77 +199,90 @@ export default async function RulesPage({ params }: { params: Promise<{ locale: 
               const items = rules.filter((c) => c.group === group.key)
               if (items.length === 0) return null
 
+              const groupText = groupWords(group.key)
+
               return (
                 <div key={group.key}>
                   <div className="max-w-[75ch]">
                     <h3 className="text-[19px] font-medium leading-tight">
-                      {english ? group.labelEn : group.label}
+                      {groupText.label}
                       <span className="ml-3 text-[14px] font-normal text-ink-400">
                         {text.ruleCount(items.length)}
                       </span>
                     </h3>
                     <p className="mt-2 text-[15px] leading-relaxed text-ink-500">
-                      {english ? group.introEn : group.intro}
+                      {groupText.intro}
                     </p>
                   </div>
 
                   <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
-                    {items.map((c) => (
-                      <div
-                        key={c.code}
-                        className="rounded-2xl border border-ink-100 bg-white p-5"
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <h4 className="text-[15px] font-medium leading-snug">
+                    {items.map((c) => {
+                      const rule = words(c.code)
+
+                      return (
+                        <div
+                          key={c.code}
+                          className="rounded-2xl border border-ink-100 bg-white p-5"
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <h4 className="text-[15px] font-medium leading-snug">
+                              <span
+                                className={`stat-value mr-2 text-ink-300`}
+                              >
+                                {numberOf.get(c.code)}
+                              </span>
+                              {rule.label}
+                            </h4>
+                            {/*
+                               Вес правила назван словом, а не цветом: цвет
+                               сообщает настроение, а нам надо сообщить, что
+                               будет с записью.
+                            */}
                             <span
-                              className={`stat-value mr-2 text-ink-300`}
+                              className={`shrink-0 rounded-md px-2 py-0.5 text-[11px] ${
+                                c.severity === 'fix'
+                                  ? 'bg-[#f7e9e5] text-[#9e3520]'
+                                  : 'bg-amber-50 text-amber-800'
+                              }`}
                             >
-                              {numberOf.get(c.code)}
+                              {text.severity[c.severity]}
                             </span>
-                            {english ? c.labelEn : c.label}
-                          </h4>
+                          </div>
+
+                          <p className="mt-3 text-[14px] leading-relaxed text-ink-700">
+                            {rule.what}
+                          </p>
+                          <p className="mt-2 text-[13px] leading-relaxed text-ink-500">
+                            {rule.why}
+                          </p>
+
                           {/*
-                             Вес правила назван словом, а не цветом: цвет
-                             сообщает настроение, а нам надо сообщить, что
-                             будет с записью.
+                             Строка границы показывается по русской записи,
+                             а не по переводу: наличие порога — свойство
+                             правила, а не языка. Словарь, где границу
+                             потеряли, не соберётся (`i18n/data/checks.ts`),
+                             так что расходиться этим двум неоткуда.
                           */}
-                          <span
-                            className={`shrink-0 rounded-md px-2 py-0.5 text-[11px] ${
-                              c.severity === 'fix'
-                                ? 'bg-[#f7e9e5] text-[#9e3520]'
-                                : 'bg-amber-50 text-amber-800'
-                            }`}
-                          >
-                            {text.severity[c.severity]}
-                          </span>
+                          {c.threshold && (
+                            <p className="mt-3 border-t border-ink-100 pt-2 text-[12px] tabular-nums text-ink-400">
+                              {text.thresholdLabel} {rule.threshold}
+                            </p>
+                          )}
+
+                          {/*
+                             Правило, которого база и так не пропустит, помечено
+                             отдельно. Иначе оно читается в отчёте как непроверенное:
+                             «не сработало ни разу» и «нечему появиться» — разные
+                             вещи, и различить их можно только здесь.
+                          */}
+                          {c.dbGuard && (
+                            <p className="mt-2 text-[12px] leading-snug text-ink-400">
+                              {text.dbGuardNote}
+                            </p>
+                          )}
                         </div>
-
-                        <p className="mt-3 text-[14px] leading-relaxed text-ink-700">
-                          {english ? c.whatEn : c.what}
-                        </p>
-                        <p className="mt-2 text-[13px] leading-relaxed text-ink-500">
-                          {english ? c.whyEn : c.why}
-                        </p>
-
-                        {c.threshold && (
-                          <p className="mt-3 border-t border-ink-100 pt-2 text-[12px] tabular-nums text-ink-400">
-                            {text.thresholdLabel} {english ? c.thresholdEn : c.threshold}
-                          </p>
-                        )}
-
-                        {/*
-                           Правило, которого база и так не пропустит, помечено
-                           отдельно. Иначе оно читается в отчёте как непроверенное:
-                           «не сработало ни разу» и «нечему появиться» — разные
-                           вещи, и различить их можно только здесь.
-                        */}
-                        {c.dbGuard && (
-                          <p className="mt-2 text-[12px] leading-snug text-ink-400">
-                            {text.dbGuardNote}
-                          </p>
-                        )}
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               )

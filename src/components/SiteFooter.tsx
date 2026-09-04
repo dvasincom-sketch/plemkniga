@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import Link from 'next/link'
 import { Logo } from './Logo'
 import { currentTenant } from '@/lib/tenant-server'
@@ -37,16 +38,26 @@ export async function SiteFooter() {
       style={{ marginTop: 'var(--footer-air)' }}
       className="bg-basement py-12 text-white"
     >
+      {/*
+         Сетка считается по числу непустых колонок: жёсткие
+         `md:grid-cols-[1.2fr_1fr_1fr_1fr]` растянули бы знак на три
+         четверти ширины, когда колонок осталась одна.
+
+         Считать её пришлось переменной, а не свойством в `style`, и это
+         не украшательство. Свойство в `style` действует на любой ширине
+         и старше любого класса — поэтому `grid-cols-1` рядом с ним
+         не работал вовсе, и подвал книги стоял на телефоне в четыре
+         колонки шириной с палец. Поломка появилась вместе с расчётом
+         колонок по книге и не была замечена: на широком экране всё
+         правильно, а сам подвал открывают редко и глазами не проверяют.
+
+         Отсюда правило шире этого файла: вычисленное значение уезжает
+         в переменную, а переключает его класс. Иначе всякий расчёт
+         в разметке молча отменяет отзывчивость вокруг себя.
+      */}
       <div
-        className="container-page grid grid-cols-1 gap-10"
-        /*
-           Сетка считается по числу непустых колонок: жёсткие
-           `md:grid-cols-[1.2fr_1fr_1fr_1fr]` растянули бы знак на
-           три четверти ширины, когда колонок осталась одна.
-        */
-        style={{
-          gridTemplateColumns: `1.2fr ${'1fr '.repeat(columns)}`.trim(),
-        }}
+        className="container-page grid grid-cols-1 gap-10 md:[grid-template-columns:var(--footer-columns)]"
+        style={{ '--footer-columns': `1.2fr ${'1fr '.repeat(columns)}`.trim() } as CSSProperties}
       >
         <div className="flex flex-col items-start gap-4">
           {/*
