@@ -1,3 +1,5 @@
+import Link from 'next/link'
+import { FGIAS_PAGES } from '@/lib/fgias-pages'
 import {
   FGIAS_MEASURED_AT,
   FGIAS_MEASURED_ON,
@@ -5,6 +7,9 @@ import {
   FGIAS_TOTALS,
   type FgiasTemplateState,
 } from '@/lib/fgias-templates'
+
+/** Разбор шаблона, если он написан. */
+const pageFor = (name: string) => FGIAS_PAGES.find((p) => p.template === name)
 
 /**
  * Вкладка «ФГИАС ПР».
@@ -170,7 +175,29 @@ export function EvolutionFgias() {
             <tbody>
               {sorted.map((t) => (
                 <tr key={t.name}>
-                  <td className="font-medium">{t.name}</td>
+                  {/*
+                     Имя шаблона ведёт на его разбор, если разбор написан.
+                     Страница без ссылки изнутри обходится последней
+                     и читателем, и поиском, а таблица — единственное
+                     место, где двадцать шаблонов перечислены разом.
+
+                     Ссылка ставится только тем, у кого страница есть:
+                     ведущая в «не найдено» хуже её отсутствия. Сейчас
+                     страницы есть у всех двадцати, и проверка следит,
+                     чтобы это не разошлось (`check:fgias-pages`).
+                  */}
+                  <td className="font-medium">
+                    {pageFor(t.name) ? (
+                      <Link
+                        href={`/ru/fgias/${pageFor(t.name)!.slug}`}
+                        className="underline underline-offset-4 hover:text-forest-500"
+                      >
+                        {t.name}
+                      </Link>
+                    ) : (
+                      t.name
+                    )}
+                  </td>
                   <td className="text-right tabular-nums">{t.columns}</td>
                   <td className="text-right tabular-nums">{t.fill}</td>
                   <td>

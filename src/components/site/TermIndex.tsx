@@ -86,38 +86,51 @@ export function TermIndex({ groups }: { groups: IndexGroup[] }) {
           <p className="mt-3 max-w-[75ch] text-[16px] leading-relaxed text-ink-500">{g.lead}</p>
 
           {/*
+             Таблица, а не список абзацев. Указатель не читают подряд —
+             в нём ищут своё слово, — и две колонки, «термин» и «что это»,
+             дают это одним движением глаза. Абзацами тот же список
+             занимал четыре экрана и читался как текст, которым не является.
+
              Якорь на каждой строке, а не только на тех, у кого есть статья:
              на строку без статьи ведут ссылки «читать дальше» из соседних
              терминов, и вести им больше некуда (`lib/terms.ts`, `termHref`).
           */}
-          <dl className="mt-6 space-y-5">
-            {g.terms.map((t) => (
-              <div
-                key={t.slug}
-                id={t.slug}
-                className="max-w-[80ch] scroll-mt-24 border-t border-ink-100 pt-5"
-              >
-                <dt className="text-[17px] font-medium">
-                  {/*
-                     Ссылка стоит только у термина со своей статьёй. Строка
-                     указателя, ведущая на страницу, которой нет, хуже строки
-                     без ссылки: по ней идут и не находят обещанного.
-                  */}
-                  {t.hasPage ? (
-                    <Link
-                      href={`/ru/slovar/${t.slug}`}
-                      className="underline underline-offset-4 hover:text-forest-500"
+          <div className="mt-5 overflow-x-auto rounded-2xl border border-ink-100 bg-white">
+            <table className="w-full min-w-[640px] text-[15px]">
+              <tbody>
+                {g.terms.map((t, i) => (
+                  <tr
+                    key={t.slug}
+                    id={t.slug}
+                    className={`scroll-mt-24 ${i > 0 ? 'border-t border-ink-100' : ''}`}
+                  >
+                    <th
+                      scope="row"
+                      className="w-[26%] px-5 py-3.5 text-left align-top font-medium"
                     >
-                      {t.title}
-                    </Link>
-                  ) : (
-                    t.title
-                  )}
-                </dt>
-                <dd className="mt-2 text-[16px] leading-relaxed text-ink-700">{t.short}</dd>
-              </div>
-            ))}
-          </dl>
+                      {/*
+                         Ссылка стоит только у термина со своей статьёй:
+                         ведущая в «не найдено» хуже её отсутствия.
+                      */}
+                      {t.hasPage ? (
+                        <Link
+                          href={`/ru/slovar/${t.slug}`}
+                          className="underline underline-offset-4 hover:text-forest-500"
+                        >
+                          {t.title}
+                        </Link>
+                      ) : (
+                        t.title
+                      )}
+                    </th>
+                    <td className="px-5 py-3.5 align-top leading-relaxed text-ink-700">
+                      {t.short}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
       ))}
     </>

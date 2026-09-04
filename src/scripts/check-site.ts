@@ -38,23 +38,58 @@ import 'dotenv/config'
  *   BASE=https://plem.online npm run check:site
  */
 
+import { request as httpRequest } from 'node:http'
+import { request as httpsRequest } from 'node:https'
+
 const TAG = 'check:site'
 const BASE = process.env.BASE ?? 'http://localhost:3000'
 
-/*
+/**
  * Домен подставляется заголовком, а не адресом: сервер один, а сайта
- * на нём два, и без заголовка своя сборка отдала бы страницы книги.
- * У боевого адреса заголовок совпадает с ним самим и ничего не меняет.
+ * на нём два, и без заголовка своя сборка отдаёт страницы книги.
+ *
+ * Идёт это не через `fetch`, и это не вкусовщина. `fetch` в Node
+ * заголовок `host` молча выбрасывает — он в списке запрещённых, — и первая
+ * редакция прогона получила на `localhost` карту **книги** из четырёх
+ * адресов, обошла их и ответила зелёным. Проверка, которая ничего
+ * не проверила и не сказала об этом, хуже отсутствующей.
+ *
+ * Поэтому запрос собирается низкоуровнево, где заголовки свои, а ниже
+ * стоит защита от повторения той же беды: если карта оказалась книжной,
+ * прогон падает и говорит, почему.
  */
-const SITE_HEADERS = { host: 'plem.online' }
+const SITE_HOST = 'plem.online'
 
 /** Сколько адресов тянуть разом: сервер один, и его не надо ронять. */
 const BATCH = 8
 
-const get = async (url: string) => {
-  const res = await fetch(url, { headers: SITE_HEADERS, redirect: 'manual' })
-  return res.status
-}
+/** Запрос с настоящим заголовком `Host` и без переходов по перенаправлениям. */
+const get = (url: string): Promise<{ status: number; body: string }> =>
+  new Promise((resolve, reject) => {
+    const u = new URL(url)
+    const send = u.protocol === 'https:' ? httpsRequest : httpRequest
+
+    const req = send(
+      {
+        protocol: u.protocol,
+        hostname: u.hostname,
+        port: u.port || (u.protocol === 'https:' ? 443 : 80),
+        path: u.pathname + u.search,
+        method: 'GET',
+        headers: { host: SITE_HOST },
+      },
+      (res) => {
+        const chunks: Buffer[] = []
+        res.on('data', (c: Buffer) => chunks.push(c))
+        res.on('end', () =>
+          resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString('utf8') }),
+        )
+      },
+    )
+
+    req.on('error', reject)
+    req.end()
+  })
 
 async function main() {
   console.log(`${TAG}: адреса витрины, ${BASE}\n`)
@@ -65,7 +100,7 @@ async function main() {
    * читается как «сломалось что-то в проверке», и первое, что делает
    * получивший его, — лезет в проверку вместо того, чтобы поднять `next`.
    */
-  const mapRes = await fetch(`${BASE}/sitemap.xml`, { headers: SITE_HEADERS }).catch(() => null)
+  const mapRes = await get(`${BASE}/sitemap.xml`).catch(() => null)
   if (!mapRes) {
     console.log(`  ✗ ${BASE} не отвечает — прогон ходит по страницам снаружи и требует сервера`)
     console.log('    Поднимите его: npm run dev (или npm run build && npm run start)')
@@ -73,15 +108,28 @@ async function main() {
     process.exit(1)
   }
 
-  if (!mapRes.ok) {
+  if (mapRes.status !== 200) {
     console.log(`  ✗ карта сайта не отдалась: ${mapRes.status}`)
     process.exit(1)
   }
 
-  const xml = await mapRes.text()
-  const paths = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)]
-    .map((m) => m[1]!)
-    .map((u) => new URL(u).pathname)
+  const xml = mapRes.body
+  const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]!)
+  const paths = locs.map((u) => new URL(u).pathname)
+
+  /*
+   * Карта книги вместо карты витрины — признак того, что заголовок `Host`
+   * не доехал. Проверять надо именно это, а не число адресов: книжная
+   * карта короткая, и прогон по ней отвечает зелёным, ничего не проверив.
+   */
+  const wrongHost = locs.filter((u) => new URL(u).host !== SITE_HOST)
+  if (wrongHost.length > 0) {
+    console.log(
+      `  ✗ карта отдана для домена ${new URL(wrongHost[0]!).host}, а не ${SITE_HOST}: ` +
+        'заголовок Host не доехал, и прогон проверил бы книгу вместо витрины',
+    )
+    process.exit(1)
+  }
 
   if (paths.length === 0) {
     console.log('  ✗ в карте сайта нет ни одного адреса')
@@ -94,10 +142,10 @@ async function main() {
 
   for (let i = 0; i < paths.length; i += BATCH) {
     const part = paths.slice(i, i + BATCH)
-    const statuses = await Promise.all(part.map((p) => get(`${BASE}${p}`)))
+    const answers = await Promise.all(part.map((p) => get(`${BASE}${p}`)))
 
     part.forEach((p, k) => {
-      const status = statuses[k]!
+      const status = answers[k]!.status
       if (status !== 200) bad.push({ path: p, status })
     })
   }

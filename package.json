@@ -113,6 +113,8 @@
     "check:seo": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-seo.ts",
     "check:english": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-english.ts",
     "check:languages": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-languages.ts",
+    "check:trait-sd": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-trait-sd.ts",
+    "check:fgias-pages": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-fgias-pages.ts",
     "check:site": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-site.ts",
     "check:terms": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-terms.ts",
     "check:jsonld": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-jsonld.ts",

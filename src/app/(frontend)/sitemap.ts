@@ -7,6 +7,7 @@ import { BREED_PAGES } from '@/lib/breed-pages'
 import { NOTES } from '@/lib/notes'
 import { STUDIES } from '@/lib/studies'
 import { TERM_PAGES } from '@/lib/terms'
+import { FGIAS_PAGES } from '@/lib/fgias-pages'
 
 /**
  * Карта сайта.
@@ -117,6 +118,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...STUDIES.map((s) => ({
       url: `${base}/ru/issledovaniya/${s.slug}`,
       lastModified: new Date(s.date),
+      priority: 0.7,
+    })),
+    /*
+     * Двадцать шаблонов реестра: страницы русские, как разборы и словарь,
+     * и адрес у них русский. Обзорная страница `/fgias` стоит выше среди
+     * шестиязычных — она про то, сколько шаблонов книга умеет, и это
+     * утверждение переводимо; разбор отдельного шаблона нет.
+     */
+    ...FGIAS_PAGES.map((p) => ({
+      url: `${base}/ru/fgias/${p.slug}`,
+      lastModified: now,
       priority: 0.7,
     })),
     /*

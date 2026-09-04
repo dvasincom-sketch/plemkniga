@@ -1,7 +1,15 @@
 import Link from 'next/link'
 import { nf } from '@/lib/format'
 import { termHref } from '@/lib/terms'
-import { fieldTally, type Study, type StudyField, type StudyHolding } from '@/lib/studies'
+import {
+  demandTally,
+  fieldTally,
+  type Study,
+  type StudyDemand,
+  type StudyDemandKind,
+  type StudyField,
+  type StudyHolding,
+} from '@/lib/studies'
 
 /**
  * Обвязка страницы исследования.
@@ -19,21 +27,59 @@ import { fieldTally, type Study, type StudyField, type StudyHolding } from '@/li
  * Порядок и есть жанр — как три части у статьи словаря. Оставленный
  * на усмотрение пишущего, он немедленно расходится: одному покажется,
  * что «чего не хватает» лучше в конце, другому — что оговорки можно
- * и опустить. Шесть заголовков стоят в коде, страница их не выбирает
- * и пропустить не может, потому что тип требует все шесть.
+ * и опустить. Семь заголовков стоят в коде, страница их не выбирает
+ * и пропустить не может, потому что тип требует все семь.
  *
- * ## Почему у полей и у счёта своя разметка, а не абзацы
+ * Последним стоит не «чего пересчёт не докажет», а «что книга должна
+ * научиться хранить», и заголовок написан требованием, а не оговоркой.
+ * Разница не в вежливости: страница, кончающаяся перечнем причин, по
+ * которым мы чего-то не можем, закрепляет эти причины. Страница,
+ * кончающаяся списком работ, называет их временными.
  *
- * Это две таблицы, которые читают глазами, а не подряд: соискатель ищет
- * в первой своё поле, а во второй — есть ли у нас материал. Набранные
- * прозой, они превратились бы в перечисление через запятую, по которому
- * ничего не найти, — и главное, перестали бы считаться из кода.
+ * ## Почему у полей, у счёта и у требований своя разметка, а не абзацы
+ *
+ * Это три таблицы, которые читают глазами, а не подряд: соискатель ищет
+ * в первой своё поле, во второй — есть ли у нас материал, а в третьей
+ * своё место в коде ищем уже мы. Набранные прозой, они превратились бы
+ * в перечисление через запятую, по которому ничего не найти, — и главное,
+ * перестали бы считаться из кода.
  */
 
-/** Что мы прочли — подписью, а не значком: значок здесь пришлось бы объяснять. */
-const READ_LABEL: Record<Study['work']['read'], string> = {
-  full: 'Прочитан полный текст',
-  abstract: 'Прочитана открытая часть: название, аннотация, объём выборки',
+/**
+ * Что мы прочли.
+ *
+ * Двумя способами сразу и намеренно: значком у заголовка паспорта, который
+ * виден до чтения, и строкой в самом паспорте, которая объясняет значок.
+ * Значок без подписи пришлось бы разгадывать, подпись без значка — искать
+ * в таблице из четырёх строк, а знать это нужно раньше первого утверждения
+ * о работе.
+ */
+const READ: Record<Study['work']['read'], { badge: string; row: string; className: string }> = {
+  full: {
+    badge: 'прочитан полный текст',
+    row: 'Прочитан полный текст',
+    className: 'bg-forest-50 text-forest-600',
+  },
+  abstract: {
+    badge: 'прочитана открытая часть',
+    row: 'Прочитана открытая часть: название, аннотация, объём выборки',
+    className: 'bg-amber-50 text-amber-700',
+  },
+}
+
+/**
+ * Род требования.
+ *
+ * Подпись говорит, кто это закрывает, а не сколько это стоит. «Вне книги»
+ * стоит особняком потому, что это единственное, чего нельзя взять и
+ * сделать: полный текст покупается, код в стандарте ждут. Смешать его
+ * с остальным значило бы сделать весь список одинаково недостижимым.
+ */
+const DEMAND_KIND: Record<StudyDemandKind, { label: string; className: string }> = {
+  field: { label: 'поле в книге', className: 'bg-forest-50 text-forest-600' },
+  intake: { label: 'загрузка и обмен', className: 'bg-brand-50 text-forest-600' },
+  calc: { label: 'расчёт', className: 'bg-amber-50 text-amber-700' },
+  outside: { label: 'вне книги', className: 'bg-ink-100 text-ink-500' },
 }
 
 /**
@@ -96,7 +142,19 @@ export function StudyHeader({ study }: { study: Study }) {
          в одной базе.
       */}
       <section className="mt-8 max-w-[75ch] rounded-2xl border border-ink-100 bg-white p-6 sm:p-8">
-        <p className="text-[13px] uppercase tracking-wide text-ink-400">Работа</p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[13px] uppercase tracking-wide text-ink-400">Работа</p>
+          {/*
+             Пометка о прочитанном стоит у самого заголовка паспорта,
+             а не только строкой ниже: она определяет цену всего, что
+             написано дальше, и читается раньше названия работы.
+          */}
+          <span
+            className={`rounded-full px-2 py-[2px] text-[12px] ${READ[work.read].className}`}
+          >
+            {READ[work.read].badge}
+          </span>
+        </div>
 
         <p className="mt-3 text-[17px] leading-snug">
           <a
@@ -114,7 +172,7 @@ export function StudyHeader({ study }: { study: Study }) {
             { label: 'Авторы', value: work.authors },
             { label: 'Где и когда', value: `${work.journal}, ${work.year}` },
             { label: 'Выборка', value: work.sample },
-            { label: 'Что мы прочли', value: READ_LABEL[work.read] },
+            { label: 'Что мы прочли', value: READ[work.read].row },
           ].map((row) => (
             <div
               key={row.label}
@@ -125,6 +183,22 @@ export function StudyHeader({ study }: { study: Study }) {
             </div>
           ))}
         </dl>
+
+        {/*
+           Что следует из «прочитана открытая часть» — словами, на самой
+           странице. Пометка сама по себе сообщает факт о нас, а читателю
+           нужно следствие: чего эта страница не говорит о работе и почему
+           здесь не будет ни одной величины из закрытого текста.
+        */}
+        {work.read === 'abstract' && (
+          <p className="mt-6 border-t border-ink-100 pt-6 text-[14px] leading-relaxed text-ink-500">
+            Страница написана по открытой части и потому не пересказывает выводов работы:
+            всё, что здесь сказано о ней, проверяется по названию, аннотации и объёму
+            выборки. Величин и корреляций из закрытого текста тут нет — ни своими словами,
+            ни через чужой пересказ. Наша половина страницы, начиная со второй части,
+            от этого не зависит: она про нашу базу.
+          </p>
+        )}
       </section>
     </>
   )
@@ -208,10 +282,65 @@ function Holdings({ holdings }: { holdings: readonly StudyHolding[] }) {
 }
 
 /**
- * Шесть частей в закреплённом порядке.
+ * Требования к книге — седьмой частью и без вводных абзацев.
+ *
+ * Абзаца перед списком здесь нет намеренно. Всё, что можно было сказать
+ * прозой, уже сказано в «чего не хватает»; повторить это ещё раз значило бы
+ * дать требованиям смягчающую рамку — а они и заведены затем, чтобы рамки
+ * не было. Список начинается сразу с первой задачи.
+ */
+function Demands({ study }: { study: Study }) {
+  const demands: readonly StudyDemand[] = study.demands
+  const tally = demandTally(study)
+
+  return (
+    <div className="mt-6 max-w-[75ch] overflow-hidden rounded-2xl border border-ink-100 bg-white">
+      <ul className="divide-y divide-ink-100">
+        {demands.map((d) => (
+          <li key={d.what.slice(0, 60)} className="p-5 sm:p-6">
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span
+                className={`rounded-full px-2 py-[2px] text-[12px] ${DEMAND_KIND[d.kind].className}`}
+              >
+                {DEMAND_KIND[d.kind].label}
+              </span>
+              {/*
+                 Место в коде стоит рядом с родом работы, а не в конце
+                 абзаца: тот, кто возьмётся, ищет глазами именно его.
+                 У требования вне книги места нет, и прочерка тоже —
+                 прочерк читался бы как незаполненное поле.
+              */}
+              {d.where && <code className="text-[13px] text-ink-400">{d.where}</code>}
+            </div>
+
+            <p className="mt-2 text-[16px] font-medium leading-relaxed">{d.what}</p>
+            <p className="mt-2 text-[15px] leading-relaxed text-ink-700">{d.why}</p>
+          </li>
+        ))}
+      </ul>
+
+      {/*
+         Итог считается из самого списка (`demandTally`) и отвечает
+         на первый вопрос читателя: много ли из названного зависит от нас.
+      */}
+      <p className="border-t border-ink-100 bg-ink-50 px-5 py-4 text-[14px] text-ink-500 sm:px-6">
+        Требований названо {demands.length}: полей {tally.field}, загрузок и обменов{' '}
+        {tally.intake}, расчётов {tally.calc}, вне книги {tally.outside}.
+      </p>
+    </div>
+  )
+}
+
+/**
+ * Семь частей в закреплённом порядке.
  *
  * Заголовки написаны здесь, а не в реестре: они одинаковы у всех страниц
  * раздела, и разрешить их менять значило бы разрешить менять жанр.
+ *
+ * Последний заголовок написан требованием — «что книга должна научиться
+ * хранить», а не «чего у нас нет». Второе описывает состояние и никого
+ * ни к чему не обязывает; первое называет работу и потому может быть
+ * сделано или не сделано, и это видно.
  */
 export function StudyBody({ study }: { study: Study }) {
   return (
@@ -227,6 +356,13 @@ export function StudyBody({ study }: { study: Study }) {
       <Part title="Чего не хватает" paragraphs={study.missing} />
       <Part title="Чем наш ответ будет отличаться" paragraphs={study.difference} />
       <Part title="Чего пересчёт не докажет" paragraphs={study.limits} />
+
+      <section className="mt-14 max-w-[75ch]">
+        <h2 className="text-[24px] font-medium leading-tight sm:text-[28px]">
+          Что книга должна научиться хранить
+        </h2>
+      </section>
+      <Demands study={study} />
     </>
   )
 }
