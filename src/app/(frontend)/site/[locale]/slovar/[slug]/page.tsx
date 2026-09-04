@@ -5,11 +5,27 @@ import { pageMetadata } from '@/lib/seo'
 import { JsonLd } from '@/components/JsonLd'
 import { breadcrumbLd, graph, termLd } from '@/lib/jsonld'
 import { TermBody, TermFooter, TermHeader } from '@/components/site/TermFrame'
-import { TERM_PAGES, termBySlug } from '@/lib/terms'
+import { termBySlug } from '@/lib/terms'
 
-export function generateStaticParams() {
-  return TERM_PAGES.map((t) => ({ slug: t.slug }))
-}
+/*
+ * Страница собирается на каждый запрос, и это не оптимизация наоборот,
+ * а условие работоспособности.
+ *
+ * Здесь стоял `generateStaticParams`, перечислявший слаги терминов,
+ * и раздел отдавал «Internal Server Error» на любом адресе — включая
+ * несуществующий слаг, то есть падал сам маршрут, а не данные под ним.
+ * Причина в том, что у маршрута два изменяемых куска, `[locale]`
+ * и `[slug]`, а перечислялся один: язык в списке не назван, и собрать
+ * страницу заранее нечем. Указатель при этом открывался, и поломка
+ * выглядела как беда отдельных статей.
+ *
+ * Перечислять языки было бы неправдой: словарь русский, и шесть языковых
+ * копий одной статьи — это пять обещаний перевода, которого нет.
+ * Поэтому статическая сборка отключена целиком, как у страницы породы,
+ * где рядом стоит та же строка по той же причине: раскладка витрины
+ * читает домен из заголовка запроса, и до запроса его нет.
+ */
+export const dynamic = 'force-dynamic'
 
 export async function generateMetadata({
   params,

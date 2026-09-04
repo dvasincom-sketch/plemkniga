@@ -12,9 +12,18 @@ import { breadcrumbLd, graph, studyLd } from '@/lib/jsonld'
 import { STUDIES, studyBySlug } from '@/lib/studies'
 import { pageMetadata } from '@/lib/seo'
 
-export function generateStaticParams() {
-  return STUDIES.map((s) => ({ slug: s.slug }))
-}
+/*
+ * Собирается на каждый запрос. Здесь стоял `generateStaticParams`
+ * со слагами работ, и раздел падал на любом адресе: у маршрута два
+ * изменяемых куска, `[locale]` и `[slug]`, а перечислялся один — язык
+ * не назван, и собрать страницу заранее нечем. Указатель открывался,
+ * и поломка выглядела бедой отдельных страниц.
+ *
+ * Перечислять шесть языков было бы неправдой: раздел русский. Разбор
+ * подробнее — в соседней странице словаря, где то же самое и по той же
+ * причине.
+ */
+export const dynamic = 'force-dynamic'
 
 export async function generateMetadata({
   params,
