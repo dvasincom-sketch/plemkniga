@@ -36,12 +36,14 @@ const forecastFields = (opts: { unit?: string } = {}) =>
     { name: 'r', type: 'number' as const, label: 'Надёжность, R %', min: 0, max: 100 },
   ] as const
 
-/** Носительство генетического дефекта. */
-const CARRIER_OPTIONS = [
-  { value: 'unknown', label: 'Не тестировано' },
-  { value: 'free', label: 'Свободен (не носитель)' },
-  { value: 'carrier', label: 'Носитель' },
-]
+/*
+ * Носительство генетического дефекта: подписи переехали в `lib/carrier.ts`.
+ *
+ * Здесь они и стояли, и потому племенное свидетельство печатало
+ * `CVM: carrier` — документ собирается в `lib`, до коллекции ему
+ * не дотянуться, и он подставлял само значение. Разбор — в том файле.
+ */
+import { CARRIER_OPTIONS } from '@/lib/carrier'
 
 export const Animals: CollectionConfig = {
   slug: 'animals',

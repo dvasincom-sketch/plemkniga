@@ -10,10 +10,20 @@ type Row = { code: string; name: string; description?: string; sortOrder?: numbe
 
 export const BREEDS: Row[] = [
   { code: '1', name: 'Голштинская', whffCode: 'HOL', sortOrder: 10 },
-  { code: '2', name: 'Чёрно-пёстрая', whffCode: 'BLW', sortOrder: 20 },
+  /*
+   * У чёрно-пёстрой кода Interbull нет, и стоявший здесь `BLW` был
+   * выдуман: в списке такого кода не существует вовсе. Порода
+   * отечественная и в международной торговле семенем не участвует,
+   * а `RU_TO_ICAR` её намеренно ни с чем не сопоставляет — переводчик
+   * уверенно поставил бы `HOL`, и это объявило бы чужой стране чужую
+   * породу. Пусто здесь — не пробел, а факт.
+   */
+  { code: '2', name: 'Чёрно-пёстрая', sortOrder: 20 },
   { code: '3', name: 'Симментальская', whffCode: 'SIM', isImprover: true, sortOrder: 30 },
   { code: '4', name: 'Джерсейская', whffCode: 'JER', isImprover: true, sortOrder: 40 },
-  { code: '5', name: 'Айрширская', whffCode: 'AYR', isImprover: true, sortOrder: 50 },
+  /* Айрширская у Interbull входит в европейскую красную молочную, `RDC`;
+     кода `AYR` в списке нет, хотя выглядит он убедительнее верного. */
+  { code: '5', name: 'Айрширская', whffCode: 'RDC', isImprover: true, sortOrder: 50 },
   { code: '6', name: 'Красно-пёстрая', whffCode: 'RED', sortOrder: 60 },
   { code: '7', name: 'Бурая швицкая', whffCode: 'BSW', isImprover: true, sortOrder: 70 },
 ]

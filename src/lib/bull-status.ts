@@ -52,9 +52,26 @@ export const reliabilityK = (heritability: number): number =>
 export const reliabilityOf = (daughters: number, heritability = MILK_HERITABILITY): number =>
   daughters <= 0 ? 0 : daughters / (daughters + reliabilityK(heritability))
 
-/** Сколько дочерей нужно для заданной надёжности. */
-export const daughtersFor = (r: number, heritability = MILK_HERITABILITY): number =>
-  Math.ceil((r * reliabilityK(heritability)) / (1 - r))
+/**
+ * Сколько дочерей нужно для заданной надёжности.
+ *
+ * Округление вверх — по смыслу: дробной дочери не бывает, и сто одиннадцать
+ * с половиной означает сто двенадцать. Но округлять приходится осторожно.
+ * Ровное значение выходит из деления не ровным: при наследуемости 0,3
+ * надёжность 0,90 требует 111 дочерей, а `0.9 × 12.333… / 0.1` даёт
+ * 111,00000000000001 — и вверх округляется до ста двенадцати. Число
+ * печаталось в разборе, и проверивший его формулой видел у нас ошибку
+ * там, где ошибки нет.
+ *
+ * Поэтому хвост, меньший миллионной доли, снимается до округления.
+ * Это не «подгонка под ответ»: миллионная доля дочери не существует
+ * ни в каком смысле, а разница между 111 и 112 — существует.
+ */
+export const daughtersFor = (r: number, heritability = MILK_HERITABILITY): number => {
+  const exact = (r * reliabilityK(heritability)) / (1 - r)
+  const rounded = Math.round(exact)
+  return Math.abs(exact - rounded) < 1e-6 ? rounded : Math.ceil(exact)
+}
 
 /**
  * Ключи ступеней. `official` здесь — имя в коде, а не слово на экране.

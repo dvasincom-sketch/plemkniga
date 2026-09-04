@@ -3,6 +3,7 @@ import type { Animal } from '@/payload-types'
 import { buildPedigree, type PedigreeNode } from '@/lib/pedigree'
 import { analyzeAncestry } from '@/lib/ancestry'
 import { AGE_GROUPS, SEXES, labelOf } from '@/lib/dictionaries'
+import { carrierLabel } from '@/lib/carrier'
 import type { CertificateKind } from '@/lib/certification'
 
 /**
@@ -141,9 +142,14 @@ export async function buildCertificateView(
 
   const markers =
     [
-      animal.genetics?.cvm ? `CVM: ${animal.genetics.cvm}` : null,
-      animal.genetics?.blad ? `BLAD: ${animal.genetics.blad}` : null,
-      animal.genetics?.dumps ? `DUMPS: ${animal.genetics.dumps}` : null,
+      /*
+         Подпись, а не значение. Печаталось `CVM: carrier` — машинное
+         слово в документе, который предъявляют покупателю; на экране
+         при этом всё было правильно, и потому никто не замечал.
+      */
+      animal.genetics?.cvm ? `CVM: ${carrierLabel(animal.genetics.cvm)}` : null,
+      animal.genetics?.blad ? `BLAD: ${carrierLabel(animal.genetics.blad)}` : null,
+      animal.genetics?.dumps ? `DUMPS: ${carrierLabel(animal.genetics.dumps)}` : null,
       animal.genetics?.kappaCasein ? `κ-казеин: ${animal.genetics.kappaCasein}` : null,
     ]
       .filter(Boolean)

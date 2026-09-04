@@ -63,11 +63,16 @@ export const BOOK_FEATURES_EN: Record<string, BookFeature> = {
   milk: {
     slug: 'milk',
     title: 'Lactations and test-day records',
-    short:
-      'Yield, fat, protein and somatic cells; the 305-day lactation is computed from test days rather than typed in.',
+    /*
+     * Английский повторял то же опережающее обещание, что и русский:
+     * будто лактация за 305 дней вычисляется из контрольных доений.
+     * Она хранится числом, а расчёта из ряда в коде нет. Разбор —
+     * в русской ветке, `lib/book-features.ts`.
+     */
+    short: 'Yield, fat, protein and somatic cells; the series behind a lactation is visible.',
     body: [
-      'The test day is the primary record: date, 24-hour yield, fat, protein, somatic cell count, laboratory. The lactation is derived from them rather than entered: an entered figure cannot be checked, a derived one can — and it is visible which points produced it.',
-      'Gaps and breaks in the series of test days are shown separately: a lactation computed from sparse points differs from a complete one, and whoever reads the figure is entitled to know that.',
+      'The test day is the primary record: date, 24-hour yield, fat, protein, somatic cell count, laboratory. The lactation figure sits alongside them, and the book keeps the two together for a reason: the series shows how many points the figure rests on and whether it has gaps. An entered figure cannot be checked on its own — what checks it is what lies beneath it.',
+      'Gaps and breaks in the series of test days are shown separately: a lactation resting on sparse points differs from a complete one, and whoever reads the figure is entitled to know that.',
       'Every test day carries its recording method, expressed in ICAR enumerations rather than as free text: who took the readings (a recording organisation or the farmer), which milkings were included, how and when the sample was taken. The familiar "A4" is reassembled from these. This is what makes figures comparable: a lactation under official recording and a lactation recorded by the owner are figures of different weight, and a ranking that adds them together misleads both parties.',
     ],
     limits: [
