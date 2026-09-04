@@ -239,3 +239,166 @@ export function QualityScreen() {
     </div>
   )
 }
+
+/**
+ * Лактации и контрольные доения: ряд замеров и то, что из него следует.
+ *
+ * Раздел про доения текстом не показать: там речь о ряде — о том, что
+ * замеры идут через равные промежутки и что из ряда считается кривая
+ * и итог за 305 дней. Таблица из четырёх строк говорит это сразу,
+ * а пропуск в ряду — самое частое, за что цепляется проверка, —
+ * виден как разрыв.
+ */
+export function MilkScreen() {
+  const rows: [день: string, надой: string, жир: string, белок: string][] = [
+    ['30', '38,2', '3,74', '3,18'],
+    ['58', '41,6', '3,68', '3,15'],
+    ['86', '—', '—', '—'],
+    ['114', '36,9', '3,91', '3,24'],
+  ]
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-ink-100 bg-white">
+      <div className="flex items-center justify-between border-b border-ink-100 px-4 py-3">
+        <span className="text-[13px] font-medium">Контрольные доения</span>
+        <span className="rounded-md bg-brand-50 px-2 py-0.5 text-[11px] text-forest-600">A4</span>
+      </div>
+
+      <table className="w-full text-[11px]">
+        <thead>
+          <tr className="text-ink-400">
+            <th className="px-4 py-2 text-left font-normal">День лактации</th>
+            <th className="px-2 py-2 text-right font-normal">Надой, кг</th>
+            <th className="px-2 py-2 text-right font-normal">Жир, %</th>
+            <th className="px-4 py-2 text-right font-normal">Белок, %</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(([day, milk, fat, protein]) => {
+            const gap = milk === '—'
+            return (
+              <tr key={day} className="border-t border-ink-100">
+                <td className={`px-4 py-2 tabular-nums ${gap ? 'text-ink-400' : ''}`}>{day}</td>
+                <td className={`px-2 py-2 text-right tabular-nums ${gap ? 'text-amber-700' : ''}`}>
+                  {gap ? 'пропуск' : milk}
+                </td>
+                <td className="px-2 py-2 text-right tabular-nums text-ink-500">{fat}</td>
+                <td className="px-4 py-2 text-right tabular-nums text-ink-500">{protein}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+
+      <div className="flex items-baseline justify-between border-t border-ink-100 px-4 py-3">
+        <span className="text-[11px] text-ink-500">За 305 дней</span>
+        <span className="text-[13px] font-medium tabular-nums">9 640 кг</span>
+      </div>
+
+      <p className="border-t border-ink-100 px-4 py-2 text-[11px] leading-snug text-ink-400">
+        Метод записан рядом с рядом замеров: без него «9 640 кг» из двух хозяйств несравнимы,
+        а выглядят одинаково.
+      </p>
+    </div>
+  )
+}
+
+/**
+ * Индекс племенной ценности: из чего он сложился.
+ *
+ * Само число ничего не значит без разбора — этому и посвящён раздел.
+ * Поэтому рисунок показывает не индекс, а вклады: видно, что решило,
+ * и видно, что один из вкладов отрицательный.
+ */
+export function IndexScreen() {
+  const parts: [признак: string, вклад: number][] = [
+    ['Жир', 46],
+    ['Белок', 28],
+    ['Здоровье вымени', 17],
+    ['Композит тела', -9],
+  ]
+  const peak = Math.max(...parts.map(([, v]) => Math.abs(v)))
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-ink-100 bg-white">
+      <div className="flex items-baseline justify-between border-b border-ink-100 px-4 py-3">
+        <span className="text-[13px] font-medium">Индекс племенной ценности</span>
+        <span className="text-[15px] font-medium tabular-nums text-forest-600">+460</span>
+      </div>
+
+      <div className="space-y-2.5 px-4 py-3">
+        {parts.map(([name, value]) => (
+          <div key={name}>
+            <div className="flex items-baseline justify-between text-[11px]">
+              <span>{name}</span>
+              <span className={`tabular-nums ${value < 0 ? 'text-[#9e3520]' : 'text-ink-500'}`}>
+                {value > 0 ? '+' : '−'}
+                {Math.abs(value)}
+              </span>
+            </div>
+            <div className="mt-1 h-1.5 w-full rounded-full bg-ink-100">
+              <div
+                className={`h-1.5 rounded-full ${value < 0 ? 'bg-[#c0563c]' : 'bg-forest-500'}`}
+                style={{ width: `${(Math.abs(value) / peak) * 100}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <p className="border-t border-ink-100 px-4 py-2 text-[11px] leading-snug text-ink-400">
+        Профиль назван, достоверность стоит рядом с числом. Индекс без профиля — число
+        без единицы: сравнивать его не с чем.
+      </p>
+    </div>
+  )
+}
+
+/**
+ * Выгрузки и обмен: один и тот же животный, два адресата, две формы.
+ *
+ * Раздел объясняет, что запись одна, а форм у неё столько, сколько
+ * адресатов. Показать это можно только рядом: слева строка реестра,
+ * справа ответ по международному стандарту — те же величины, разные
+ * имена полей.
+ */
+export function ExchangeScreen() {
+  return (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="overflow-hidden rounded-2xl border border-ink-100 bg-white">
+        <div className="border-b border-ink-100 px-4 py-2.5 text-[12px] font-medium">
+          Государственный реестр
+        </div>
+        <dl className="space-y-1.5 px-4 py-3 text-[11px]">
+          {[
+            ['Базовый номер', 'RU 4512 087'],
+            ['Дата доения', '12.04.2026'],
+            ['Надой за сутки, кг', '38,2'],
+            ['Массовая доля жира, %', '3,74'],
+          ].map(([k, v]) => (
+            <div key={k} className="flex items-baseline justify-between gap-3">
+              <dt className="text-ink-500">{k}</dt>
+              <dd className="tabular-nums">{v}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-ink-100 bg-white">
+        <div className="border-b border-ink-100 px-4 py-2.5 text-[12px] font-medium">
+          ICAR ADE
+        </div>
+        <pre className="overflow-x-auto px-4 py-3 text-[10px] leading-relaxed text-ink-700">
+{`{
+  "animal": { "id": "RU4512087" },
+  "milkingDateTime": "2026-04-12",
+  "milkWeight24Hours": 38.2,
+  "milkingMilkCharacteristics": [
+    { "characteristic": "FAT", "value": 3.74 }
+  ]
+}`}
+        </pre>
+      </div>
+    </div>
+  )
+}

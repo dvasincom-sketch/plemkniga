@@ -6,7 +6,14 @@ import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
 import { BOOK_FEATURES, featureBySlug } from '@/lib/book-features'
 import { CertificateArt } from '@/components/site/CertificateArt'
-import { AnimalStates, PedigreeScreen, QualityScreen } from '@/components/site/BookScreens'
+import {
+  AnimalStates,
+  ExchangeScreen,
+  IndexScreen,
+  MilkScreen,
+  PedigreeScreen,
+  QualityScreen,
+} from '@/components/site/BookScreens'
 import { BOOK_URL, PRODUCT_MAIL } from '@/lib/hosts'
 
 export const metadata: Metadata = { title: 'Раздел книги' }
@@ -120,6 +127,42 @@ export default async function BookFeaturePage({
             <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
               Находка называет животное и поле — иначе её нельзя исправить. Отказ реестра
               приходит через неделю и говорит про файл.
+            </p>
+          </section>
+        )}
+
+        {feature.slug === 'milk' && (
+          <section className="mt-10">
+            <div className="max-w-[75ch]">
+              <MilkScreen />
+            </div>
+            <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
+              Метод контроля записан рядом с рядом замеров, а пропуск в ряду назван
+              пропуском. Без метода два одинаковых «9 640 кг» из разных хозяйств
+              несравнимы, а выглядят одинаково.
+            </p>
+          </section>
+        )}
+
+        {feature.slug === 'index' && (
+          <section className="mt-10">
+            <div className="max-w-[75ch]">
+              <IndexScreen />
+            </div>
+            <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
+              Показано не число, а из чего оно сложилось — включая вклад со знаком минус.
+              Индекс без разбора нечем проверить и не с чем спорить.
+            </p>
+          </section>
+        )}
+
+        {feature.slug === 'exchange' && (
+          <section className="mt-10">
+            <ExchangeScreen />
+            <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
+              Одно и то же доение в двух формах: слева колонки государственного реестра,
+              справа ответ по международному стандарту. Запись при этом одна — вводится
+              она единожды, а форм у неё столько, сколько адресатов.
             </p>
           </section>
         )}

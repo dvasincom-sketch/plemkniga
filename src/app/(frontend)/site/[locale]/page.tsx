@@ -13,11 +13,13 @@ import {
   FEATURE_ICONS,
   FlowArt,
   LayersArt,
-  RankArt,
   StandardArt,
 } from '@/components/site/SiteArt'
+import { RankScale } from '@/components/site/RankScale'
 import { DemoVideo } from '@/components/site/DemoVideo'
 import { AnimalScreen } from '@/components/site/ScreenArt'
+import { ScreenSlider } from '@/components/site/ScreenSlider'
+import { IndexScreen, PedigreeScreen } from '@/components/site/BookScreens'
 import { ADE_MAP } from '@/lib/ade-schema-map'
 import { PRODUCT_MESSAGES } from '@/lib/i18n/product-messages'
 import { SITE_MESSAGES } from '@/lib/i18n/site-messages'
@@ -368,7 +370,7 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
                     <h3 className="text-[16px] font-medium leading-snug">{item.title}</h3>
                     <p
                       className={`mt-2 text-[14px] leading-relaxed ${
-                        i === 2 ? 'text-white/80' : 'text-ink-500'
+                        i === 2 ? 'text-white/80' : 'text-ink-700/75'
                       }`}
                     >
                       {item.body}
@@ -377,10 +379,26 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
                 )
 
                 if (i !== 2) {
+                  /*
+                     Карточка красится тем же цветом, что её полоса
+                     в пирамиде слева.
+                     
+                     Белые карточки рядом с цветной пирамидой читались
+                     как отдельный список: связь «эта полоса — вот эта
+                     карточка» приходилось искать по названию, читая
+                     дважды. Цвет связывает их с одного взгляда, и порядок
+                     тот же — нижняя полоса и первая карточка про одно.
+                     
+                     Оттенки взяты из пирамиды дословно, а не подобраны
+                     на глаз: подобранный похожий оттенок читается как
+                     ошибка вёрстки, а не как соответствие.
+                  */
                   return (
                     <div
                       key={item.title}
-                      className="rounded-2xl border border-ink-100 bg-white p-6 text-ink-700"
+                      className={`rounded-2xl p-6 text-ink-700 ${
+                        i === 0 ? 'bg-ink-100' : 'bg-brand-100'
+                      }`}
                     >
                       {inner}
                     </div>
@@ -422,7 +440,7 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
               <p className="mt-4 text-[16px] leading-relaxed text-ink-700">{s.ranking.body}</p>
             </div>
 
-            <RankArt title={s.ranking.title} />
+            <RankScale title={s.ranking.title} />
           </div>
         </section>
 
@@ -556,8 +574,37 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
             {s.screen.lead}
           </p>
 
+          {/*
+             Три экрана вместо одного.
+
+             Одна карточка животного отвечала на вопрос «как это
+             выглядит» и оставляла впечатление, что книга и есть
+             карточка. Родословная и разбор оценки снимают два других
+             возражения — «а происхождение вы видите?» и «а откуда
+             берётся ваш индекс?», — и ни одно из трёх не снимается
+             остальными.
+
+             Сменяются сами: на витрине читатель не работает, а листает,
+             и вкладки, которые надо нажать, смотрит меньшинство.
+             Нажатие при этом останавливает показ — отнимать выбор ради
+             движения нельзя.
+          */}
           <div className="mt-8">
-            <AnimalScreen labels={s.screen} />
+            <ScreenSlider
+              items={[
+                {
+                  key: 'card',
+                  label: s.screen.tabs.card,
+                  screen: <AnimalScreen labels={s.screen} />,
+                },
+                {
+                  key: 'pedigree',
+                  label: s.screen.tabs.pedigree,
+                  screen: <PedigreeScreen />,
+                },
+                { key: 'index', label: s.screen.tabs.index, screen: <IndexScreen /> },
+              ]}
+            />
           </div>
 
           <p className="mt-4 max-w-[70ch] text-[14px] leading-relaxed text-ink-500">
