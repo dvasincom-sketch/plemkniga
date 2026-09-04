@@ -173,6 +173,51 @@ export const NOTES: Note[] = [
       },
     ],
   },
+  {
+    slug: 'otsenka-eksterjera',
+    title: 'Оценка экстерьера: как её ведут в мире и что взято у нас',
+    lead:
+      'Корову можно похвалить, а можно описать — и это разные утверждения. ' +
+      'Рассказываем, откуда взялась линейная оценка, что в ней согласовано международно, ' +
+      'чем от неё отличается бонитировочный класс и почему мы держим оба измерения врозь.',
+    date: '2026-09-04',
+    author: NOTE_AUTHOR,
+    authorUrl: NOTE_AUTHOR_URL,
+    passport: [
+      { label: 'Что разбирается', value: 'Системы оценки экстерьера и наш выбор шкалы' },
+      { label: 'Международная рамка', value: 'ICAR, раздел 5; WHFF — 20 стандартных признаков' },
+      { label: 'У нас', value: '18 линейных признаков по шкале 1–9 и 3 композита' },
+      { label: 'Отечественная рамка', value: 'Бонитировка: приказ Минсельхоза № 379 от 2010 года' },
+    ],
+    sources: [
+      {
+        title: 'ICAR. Section 5 — Conformation Recording',
+        url: 'https://wiki.icar.org/index.php/Section_05_%E2%80%93_Conformation_Recording',
+        what: 'Список стандартных признаков, шкала 1–9, композиты и границы классов',
+      },
+      {
+        title: 'Holstein Association USA. Classification — Type Evaluation',
+        url: 'https://www.holsteinusa.com/programs_services/classification.html',
+        what: 'Шкала 1–50, семнадцать признаков, веса разделов, Final Score и BAA',
+      },
+      {
+        title: 'Lactanet. Display of Type Traits with an Intermediate Optimum',
+        url: 'https://lactanet.ca/en/display-of-type-traits-with-an-intermediate-optimum/',
+        what: 'Решение декабря 2023 года о признаках, у которых лучшее значение посередине',
+      },
+      {
+        title:
+          'Приказ Минсельхоза России от 28.10.2010 № 379 «Об утверждении Порядка и условий проведения бонитировки племенного крупного рогатого скота молочного и молочно-мясного направлений продуктивности»',
+        url: 'https://normativ.kontur.ru/document?documentId=168882',
+        what: 'Стобалльная оценка экстерьера и комплексные классы',
+      },
+      {
+        title: 'Юшкова И. «Рожки да ножки» и другие особенности национальной бонитировки. Журнал «Председатель»',
+        url: 'https://predsedatel-apk.ru/zhivotnovodstvo/bonitirovka-novaya-metodika/',
+        what: 'Мнение специалиста о том, как бонитировка-2010 применялась на практике',
+      },
+    ],
+  },
 ]
 
 export const noteBySlug = (slug: string): Note | undefined => NOTES.find((n) => n.slug === slug)
