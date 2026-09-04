@@ -66,42 +66,89 @@ export function ProductHeader({
 }) {
   const l = PAGE_MESSAGES[locale]
 
+  /**
+   * Что стоит в шапке.
+   *
+   * Два пункта, а не восемь. Шапка отвечает на вопрос «куда пойти
+   * прямо сейчас», и на него есть ровно два ответа, за которыми
+   * приходят: посмотреть, какие породы книга умеет вести, и почитать
+   * разбор. Всё остальное — соответствие, обмен, правила, интерфейс,
+   * организация — стоит в подвале: туда идут, дочитав страницу,
+   * а не вместо неё. Полная навигация наверху заставляет выбирать
+   * до того, как человек понял, из чего выбирает.
+   *
+   * «Разборы» — только на русском, как и в подвале: раздел написан
+   * по-русски и переводиться не будет (`lib/notes.ts`), а пункт меню
+   * на английской странице обещал бы английский текст.
+   */
+  const menu: { href: string; label: string }[] = [
+    { href: `/${locale}/breeds`, label: l.nav.breeds },
+    ...(locale === 'ru' ? [{ href: '/ru/razbory', label: 'Разборы' }] : []),
+  ]
+
   return (
-    <header className="container-page flex flex-wrap items-center justify-between gap-x-8 gap-y-4 py-8">
-      {/*
-         Знак ведёт на корень витринного домена. Сам он ссылкой
-         не является — в отличие от знака Ассоциации, — и обёртка здесь
-         не создаёт вложенных ссылок.
-      */}
-      <Link href="/" aria-label="ПЛЕМ online">
-        <PlemLogo />
-      </Link>
+    /*
+       Тёмная полоса во всю ширину, а не тёмная карточка внутри страницы.
+       Шапка — край экрана: обрезанная по колонке текста, она читалась бы
+       плашкой поверх страницы, а не её краем.
 
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-        {children}
-
+       Цвет тот же, что у подвала (`basement`): верх и низ страницы — одно
+       и то же обрамление, и разные тёмные оттенки у них читались бы
+       как разные сущности.
+    */
+    <header className="bg-basement">
+      <div className="container-page flex flex-wrap items-center justify-between gap-x-8 gap-y-4 py-6">
         {/*
-           Переключатель языка стоит на каждой странице продукта,
-           а не только на главной.
-
-           Человек, выбравший язык на первом экране и ушедший
-           в «Соответствие», прежде оказывался на русской странице
-           без всякой возможности вернуться к своему языку иначе,
-           чем через главную. Язык — свойство посетителя, а не одной
-           страницы.
+           Знак ведёт на корень витринного домена. Сам он ссылкой
+           не является — в отличие от знака Ассоциации, — и обёртка здесь
+           не создаёт вложенных ссылок.
         */}
-        {path && (
-          <LocaleSwitcher
-            active={locale}
-            label={l.nav.language}
-            hrefs={
-              Object.fromEntries(LOCALE_CODES.map((c) => [c, `/${c}${path}`])) as Record<
-                Locale,
-                string
+        <Link href="/" aria-label="ПЛЕМ online">
+          <PlemLogo on="dark" />
+        </Link>
+
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          <nav
+            aria-label={l.nav.sections}
+            className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[15px]"
+          >
+            {menu.map((m) => (
+              <Link
+                key={m.href}
+                href={m.href}
+                className="text-white/70 transition-colors hover:text-white"
               >
-            }
-          />
-        )}
+                {m.label}
+              </Link>
+            ))}
+          </nav>
+
+          {children}
+
+          {/*
+             Переключатель языка стоит на каждой странице продукта,
+             а не только на главной.
+
+             Человек, выбравший язык на первом экране и ушедший
+             в «Соответствие», прежде оказывался на русской странице
+             без всякой возможности вернуться к своему языку иначе,
+             чем через главную. Язык — свойство посетителя, а не одной
+             страницы.
+          */}
+          {path && (
+            <LocaleSwitcher
+              active={locale}
+              label={l.nav.language}
+              on="dark"
+              hrefs={
+                Object.fromEntries(LOCALE_CODES.map((c) => [c, `/${c}${path}`])) as Record<
+                  Locale,
+                  string
+                >
+              }
+            />
+          )}
+        </div>
       </div>
     </header>
   )
