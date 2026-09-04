@@ -179,6 +179,8 @@ export type Study = {
   /** 6. Чего пересчёт не докажет. */
   limits: Paragraphs
 
+  /** Термины словаря, употреблённые на странице (`lib/term-links.ts`). */
+  terms?: string[]
   /** Куда идти дальше: разбор, раздел книги, статья словаря. */
   see?: { label: string; href: string }[]
   sources: StudySource[]
@@ -380,6 +382,18 @@ export const STUDIES: Study[] = [
       'Ни то ни другое не скажет, стоит ли отбирать по этому показателю. Для этого нужна ' +
         'экономическая оценка и место в индексе, а это отдельная работа и отдельное ' +
         'решение Ассоциации.',
+    ],
+    terms: [
+      'kontrolnoe-doenie',
+      'metod-kontrolya-produktivnosti',
+      'protokol-kontrolya',
+      'skhema-kontrolya',
+      'skhema-otbora-proby',
+      'moment-otbora-proby',
+      'rodoslovnaya',
+      'glubina-obkhoda',
+      'nasleduemost',
+      'genomnaya-otsenka',
     ],
     see: [
       {
@@ -595,6 +609,15 @@ export const STUDIES: Study[] = [
       'И он ничего не скажет про конкретное стадо. Четыре с половиной процента объяснённого ' +
         'разброса на трёх миллионах животных — это утверждение о популяции; зоотехник, ' +
         'который прочтёт его как обещание прибавки в своём стаде, прочтёт неверно.',
+    ],
+    terms: [
+      'vozrast-pervogo-otela',
+      'laktatsiya-za-305-dney',
+      'udoy-za-laktatsiyu',
+      'massovaya-dolya-zhira-i-belka',
+      'doynye-dni',
+      'mezhotelnyy-period',
+      'rodoslovnaya',
     ],
     see: [
       {
@@ -815,6 +838,16 @@ export const STUDIES: Study[] = [
       'И он ничего не скажет о лечении. Связь между показателями не превращается ' +
         'в рекомендацию по маститу: для этого нужны клинические данные, которых книга ' +
         'не собирает.',
+    ],
+    terms: [
+      'somaticheskie-kletki',
+      'servis-period',
+      'dney-do-pervogo-osemeneniya',
+      'indeks-osemeneniya',
+      'stelnost',
+      'kontrolnoe-doenie',
+      'rodoslovnaya',
+      'genomnaya-otsenka',
     ],
     see: [
       { label: 'Словарь: сервис-период', href: '/ru/slovar/servis-period' },

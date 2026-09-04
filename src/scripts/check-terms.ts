@@ -1,6 +1,7 @@
 import { NOTES } from '@/lib/notes'
 import { BOOK_FEATURES } from '@/lib/book-features'
 import { BREED_PAGES } from '@/lib/breed-pages'
+import { STUDIES } from '@/lib/studies'
 import { TERMS, TERM_GROUPS, TERM_PAGES, termsIn } from '@/lib/terms'
 
 /**
@@ -32,6 +33,22 @@ import { TERMS, TERM_GROUPS, TERM_PAGES, termsIn } from '@/lib/terms'
  * массив типу не противоречит, а статья без «чего это не означает»
  * превращается в рекламный буклет — ровно то, ради избавления от чего
  * жанр и заведён.
+ *
+ * **Опечатка в списке слов страницы.** Разбор, исследование и страница
+ * породы перечисляют термины, которые в них употреблены, и из этих
+ * списков считается обратное направление — «где это работает» на статье
+ * словаря. Слаг с опечаткой `termsOf` просто не показывает: страница
+ * открывается, блок выглядит целым, и связь исчезает, не сказав ни слова.
+ * Заметить такое глазами нельзя ни с одной из двух сторон, потому что
+ * с одной пропажа не видна, а с другой её нечем ждать.
+ *
+ * ## Что здесь считается, а не ловится
+ *
+ * Сколько терминов со статьёй не упомянуты нигде. Это не ошибка: статья
+ * пишется потому, что слово требует объяснения, а не потому, что на неё
+ * кто-то сослался. Но страница, на которую не ведёт ничего изнутри,
+ * обходится последней и читателем, и поиском, — поэтому список печатается,
+ * а прогон от него не падает.
  *
  *   npm run check:terms
  */
@@ -143,6 +160,49 @@ for (const g of TERM_GROUPS) {
   const n = termsIn(g.key).length
   if (n === 0) fail(`группа «${g.title}» пуста — на указателе её не будет вовсе`)
   else console.log(`  · ${g.title}: ${n}`)
+}
+
+/* ------------------------ 4. Слова страниц -------------------------------- */
+
+/*
+   Все три раздела проверяются одним проходом: правило у них общее,
+   а разное только то, как называть страницу в сообщении об ошибке.
+*/
+const uses: { kind: string; page: string; terms: string[] }[] = [
+  ...NOTES.map((n) => ({ kind: 'разбор', page: n.slug, terms: n.terms ?? [] })),
+  ...STUDIES.map((s) => ({ kind: 'исследование', page: s.slug, terms: s.terms ?? [] })),
+  ...BREED_PAGES.map((b) => ({ kind: 'порода', page: b.slug, terms: b.terms ?? [] })),
+]
+
+const mentioned = new Set<string>()
+let declared = 0
+
+for (const u of uses) {
+  const own = new Set<string>()
+
+  for (const slug of u.terms) {
+    declared += 1
+
+    if (!termSlugs.has(slug)) fail(`${u.kind} «${u.page}» → нет термина «${slug}»`)
+    else mentioned.add(slug)
+
+    if (own.has(slug)) fail(`${u.kind} «${u.page}» — термин «${slug}» назван дважды`)
+    own.add(slug)
+  }
+}
+
+console.log(`Слов на страницах: ${declared}, разных терминов упомянуто: ${mentioned.size}`)
+
+/*
+   Печатается по названию, а не по слагу: список читают глазами и решают,
+   дописать ли слово в подходящий разбор, — а решать это удобнее над теми
+   словами, какими термин назван на указателе.
+*/
+const orphans = TERM_PAGES.filter((t) => !mentioned.has(t.slug))
+
+if (orphans.length > 0) {
+  console.log(`\nСтатей, на которые не ведёт ни одна страница: ${orphans.length}`)
+  for (const t of orphans) console.log(`  · ${t.title} (${t.slug})`)
 }
 
 console.log(

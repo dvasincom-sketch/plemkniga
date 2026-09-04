@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import { NoteHeader, NoteNeighbours, NoteSources } from '@/components/site/NoteFrame'
+import { TermsSeen } from '@/components/site/TermsSeen'
 import { NOTES, noteBySlug } from '@/lib/notes'
 import { pageMetadata } from '@/lib/seo'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
@@ -407,6 +408,7 @@ export default async function IndexVsNmTpiPage({
           </div>
         </section>
 
+        <TermsSeen slugs={note.terms} />
         <NoteSources note={note} />
         <NoteNeighbours notes={NOTES} current={SLUG} />
       </main>

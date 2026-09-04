@@ -64,6 +64,14 @@ export type Note = {
    * потому что читатель решает по нему, стоит ли читать дальше.
    */
   passport: { label: string; value: string }[]
+  /**
+   * Термины словаря, о которые читатель этой страницы спотыкается.
+   *
+   * Объявляются здесь, а не с обеих сторон: обратная связь — «где это
+   * работает» на статье словаря — считается из этого списка и потому
+   * не может от него отстать (`lib/term-links.ts`).
+   */
+  terms?: string[]
   sources: NoteSource[]
 }
 
@@ -86,6 +94,16 @@ export const NOTES: Note[] = [
       { label: 'Версия в системе', value: 'CDCB-2025-metric' },
       { label: 'Первоисточник', value: 'USDA AGIL, ARR NM$9 (01-25), февраль 2025' },
       { label: 'Признаков в базе', value: '11 из 17 у источника' },
+    ],
+    terms: [
+      'baza-sravneniya',
+      'indeks-plemennoy-tsennosti',
+      'plemennaya-tsennost',
+      'geneticheskoe-standartnoe-otklonenie',
+      'profil-vesov',
+      'ekonomicheskie-vesa',
+      'net-merit',
+      'legkost-otela',
     ],
     sources: [
       {
@@ -121,6 +139,13 @@ export const NOTES: Note[] = [
       { label: 'Выборка', value: '396 471 корова, 6 985 стад, Великобритания' },
       { label: 'Отёлы', value: '2006–2008, наблюдение до 2012 года' },
     ],
+    terms: [
+      'vozrast-pervogo-otela',
+      'udoy-za-laktatsiyu',
+      'mezhotelnyy-period',
+      'somaticheskie-kletki',
+      'zhivaya-massa',
+    ],
     sources: [
       {
         title: 'Eastham N. T. et al. Associations between age at first calving and subsequent lactation performance in UK Holstein and Holstein-Friesian dairy cows. PLOS ONE, 2018',
@@ -149,6 +174,19 @@ export const NOTES: Note[] = [
       { label: 'Что сравнивается', value: 'NM$ 2025 (CDCB) и TPI редакции апреля 2026 (HAUSA)' },
       { label: 'Признаков в NM$', value: '12 отдельных и 5 композитов; шести из них у нас нет' },
       { label: 'Короткий ответ', value: 'Разные шкалы, признаки, оценки и базы' },
+    ],
+    terms: [
+      'indeks-plemennoy-tsennosti',
+      'plemennaya-tsennost',
+      'baza-sravneniya',
+      'profil-vesov',
+      'ekonomicheskie-vesa',
+      'net-merit',
+      'tpi',
+      'kompozit',
+      'somaticheskie-kletki',
+      'interbull',
+      'mace',
     ],
     sources: [
       {
@@ -188,6 +226,18 @@ export const NOTES: Note[] = [
       { label: 'Международная рамка', value: 'ICAR, раздел 5; WHFF — 20 стандартных признаков' },
       { label: 'У нас', value: '18 линейных признаков по шкале 1–9 и 3 композита' },
       { label: 'Отечественная рамка', value: 'Бонитировка: приказ Минсельхоза № 379 от 2010 года' },
+    ],
+    terms: [
+      'lineynaya-otsenka-eksterjera',
+      'standartnye-priznaki-whff',
+      'kompozit-eksterjera',
+      'promezhutochnyy-optimum',
+      'otklonenie-po-eksterjeru',
+      'svodnaya-otsenka-eksterjera',
+      'final-score',
+      'bonitirovka',
+      'kompleksnyy-klass',
+      'boniter',
     ],
     sources: [
       {
@@ -234,6 +284,16 @@ export const NOTES: Note[] = [
       { label: 'У нас', value: 'Три перечисления и момент отбора пробы вместо одного поля' },
       { label: 'Кому', value: 'Зоотехнику, который сравнивает стада или продаёт животных' },
     ],
+    terms: [
+      'metod-kontrolya-produktivnosti',
+      'protokol-kontrolya',
+      'skhema-kontrolya',
+      'skhema-otbora-proby',
+      'moment-otbora-proby',
+      'kontrolnoe-doenie',
+      'laktatsiya-za-305-dney',
+      'massovaya-dolya-zhira-i-belka',
+    ],
     sources: [
       {
         title: 'ICAR. Section 2 — Cattle Milk Recording',
@@ -262,6 +322,18 @@ export const NOTES: Note[] = [
       { label: 'Формула', value: 'R = n / (n + k), где k = (4 − h²) / h²' },
       { label: 'У нас', value: 'Пороги выведены из формулы, а не назначены' },
       { label: 'Кому', value: 'Тому, кто выбирает быка по каталогу' },
+    ],
+    terms: [
+      'nadezhnost-otsenki',
+      'nasleduemost',
+      'povtoryaemost',
+      'geneticheskoe-standartnoe-otklonenie',
+      'plemennaya-tsennost',
+      'indeks-plemennoy-tsennosti',
+      'status-otsenki-byka',
+      'genomnaya-otsenka',
+      'referentnaya-populyatsiya',
+      'baza-sravneniya',
     ],
     sources: [
       {
@@ -292,6 +364,17 @@ export const NOTES: Note[] = [
       { label: 'У нас', value: 'Шесть колен в подборе пар, девять в карточке животного' },
       { label: 'Порог', value: '6,25 % — эквивалент спаривания двоюродных' },
     ],
+    terms: [
+      'koeffitsient-inbridinga',
+      'koeffitsient-rodstva',
+      'sobstvennyy-inbriding-predka',
+      'glubina-obkhoda',
+      'polnota-rodoslovnoy',
+      'rodoslovnaya',
+      'podbor-par',
+      'liniya',
+      'vetv',
+    ],
     sources: [
       {
         title: 'Wright S. Coefficients of inbreeding and relationship. The American Naturalist, 1922',
@@ -320,6 +403,15 @@ export const NOTES: Note[] = [
       { label: 'Источников', value: '7 зарубежных и 8 российских работ, все проверены по первоисточнику' },
       { label: 'Вывод', value: '22–25 месяцев при условии 400 кг к 14–15 месяцам' },
       { label: 'Кому', value: 'Тому, кто решает, когда осеменять тёлок' },
+    ],
+    terms: [
+      'vozrast-pervogo-otela',
+      'zhivaya-massa',
+      'udoy-za-laktatsiyu',
+      'mezhotelnyy-period',
+      'legkost-otela',
+      'nasleduemost',
+      'plemennaya-tsennost',
     ],
     sources: [
       {
@@ -360,6 +452,17 @@ export const NOTES: Note[] = [
       { label: 'Кому', value: 'Хозяйству, которое выбирает быка и платит за прогноз' },
       { label: 'Чего здесь нет', value: 'Советов, какого поставщика выбрать' },
     ],
+    terms: [
+      'plemennaya-tsennost',
+      'indeks-plemennoy-tsennosti',
+      'baza-sravneniya',
+      'nadezhnost-otsenki',
+      'status-otsenki-byka',
+      'genomnaya-otsenka',
+      'referentnaya-populyatsiya',
+      'sravnenie-so-sverstnitsami',
+      'oplodotvoryayushchaya-sposobnost',
+    ],
     sources: [
       {
         title: 'CDCB. Introducing Net Merit 2025',
@@ -389,6 +492,18 @@ export const NOTES: Note[] = [
       { label: 'Что работает', value: 'Родословная, коэффициент родства, подбор пар' },
       { label: 'Кому', value: 'Объединению или хозяйству, ведущему редкую породу' },
     ],
+    terms: [
+      'proiskhozhdenie',
+      'koeffitsient-rodstva',
+      'koeffitsient-inbridinga',
+      'podbor-par',
+      'genomnaya-otsenka',
+      'referentnaya-populyatsiya',
+      'effektivnaya-chislennost',
+      'prirost-inbridinga',
+      'kod-porody-icar',
+      'mezhdunarodnyy-nomer-zhivotnogo',
+    ],
     sources: [
       {
         title: 'FAO. Domestic Animal Diversity Information System (DAD-IS)',
@@ -417,6 +532,17 @@ export const NOTES: Note[] = [
       { label: 'Срок', value: 'ФГИАС ПР обязательна с 1 марта 2026 года' },
       { label: 'Цель ведомства', value: 'Национальный индекс племенной ценности к 2030 году' },
       { label: 'У нас', value: '20 шаблонов версии 2.6.0, 194 колонки из 265' },
+    ],
+    terms: [
+      'plemennaya-tsennost',
+      'indeks-plemennoy-tsennosti',
+      'proiskhozhdenie',
+      'rodoslovnaya',
+      'geneticheskie-defekty',
+      'genomnaya-otsenka',
+      'metod-kontrolya-produktivnosti',
+      'baza-sravneniya',
+      'profil-vesov',
     ],
     sources: [
       {

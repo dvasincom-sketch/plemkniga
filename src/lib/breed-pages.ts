@@ -76,6 +76,8 @@ export type BreedPage = {
   where: string
   /** Наш абзац: что нынешнее состояние означает для работы с породой. */
   note: string
+  /** Термины словаря, употреблённые на странице (`lib/term-links.ts`). */
+  terms?: string[]
 }
 
 /**
@@ -112,6 +114,14 @@ export const BREED_PAGES: BreedPage[] = [
       'Это единственная порода из восьми, у которой есть и код международного справочника, ' +
       'и ключ государственного реестра, и объединение, взявшееся вести книгу. Всё остальное ' +
       'в этом списке отличается от неё не биологией, а тем, что за породой никто не встал.',
+    terms: [
+      'kod-porody-icar',
+      'udoy-za-laktatsiyu',
+      'massovaya-dolya-zhira-i-belka',
+      'tip-porody',
+      'poroda-uluchshatel',
+      'ekonomicheskie-vesa',
+    ],
   },
   {
     slug: 'cherno-pestraya',
@@ -141,6 +151,12 @@ export const BREED_PAGES: BreedPage[] = [
       'Порода, у которой разрыв между поголовьем и учётом самый заметный. Для объединения ' +
       'это не упрёк, а возможность: книга, заведённая на такой популяции, сразу получает ' +
       'сравнимую базу, какой нет ни у одной малочисленной породы.',
+    terms: [
+      'kod-porody-icar',
+      'udoy-za-laktatsiyu',
+      'massovaya-dolya-zhira-i-belka',
+      'zhivaya-massa',
+    ],
   },
   {
     slug: 'ayrshirskaya',
@@ -166,6 +182,13 @@ export const BREED_PAGES: BreedPage[] = [
       'У породы есть международный код и ключ реестра — то есть всё, что нужно, чтобы завести ' +
       'книгу. Не хватает только объединения, которое возьмётся её вести. Это и есть состояние ' +
       '«готово к ведению» в нашем каталоге.',
+    terms: [
+      'kod-porody-icar',
+      'udoy-za-laktatsiyu',
+      'massovaya-dolya-zhira-i-belka',
+      'zhivaya-massa',
+      'tip-porody',
+    ],
   },
   {
     slug: 'simmentalskaya',
@@ -189,6 +212,13 @@ export const BREED_PAGES: BreedPage[] = [
       'различаются заметно, а в реестре стоят под общим именем. Книга, заведённая по симменталам, ' +
       'обязана хранить тип отдельным полем, иначе сравнение животных из разных зон будет ' +
       'сравнением разного.',
+    terms: [
+      'kod-porody-icar',
+      'udoy-za-laktatsiyu',
+      'massovaya-dolya-zhira-i-belka',
+      'tip-porody',
+      'napravlenie-produktivnosti',
+    ],
   },
   {
     slug: 'kholmogorskaya',
@@ -210,6 +240,12 @@ export const BREED_PAGES: BreedPage[] = [
       'Порода, на которой лучше всего видно, зачем книге хранить тип. Печорский и татарстанский ' +
       'типы различаются по удою втрое, и средняя цифра «по холмогорской» не описывает ни того ' +
       'ни другого. Отдельная запись типа — не украшение учёта, а условие осмысленного сравнения.',
+    terms: [
+      'kod-porody-icar',
+      'udoy-za-laktatsiyu',
+      'massovaya-dolya-zhira-i-belka',
+      'tip-porody',
+    ],
   },
   {
     slug: 'yaroslavskaya',
@@ -233,6 +269,13 @@ export const BREED_PAGES: BreedPage[] = [
       'Порода с историей, узнаваемым типом и живым поголовьем — и без своей книги. Это самый ' +
       'частый случай в нашем каталоге: сохранять её формально нечего, потому что ни численность, ' +
       'ни родство никем не считаются как книга, а не как отчёт.',
+    terms: [
+      'kod-porody-icar',
+      'udoy-za-laktatsiyu',
+      'massovaya-dolya-zhira-i-belka',
+      'krovnost',
+      'chistoporodnost',
+    ],
   },
   {
     slug: 'istobenskaya',
@@ -255,6 +298,13 @@ export const BREED_PAGES: BreedPage[] = [
       'накапливается за считанные поколения, и без родословной, посчитанной по всем животным ' +
       'сразу, его не увидеть. Это ровно та задача, ради которой книга и существует, ' +
       'и ровно та порода, у которой её нет.',
+    terms: [
+      'kod-porody-icar',
+      'udoy-za-laktatsiyu',
+      'massovaya-dolya-zhira-i-belka',
+      'koeffitsient-inbridinga',
+      'rodoslovnaya',
+    ],
   },
   {
     slug: 'krasnaya-gorbatovskaya',
@@ -278,6 +328,13 @@ export const BREED_PAGES: BreedPage[] = [
       'и это ровно тот случай, когда «книга есть» и «книгу можно открыть и посмотреть» ' +
       'не совпадают. Устойчивость к трём болезням при двухстах восьмидесяти головах — ' +
       'генофонд, который стоит считать поимённо, пока считать ещё есть кого.',
+    terms: [
+      'kod-porody-icar',
+      'udoy-za-laktatsiyu',
+      'massovaya-dolya-zhira-i-belka',
+      'krovnost',
+      'poroda-uluchshatel',
+    ],
   },
 ]
 

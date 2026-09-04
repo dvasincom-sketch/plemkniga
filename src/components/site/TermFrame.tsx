@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { termHref, type Term } from '@/lib/terms'
+import { USE_LABEL, usesOf } from '@/lib/term-links'
 
 /**
  * Обвязка статьи словаря.
@@ -76,8 +77,39 @@ export function TermBody({ term }: { term: Term }) {
 
 /** Куда идти дальше и на чём это стоит. */
 export function TermFooter({ term }: { term: Term }) {
+  /*
+   * Где это слово работает — считается, а не перечисляется руками.
+   *
+   * Перечень с обеих сторон дал бы две правды об одной связи: добавивший
+   * термин в разбор забыл бы дописать разбор в термин, и увидеть это
+   * нельзя было бы ни с одной из двух страниц. Объявляет связь та
+   * сторона, которая про неё знает, — разбор, исследование, порода,
+   * — а здесь она читается обратно (`lib/term-links.ts`).
+   */
+  const uses = usesOf(term.slug)
+
   return (
     <>
+      {uses.length > 0 && (
+        <section className="mt-14 max-w-[75ch]">
+          <h2 className="text-[20px] font-medium leading-tight">Где это работает</h2>
+
+          <ul className="mt-4 space-y-2">
+            {uses.map((u) => (
+              <li key={u.href} className="text-[15px] leading-relaxed">
+                <span className="text-ink-500">{USE_LABEL[u.kind]}: </span>
+                <Link
+                  href={u.href}
+                  className="underline underline-offset-4 hover:text-forest-500"
+                >
+                  {u.title}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {term.see && term.see.length > 0 && (
         <section className="mt-14 max-w-[75ch]">
           <h2 className="text-[20px] font-medium leading-tight">Читать дальше</h2>

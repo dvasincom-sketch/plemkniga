@@ -59,7 +59,20 @@ const get = async (url: string) => {
 async function main() {
   console.log(`${TAG}: адреса витрины, ${BASE}\n`)
 
-  const mapRes = await fetch(`${BASE}/sitemap.xml`, { headers: SITE_HEADERS })
+  /*
+   * Отказ соединения — не поломка витрины, а незапущенный сервер,
+   * и говорить об этом надо словами. Развёрнутый след `ECONNREFUSED`
+   * читается как «сломалось что-то в проверке», и первое, что делает
+   * получивший его, — лезет в проверку вместо того, чтобы поднять `next`.
+   */
+  const mapRes = await fetch(`${BASE}/sitemap.xml`, { headers: SITE_HEADERS }).catch(() => null)
+  if (!mapRes) {
+    console.log(`  ✗ ${BASE} не отвечает — прогон ходит по страницам снаружи и требует сервера`)
+    console.log('    Поднимите его: npm run dev (или npm run build && npm run start)')
+    console.log('    Против боевого: BASE=https://plem.online npm run check:site')
+    process.exit(1)
+  }
+
   if (!mapRes.ok) {
     console.log(`  ✗ карта сайта не отдалась: ${mapRes.status}`)
     process.exit(1)

@@ -7,6 +7,7 @@ import {
   StudyHeader,
   StudyNeighbours,
 } from '@/components/site/StudyFrame'
+import { TermsSeen } from '@/components/site/TermsSeen'
 import { JsonLd } from '@/components/JsonLd'
 import { breadcrumbLd, graph, studyLd } from '@/lib/jsonld'
 import { STUDIES, studyBySlug } from '@/lib/studies'
@@ -88,6 +89,7 @@ export default async function StudyPage({ params }: { params: Promise<{ slug: st
       <main className="container-page pb-16">
         <StudyHeader study={study} />
         <StudyBody study={study} />
+        <TermsSeen slugs={study.terms} />
         <StudyFooter study={study} />
         <StudyNeighbours studies={STUDIES} current={study.slug} />
       </main>

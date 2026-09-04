@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
+import { TermsSeen } from '@/components/site/TermsSeen'
 import { JsonLd } from '@/components/JsonLd'
 import { breadcrumbLd, graph } from '@/lib/jsonld'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
@@ -309,6 +310,13 @@ export default async function BreedPage({
             Все породы каталога →
           </Link>
         </section>
+
+        {/*
+           Слова страницы — в словарь. Кровность, комплексный класс,
+           категория племенного учёта: здесь они употреблены как термины,
+           и читатель, пришедший за породой, о них и спотыкается.
+        */}
+        <TermsSeen slugs={page.terms} />
       </main>
 
       <ProductFooter lang={locale} />
