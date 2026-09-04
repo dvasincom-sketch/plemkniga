@@ -22,7 +22,22 @@ import { pick } from '@/lib/i18n/translated'
  * знать про языки, поэтому без параметра блок остаётся русским,
  * а витрина передаёт язык читателя явно.
  */
-export function EconomicAssumptions({ wide, locale }: { wide?: boolean; locale?: Locale }) {
+export function EconomicAssumptions({
+  wide,
+  locale,
+  /**
+   * Печатать ли собственный заголовок и подводку.
+   *
+   * По умолчанию да: в кабинете блок стоит сам по себе, и без них
+   * он повисает таблицей цен без объяснения, откуда они. На витрине
+   * над ним уже стоит раздел с тем же заголовком — там передают `false`.
+   */
+  withHeading = true,
+}: {
+  wide?: boolean
+  locale?: Locale
+  withHeading?: boolean
+}) {
   const text = pick(ECONOMICS_PAGE_TEXT, locale ?? DEFAULT_LOCALE).value
   const t = text.assumptions
 
@@ -35,8 +50,21 @@ export function EconomicAssumptions({ wide, locale }: { wide?: boolean; locale?:
 
   return (
     <div className={`rounded-2xl border border-ink-100 p-5 ${wide ? 'xl:col-span-2' : ''}`}>
-      <h3 className="text-[15px] font-medium leading-tight">{t.title}</h3>
-      <p className="mt-2 max-w-[70ch] text-[13px] leading-relaxed text-ink-500">{t.lead}</p>
+      {/*
+         Свой заголовок блок печатает только там, где его никто
+         не объявил. На витрине над ним стоит раздел «Из каких цен это
+         собрано» с той же мыслью в подводке — и получалось два
+         заголовка об одном подряд, а фраза «индекс верен настолько,
+         насколько верны цены» звучала на странице трижды. В кабинете
+         же блок стоит сам по себе, и без заголовка он повисает
+         таблицей без объяснения.
+      */}
+      {withHeading && (
+        <>
+          <h3 className="text-[15px] font-medium leading-tight">{t.title}</h3>
+          <p className="mt-2 max-w-[70ch] text-[13px] leading-relaxed text-ink-500">{t.lead}</p>
+        </>
+      )}
 
       {/*
          Две колонки только на широком экране. На среднем блок занимает

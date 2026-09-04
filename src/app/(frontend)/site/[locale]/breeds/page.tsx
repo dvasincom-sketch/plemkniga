@@ -321,7 +321,6 @@ export default async function BreedsPage({
                      не нейтрален: он говорит «улучшающих пород нет»,
                      что неверно, и делает это шестьдесят раз подряд.
                   */}
-                  <th className="w-[110px] text-left">{text.list.columns.registry}</th>
                   <th className="w-[190px] text-left">{text.list.columns.state}</th>
                   <th className="w-[210px] text-left">{text.list.columns.missing}</th>
                   <th className="text-left">{text.list.columns.where}</th>
@@ -365,7 +364,6 @@ export default async function BreedsPage({
                         )}
                       </td>
                       <td className="tabular-nums text-ink-500">{r.icar ?? '—'}</td>
-                      <td className="text-ink-500">{r.fgiasUuid ? text.list.registryYes : '—'}</td>
                       <td>
                         <span
                           className={`row-chip inline-block rounded-md px-2 py-0.5 text-[13px] ${STATE_CLASS[r.state]}`}

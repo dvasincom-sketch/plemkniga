@@ -217,7 +217,14 @@ export default async function EconomicsPage({ params }: { params: Promise<{ loca
                       }`}
                     >
                       {money(w.value)}
-                      <span className="ml-1 text-[12px] text-ink-400">/ {w.unit}</span>
+                      {/*
+                         Слэш прижат к рублю без отступа: с отступом
+                         выходило «+1 320 ₽ / кг», то есть три отдельные
+                         величины вместо одной цены за единицу. В блоке
+                         цен ниже та же дробь набрана слитно — «₽/кг», —
+                         и две записи одного на одной странице спорили.
+                      */}
+                      <span className="text-[12px] text-ink-400">/{w.unit}</span>
                     </td>
                     <td
                       className={`text-right stat-value ${
@@ -287,16 +294,27 @@ export default async function EconomicsPage({ params }: { params: Promise<{ loca
           </p>
 
           <div className="mt-8">
-            {/* Блоку цен передаётся тот язык, на котором показан текст страницы. */}
-            <EconomicAssumptions wide locale={picked.shown} />
+            {/*
+               Блоку цен передаётся язык, на котором показан текст
+               страницы, и запрет на собственный заголовок: он здесь уже
+               есть — «Из каких цен это собрано» с подводкой, — и второй
+               заголовок под ним читался бы как начало нового раздела.
+            */}
+            <EconomicAssumptions wide withHeading={false} locale={picked.shown} />
           </div>
         </section>
 
         <section className="mt-14 max-w-[75ch] rounded-2xl border border-brand-100 bg-brand-50 p-8 sm:p-10">
           <h2 className="text-[22px] font-medium leading-tight sm:text-[26px]">{text.whereTitle}</h2>
           <p className="mt-4 text-[16px] leading-relaxed text-ink-700">{text.whereBody}</p>
+          {/*
+             Ссылка ведёт в раздел про индекс, а не в каталог пород.
+             Блок называется «Где это в книге» и говорит про профиль
+             рядом с остальными — а уводил на список пород, то есть
+             отвечал не на тот вопрос, который сам же поставил.
+          */}
           <Link
-            href={`/${locale}/breeds`}
+            href={`/${locale}/book/index`}
             className="mt-5 inline-block text-[15px] font-medium text-forest-600 underline underline-offset-4 hover:text-forest-500"
           >
             {text.whereLink}

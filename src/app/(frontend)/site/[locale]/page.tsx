@@ -1,9 +1,8 @@
 import type { Metadata } from 'next'
+import { ProductHeader } from '@/components/site/ProductShell'
 import Link from 'next/link'
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
-import { PlemLogo } from '@/components/PlemLogo'
-import { LocaleSwitcher } from '@/components/LocaleSwitcher'
 import {
   AssociationArt,
   BreedBookArt,
@@ -190,20 +189,19 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
 
   return (
     <div lang={locale}>
-      <header className="container-page flex flex-wrap items-center justify-between gap-x-8 gap-y-4 py-8">
-        <PlemLogo />
+      {/*
+         Шапка у главной та же, что у всех страниц витрины.
 
-        <LocaleSwitcher
-          active={locale}
-          label={m.nav.language}
-          hrefs={
-            Object.fromEntries(LOCALE_CODES.map((l) => [l, `${base}/${l}`])) as Record<
-              Locale,
-              string
-            >
-          }
-        />
-      </header>
+         Своя была здесь с самого начала и пережила переделку шапки
+         в тёмную: внутренние страницы стали тёмными с меню, а первая —
+         единственная, которую видят все, — осталась светлой и пустой.
+         Расхождение такого рода не находится чтением кода: два места
+         рисуют одно и то же, и правят всегда одно.
+
+         `path=''` — это и есть главная: переключатель ведёт на `/en`,
+         `/kk` и так далее, то есть на ту же страницу на другом языке.
+      */}
+      <ProductHeader locale={locale} path="" />
 
       <main className="container-page pb-8">
         {/* ---------------------------- Первый экран --------------------------- */}

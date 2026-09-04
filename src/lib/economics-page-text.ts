@@ -103,7 +103,7 @@ const RU: EconomicsPageText = {
   whereTitle: 'Где это в книге',
   whereBody:
     'Профиль стоит рядом с остальными в разделе индекса племенной ценности: его берут за основу и правят цены под своё хозяйство. Веса пересчитываются сразу, и видно, как от цены молока меняется место животного в списке.',
-  whereLink: 'Какие породы книга умеет вести →',
+  whereLink: 'Раздел про индекс племенной ценности →',
 
   assumptions: {
     title: 'Из каких цен считается',
@@ -188,7 +188,7 @@ const EN: EconomicsPageText = {
   whereTitle: 'Where this sits in the book',
   whereBody:
     'The profile stands beside the others in the breeding value index section: it is taken as a starting point and its prices are edited to fit the farm. The weights are recomputed at once, and it becomes visible how the price of milk moves an animal up or down the list.',
-  whereLink: 'Which breeds the book can keep →',
+  whereLink: 'The breeding value index section →',
 
   assumptions: {
     title: 'Which prices it is computed from',
