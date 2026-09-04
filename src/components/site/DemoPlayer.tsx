@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import { DEFAULT_LOCALE, type Locale } from '@/lib/i18n/locales'
+import { screensText } from '@/lib/book-screens-text'
 
 /**
  * Запись работы, идущая сама и без кнопок.
@@ -35,8 +37,23 @@ import { useEffect, useRef } from 'react'
  * людей движущаяся картинка вызывает тошноту и головную боль. Для них
  * запись стоит на первом кадре, и это единственная причина, по которой
  * компонент вообще клиентский, — узнать настройку можно только в браузере.
+ *
+ * ## Про единственную здесь подпись
+ *
+ * Видно её только тому, кто читает страницу голосом, и потому она
+ * дольше всех оставалась русской: глазами эту небрежность не заметить.
+ * Теперь она приходит из набора строк экранов, а язык по умолчанию
+ * русский — как было.
  */
-export function DemoPlayer({ src, poster }: { src: string; poster?: string }) {
+export function DemoPlayer({
+  src,
+  poster,
+  locale = DEFAULT_LOCALE,
+}: {
+  src: string
+  poster?: string
+  locale?: Locale
+}) {
   const ref = useRef<HTMLVideoElement>(null)
 
   useEffect(() => {
@@ -76,7 +93,7 @@ export function DemoPlayer({ src, poster }: { src: string; poster?: string }) {
       playsInline
       preload="metadata"
       poster={poster}
-      aria-label="Запись работы в кабинете. Нажатие останавливает и продолжает показ."
+      aria-label={screensText(locale).demo}
       onClick={(e) => {
         const el = e.currentTarget
         if (el.paused) void el.play().catch(() => {})

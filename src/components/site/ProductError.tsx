@@ -1,5 +1,8 @@
 import Link from 'next/link'
 import { PRODUCT_MAIL } from '@/lib/hosts'
+import { DEFAULT_LOCALE, type Locale } from '@/lib/i18n/locales'
+import { pick } from '@/lib/i18n/translated'
+import { PRODUCT_ERROR_TEXT, type ProductWayKey } from '@/lib/product-error-text'
 
 /**
  * Страницы отказа на витрине: «не найдено» и «не загрузилось».
@@ -30,55 +33,79 @@ import { PRODUCT_MAIL } from '@/lib/hosts'
  * адрес витрины, пришёл за одним из четырёх: посмотреть, что за продукт,
  * какие породы, по каким правилам он устроен и как выглядит работающая
  * книга. Полный список разделов здесь был бы предложением начать сначала.
+ *
+ * ## Где слова
+ *
+ * В `lib/product-error-text.ts`, вместе с доводом, почему набор строк
+ * отдельный и почему об откате на русский здесь не объявляют. Пока
+ * фразы стояли в разметке, английская витрина показывала переведённую
+ * шапку, переведённый подвал и русский отказ посередине.
  */
 
-const WAYS: { href: string; label: string; hint: string }[] = [
-  { href: '', label: 'О продукте', hint: 'что это за система и кому она' },
-  { href: '/breeds', label: 'Породы', hint: 'какие книга умеет вести и в каком состоянии' },
-  { href: '/rules', label: 'Проверки данных', hint: 'по каким правилам книга спорит с записью' },
-  { href: '/compliance', label: 'Соответствие', hint: 'чему следует и чего ей не хватает' },
+/*
+ * Адреса дорог лежат здесь, а подписи — в наборе строк.
+ *
+ * Адрес одинаков на всех языках и меняется вместе с разметкой сайта,
+ * подпись переводится и меняется вместе с текстом. Держать их вместе
+ * значило бы просить переводчика не задеть ссылку, а нас — не забыть
+ * ссылку при переводе.
+ */
+const WAYS: { key: ProductWayKey; href: string }[] = [
+  { key: 'about', href: '' },
+  { key: 'breeds', href: '/breeds' },
+  { key: 'rules', href: '/rules' },
+  { key: 'compliance', href: '/compliance' },
 ]
 
-export function ProductNotFound({ locale = 'ru' }: { locale?: string }) {
+export function ProductNotFound({ locale = DEFAULT_LOCALE }: { locale?: Locale }) {
+  const t = pick(PRODUCT_ERROR_TEXT, locale).value.notFound
+
   return (
     <div className="max-w-[75ch] pt-10">
-      <p className="text-[14px] uppercase tracking-wide text-ink-400">Страница не найдена</p>
+      <p className="text-[14px] uppercase tracking-wide text-ink-400">{t.eyebrow}</p>
 
-      <h1 className="mt-3 text-[34px] font-medium leading-tight sm:text-[44px]">
-        Животное по номеру мы находим, а эту страницу — нет
-      </h1>
+      <h1 className="mt-3 text-[34px] font-medium leading-tight sm:text-[44px]">{t.title}</h1>
 
-      <p className="mt-6 text-[17px] leading-relaxed text-ink-700">
-        Адрес не совпал ни с одним разделом. Обычно это опечатка или ссылка из старого
-        письма: страницы витрины за это время переезжали. Ничего не пропало — не найден
-        именно адрес.
-      </p>
+      <p className="mt-6 text-[17px] leading-relaxed text-ink-700">{t.body}</p>
 
-      <h2 className="mt-10 text-[15px] font-medium">Куда отсюда</h2>
+      <h2 className="mt-10 text-[15px] font-medium">{t.waysTitle}</h2>
 
       <ul className="mt-4 space-y-3">
         {WAYS.map((w) => (
-          <li key={w.label} className="text-[15px] leading-relaxed">
+          <li key={w.key} className="text-[15px] leading-relaxed">
             <Link
               href={`/${locale}${w.href}`}
               className="font-medium underline underline-offset-4 hover:text-forest-500"
             >
-              {w.label}
+              {t.ways[w.key].label}
             </Link>
-            <span className="text-ink-500"> — {w.hint}</span>
+            <span className="text-ink-500"> — {t.ways[w.key].hint}</span>
           </li>
         ))}
       </ul>
 
       <p className="mt-10 text-[14px] leading-relaxed text-ink-500">
-        Если сюда привела ссылка из письма или презентации, напишите на{' '}
+        {t.mailLead}{' '}
         <a href={`mailto:${PRODUCT_MAIL}`} className="underline underline-offset-4">
           {PRODUCT_MAIL}
         </a>{' '}
-        — поправим адрес, а не читателя.
+        {t.mailTail}
       </p>
     </div>
   )
+}
+
+type ProductFailedProps = {
+  digest?: string
+  /**
+   * Язык страницы, на которой случился отказ.
+   *
+   * Со значением по умолчанию, в отличие от обычных страниц витрины:
+   * границу ошибок вызывает Next, и языка у неё под рукой может
+   * не оказаться вовсе (`app/(frontend)/error.tsx`). Русский здесь —
+   * запасной язык союза, а не «главный» (`i18n/locales.ts`).
+   */
+  locale?: Locale
 }
 
 /**
@@ -92,24 +119,18 @@ export function ProductNotFound({ locale = 'ru' }: { locale?: string }) {
  * в логе за секунды, и человек, приславший его в письме, экономит нам
  * час поисков — а нам ещё придётся объяснять, почему час ушёл.
  */
-export function ProductFailed({ digest }: { digest?: string }) {
+export function ProductFailed({ digest, locale = DEFAULT_LOCALE }: ProductFailedProps) {
+  const t = pick(PRODUCT_ERROR_TEXT, locale).value.failed
+
   return (
     <div className="max-w-[75ch] pt-10">
-      <p className="text-[14px] uppercase tracking-wide text-ink-400">Ошибка</p>
+      <p className="text-[14px] uppercase tracking-wide text-ink-400">{t.eyebrow}</p>
 
-      <h1 className="mt-3 text-[34px] font-medium leading-tight sm:text-[44px]">
-        Страница не загрузилась
-      </h1>
+      <h1 className="mt-3 text-[34px] font-medium leading-tight sm:text-[44px]">{t.title}</h1>
 
-      <p className="mt-6 text-[17px] leading-relaxed text-ink-700">
-        Отказала наша сторона, а не ваш браузер. Записи книги при этом целы: ломается показ,
-        а не данные — они лежат в базе и не меняются от того, что страница не собралась.
-      </p>
+      <p className="mt-6 text-[17px] leading-relaxed text-ink-700">{t.body}</p>
 
-      <p className="mt-4 text-[16px] leading-relaxed text-ink-700">
-        Чаще всего помогает обновить страницу через минуту. Если не помогло — напишите нам,
-        и приложите отпечаток ниже: по нему ошибка находится в журнале сразу, без поисков.
-      </p>
+      <p className="mt-4 text-[16px] leading-relaxed text-ink-700">{t.help}</p>
 
       {digest && (
         <p className="mt-6 rounded-xl bg-ink-50 px-4 py-3 font-mono text-[13px] text-ink-700">

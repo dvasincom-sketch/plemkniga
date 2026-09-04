@@ -139,65 +139,55 @@ export const ECONOMIC_WEIGHTS: Partial<Record<TraitKey, number>> = {
   ),
 }
 
-/** Русская запись числа: разделитель дробной части — запятая. */
-const ru = (n: number, digits = 1) =>
-  n.toLocaleString('ru-RU', { minimumFractionDigits: digits, maximumFractionDigits: digits })
+/* ------------------------------------------------------------------ *
+ *                     Допущения в том виде, как их показывают          *
+ * ------------------------------------------------------------------ */
 
-/** Строки для показа допущений в интерфейсе и в документации. */
-export const ECONOMIC_ASSUMPTIONS: { label: string; value: string; note: string }[] = [
-  {
-    label: 'Молоко, базисное',
-    value: `${ru(MILK_BASE_PRICE)} ₽/кг`,
-    note: 'апрель 2026, без НДС, при 3,4 % жира и 3,0 % белка',
-  },
-  {
-    label: 'Жир',
-    value: `${FAT_PRICE} ₽/кг`,
-    note: `${Math.round(MILK_VALUE_SHARES.fat * 100)} % цены молока, делённые на массу жира`,
-  },
-  {
-    label: 'Белок',
-    value: `${PROTEIN_PRICE} ₽/кг`,
-    note: `${Math.round(MILK_VALUE_SHARES.protein * 100)} % цены молока, делённые на массу белка`,
-  },
-  {
-    label: 'Объём молока',
-    value: `${ru(MILK_VOLUME_PRICE)} ₽/кг`,
-    note: 'остаток цены сверх жира и белка',
-  },
-  {
-    label: 'Нетель на замену',
-    value: `${COSTS.heifer.toLocaleString('ru-RU')} ₽`,
-    note: 'по объявлениям племпродажи 150–260 тыс.',
-  },
-  {
-    label: 'Выбракованная корова',
-    value: `${COSTS.cullRevenue.toLocaleString('ru-RU')} ₽`,
-    note: '600 кг живого веса по 175 ₽/кг',
-  },
-  {
-    label: 'Случай мастита',
-    value: `${COSTS.mastitisCase.toLocaleString('ru-RU')} ₽`,
-    note: 'лечение, выброшенное молоко, потеря удоя',
-  },
-  {
-    label: 'Трудный отёл',
-    value: `${COSTS.hardCalving.toLocaleString('ru-RU')} ₽`,
-    note: 'ветпомощь, дни в родильном отделении, потеря продуктивности',
-  },
-  {
-    label: 'Телёнок при рождении',
-    value: `${COSTS.calfValue.toLocaleString('ru-RU')} ₽`,
-    note: 'усреднённо по полу',
-  },
-  {
-    label: 'День сервис-периода',
-    value: `${COSTS.openDay} ₽`,
-    note: 'недополученное молоко, корма, доза семени',
-  },
-  {
-    label: 'Горизонт',
-    value: `${ru(LIFETIME_LACTATIONS)} лактации`,
-    note: 'на столько умножаются признаки лактации, чтобы получить «за жизнь»',
-  },
+/** Ключ допущения: по нему набор строк страницы находит подпись и пояснение. */
+export type AssumptionKey =
+  | 'milkBase'
+  | 'fat'
+  | 'protein'
+  | 'milkVolume'
+  | 'heifer'
+  | 'cull'
+  | 'mastitis'
+  | 'hardCalving'
+  | 'calf'
+  | 'openDay'
+  | 'horizon'
+
+/** В чём измерено допущение. Слово при числе — уже перевод, оно приходит извне. */
+export type AssumptionUnit = 'rubPerKg' | 'rub' | 'lactations'
+
+export type Assumption = {
+  key: AssumptionKey
+  amount: number
+  /** Знаков после запятой: цена молока дробная, цена нетели — нет. */
+  digits: number
+  unit: AssumptionUnit
+}
+
+/**
+ * Числа допущений для показа.
+ *
+ * Раньше здесь лежали готовые строки вместе с русскими подписями,
+ * и витрина по-английски показывала бы «Нетель на замену, 200 000 ₽».
+ * Подписи, пояснения и слово при числе ушли в набор строк страницы
+ * (`lib/economics-page-text.ts`), а число и его вид остались здесь —
+ * там, где считаются сами цены. Переводится слово, а не рубль:
+ * цены российские и рублёвыми остаются.
+ */
+export const ECONOMIC_ASSUMPTIONS: Assumption[] = [
+  { key: 'milkBase', amount: MILK_BASE_PRICE, digits: 1, unit: 'rubPerKg' },
+  { key: 'fat', amount: FAT_PRICE, digits: 0, unit: 'rubPerKg' },
+  { key: 'protein', amount: PROTEIN_PRICE, digits: 0, unit: 'rubPerKg' },
+  { key: 'milkVolume', amount: MILK_VOLUME_PRICE, digits: 1, unit: 'rubPerKg' },
+  { key: 'heifer', amount: COSTS.heifer, digits: 0, unit: 'rub' },
+  { key: 'cull', amount: COSTS.cullRevenue, digits: 0, unit: 'rub' },
+  { key: 'mastitis', amount: COSTS.mastitisCase, digits: 0, unit: 'rub' },
+  { key: 'hardCalving', amount: COSTS.hardCalving, digits: 0, unit: 'rub' },
+  { key: 'calf', amount: COSTS.calfValue, digits: 0, unit: 'rub' },
+  { key: 'openDay', amount: COSTS.openDay, digits: 0, unit: 'rub' },
+  { key: 'horizon', amount: LIFETIME_LACTATIONS, digits: 1, unit: 'lactations' },
 ]

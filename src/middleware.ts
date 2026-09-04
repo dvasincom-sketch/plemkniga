@@ -3,11 +3,13 @@ import {
   DEMO_HOST,
   DEMO_READY,
   SITE_HOSTS,
+  SITE_LOCALE_HEADER,
   isProductAsset,
   isSiteHost,
   redirectToSite,
   rewriteToSite,
 } from '@/lib/hosts'
+import { isLocale } from '@/lib/i18n/locales'
 
 /**
  * Разведение двух доменов по одному приложению.
@@ -106,7 +108,24 @@ export function middleware(request: NextRequest) {
   const url = request.nextUrl.clone()
   url.pathname = next
 
-  return NextResponse.rewrite(url)
+  /*
+   * Язык страницы уезжает вместе с запросом отдельным заголовком.
+   *
+   * Общая обвязка (`app/(frontend)/layout.tsx`) объявляет `<html lang>`,
+   * и брала она его у арендатора домена — то есть у книги. На витрине
+   * это давало `lang="ru"` на всех шести языках: английская страница
+   * представлялась читалке экрана и переводчику браузера русской,
+   * а поисковой системе — русской страницей с английским текстом.
+   *
+   * Достать язык в самой обвязке нечем: адрес в ней недоступен,
+   * а `params` есть только у страницы. Заголовок — единственное место,
+   * куда его можно положить здесь и прочитать там.
+   */
+  const headers = new Headers(request.headers)
+  const locale = next.split('/')[2]
+  if (locale && isLocale(locale)) headers.set(SITE_LOCALE_HEADER, locale)
+
+  return NextResponse.rewrite(url, { request: { headers } })
 }
 
 export const config = {

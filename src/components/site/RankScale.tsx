@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { DEFAULT_LOCALE, type Locale } from '@/lib/i18n/locales'
+import { screensText } from '@/lib/book-screens-text'
 
 /**
  * Шкала места среди всей популяции — с движением.
@@ -28,6 +30,11 @@ import { useEffect, useRef, useState } from 'react'
  * Они выдуманные, и это не беда: рисунок объясняет устройство,
  * а не показывает данные. Беда была бы в обратном — подставить сюда
  * настоящее животное настоящего хозяйства.
+ *
+ * Разряды у них разные по языкам, и это не оформление: «16,320»
+ * русский читатель прочтёт как шестнадцать с третью. Поэтому и число,
+ * и строка для голосового доступа приходят из набора строк экранов
+ * (`lib/book-screens-text.ts`), а язык по умолчанию русский.
  *
  * ## Про тех, кому движение мешает
  *
@@ -83,7 +90,14 @@ const MOVE = 900
  */
 const clamp = (percent: number) => Math.min(96, Math.max(4, percent))
 
-export function RankScale({ title }: { title: string }) {
+export function RankScale({
+  title,
+  locale = DEFAULT_LOCALE,
+}: {
+  title: string
+  locale?: Locale
+}) {
+  const t = screensText(locale)
   const [rank, setRank] = useState(STOPS[0]!)
   const frame = useRef<number>(0)
 
@@ -133,13 +147,17 @@ export function RankScale({ title }: { title: string }) {
   const fill = `${share}%`
 
   return (
-    <div role="img" aria-label={`${title}: ${rank} место из ${TOTAL}`} className="w-full max-w-[320px]">
+    <div
+      role="img"
+      aria-label={`${title}: ${t.rank(t.number(rank), t.number(TOTAL))}`}
+      className="w-full max-w-[320px]"
+    >
       <div className="relative pt-7">
         <span
           className="absolute top-0 -translate-x-1/2 text-[13px] font-medium tabular-nums text-forest-600"
           style={{ left: at }}
         >
-          {rank.toLocaleString('ru-RU')}
+          {t.number(rank)}
         </span>
 
         <div className="h-3 w-full rounded-full bg-ink-100">
@@ -154,7 +172,7 @@ export function RankScale({ title }: { title: string }) {
 
       <div className="mt-3 flex justify-between text-[12px] tabular-nums text-ink-500">
         <span>1</span>
-        <span>{TOTAL.toLocaleString('ru-RU')}</span>
+        <span>{t.number(TOTAL)}</span>
       </div>
     </div>
   )

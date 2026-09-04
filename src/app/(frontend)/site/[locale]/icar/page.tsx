@@ -5,17 +5,15 @@ import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import { siteMetadata } from '@/lib/seo'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
+import { pick } from '@/lib/i18n/translated'
 import {
-  ICAR_GAP_COUNT,
   ICAR_SECTIONS,
   ICAR_STATE_CLASS,
   ICAR_STATE_LABEL,
+  ICAR_STATE_LABEL_EN,
   ICAR_WIKI,
-  ICAR_WITH_GAPS,
 } from '@/lib/icar-map'
-import { plural } from '@/lib/format'
-import { ADE_COLLECTIONS } from '@/lib/ade/core'
-import { ADE_WRITABLE } from '@/lib/ade/parse'
+import { ICAR_PAGE_TEXT } from '@/lib/icar-page-text'
 
 /*
  * Заголовок, описание и указание основной страницы — из одного места
@@ -61,6 +59,14 @@ export async function generateMetadata({
  * а расхождение стоило бы дороже всего — читатель поверил бы той странице,
  * которую открыл первой.
  *
+ * ## Почему весь текст страницы лежит в наборе строк
+ *
+ * Набранный прямо в разметке абзац перевода не видит: заголовок
+ * и подводка приходили переведёнными, а тело оставалось русским,
+ * и английская страница читалась как брошенная на полпути. Слова
+ * страницы теперь в `lib/icar-page-text.ts`, а разборы разделов —
+ * английскими полями рядом с русскими в `lib/icar-map.ts`.
+ *
  * ## Почему знака ICAR здесь нет
  *
  * Марка выдаётся Советом организации по статусу члена или по пройденной
@@ -77,7 +83,25 @@ export default async function IcarPage({
 
   const locale: Locale = raw
   const frame = PAGE_MESSAGES[locale].pages.icar
-  const notice = PAGE_MESSAGES[locale].notice
+
+  const picked = pick(ICAR_PAGE_TEXT, locale)
+  const text = picked.value.map
+
+  /*
+   * Оговорка «текст ниже по-русски» стоит только там, где он и правда
+   * русский. Раньше она показывалась на всех нерусских языках без разбора —
+   * в том числе на английском, где переведено уже всё, — и извинялась
+   * за то, чего нет.
+   */
+  const notice = picked.fallback ? PAGE_MESSAGES[locale].notice : null
+
+  /*
+   * Разборы разделов идут за языком, на котором показан текст страницы,
+   * а не за языком в адресе: на казахской странице тело русское, и русские
+   * разборы рядом с ним на месте, а английские выглядели бы третьим языком
+   * на одной странице.
+   */
+  const english = picked.shown === 'en'
 
   return (
     <>
@@ -99,18 +123,9 @@ export default async function IcarPage({
         )}
 
         <div className="mt-6 max-w-[80ch] space-y-4 text-[15px] leading-relaxed text-ink-700">
-          <p>
-            Международный комитет по учёту животных (International Committee for Animal Recording,
-            ICAR) пишет руководства, по которым в мире ведут учёт продуктивности, подтверждают
-            происхождение и оценивают племенную ценность. Около ста тридцати организаций
-            из шестидесяти стран работают по ним; племенные книги Чехии, Нидерландов, Ирландии,
-            Великобритании построены на этих правилах.
-          </p>
-          <p>
-            Племенная книга строится по тем же руководствам. Ниже — карта: что требует каждый
-            раздел и как это сделано у нас. Полностью учтённых разделов пока нет ни одного,
-            и это состояние на сегодня, а не осторожность формулировок.
-          </p>
+          {text.intro.map((para) => (
+            <p key={para}>{para}</p>
+          ))}
         </div>
 
         {/*
@@ -119,13 +134,7 @@ export default async function IcarPage({
            нужно до того, как первая строка будет принята за цитату.
         */}
         <div className="card mt-8 max-w-[80ch] text-[14px] leading-relaxed text-ink-500">
-          <p>
-            Руководства принадлежат ICAR. Ниже — краткий пересказ своими словами и ссылка
-            на английский оригинал, а не перевод: публиковать перевод целиком мы не вправе.
-            Разрешение на русский перевод отдельных разделов у ICAR запрошено. Знак ICAR
-            на этой странице не используется — он выдаётся Советом организации по статусу
-            члена, а не за соответствие руководствам.
-          </p>
+          <p>{text.disclaimer}</p>
         </div>
 
         <div className="card mt-6">
@@ -133,10 +142,10 @@ export default async function IcarPage({
             <table className="metric-table">
               <thead>
                 <tr>
-                  <th className="whitespace-nowrap">Раздел</th>
-                  <th>О чём</th>
-                  <th>Как в книге</th>
-                  <th className="whitespace-nowrap">Состояние</th>
+                  <th className="whitespace-nowrap">{text.table.section}</th>
+                  <th>{text.table.about}</th>
+                  <th>{text.table.ours}</th>
+                  <th className="whitespace-nowrap">{text.table.state}</th>
                 </tr>
               </thead>
               <tbody>
@@ -149,23 +158,23 @@ export default async function IcarPage({
                         rel="noopener noreferrer"
                         className="underline underline-offset-4 hover:text-forest-500"
                       >
-                        {r.title}
+                        {english ? r.titleEn : r.title}
                       </a>
                       <span className="block text-[12px] tabular-nums text-ink-500">
                         Section {r.section}
                       </span>
                     </td>
                     <td className="max-w-[34ch] align-top text-[14px] leading-relaxed text-ink-700">
-                      {r.about}
+                      {english ? r.aboutEn : r.about}
                     </td>
                     <td className="max-w-[38ch] align-top text-[14px] leading-relaxed text-ink-700">
-                      {r.ours}
+                      {english ? r.oursEn : r.ours}
                     </td>
                     <td className="align-top">
                       <span
                         className={`inline-block whitespace-nowrap rounded-md px-2 py-0.5 text-[12px] ${ICAR_STATE_CLASS[r.state]}`}
                       >
-                        {ICAR_STATE_LABEL[r.state]}
+                        {english ? ICAR_STATE_LABEL_EN[r.state] : ICAR_STATE_LABEL[r.state]}
                       </span>
                       {/*
                          Ссылка ведёт к разбору именно этого раздела, а не
@@ -178,7 +187,7 @@ export default async function IcarPage({
                           href={`/${locale}/icar/gaps#${r.slug}`}
                           className="mt-1.5 block whitespace-nowrap text-[12px] underline underline-offset-4 hover:text-forest-500"
                         >
-                          чего не хватает: {r.gaps.length}
+                          {text.gapsLink}: {r.gaps.length}
                         </Link>
                       )}
                     </td>
@@ -189,50 +198,53 @@ export default async function IcarPage({
           </div>
 
           <p className="mt-3 max-w-[90ch] text-[13px] leading-relaxed text-ink-500">
-            «Вне области» — раздел не о нас: сертификация приборов и аккредитация лабораторий
-            не задача учётной системы.{' '}
-            <Link href="/icar/gaps" className="underline underline-offset-4 hover:text-forest-500">
-              Разбор всех {ICAR_GAP_COUNT} пробелов
+            {text.outNote.lead}{' '}
+            {/*
+               Ссылка на разбор ведёт на страницу того же языка. Адрес без
+               языка перенаправляется на русскую версию, и читатель
+               английской страницы уходил с неё молча.
+            */}
+            <Link
+              href={`/${locale}/icar/gaps`}
+              className="underline underline-offset-4 hover:text-forest-500"
+            >
+              {text.outNote.link}
             </Link>{' '}
-            по {plural(ICAR_WITH_GAPS.length, 'разделу', 'разделам', 'разделам')} — отдельной
-            страницей.
+            {text.outNote.tail}
           </p>
         </div>
 
         <div className="mt-8 max-w-[80ch] space-y-4 text-[15px] leading-relaxed text-ink-700">
-          <h2 className="text-[22px] font-medium leading-tight">Что ещё открыто всем</h2>
+          <h2 className="text-[22px] font-medium leading-tight">{text.open.title}</h2>
           <p>
-            Руководства целиком лежат на{' '}
+            {text.open.lead}{' '}
             <a
               href="https://wiki.icar.org/index.php/Guidelines"
               target="_blank"
               rel="noopener noreferrer"
               className="underline underline-offset-4 hover:text-forest-500"
             >
-              wiki.icar.org
+              {text.open.wiki}
             </a>{' '}
-            и читаются без регистрации. Стандарт обмена данными ADE выложен{' '}
+            {text.open.afterWiki}{' '}
             <a
               href="https://github.com/adewg/ICAR"
               target="_blank"
               rel="noopener noreferrer"
               className="underline underline-offset-4 hover:text-forest-500"
             >
-              на GitHub
+              {text.open.github}
             </a>{' '}
-            под лицензией Apache 2.0 — его можно внедрять и дорабатывать свободно; книга отдаёт
-            по нему {ADE_COLLECTIONS.length}{' '}
-            {plural(ADE_COLLECTIONS.length, 'коллекцию', 'коллекции', 'коллекций')} и принимает{' '}
-            {ADE_WRITABLE.length} из них на запись. Двадцать девять выпусков{' '}
+            {text.open.afterGithub}{' '}
             <a
               href="https://www.icar.org/publications/technical-series-and-proceedings/"
               target="_blank"
               rel="noopener noreferrer"
               className="underline underline-offset-4 hover:text-forest-500"
             >
-              ICAR Technical Series
+              {text.open.series}
             </a>{' '}
-            — тоже открыты.
+            {text.open.afterSeries}
           </p>
         </div>
       </main>

@@ -5,7 +5,9 @@ import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import { siteMetadata } from '@/lib/seo'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
-import { PLATFORM, PLATFORM_PURPOSE } from '@/lib/platform'
+import { pick } from '@/lib/i18n/translated'
+import { PLATFORM } from '@/lib/platform'
+import { ORG_PAGE_TEXT } from '@/lib/org-page-text'
 import { BOOK_URL, PRODUCT_MAIL } from '@/lib/hosts'
 
 /*
@@ -48,6 +50,15 @@ export async function generateMetadata({
  * Слов о миссии и о будущем отрасли. Организация оценивается уставной
  * целью, устройством управления и источником средств — остальное
  * читатель проверить не может, а значит и верить ему не обязан.
+ *
+ * ## Почему весь текст страницы лежит в наборе строк
+ *
+ * Набранный прямо в разметке абзац перевода не видит: заголовок
+ * и подводка приходили переведёнными, а карточки о форме, разбор
+ * «чьи данные» и подписи реквизитов оставались русскими, и английская
+ * страница читалась как брошенная на полпути. Слова страницы теперь
+ * в `lib/org-page-text.ts`, а факты — имя, номера, год — в `lib/platform.ts`:
+ * первое переводится, второе одно на все языки.
  */
 export default async function OrgPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: raw } = await params
@@ -55,7 +66,26 @@ export default async function OrgPage({ params }: { params: Promise<{ locale: st
 
   const locale: Locale = raw
   const frame = PAGE_MESSAGES[locale].pages.org
-  const notice = PAGE_MESSAGES[locale].notice
+
+  const picked = pick(ORG_PAGE_TEXT, locale)
+  const text = picked.value
+
+  /*
+   * Оговорка «текст ниже по-русски» стоит только там, где он и правда
+   * русский. Раньше она показывалась на всех нерусских языках без
+   * разбора — в том числе на английском, где переведено уже всё, — и
+   * извинялась за то, чего нет. Строка, извиняющаяся напрасно,
+   * обесценивает ту же строку там, где она сказана по делу.
+   */
+  const notice = picked.fallback ? PAGE_MESSAGES[locale].notice : null
+
+  /*
+   * Название организации идёт за языком, на котором показан текст,
+   * а не за языком в адресе: на казахской странице текст русский,
+   * и русское название рядом с ним на месте, а английское выглядело бы
+   * третьим языком на одной странице.
+   */
+  const english = picked.shown === 'en'
 
   /*
    * Реквизиты показываются по одному и только заполненные. Строка
@@ -63,10 +93,10 @@ export default async function OrgPage({ params }: { params: Promise<{ locale: st
    * быть, но его почему-то не написали.
    */
   const details: [string, string][] = [
-    ['Полное наименование', PLATFORM.full],
-    ...(PLATFORM.inn ? ([['ИНН', PLATFORM.inn]] as [string, string][]) : []),
-    ...(PLATFORM.ogrn ? ([['ОГРН', PLATFORM.ogrn]] as [string, string][]) : []),
-    ['Почта', PRODUCT_MAIL],
+    [text.details.name, english ? PLATFORM.fullEn : PLATFORM.full],
+    ...(PLATFORM.inn ? ([[text.details.inn, PLATFORM.inn]] as [string, string][]) : []),
+    ...(PLATFORM.ogrn ? ([[text.details.ogrn, PLATFORM.ogrn]] as [string, string][]) : []),
+    [text.details.mail, PRODUCT_MAIL],
   ]
 
   return (
@@ -93,11 +123,11 @@ export default async function OrgPage({ params }: { params: Promise<{ locale: st
         {/* ------------------------------ Устройство --------------------------- */}
         <section className="mt-12">
           <h2 className="text-[24px] font-medium leading-tight sm:text-[28px]">
-            Почему именно такая форма
+            {text.formTitle}
           </h2>
 
           <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
-            {PLATFORM_PURPOSE.map((p) => (
+            {text.form.map((p) => (
               <div key={p.title} className="rounded-2xl border border-ink-100 bg-white p-6">
                 <h3 className="text-[16px] font-medium leading-snug">{p.title}</h3>
                 <p className="mt-3 text-[14px] leading-relaxed text-ink-500">{p.body}</p>
@@ -109,30 +139,25 @@ export default async function OrgPage({ params }: { params: Promise<{ locale: st
         {/* --------------------------- Чьи это данные -------------------------- */}
         <section className="mt-14 max-w-[75ch]">
           <h2 className="text-[24px] font-medium leading-tight sm:text-[28px]">
-            Организация содержит систему, но не владеет книгами
+            {text.ownTitle}
           </h2>
 
-          <p className="mt-5 text-[17px] leading-relaxed text-ink-700">
-            Книгу ведёт объединение, и записи в ней принадлежат ему, а не нам. Мы содержим систему:
-            обновляем её вслед за стандартами, отвечаем за сохранность и за то, что выданный
-            документ нельзя переписать задним числом. Роли разные, и разделены они не обещанием,
-            а устройством — у каждой книги свой домен, свои реквизиты на бланке и свои права
-            доступа.
-          </p>
+          <p className="mt-5 text-[17px] leading-relaxed text-ink-700">{text.ownBody}</p>
 
           <p className="mt-4 text-[17px] leading-relaxed text-ink-700">
-            Из этого следует и обратное обязательство: данные книги должны уходить из системы
-            целиком и в читаемом виде, когда объединение этого захочет. Для того и сделан{' '}
+            {text.dataLead}{' '}
             <Link href={`/${locale}/ade`} className="underline underline-offset-4">
-              обмен по международному стандарту
+              {text.dataLink}
             </Link>{' '}
-            — он нужен не только партнёрам, но и на случай расставания с нами.
+            {text.dataTail}
           </p>
         </section>
 
         {/* ------------------------------ Реквизиты ---------------------------- */}
         <section className="mt-14 max-w-[75ch]">
-          <h2 className="text-[24px] font-medium leading-tight sm:text-[28px]">Реквизиты</h2>
+          <h2 className="text-[24px] font-medium leading-tight sm:text-[28px]">
+            {text.detailsTitle}
+          </h2>
 
           <dl className="mt-6 divide-y divide-ink-100 border-y border-ink-100">
             {details.map(([k, v]) => (
@@ -144,12 +169,11 @@ export default async function OrgPage({ params }: { params: Promise<{ locale: st
           </dl>
 
           <p className="mt-6 text-[15px] leading-relaxed text-ink-500">
-            Действующая книга, ведущаяся на платформе, —{' '}
+            {text.bookLead}{' '}
             <a href={BOOK_URL} className="underline underline-offset-4">
               {BOOK_URL.replace('https://', '')}
             </a>
-            . Её адрес, телефон и правовые документы принадлежат Ассоциации и стоят в подвале самой
-            книги: показывать их здесь значило бы выдавать одно лицо за другое.
+            . {text.bookTail}
           </p>
         </section>
       </main>

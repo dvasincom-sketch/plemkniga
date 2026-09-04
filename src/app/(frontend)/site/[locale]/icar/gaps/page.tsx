@@ -3,22 +3,39 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
-import { isLocale, type Locale } from '@/lib/i18n/locales'
+import { isLocale, LOCALE_CODES, type Locale } from '@/lib/i18n/locales'
+import { pick } from '@/lib/i18n/translated'
 import { Breadcrumbs } from '@/components/Breadcrumbs'
-import { ICAR_GAP_COUNT, ICAR_WIKI, ICAR_WITH_GAPS } from '@/lib/icar-map'
-import { plural } from '@/lib/format'
+import { ICAR_WIKI, ICAR_WITH_GAPS } from '@/lib/icar-map'
+import { ICAR_PAGE_TEXT } from '@/lib/icar-page-text'
 
 /*
  * Единственная страница витрины, у которой не было ни описания,
  * ни указания основной версии, — нашёл `check:seo`. Заголовок был,
  * и потому пропажа не бросалась в глаза.
+ *
+ * Рамки в наборе строк у страницы нет (она не раздел продукта,
+ * а разбор внутри раздела), поэтому заголовок и описание берутся
+ * из её же слов: они уже написаны и переведены, и второе описание
+ * для робота никто не читает и потому никто не правит.
  */
-export const metadata: Metadata = {
-  title: 'Чего не хватает до руководств ICAR',
-  description:
-    'Разбор пробелов по разделам руководств ICAR: чего в книге нет, чем это грозит ' +
-    'и что нужно, чтобы закрыть. Названо нами, а не найдено проверяющим.',
-  alternates: { canonical: '/ru/icar/gaps' },
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> {
+  const { locale } = await params
+  const safe: Locale = isLocale(locale) ? locale : 'ru'
+  const meta = pick(ICAR_PAGE_TEXT, safe).value.gaps.meta
+
+  return {
+    title: meta.title,
+    description: meta.description,
+    alternates: {
+      canonical: `/${safe}/icar/gaps`,
+      languages: Object.fromEntries(LOCALE_CODES.map((c) => [c, `/${c}/icar/gaps`])),
+    },
+  }
 }
 
 /**
@@ -63,7 +80,15 @@ export default async function IcarGapsPage({
   if (!isLocale(raw)) notFound()
 
   const locale: Locale = raw
-  const notice = PAGE_MESSAGES[locale].notice
+
+  const picked = pick(ICAR_PAGE_TEXT, locale)
+  const text = picked.value.gaps
+
+  /* Оговорка про русский текст — только там, где он и правда русский. */
+  const notice = picked.fallback ? PAGE_MESSAGES[locale].notice : null
+
+  /* Разборы идут за языком показанного текста, а не за языком в адресе. */
+  const english = picked.shown === 'en'
 
   return (
     <>
@@ -71,10 +96,13 @@ export default async function IcarGapsPage({
 
       <main className="container-page pb-8">
         <Breadcrumbs
-          items={[{ label: 'Руководства ICAR', href: '/icar' }, { label: 'Чего не хватает' }]}
+          items={[
+            { label: text.breadcrumbs.map, href: `/${locale}/icar` },
+            { label: text.breadcrumbs.here },
+          ]}
         />
 
-        <h1 className="text-[38px] font-medium sm:text-[46px]">Чего не хватает</h1>
+        <h1 className="text-[38px] font-medium sm:text-[46px]">{text.title}</h1>
 
         {notice && (
           <p className="mt-5 max-w-[75ch] rounded-xl bg-ink-50 px-4 py-3 text-[14px] leading-relaxed text-ink-500">
@@ -84,21 +112,16 @@ export default async function IcarGapsPage({
 
         <div className="mt-6 max-w-[80ch] space-y-4 text-[15px] leading-relaxed text-ink-700">
           <p>
-            На{' '}
-            <Link href={`/${locale}/icar`} className="underline underline-offset-4 hover:text-forest-500">
-              карте соответствия
+            {text.intro.before}{' '}
+            <Link
+              href={`/${locale}/icar`}
+              className="underline underline-offset-4 hover:text-forest-500"
+            >
+              {text.intro.link}
             </Link>{' '}
-            против каждого раздела стоит «частично». Здесь сказано, что именно за этим словом:{' '}
-            {ICAR_GAP_COUNT} {plural(ICAR_GAP_COUNT, 'пробел', 'пробела', 'пробелов')} по{' '}
-            {ICAR_WITH_GAPS.length}{' '}
-            {plural(ICAR_WITH_GAPS.length, 'разделу', 'разделам', 'разделам')}.
+            {text.intro.after}
           </p>
-          <p>
-            Список написан без оглядки на то, как он выглядит. Специалист, открывший систему,
-            всё равно найдёт то, о чём здесь умолчали, — и дальше не поверит ничему. Знать
-            границы за десять минут выгоднее обеим сторонам, чем узнавать их на третьем месяце
-            внедрения.
-          </p>
+          <p>{text.lead}</p>
         </div>
 
         {/*
@@ -107,14 +130,14 @@ export default async function IcarGapsPage({
            что рядом есть остальные, — но не должен ради этого прокручивать
            всю страницу обратно.
         */}
-        <nav aria-label="Разделы" className="mt-8 flex flex-wrap gap-x-4 gap-y-2">
+        <nav aria-label={text.navLabel} className="mt-8 flex flex-wrap gap-x-4 gap-y-2">
           {ICAR_WITH_GAPS.map((s) => (
             <a
               key={s.slug}
               href={`#${s.slug}`}
               className="text-[14px] text-ink-500 underline underline-offset-4 transition-colors hover:text-forest-500"
             >
-              {s.title}{' '}
+              {english ? s.titleEn : s.title}{' '}
               <span className="tabular-nums text-ink-300">({s.gaps.length})</span>
             </a>
           ))}
@@ -123,7 +146,9 @@ export default async function IcarGapsPage({
         {ICAR_WITH_GAPS.map((s) => (
           <section key={s.slug} id={s.slug} className="mt-14 scroll-mt-8">
             <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-              <h2 className="text-[26px] font-medium leading-tight">{s.title}</h2>
+              <h2 className="text-[26px] font-medium leading-tight">
+                {english ? s.titleEn : s.title}
+              </h2>
               <a
                 href={`${ICAR_WIKI}${s.wiki}`}
                 target="_blank"
@@ -134,23 +159,30 @@ export default async function IcarGapsPage({
               </a>
             </div>
 
-            <p className="mt-3 max-w-[80ch] text-[15px] leading-relaxed text-ink-700">{s.about}</p>
+            <p className="mt-3 max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
+              {english ? s.aboutEn : s.about}
+            </p>
 
             <p className="mt-3 max-w-[80ch] text-[14px] leading-relaxed text-ink-500">
-              <span className="text-ink-700">Как сейчас.</span> {s.ours}
+              <span className="text-ink-700">{text.labels.ours}</span>{' '}
+              {english ? s.oursEn : s.ours}
             </p>
 
             <div className="mt-6 space-y-4">
               {s.gaps.map((g) => (
                 <div key={g.what} className="rounded-2xl border border-ink-100 p-6">
-                  <h3 className="max-w-[70ch] text-[17px] font-medium leading-snug">{g.what}</h3>
+                  <h3 className="max-w-[70ch] text-[17px] font-medium leading-snug">
+                    {english ? g.whatEn : g.what}
+                  </h3>
 
                   <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-700">
-                    <span className="text-ink-500">Чем это грозит.</span> {g.why}
+                    <span className="text-ink-500">{text.labels.why}</span>{' '}
+                    {english ? g.whyEn : g.why}
                   </p>
 
                   <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-700">
-                    <span className="text-ink-500">Что для этого нужно.</span> {g.need}
+                    <span className="text-ink-500">{text.labels.need}</span>{' '}
+                    {english ? g.needEn : g.need}
                   </p>
                 </div>
               ))}
@@ -159,18 +191,16 @@ export default async function IcarGapsPage({
         ))}
 
         <div className="mt-16 max-w-[80ch] rounded-2xl bg-white p-8 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)]">
-          <h2 className="text-[22px] font-medium leading-tight">Что из этого зависит не от кода</h2>
+          <h2 className="text-[22px] font-medium leading-tight">{text.outro.title}</h2>
           <p className="mt-4 text-[15px] leading-relaxed text-ink-700">
-            Часть пробелов закрывается работой, часть — решением, и путать их не стоит.
-            Разделы племенной книги, состав признаков экстерьера и структура методов контроля —
-            это решения Ассоциации: система умеет и так, и иначе, а выбирать должен тот,
-            кто отвечает за породу. Расчёт генетических параметров по российской популяции —
-            работа научного учреждения. Международное сравнение оценок и сертификация качества
-            ведения книги упираются в членство в ICAR, и это{' '}
-            <Link href={`/${locale}/icar`} className="underline underline-offset-4 hover:text-forest-500">
-              отдельный разговор
+            {text.outro.body}{' '}
+            <Link
+              href={`/${locale}/icar`}
+              className="underline underline-offset-4 hover:text-forest-500"
+            >
+              {text.outro.link}
             </Link>
-            , в котором от нас зависит немногое.
+            {text.outro.tail}
           </p>
         </div>
       </main>

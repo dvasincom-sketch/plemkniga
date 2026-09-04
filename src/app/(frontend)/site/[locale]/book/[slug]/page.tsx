@@ -40,7 +40,13 @@ export async function generateMetadata({
   const { locale, slug } = await params
   const safe: Locale = isLocale(locale) ? locale : 'ru'
   const feature = featureFor(slug, safe)
-  if (!feature) return { title: 'Раздел книги' }
+  /*
+   * Раздела с таким адресом нет, и страница ниже покажет «не найдено».
+   * Заголовок вкладки при этом всё равно нужен, и нужен на языке
+   * читателя: русское «Раздел книги» на английском адресе — тот самый
+   * шов, из-за которого страница выглядит переведённой наполовину.
+   */
+  if (!feature) return { title: pick(BOOK_PAGE_TEXT, safe).value.unknown }
 
   /*
    * Заголовок в выдаче — на языке страницы. Русский заголовок
@@ -111,20 +117,26 @@ export default async function BookFeaturePage({
      `wide` — рисунок шире колонки текста: карточка животного в трёх
      прочтениях и две формы одного доения ставятся рядом, и в семьдесят
      пять знаков они не помещаются.
+
+     Язык у рисунка тот же, что у страницы: подписи внутри экранов лежат
+     в своём наборе строк (`lib/book-screens-text.ts`) и откатываются
+     на русский там, где перевода нет, — так же, как сам разбор раздела.
+     Прежде экраны были русскими на всех шести языках, и английская
+     страница выходила текстом на одном языке и картинкой на другом.
   */
   const SCREENS: Record<string, { node: React.ReactNode; wide?: boolean }> = {
-    animal: { node: <AnimalStates />, wide: true },
-    pedigree: { node: <PedigreeScreen /> },
-    quality: { node: <QualityScreen /> },
-    milk: { node: <MilkScreen /> },
-    index: { node: <IndexScreen /> },
-    conformation: { node: <ConformationScreen /> },
-    mating: { node: <MatingScreen /> },
-    reports: { node: <ReportsScreen /> },
-    access: { node: <AccessScreen /> },
-    submissions: { node: <SubmissionsScreen /> },
-    exchange: { node: <ExchangeScreen />, wide: true },
-    documents: { node: <CertificateArt /> },
+    animal: { node: <AnimalStates locale={locale} />, wide: true },
+    pedigree: { node: <PedigreeScreen locale={locale} /> },
+    quality: { node: <QualityScreen locale={locale} /> },
+    milk: { node: <MilkScreen locale={locale} /> },
+    index: { node: <IndexScreen locale={locale} /> },
+    conformation: { node: <ConformationScreen locale={locale} /> },
+    mating: { node: <MatingScreen locale={locale} /> },
+    reports: { node: <ReportsScreen locale={locale} /> },
+    access: { node: <AccessScreen locale={locale} /> },
+    submissions: { node: <SubmissionsScreen locale={locale} /> },
+    exchange: { node: <ExchangeScreen locale={locale} />, wide: true },
+    documents: { node: <CertificateArt locale={locale} /> },
   }
 
   const screen = SCREENS[feature.slug]

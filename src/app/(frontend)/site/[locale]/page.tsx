@@ -20,6 +20,7 @@ import { AnimalScreen } from '@/components/site/ScreenArt'
 import { ScreenSlider } from '@/components/site/ScreenSlider'
 import { WindowFrame } from '@/components/site/WindowFrame'
 import { IndexScreen, PedigreeScreen } from '@/components/site/BookScreens'
+import { screensText } from '@/lib/book-screens-text'
 import { ADE_MAP } from '@/lib/ade-schema-map'
 import { PRODUCT_MESSAGES } from '@/lib/i18n/product-messages'
 import { SITE_MESSAGES } from '@/lib/i18n/site-messages'
@@ -143,6 +144,22 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
   /* Рамки внутренних страниц — для подписей ссылок «кому это». */
   const pages = PAGE_MESSAGES[locale].pages
   const info = localeInfo(locale)
+
+  /*
+   * Что открыто в нарисованном окне: кличка и номер.
+   *
+   * Берётся из набора строк экранов, а не набирается тремя одинаковыми
+   * строками в разметке: одно животное на трёх экранах — это утверждение,
+   * и разъехаться оно не должно от правки одной из строк.
+   *
+   * Кличка при этом транслитерируется, а не переводится: на английской
+   * странице внутри экранов стоит `Romashka`, и заголовок окна обязан
+   * называть то же животное, что родословная под ним. Прежде здесь
+   * стояла русская строка на всех шести языках — вместе с русскими
+   * экранами это было хотя бы согласованно, а порознь читалось бы как
+   * два разных животных.
+   */
+  const screenAnimal = screensText(locale).card.window
 
   /*
    * Числа пород берутся из того же места, что и каталог: посчитанные
@@ -324,8 +341,14 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
                 className="group block rounded-2xl border border-ink-100 bg-white p-5 transition-colors hover:border-forest-500"
               >
                 {inner}
+                {/*
+                   Подпись берётся из набора строк: набранная здесь, она
+                   оставалась русской на всех шести языках — единственное
+                   русское слово на английской странице стояло ровно там,
+                   куда ведёт довод.
+                */}
                 <span className="mt-3 inline-block text-[12px] text-ink-400 transition-colors group-hover:text-forest-600">
-                  Разобрать →
+                  {s.proofMore} →
                 </span>
               </Link>
             ) : (
@@ -440,7 +463,7 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
               <p className="mt-4 text-[16px] leading-relaxed text-ink-700">{s.ranking.body}</p>
             </div>
 
-            <RankScale title={s.ranking.title} />
+            <RankScale title={s.ranking.title} locale={locale} />
           </div>
         </section>
 
@@ -607,8 +630,8 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
                   key: 'card',
                   label: s.screen.tabs.card,
                   screen: (
-                    <WindowFrame title="Ромашка · RU 4512 087" subtitle="запись хозяйства">
-                      <AnimalScreen labels={s.screen} />
+                    <WindowFrame title={screenAnimal} subtitle={s.screen.badges.card}>
+                      <AnimalScreen labels={s.screen} locale={locale} />
                     </WindowFrame>
                   ),
                 },
@@ -616,8 +639,8 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
                   key: 'pedigree',
                   label: s.screen.tabs.pedigree,
                   screen: (
-                    <WindowFrame title="Ромашка · RU 4512 087" subtitle="происхождение">
-                      <PedigreeScreen />
+                    <WindowFrame title={screenAnimal} subtitle={s.screen.badges.pedigree}>
+                      <PedigreeScreen locale={locale} />
                     </WindowFrame>
                   ),
                 },
@@ -625,8 +648,8 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
                   key: 'index',
                   label: s.screen.tabs.index,
                   screen: (
-                    <WindowFrame title="Ромашка · RU 4512 087" subtitle="профиль Ассоциации">
-                      <IndexScreen />
+                    <WindowFrame title={screenAnimal} subtitle={s.screen.badges.index}>
+                      <IndexScreen locale={locale} />
                     </WindowFrame>
                   ),
                 },
@@ -914,12 +937,17 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
         {!info.reviewed && (
           <p className="mt-16 max-w-[70ch] text-[13px] leading-relaxed text-ink-500">
             {m.draft.notice}{' '}
+            {/*
+               Языки названы своими самоназваниями из `locales.ts`, а не
+               набраны здесь: в списке языков человек ищет своё слово,
+               и место, где это слово хранится, в проекте одно.
+            */}
             <Link href={`${base}/ru`} className="underline underline-offset-4 hover:text-forest-500">
-              Русский
+              {localeInfo('ru').native}
             </Link>
             {' · '}
             <Link href={`${base}/en`} className="underline underline-offset-4 hover:text-forest-500">
-              English
+              {localeInfo('en').native}
             </Link>
           </p>
         )}

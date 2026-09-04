@@ -1,3 +1,13 @@
+import { DEFAULT_LOCALE, type Locale } from '@/lib/i18n/locales'
+import {
+  screensText,
+  type ConformationTrait,
+  type IndexPart,
+  type ScreenRow,
+  type SubmissionTone,
+  type TrustStep,
+} from '@/lib/book-screens-text'
+
 /**
  * Экраны книги, нарисованные вёрсткой, — для страниц разделов.
  *
@@ -34,9 +44,18 @@
  * Те же четыре довода, что у карточки на главной: снимок стареет
  * молча, весит сотни килобайт, не переводится — и содержит настоящих
  * животных настоящих хозяйств, которым не место на витрине.
+ *
+ * ## Почему у каждого экрана есть язык
+ *
+ * Третий довод был обещанием, пока подписи стояли прямо здесь: рисунок
+ * «переводится вместе со страницей» только если ему есть чем переводиться.
+ * Теперь слова приходят из `lib/book-screens-text.ts` по языку читателя,
+ * а язык по умолчанию русский — чтобы экран, вставленный без него,
+ * рисовался как прежде, а не пустым.
  */
 
-type Row = [label: string, value: string]
+/** Язык рисунка; без него — русский, как было до перевода. */
+type ScreenProps = { locale?: Locale }
 
 function Panel({
   title,
@@ -67,7 +86,7 @@ function Panel({
   )
 }
 
-const Rows = ({ rows }: { rows: Row[] }) => (
+const Rows = ({ rows }: { rows: ScreenRow[] }) => (
   <dl className="space-y-1.5">
     {rows.map(([label, value]) => (
       <div key={label} className="flex items-baseline justify-between gap-3">
@@ -94,38 +113,24 @@ const Tabs = ({ items, active }: { items: string[]; active: number }) => (
 )
 
 /** Три прочтения карточки животного. */
-export function AnimalStates() {
+export function AnimalStates({ locale = DEFAULT_LOCALE }: ScreenProps) {
+  const t = screensText(locale).animal
+
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-      <Panel title="Чужая корова" badge="публичный просмотр">
-        <Tabs items={['Основное', 'Происхождение', 'Документы']} active={0} />
-        <Rows
-          rows={[
-            ['Номер', 'RU 4512 087'],
-            ['Порода', 'Голштинская'],
-            ['Отец', 'RR Linus'],
-            ['ИПЦ', '+460'],
-            ['Свидетельство', 'выдано'],
-          ]}
-        />
+      <Panel title={t.outside.title} badge={t.outside.badge}>
+        <Tabs items={t.outside.tabs} active={0} />
+        <Rows rows={t.outside.rows} />
         <p className="mt-3 border-t border-ink-100 pt-2 text-[11px] leading-snug text-ink-400">
-          Событий, здоровья и экономики не видно: их открывает владелец, а не система.
+          {t.outside.note}
         </p>
       </Panel>
 
-      <Panel title="Своя корова" badge="владелец" badgeTone="own">
-        <Tabs items={['Основное', 'Продуктивность', 'События', 'Документы']} active={1} />
-        <Rows
-          rows={[
-            ['За 305 дней', '9 640 кг'],
-            ['Жир / белок', '3,83 / 3,21 %'],
-            ['Соматика', '148 тыс.'],
-            ['Осеменение', '12.04, бык RR Linus'],
-            ['Проверка стельности', '18.05, стельная'],
-          ]}
-        />
+      <Panel title={t.own.title} badge={t.own.badge} badgeTone="own">
+        <Tabs items={t.own.tabs} active={1} />
+        <Rows rows={t.own.rows} />
         <div className="mt-3 flex flex-wrap gap-1.5 border-t border-ink-100 pt-2">
-          {['Внести доение', 'Выгрузить в реестр', 'Выпустить документ'].map((b) => (
+          {t.own.buttons.map((b) => (
             <span key={b} className="rounded-md bg-forest-500 px-2 py-0.5 text-[11px] text-white">
               {b}
             </span>
@@ -133,19 +138,11 @@ export function AnimalStates() {
         </div>
       </Panel>
 
-      <Panel title="Бык" badge="другая карточка" badgeTone="bull">
-        <Tabs items={['Основное', 'Дочери', 'Семя']} active={1} />
-        <Rows
-          rows={[
-            ['Дочерей в книге', '1 284'],
-            ['Со сверстницами', '+512 кг'],
-            ['Достоверность', '0,91'],
-            ['Семя в наличии', 'да, 3 хозяйства'],
-            ['Гаплотипы', 'свободен'],
-          ]}
-        />
+      <Panel title={t.bull.title} badge={t.bull.badge} badgeTone="bull">
+        <Tabs items={t.bull.tabs} active={1} />
+        <Rows rows={t.bull.rows} />
         <p className="mt-3 border-t border-ink-100 pt-2 text-[11px] leading-snug text-ink-400">
-          Лактаций у быка нет — вместо них дочери и сравнение со сверстницами.
+          {t.bull.note}
         </p>
       </Panel>
     </div>
@@ -153,7 +150,9 @@ export function AnimalStates() {
 }
 
 /** Родословная: сколько поколений видно и что помечено. */
-export function PedigreeScreen() {
+export function PedigreeScreen({ locale = DEFAULT_LOCALE }: ScreenProps) {
+  const t = screensText(locale).pedigree
+
   return (
     /* Обводку даёт окно переключателя; своя вторая рамка внутри
        выглядела бы вложенным окном. */
@@ -161,21 +160,20 @@ export function PedigreeScreen() {
       <div className="grid grid-cols-3 gap-x-3 gap-y-2 text-[11px]">
         <div className="space-y-2">
           <div className="rounded-lg border border-ink-100 px-2 py-1.5">
-            <div className="font-medium">Ромашка</div>
-            <div className="tabular-nums text-ink-500">RU 4512 087</div>
+            <div className="font-medium">{t.self.name}</div>
+            <div className="tabular-nums text-ink-500">{t.self.number}</div>
           </div>
         </div>
 
         <div className="space-y-2">
-          {[
-            ['RR Linus', 'HODEU000360023959', true],
-            ['Берёзка', 'RUSF 000003910444', false],
-          ].map(([name, num, dna]) => (
-            <div key={String(num)} className="rounded-lg border border-ink-100 px-2 py-1.5">
+          {t.parents.map(([name, num, dna]) => (
+            <div key={num} className="rounded-lg border border-ink-100 px-2 py-1.5">
               <div className="flex items-center justify-between gap-2">
                 <span className="font-medium">{name}</span>
                 {dna && (
-                  <span className="rounded bg-brand-50 px-1.5 text-[10px] text-forest-600">ДНК</span>
+                  <span className="rounded bg-brand-50 px-1.5 text-[10px] text-forest-600">
+                    {t.dna}
+                  </span>
                 )}
               </div>
               <div className="tabular-nums text-ink-500">{num}</div>
@@ -184,47 +182,42 @@ export function PedigreeScreen() {
         </div>
 
         <div className="space-y-1.5">
-          {['Progenesis Lighter', 'Gywer RDC', 'Дубрава', '—'].map((name, i) => (
+          {t.grand.map((name, i) => (
             <div
               key={`${name}-${i}`}
               className={`rounded-lg border px-2 py-1 ${
                 name === '—' ? 'border-dashed border-ink-200 text-ink-400' : 'border-ink-100'
               }`}
             >
-              {name === '—' ? 'предок неизвестен' : name}
+              {name === '—' ? t.unknown : name}
             </div>
           ))}
         </div>
       </div>
 
       <p className="mt-3 border-t border-ink-100 pt-2 text-[11px] leading-snug text-ink-400">
-        Пропуск в цепочке показан, а не скрыт: коэффициент родства считается по тому, что есть,
-        и рядом стоит полнота данных.
+        {t.note}
       </p>
     </div>
   )
 }
 
 /** Качество данных: находка называет животное и поле. */
-export function QualityScreen() {
-  const rows: [string, string, string][] = [
-    ['RU 4512 087', 'Отец моложе потомка', 'происхождение'],
-    ['RU 4512 130', 'Осеменение раньше отёла', 'события'],
-    ['RU 4511 902', 'Приплод не сходится с типом рождения', 'отёл'],
-  ]
+export function QualityScreen({ locale = DEFAULT_LOCALE }: ScreenProps) {
+  const t = screensText(locale).quality
 
   return (
     <div className="overflow-hidden rounded-2xl border border-ink-100 bg-white">
       <div className="flex items-center justify-between border-b border-ink-100 px-4 py-3">
-        <span className="text-[13px] font-medium">Качество книги</span>
+        <span className="text-[13px] font-medium">{t.title}</span>
         <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[11px] text-amber-800">
-          3 находки
+          {t.found}
         </span>
       </div>
 
       <table className="w-full text-[11px]">
         <tbody>
-          {rows.map(([animal, issue, where]) => (
+          {t.rows.map(([animal, issue, where]) => (
             <tr key={animal} className="border-b border-ink-100 last:border-0">
               <td className="px-4 py-2 tabular-nums text-ink-500">{animal}</td>
               <td className="px-2 py-2">{issue}</td>
@@ -235,8 +228,7 @@ export function QualityScreen() {
       </table>
 
       <p className="border-t border-ink-100 px-4 py-2 text-[11px] leading-snug text-ink-400">
-        Находка не блокирует работу: правило может ошибаться в редком случае, и решение остаётся
-        за человеком.
+        {t.note}
       </p>
     </div>
   )
@@ -251,38 +243,35 @@ export function QualityScreen() {
  * а пропуск в ряду — самое частое, за что цепляется проверка, —
  * виден как разрыв.
  */
-export function MilkScreen() {
-  const rows: [день: string, надой: string, жир: string, белок: string][] = [
-    ['30', '38,2', '3,74', '3,18'],
-    ['58', '41,6', '3,68', '3,15'],
-    ['86', '—', '—', '—'],
-    ['114', '36,9', '3,91', '3,24'],
-  ]
+export function MilkScreen({ locale = DEFAULT_LOCALE }: ScreenProps) {
+  const t = screensText(locale).milk
 
   return (
     <div className="overflow-hidden rounded-2xl border border-ink-100 bg-white">
       <div className="flex items-center justify-between border-b border-ink-100 px-4 py-3">
-        <span className="text-[13px] font-medium">Контрольные доения</span>
-        <span className="rounded-md bg-brand-50 px-2 py-0.5 text-[11px] text-forest-600">A4</span>
+        <span className="text-[13px] font-medium">{t.title}</span>
+        <span className="rounded-md bg-brand-50 px-2 py-0.5 text-[11px] text-forest-600">
+          {t.method}
+        </span>
       </div>
 
       <table className="w-full text-[11px]">
         <thead>
           <tr className="text-ink-400">
-            <th className="px-4 py-2 text-left font-normal">День лактации</th>
-            <th className="px-2 py-2 text-right font-normal">Надой, кг</th>
-            <th className="px-2 py-2 text-right font-normal">Жир, %</th>
-            <th className="px-4 py-2 text-right font-normal">Белок, %</th>
+            <th className="px-4 py-2 text-left font-normal">{t.head[0]}</th>
+            <th className="px-2 py-2 text-right font-normal">{t.head[1]}</th>
+            <th className="px-2 py-2 text-right font-normal">{t.head[2]}</th>
+            <th className="px-4 py-2 text-right font-normal">{t.head[3]}</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map(([day, milk, fat, protein]) => {
+          {t.rows.map(([day, milk, fat, protein]) => {
             const gap = milk === '—'
             return (
               <tr key={day} className="border-t border-ink-100">
                 <td className={`px-4 py-2 tabular-nums ${gap ? 'text-ink-400' : ''}`}>{day}</td>
                 <td className={`px-2 py-2 text-right tabular-nums ${gap ? 'text-amber-700' : ''}`}>
-                  {gap ? 'пропуск' : milk}
+                  {gap ? t.gap : milk}
                 </td>
                 <td className="px-2 py-2 text-right tabular-nums text-ink-500">{fat}</td>
                 <td className="px-4 py-2 text-right tabular-nums text-ink-500">{protein}</td>
@@ -293,13 +282,12 @@ export function MilkScreen() {
       </table>
 
       <div className="flex items-baseline justify-between border-t border-ink-100 px-4 py-3">
-        <span className="text-[11px] text-ink-500">За 305 дней</span>
-        <span className="text-[13px] font-medium tabular-nums">9 640 кг</span>
+        <span className="text-[11px] text-ink-500">{t.totalLabel}</span>
+        <span className="text-[13px] font-medium tabular-nums">{t.total}</span>
       </div>
 
       <p className="border-t border-ink-100 px-4 py-2 text-[11px] leading-snug text-ink-400">
-        Метод записан рядом с рядом замеров: без него «9 640 кг» из двух хозяйств несравнимы,
-        а выглядят одинаково.
+        {t.note}
       </p>
     </div>
   )
@@ -311,28 +299,34 @@ export function MilkScreen() {
  * Само число ничего не значит без разбора — этому и посвящён раздел.
  * Поэтому рисунок показывает не индекс, а вклады: видно, что решило,
  * и видно, что один из вкладов отрицательный.
+ *
+ * Величины вкладов остаются здесь, а не уезжают в набор строк: они
+ * задают длину полос, то есть сам рисунок, и от языка не зависят.
+ * Переводится имя признака.
  */
-export function IndexScreen() {
-  const parts: [признак: string, вклад: number][] = [
-    ['Жир', 46],
-    ['Белок', 28],
-    ['Здоровье вымени', 17],
-    ['Композит тела', -9],
+export function IndexScreen({ locale = DEFAULT_LOCALE }: ScreenProps) {
+  const t = screensText(locale).index
+
+  const parts: [признак: IndexPart, вклад: number][] = [
+    ['fat', 46],
+    ['protein', 28],
+    ['udder', 17],
+    ['body', -9],
   ]
   const peak = Math.max(...parts.map(([, v]) => Math.abs(v)))
 
   return (
     <div>
       <div className="flex items-baseline justify-between border-b border-ink-100 px-4 py-3">
-        <span className="text-[13px] font-medium">Индекс племенной ценности</span>
-        <span className="text-[15px] font-medium tabular-nums text-forest-600">+460</span>
+        <span className="text-[13px] font-medium">{t.title}</span>
+        <span className="text-[15px] font-medium tabular-nums text-forest-600">{t.value}</span>
       </div>
 
       <div className="space-y-2.5 px-4 py-3">
-        {parts.map(([name, value]) => (
-          <div key={name}>
+        {parts.map(([part, value]) => (
+          <div key={part}>
             <div className="flex items-baseline justify-between text-[11px]">
-              <span>{name}</span>
+              <span>{t.parts[part]}</span>
               <span className={`tabular-nums ${value < 0 ? 'text-[#9e3520]' : 'text-ink-500'}`}>
                 {value > 0 ? '+' : '−'}
                 {Math.abs(value)}
@@ -349,8 +343,7 @@ export function IndexScreen() {
       </div>
 
       <p className="border-t border-ink-100 px-4 py-2 text-[11px] leading-snug text-ink-400">
-        Профиль назван, достоверность стоит рядом с числом. Индекс без профиля — число
-        без единицы: сравнивать его не с чем.
+        {t.note}
       </p>
     </div>
   )
@@ -363,21 +356,22 @@ export function IndexScreen() {
  * адресатов. Показать это можно только рядом: слева строка реестра,
  * справа ответ по международному стандарту — те же величины, разные
  * имена полей.
+ *
+ * Правая половина не переводится вовсе: это ответ по стандарту ICAR,
+ * и имена полей в нём английские на любом языке страницы. Перевести
+ * их значило бы нарисовать сообщение, которого не бывает.
  */
-export function ExchangeScreen() {
+export function ExchangeScreen({ locale = DEFAULT_LOCALE }: ScreenProps) {
+  const t = screensText(locale).exchange
+
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <div className="overflow-hidden rounded-2xl border border-ink-100 bg-white">
         <div className="border-b border-ink-100 px-4 py-2.5 text-[12px] font-medium">
-          Государственный реестр
+          {t.register}
         </div>
         <dl className="space-y-1.5 px-4 py-3 text-[11px]">
-          {[
-            ['Базовый номер', 'RU 4512 087'],
-            ['Дата доения', '12.04.2026'],
-            ['Надой за сутки, кг', '38,2'],
-            ['Массовая доля жира, %', '3,74'],
-          ].map(([k, v]) => (
+          {t.rows.map(([k, v]) => (
             <div key={k} className="flex items-baseline justify-between gap-3">
               <dt className="text-ink-500">{k}</dt>
               <dd className="tabular-nums">{v}</dd>
@@ -426,21 +420,28 @@ export function ExchangeScreen() {
  * «Слоновость — саблистость» не оставляет такой возможности: обе
  * подписи называют недостаток, и становится видно, что оценка тут
  * не про количество.
+ *
+ * ## Почему числа остались здесь
+ *
+ * Оценка и границы желаемого — положение на шкале, а не слова: от них
+ * зависит, где стоят отметка и полоса. В наборе строк они разъехались бы
+ * между языками, и английский рисунок утверждал бы про то же животное
+ * другое.
  */
-export function ConformationScreen() {
+export function ConformationScreen({ locale = DEFAULT_LOCALE }: ScreenProps) {
+  const t = screensText(locale).conformation
+
   const traits: {
-    name: string
-    low: string
-    high: string
+    id: ConformationTrait
     /** Оценка животного, 1–9. */
     value: number
     /** Где лежит желаемое: от и до по той же шкале. */
     want: [number, number]
   }[] = [
-    { name: 'Рост', low: 'низкая', high: 'высокая', value: 7, want: [6, 8] },
-    { name: 'Глубина туловища', low: 'мелкое', high: 'глубокое', value: 6, want: [5, 8] },
-    { name: 'Постановка задних ног', low: 'слоновость', high: 'саблистость', value: 5, want: [4, 6] },
-    { name: 'Прикрепление вымени', low: 'слабое', high: 'плотное', value: 8, want: [7, 9] },
+    { id: 'stature', value: 7, want: [6, 8] },
+    { id: 'depth', value: 6, want: [5, 8] },
+    { id: 'legs', value: 5, want: [4, 6] },
+    { id: 'udder', value: 8, want: [7, 9] },
   ]
 
   /* Девять делений: доля от левого края до середины деления. */
@@ -448,47 +449,49 @@ export function ConformationScreen() {
 
   return (
     <div className="space-y-4 p-4">
-      {traits.map((t) => (
-        <div key={t.name}>
-          <div className="flex items-baseline justify-between gap-3">
-            <span className="text-[12px] font-medium">{t.name}</span>
-            <span className="text-[11px] tabular-nums text-ink-500">{t.value} из 9</span>
-          </div>
+      {traits.map((trait) => {
+        const name = t.traits[trait.id]
+        return (
+          <div key={trait.id}>
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-[12px] font-medium">{name.name}</span>
+              <span className="text-[11px] tabular-nums text-ink-500">{t.score(trait.value)}</span>
+            </div>
 
-          <div className="relative mt-2 h-4">
-            {/* полоса желаемого */}
-            <div
-              className="absolute top-1 h-2 rounded-full bg-brand-50"
-              style={{
-                left: `${at(t.want[0])}%`,
-                width: `${at(t.want[1]) - at(t.want[0])}%`,
-              }}
-            />
-            <div className="absolute top-[7px] h-0.5 w-full rounded-full bg-ink-100" />
-            {/* деления */}
-            {Array.from({ length: 9 }, (_, i) => i + 1).map((n) => (
-              <span
-                key={n}
-                className="absolute top-[5px] h-1.5 w-px bg-ink-200"
-                style={{ left: `${at(n)}%` }}
+            <div className="relative mt-2 h-4">
+              {/* полоса желаемого */}
+              <div
+                className="absolute top-1 h-2 rounded-full bg-brand-50"
+                style={{
+                  left: `${at(trait.want[0])}%`,
+                  width: `${at(trait.want[1]) - at(trait.want[0])}%`,
+                }}
               />
-            ))}
-            <span
-              className="absolute top-0 h-4 w-1.5 -translate-x-1/2 rounded-full bg-forest-500"
-              style={{ left: `${at(t.value)}%` }}
-            />
-          </div>
+              <div className="absolute top-[7px] h-0.5 w-full rounded-full bg-ink-100" />
+              {/* деления */}
+              {Array.from({ length: 9 }, (_, i) => i + 1).map((n) => (
+                <span
+                  key={n}
+                  className="absolute top-[5px] h-1.5 w-px bg-ink-200"
+                  style={{ left: `${at(n)}%` }}
+                />
+              ))}
+              <span
+                className="absolute top-0 h-4 w-1.5 -translate-x-1/2 rounded-full bg-forest-500"
+                style={{ left: `${at(trait.value)}%` }}
+              />
+            </div>
 
-          <div className="mt-1 flex justify-between text-[10px] text-ink-400">
-            <span>{t.low}</span>
-            <span>{t.high}</span>
+            <div className="mt-1 flex justify-between text-[10px] text-ink-400">
+              <span>{name.low}</span>
+              <span>{name.high}</span>
+            </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
 
       <p className="border-t border-ink-100 pt-3 text-[11px] leading-snug text-ink-400">
-        Светлая полоса — желаемое, и она стоит в разных местах шкалы: у роста ближе к краю,
-        у постановки ног посередине. Девятка не значит «лучше»; она значит «очень».
+        {t.note}
       </p>
     </div>
   )
@@ -515,9 +518,18 @@ export function ConformationScreen() {
  * этой линии и выбрать другого. Предупреждение без причины
  * не предупреждение, а помеха.
  */
-export function MatingScreen() {
-  const bulls: { name: string; index: string; f: number; common?: string }[] = [
-    { name: 'RR Linus', index: '+512', f: 8.2, common: 'общий предок: Progenesis Lighter, отец матери' },
+export function MatingScreen({ locale = DEFAULT_LOCALE }: ScreenProps) {
+  const text = screensText(locale)
+  const t = text.mating
+
+  /*
+     Клички быков и их индексы одинаковы на любом языке — это имена
+     и числа. Переводится подпись перед числом и причина предупреждения;
+     сам инбридинг разбирается разрядами языка (`text.number`), иначе
+     английский читатель увидел бы «8,2» и прочёл бы запятую как разряд.
+  */
+  const bulls: { name: string; index: string; f: number; common?: boolean }[] = [
+    { name: 'RR Linus', index: '+512', f: 8.2, common: true },
     { name: 'Gywer RDC', index: '+486', f: 1.6 },
     { name: 'Bandares', index: '+455', f: 0.4 },
   ]
@@ -525,8 +537,8 @@ export function MatingScreen() {
   return (
     <div className="p-4">
       <div className="flex items-baseline justify-between gap-3 border-b border-ink-100 pb-2">
-        <span className="text-[12px] font-medium">Подбор к корове Ромашка</span>
-        <span className="text-[11px] text-ink-400">порог 6,25 %</span>
+        <span className="text-[12px] font-medium">{t.title}</span>
+        <span className="text-[11px] text-ink-400">{t.threshold}</span>
       </div>
 
       <div className="mt-3 space-y-2">
@@ -542,15 +554,17 @@ export function MatingScreen() {
               <div className="flex items-baseline justify-between gap-3">
                 <span className="text-[12px] font-medium">{b.name}</span>
                 <span className="flex items-baseline gap-3 text-[11px] tabular-nums">
-                  <span className="text-ink-500">ИПЦ {b.index}</span>
+                  <span className="text-ink-500">
+                    {t.indexLabel} {b.index}
+                  </span>
                   <span className={over ? 'font-medium text-[#9e3520]' : 'text-forest-600'}>
-                    F потомка {b.f.toLocaleString('ru-RU')} %
+                    {t.fLabel} {text.number(b.f)} %
                   </span>
                 </span>
               </div>
 
               {b.common && (
-                <p className="mt-1 text-[10px] leading-snug text-[#9e3520]">{b.common}</p>
+                <p className="mt-1 text-[10px] leading-snug text-[#9e3520]">{t.common}</p>
               )}
             </div>
           )
@@ -558,9 +572,7 @@ export function MatingScreen() {
       </div>
 
       <p className="mt-3 border-t border-ink-100 pt-2 text-[11px] leading-snug text-ink-400">
-        Список отсортирован по индексу, а предупреждение стоит у первой строки: лучший
-        по числу бык здесь и есть худший выбор. Увидеть это можно только там, где обе
-        родословные лежат рядом.
+        {t.note}
       </p>
     </div>
   )
@@ -595,61 +607,54 @@ export function MatingScreen() {
  * нарисованная дата стареет молча: через год рисунок утверждал бы,
  * что книга остановилась.
  */
-export function ReportsScreen() {
-  const rows: { name: string; value: string; count: string; open?: boolean }[] = [
-    { name: 'Средний сервис-период', value: '118 дн.', count: '231 гол.' },
-    { name: 'Возраст первого отёла', value: '25,4 мес.', count: '64 гол.', open: true },
-    { name: 'Соматика выше 400 тыс.', value: '7,4 %', count: '17 гол.' },
-  ]
+export function ReportsScreen({ locale = DEFAULT_LOCALE }: ScreenProps) {
+  const t = screensText(locale).reports
 
-  const behind: [номер: string, кличка: string, значение: string][] = [
-    ['RU 4512 087', 'Ромашка', '24,1 мес.'],
-    ['RU 4512 130', 'Зорька', '26,8 мес.'],
-    ['RU 4511 902', 'Ласка', '27,2 мес.'],
-  ]
+  /* Раскрыта средняя строка; какая именно — устройство рисунка, а не слова. */
+  const OPEN = 1
 
   return (
     <div className="p-4">
       <div className="flex items-baseline justify-between gap-3 border-b border-ink-100 pb-2">
-        <span className="text-[12px] font-medium">Воспроизводство</span>
-        <span className="text-[11px] text-ink-400">пересчитано при открытии</span>
+        <span className="text-[12px] font-medium">{t.title}</span>
+        <span className="text-[11px] text-ink-400">{t.computed}</span>
       </div>
 
       <div className="mt-2">
-        {rows.map((r) => (
-          <div key={r.name}>
+        {t.rows.map(([name, value, count], i) => (
+          <div key={name}>
             <div
               className={`flex items-baseline justify-between gap-3 rounded-lg px-2 py-2 text-[11px] ${
-                r.open ? 'bg-ink-50' : ''
+                i === OPEN ? 'bg-ink-50' : ''
               }`}
             >
-              <span>{r.name}</span>
+              <span>{name}</span>
               <span className="flex items-baseline gap-3 tabular-nums">
-                <span className="text-[12px] font-medium">{r.value}</span>
-                <span className="text-forest-600 underline underline-offset-2">{r.count}</span>
+                <span className="text-[12px] font-medium">{value}</span>
+                <span className="text-forest-600 underline underline-offset-2">{count}</span>
               </span>
             </div>
 
-            {r.open && (
+            {i === OPEN && (
               /*
                  Список смещён вправо и набран мельче: он подчинён строке,
                  а не стоит с ней рядом. Вровень он читался бы как ещё три
                  показателя отчёта.
               */
               <div className="ml-2 border-l border-ink-200 pl-3">
-                {behind.map(([number, name, value]) => (
+                {t.behind.map(([number, animal, behindValue]) => (
                   <div
                     key={number}
                     className="flex items-baseline justify-between gap-3 py-1 text-[11px]"
                   >
                     <span className="flex items-baseline gap-2">
                       <span className="tabular-nums text-ink-500">{number}</span>
-                      <span>{name}</span>
+                      <span>{animal}</span>
                     </span>
-                    <span className="tabular-nums text-ink-500">{value}</span>
+                    <span className="tabular-nums text-ink-500">{behindValue}</span>
                   </div>
                 ))}
-                <div className="py-1 text-[11px] text-ink-400">ещё 61 животное</div>
+                <div className="py-1 text-[11px] text-ink-400">{t.more}</div>
               </div>
             )}
           </div>
@@ -657,8 +662,7 @@ export function ReportsScreen() {
       </div>
 
       <p className="mt-3 border-t border-ink-100 pt-2 text-[11px] leading-snug text-ink-400">
-        Число раскрывается в список: под средним возрастом 25,4 месяца стоят и 26,8, и 27,2.
-        Среднее прячет тех, ради кого отчёт и открывают.
+        {t.note}
       </p>
     </div>
   )
@@ -687,29 +691,25 @@ export function ReportsScreen() {
  * ещё не произошло, помечена серым — иначе она читалась бы как
  * случившееся.
  */
-export function AccessScreen() {
-  const shown = ['происхождение', 'линейная оценка', 'индекс', 'документы']
-  const hidden = ['события и здоровье', 'экономика', 'остальное стадо']
-
-  const log: [когда: string, что: string, кто: string, будущее?: boolean][] = [
-    ['12.04, 10:20', 'доступ открыт', 'Иванов А., ООО «Рассвет»'],
-    ['14.04, 09:05', 'просмотр карточки', 'ООО «Заря»'],
-    ['30.09', 'доступ закроется сам', 'по сроку выдачи', true],
-  ]
+export function AccessScreen({ locale = DEFAULT_LOCALE }: ScreenProps) {
+  const t = screensText(locale).access
 
   return (
     <div className="p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-ink-100 pb-2">
-        <span className="text-[12px] font-medium">Доступ открыт ООО «Заря»</span>
-        <span className="text-[11px] text-ink-400">до 30 сентября</span>
+        <span className="text-[12px] font-medium">{t.title}</span>
+        <span className="text-[11px] text-ink-400">{t.until}</span>
       </div>
 
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="rounded-lg border border-ink-100 px-3 py-2">
-          <div className="text-[11px] text-ink-500">Что видно</div>
+          <div className="text-[11px] text-ink-500">{t.shownTitle}</div>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {shown.map((s) => (
-              <span key={s} className="rounded-md bg-brand-50 px-2 py-0.5 text-[11px] text-forest-600">
+            {t.shown.map((s) => (
+              <span
+                key={s}
+                className="rounded-md bg-brand-50 px-2 py-0.5 text-[11px] text-forest-600"
+              >
                 {s}
               </span>
             ))}
@@ -717,9 +717,9 @@ export function AccessScreen() {
         </div>
 
         <div className="rounded-lg border border-ink-100 px-3 py-2">
-          <div className="text-[11px] text-ink-500">Что не видно</div>
+          <div className="text-[11px] text-ink-500">{t.hiddenTitle}</div>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {hidden.map((s) => (
+            {t.hidden.map((s) => (
               <span key={s} className="rounded-md bg-ink-50 px-2 py-0.5 text-[11px] text-ink-400">
                 {s}
               </span>
@@ -729,21 +729,24 @@ export function AccessScreen() {
       </div>
 
       <div className="mt-4">
-        <div className="text-[11px] text-ink-500">Журнал</div>
+        <div className="text-[11px] text-ink-500">{t.logTitle}</div>
         <div className="mt-1.5 space-y-1">
-          {log.map(([when, what, who, future]) => (
-            <div key={when} className="flex items-baseline gap-3 text-[11px]">
-              <span className="w-[86px] shrink-0 tabular-nums text-ink-400">{when}</span>
-              <span className={future ? 'text-ink-400' : ''}>{what}</span>
-              <span className="ml-auto truncate text-right text-ink-400">{who}</span>
-            </div>
-          ))}
+          {t.log.map(([when, what, who], i) => {
+            /* Будущее — последняя запись журнала: она о том, чего ещё не было. */
+            const future = i === t.log.length - 1
+            return (
+              <div key={when} className="flex items-baseline gap-3 text-[11px]">
+                <span className="w-[86px] shrink-0 tabular-nums text-ink-400">{when}</span>
+                <span className={future ? 'text-ink-400' : ''}>{what}</span>
+                <span className="ml-auto truncate text-right text-ink-400">{who}</span>
+              </div>
+            )
+          })}
         </div>
       </div>
 
       <p className="mt-3 border-t border-ink-100 pt-2 text-[11px] leading-snug text-ink-400">
-        Доступ выдан на одно животное и на срок, и запись о нём видит и владелец,
-        и Ассоциация. Закроется он сам — отзывать руками нечего.
+        {t.note}
       </p>
     </div>
   )
@@ -776,24 +779,28 @@ export function AccessScreen() {
  * звено показано неисполненным, потому что подпись это отдельное
  * действие человека, а не итог загрузки.
  */
-export function SubmissionsScreen() {
-  const outcomes: { count: string; what: string; tone: 'ok' | 'doubt' | 'no' }[] = [
-    { count: '118', what: 'проверки пройдены — в книгу', tone: 'ok' },
-    { count: '3', what: 'осеменение раньше отёла — на решение', tone: 'doubt' },
-    { count: '1', what: 'отца нет в книге — отклонить', tone: 'no' },
+export function SubmissionsScreen({ locale = DEFAULT_LOCALE }: ScreenProps) {
+  const t = screensText(locale).submissions
+
+  /* Числа исходов и готовность звеньев — устройство рисунка; слова к ним
+     приходят по ключу, чтобы у языков не разъехались ни счёт, ни цвет. */
+  const outcomes: { tone: SubmissionTone; count: string }[] = [
+    { tone: 'ok', count: '118' },
+    { tone: 'doubt', count: '3' },
+    { tone: 'no', count: '1' },
   ]
 
-  const chain: [шаг: string, готово: boolean][] = [
-    ['заявлено хозяйством', true],
-    ['протокол лаборатории', true],
-    ['подпись Ассоциации', false],
+  const chain: [шаг: TrustStep, готово: boolean][] = [
+    ['declared', true],
+    ['lab', true],
+    ['signature', false],
   ]
 
   return (
     <div className="p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-ink-100 pb-2">
-        <span className="text-[12px] font-medium">Пакет от ООО «Заря»</span>
-        <span className="text-[11px] tabular-nums text-ink-400">122 записи</span>
+        <span className="text-[12px] font-medium">{t.title}</span>
+        <span className="text-[11px] tabular-nums text-ink-400">{t.count}</span>
       </div>
 
       <div className="mt-3 space-y-1.5">
@@ -805,17 +812,21 @@ export function SubmissionsScreen() {
                 ? 'border-amber-200 bg-amber-50'
                 : 'border-[#e3c4bb] bg-[#fdf3f0]'
           const number =
-            o.tone === 'ok' ? 'text-forest-600' : o.tone === 'doubt' ? 'text-amber-800' : 'text-[#9e3520]'
+            o.tone === 'ok'
+              ? 'text-forest-600'
+              : o.tone === 'doubt'
+                ? 'text-amber-800'
+                : 'text-[#9e3520]'
 
           return (
             <div
-              key={o.what}
+              key={o.tone}
               className={`flex items-baseline gap-3 rounded-lg border px-3 py-2 text-[11px] ${tone}`}
             >
               <span className={`w-8 shrink-0 text-[13px] font-medium tabular-nums ${number}`}>
                 {o.count}
               </span>
-              <span>{o.what}</span>
+              <span>{t.outcomes[o.tone]}</span>
             </div>
           )
         })}
@@ -828,13 +839,13 @@ export function SubmissionsScreen() {
       */}
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <span className="rounded-md bg-forest-500 px-2.5 py-1 text-[11px] text-white">
-          Принять 118 из 122
+          {t.accept}
         </span>
-        <span className="text-[11px] text-ink-400">остальное остаётся в заявке</span>
+        <span className="text-[11px] text-ink-400">{t.rest}</span>
       </div>
 
       <div className="mt-4 border-t border-ink-100 pt-3">
-        <div className="text-[11px] text-ink-500">Достоверность записи</div>
+        <div className="text-[11px] text-ink-500">{t.chainTitle}</div>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           {chain.map(([step, done], i) => (
             <span key={step} className="flex items-center gap-1.5">
@@ -846,7 +857,7 @@ export function SubmissionsScreen() {
                     : 'border border-dashed border-ink-200 text-ink-400'
                 }`}
               >
-                {step}
+                {t.chain[step]}
               </span>
             </span>
           ))}
@@ -854,8 +865,7 @@ export function SubmissionsScreen() {
       </div>
 
       <p className="mt-3 border-t border-ink-100 pt-2 text-[11px] leading-snug text-ink-400">
-        Уровень достоверности не назначается: его поднимает протокол, а подпись Ассоциации —
-        отдельное действие с именем и датой.
+        {t.note}
       </p>
     </div>
   )

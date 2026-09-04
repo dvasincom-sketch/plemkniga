@@ -67,10 +67,23 @@ export function PlemLogo({
    * обратно в одно имя, а сами куски от чтения скрыты.
    */
   label = 'ПЛЕМ online',
+  /**
+   * На чём стоит знак: на светлой странице или на тёмной полосе.
+   *
+   * Не «цвет знака», а именно подложка. Цветов у знака три — слово,
+   * огонёк и подпись, — и меняются они не по отдельности: на тёмном
+   * слово белеет, подпись бледнеет до половины прозрачности, а огонёк
+   * остаётся тем же зелёным, потому что он и есть знак состояния.
+   * Отдать это в `className` значило бы разрешить любую комбинацию,
+   * включая ту, где огонёк теряется.
+   */
+  on = 'light',
 }: {
   className?: string
   label?: string
+  on?: 'light' | 'dark'
 }) {
+  const dark = on === 'dark'
   return (
     <span
       className={`inline-flex items-start gap-3 ${className}`}
@@ -79,7 +92,9 @@ export function PlemLogo({
     >
       <span
         aria-hidden="true"
-        className="font-display text-[30px] font-extrabold leading-none text-ink-900 sm:text-[34px]"
+        className={`font-display text-[30px] font-extrabold leading-none sm:text-[34px] ${
+          dark ? 'text-white' : 'text-ink-900'
+        }`}
       >
         ПЛЕМ
       </span>
@@ -92,7 +107,11 @@ export function PlemLogo({
       */}
       <span aria-hidden="true" className="inline-flex items-center gap-2 pt-[2px]">
         <span className="plem-dot inline-block h-[10px] w-[10px] rounded-full bg-brand-500" />
-        <span className="text-[19px] font-medium leading-none text-ink-500 sm:text-[21px]">
+        <span
+          className={`text-[19px] font-medium leading-none sm:text-[21px] ${
+            dark ? 'text-white/60' : 'text-ink-500'
+          }`}
+        >
           online
         </span>
       </span>

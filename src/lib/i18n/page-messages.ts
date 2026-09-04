@@ -58,6 +58,8 @@ export type PageMessages = {
     org: string
     evolution: string
     language: string
+    /** Подпись навигации подвала для программ чтения с экрана. */
+    sections: string
   }
   /** Пометка о языке разбора. У русского её нет. */
   notice: string | null
@@ -82,6 +84,7 @@ const ru: PageMessages = {
     org: 'Об организации',
     evolution: 'Эволюция продукта',
     language: 'Язык',
+    sections: 'Разделы продукта',
   },
   notice: null,
   trust: {
@@ -139,7 +142,7 @@ const ru: PageMessages = {
 }
 
 const en: PageMessages = {
-  nav: { about: 'About', breeds: 'Breeds', compliance: 'Compliance', api: 'API', org: 'Organisation', evolution: 'Product evolution', language: 'Language' },
+  nav: { about: 'About', breeds: 'Breeds', compliance: 'Compliance', api: 'API', org: 'Organisation', evolution: 'Product evolution', language: 'Language', sections: 'Product sections' },
   notice:
     'The detailed analysis below is in Russian. Translating regulatory prose without a native speaker would do more harm than an honest note.',
   trust: {
@@ -197,7 +200,7 @@ const en: PageMessages = {
 }
 
 const kk: PageMessages = {
-  nav: { about: 'Өнім туралы', breeds: 'Тұқымдар', compliance: 'Сәйкестік', api: 'API', org: 'Ұйым туралы', evolution: 'Өнім эволюциясы', language: 'Тіл' },
+  nav: { about: 'Өнім туралы', breeds: 'Тұқымдар', compliance: 'Сәйкестік', api: 'API', org: 'Ұйым туралы', evolution: 'Өнім эволюциясы', language: 'Тіл', sections: 'Өнім бөлімдері' },
   notice:
     'Төмендегі толық талдау орыс тілінде. Нормативтік мәтінді ана тілі иесінсіз аудару — адал ескертуден гөрі зияндырақ.',
   trust: {
@@ -255,7 +258,7 @@ const kk: PageMessages = {
 }
 
 const hy: PageMessages = {
-  nav: { about: 'Ապրանքի մասին', breeds: 'Ցեղեր', compliance: 'Համապատասխանություն', api: 'API', org: 'Կազմակերպությունը', evolution: 'Ապրանքի զարգացումը', language: 'Լեզու' },
+  nav: { about: 'Ապրանքի մասին', breeds: 'Ցեղեր', compliance: 'Համապատասխանություն', api: 'API', org: 'Կազմակերպությունը', evolution: 'Ապրանքի զարգացումը', language: 'Լեզու', sections: 'Ապրանքի բաժինները' },
   notice:
     'Ստորև բերված մանրամասն վերլուծությունը ռուսերեն է։ Կարգավորող տեքստը մայրենի լեզվի կրողի մասնակցությամբ չթարգմանելը ավելի վնասակար կլիներ, քան ազնիվ նշումը։',
   trust: {
@@ -313,7 +316,7 @@ const hy: PageMessages = {
 }
 
 const be: PageMessages = {
-  nav: { about: 'Пра прадукт', breeds: 'Пароды', compliance: 'Адпаведнасць', api: 'API', org: 'Пра арганізацыю', evolution: 'Эвалюцыя прадукту', language: 'Мова' },
+  nav: { about: 'Пра прадукт', breeds: 'Пароды', compliance: 'Адпаведнасць', api: 'API', org: 'Пра арганізацыю', evolution: 'Эвалюцыя прадукту', language: 'Мова', sections: 'Раздзелы прадукту' },
   notice:
     'Падрабязны разбор ніжэй — па-руску. Перакладаць нарматыўны тэкст без носьбіта мовы шкодней, чым сумленная паметка.',
   trust: {
@@ -371,7 +374,7 @@ const be: PageMessages = {
 }
 
 const ky: PageMessages = {
-  nav: { about: 'Продукт жөнүндө', breeds: 'Тукумдар', compliance: 'Дал келүү', api: 'API', org: 'Уюм жөнүндө', evolution: 'Продукттун эволюциясы', language: 'Тил' },
+  nav: { about: 'Продукт жөнүндө', breeds: 'Тукумдар', compliance: 'Дал келүү', api: 'API', org: 'Уюм жөнүндө', evolution: 'Продукттун эволюциясы', language: 'Тил', sections: 'Продукттун бөлүмдөрү' },
   notice:
     'Төмөндөгү толук талдоо орус тилинде. Ченемдик текстти эне тилинин ээсисиз которуу адал эскертүүдөн көрө зыяндуу.',
   trust: {

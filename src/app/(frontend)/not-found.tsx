@@ -1,4 +1,4 @@
-import { headers } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import type { Metadata } from 'next'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
@@ -7,6 +7,8 @@ import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import { ProductNotFound } from '@/components/site/ProductError'
 import { currentTenant } from '@/lib/tenant-server'
 import { isSiteHost } from '@/lib/hosts'
+import { LOCALE_COOKIE } from '@/lib/i18n/locales'
+import { resolveLocale } from '@/lib/i18n/negotiate'
 
 export const metadata: Metadata = { title: 'Страница не найдена' }
 
@@ -33,18 +35,33 @@ export const metadata: Metadata = { title: 'Страница не найдена
  * страницу на другом языке, а этой страницы нет ни на одном. Кнопка,
  * ведущая с несуществующего адреса на несуществующий, — насмешка,
  * а не помощь.
+ *
+ * ## Откуда здесь берётся язык
+ *
+ * Не из адреса. Next вызывает эту страницу для пути, который ни с чем
+ * не сопоставился, и языковой приставки в ней нет — а если бы и была,
+ * верить ей нельзя: `/еn/breeds` с русской «е» тоже не сопоставился бы.
+ * Поэтому язык узнаётся тем же способом, что и на корне витрины
+ * (`site/page.tsx`): явный выбор человека, потом заголовок браузера.
+ * Читатель, ошибшийся адресом, остаётся на своём языке.
  */
 export default async function FrontendNotFound() {
-  const host = (await headers()).get('host')
+  const [cookieStore, headerList] = await Promise.all([cookies(), headers()])
+  const host = headerList.get('host')
 
   if (isSiteHost(host)) {
+    const locale = resolveLocale({
+      cookie: cookieStore.get(LOCALE_COOKIE)?.value,
+      acceptLanguage: headerList.get('accept-language'),
+    })
+
     return (
       <>
-        <ProductHeader />
+        <ProductHeader locale={locale} />
         <main className="container-page pb-16">
-          <ProductNotFound />
+          <ProductNotFound locale={locale} />
         </main>
-        <ProductFooter />
+        <ProductFooter lang={locale} />
       </>
     )
   }

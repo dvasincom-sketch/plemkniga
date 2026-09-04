@@ -3,8 +3,9 @@ import React, { Suspense } from 'react'
 import './globals.css'
 import { currentTenant } from '@/lib/tenant-server'
 import { Metrika } from '@/components/Metrika'
-import { BOOK_HOST, SITE_HOSTS, isSiteHost } from '@/lib/hosts'
+import { BOOK_HOST, SITE_HOSTS, SITE_LOCALE_HEADER, isSiteHost } from '@/lib/hosts'
 import { headers } from 'next/headers'
+import { isLocale } from '@/lib/i18n/locales'
 
 /*
  * Заголовок и язык берутся у книги, а не вписаны.
@@ -63,8 +64,24 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function FrontendLayout({ children }: { children: React.ReactNode }) {
   const t = await currentTenant()
 
+  /*
+   * Язык страницы, а не язык книги.
+   *
+   * `<html lang>` читают программа чтения с экрана, переводчик браузера
+   * и поисковая система. Пока он брался у арендатора домена, английская
+   * страница витрины объявляла себя русской: читалка произносила
+   * английский текст русскими правилами, а браузер предлагал перевести
+   * уже переведённое.
+   *
+   * Адреса в обвязке нет, поэтому язык кладёт в заголовок промежуточный
+   * обработчик при переписывании адреса (`middleware.ts`). Нет заголовка —
+   * значит это книга, и язык у неё свой.
+   */
+  const header = (await headers()).get(SITE_LOCALE_HEADER)
+  const lang = header && isLocale(header) ? header : t.lang
+
   return (
-    <html lang={t.lang}>
+    <html lang={lang}>
       <body className="min-h-screen bg-canvas antialiased">
         {children}
         {/*

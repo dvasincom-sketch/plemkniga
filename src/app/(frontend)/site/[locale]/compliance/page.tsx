@@ -5,24 +5,26 @@ import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import { siteMetadata } from '@/lib/seo'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
+import { pick } from '@/lib/i18n/translated'
 import {
   AREA_HINT,
+  AREA_HINT_EN,
   AREA_ORDER,
   AREA_TITLE,
+  AREA_TITLE_EN,
   COMPLIANCE,
   STATE_CLASS,
   STATE_HINT,
+  STATE_HINT_EN,
   STATE_LABEL,
+  STATE_LABEL_EN,
   STATE_ORDER,
   byArea,
-  EXTERNAL,
-  OURS,
-  OURS_DONE,
   countByState,
   type ComplianceItem,
   type Evidence,
 } from '@/lib/compliance'
-import { plural } from '@/lib/format'
+import { COMPLIANCE_PAGE_TEXT, type CompliancePageText } from '@/lib/compliance-page-text'
 import { BOOK_URL, isSharedPath } from '@/lib/hosts'
 
 /*
@@ -77,18 +79,21 @@ export async function generateMetadata({
  * приостановлено с июля 2022 года. Записать это в план значило бы
  * пообещать то, что от нас не зависит.
  *
+ * ## Почему на странице не осталось набранного текста
+ *
+ * Это страница, ради которой иностранный читатель сюда и приходит:
+ * он ищет ответ на вопрос, на каком языке система разговаривает
+ * с чужими системами. Абзац, набранный прямо в разметке, перевода
+ * не видит — заголовок приходил переведённым, а тело оставалось
+ * русским, и страница отвечала на этот вопрос раньше и хуже любого
+ * текста. Слова страницы теперь в `lib/compliance-page-text.ts`,
+ * а английские описания позиций — полями рядом с русскими
+ * в `lib/compliance.ts`.
+ *
  * ## Где смотреть
  *
  * Список — `src/lib/compliance.ts`; правится там, а не здесь.
  */
-
-const EVIDENCE_LABEL: Record<Evidence['kind'], string> = {
-  check: 'прогон',
-  page: 'страница',
-  code: 'код',
-  doc: 'документ',
-}
-
 export default async function CompliancePage({
   params,
 }: {
@@ -99,8 +104,31 @@ export default async function CompliancePage({
 
   const locale: Locale = raw
   const frame = PAGE_MESSAGES[locale].pages.compliance
-  const notice = PAGE_MESSAGES[locale].notice
   const trust = PAGE_MESSAGES[locale].trust
+
+  const picked = pick(COMPLIANCE_PAGE_TEXT, locale)
+  const text = picked.value
+
+  /*
+   * Оговорка «текст ниже по-русски» стоит только там, где он и правда
+   * русский. Показанная на английской странице, где переведено всё,
+   * она извиняется за то, чего нет, — и обесценивает ту же строку там,
+   * где она сказана по делу.
+   */
+  const notice = picked.fallback ? PAGE_MESSAGES[locale].notice : null
+
+  /*
+   * Описания позиций идут за языком, на котором показан текст, а не
+   * за языком в адресе: на казахской странице тело русское, и русские
+   * описания рядом с ним на месте, а английские выглядели бы третьим
+   * языком на одной странице.
+   */
+  const english = picked.shown === 'en'
+
+  const stateLabel = english ? STATE_LABEL_EN : STATE_LABEL
+  const stateHint = english ? STATE_HINT_EN : STATE_HINT
+  const areaTitle = english ? AREA_TITLE_EN : AREA_TITLE
+  const areaHint = english ? AREA_HINT_EN : AREA_HINT
 
   const counts = countByState()
 
@@ -135,17 +163,9 @@ export default async function CompliancePage({
         </div>
 
         <div className="mt-6 max-w-[80ch] space-y-4 text-[15px] leading-relaxed text-ink-700">
-          <p>
-            Стандарты, методологии и своды правил, которым следует племенная книга, — с честным
-            состоянием по каждому. У всего, что заявлено сделанным, стоит ссылка на то, чем это
-            подтверждается: прогон, страница, файл или документ.
-          </p>
-          <p>
-            Список написан без оглядки на то, как он выглядит. Специалист, открывший систему,
-            всё равно найдёт то, о чём здесь умолчали, — и дальше не поверит ничему. Знать
-            границы за десять минут выгоднее обеим сторонам, чем узнавать их на третьем месяце
-            внедрения.
-          </p>
+          {text.intro.map((paragraph) => (
+            <p key={paragraph.slice(0, 40)}>{paragraph}</p>
+          ))}
         </div>
 
         {/*
@@ -157,29 +177,26 @@ export default async function CompliancePage({
             <div key={state} className="min-w-[9rem]">
               <div className="flex items-baseline gap-2">
                 <span className="text-[26px] font-medium tabular-nums">{counts[state]}</span>
-                <span
-                  className={`rounded-md px-2 py-0.5 text-[12px] ${STATE_CLASS[state]}`}
-                >
-                  {STATE_LABEL[state]}
+                <span className={`rounded-md px-2 py-0.5 text-[12px] ${STATE_CLASS[state]}`}>
+                  {stateLabel[state]}
                 </span>
               </div>
               <p className="mt-1.5 max-w-[24ch] text-[12px] leading-snug text-ink-500">
-                {STATE_HINT[state]}
+                {stateHint[state]}
               </p>
             </div>
           ))}
         </div>
 
         <p className="mt-4 max-w-[80ch] text-[14px] leading-relaxed text-ink-500">
-          Всего {COMPLIANCE.length}{' '}
-          {plural(COMPLIANCE.length, 'позиция', 'позиции', 'позиций')} в{' '}
-          {AREA_ORDER.length} разделах. «Закрыто извне» — не «руки не дошли»: членство в ICAR
-          требует санкционной декларации, а членство в европейской конфедерации приостановлено
-          решением от июля 2022 года.{' '}
-          <Link href={`/${locale}/icar`} className="underline underline-offset-4 hover:text-forest-500">
-            Разбор по разделам руководств ICAR
+          {text.scale.lead}{' '}
+          <Link
+            href={`/${locale}/icar`}
+            className="underline underline-offset-4 hover:text-forest-500"
+          >
+            {text.scale.link}
           </Link>{' '}
-          — отдельной страницей.
+          {text.scale.tail}
         </p>
 
         {/*
@@ -188,24 +205,17 @@ export default async function CompliancePage({
            системы разумно требует их доделать — при том, что часть
            не доделывается ни за какие деньги на разработку.
 
-           Числа считаются из самого реестра. Написать их словами значило
-           бы завести второе место, где состояние живёт, — и то, которое
-           отстанет первым, окажется как раз на самом видном месте.
+           Числа считаются из самого реестра — там же, где собирается
+           текст. Написать их словами значило бы завести второе место,
+           где состояние живёт, — и то, которое отстанет первым, окажется
+           как раз на самом видном месте.
         */}
         <div className="card mt-6 max-w-[80ch] text-[14px] leading-relaxed text-ink-700">
           <p>
-            <strong className="font-medium">Закрыть весь список нельзя</strong>, и это свойство
-            самого списка, а не состояние работы. {EXTERNAL.length} из {COMPLIANCE.length}{' '}
-            {plural(EXTERNAL.length, 'позиции', 'позиций', 'позиций')} зависят не от кода:
-            их закрывают членство в международной организации, аккредитованный аудитор,
-            ведомство или решение самой Ассоциации. Разработкой их можно только подготовить.
+            <strong className="font-medium">{text.closed.strong}</strong>
+            {text.closed.after}
           </p>
-          <p className="mt-3">
-            Нашей работой закрываются {OURS.length}{' '}
-            {plural(OURS.length, 'позиция', 'позиции', 'позиций')}; закрыто{' '}
-            {OURS_DONE.length}. У каждой оставшейся сказано, чего именно не хватает, — и это
-            честнее круглого числа готовности, которое ничего не обещает.
-          </p>
+          <p className="mt-3">{text.closed.ours}</p>
         </div>
 
         {AREA_ORDER.map((area) => {
@@ -214,12 +224,12 @@ export default async function CompliancePage({
 
           return (
             <section key={area} className="mt-14">
-              <h2 className="text-[26px] font-medium leading-tight">{AREA_TITLE[area]}</h2>
-              <p className="mt-1.5 text-[14px] text-ink-500">{AREA_HINT[area]}</p>
+              <h2 className="text-[26px] font-medium leading-tight">{areaTitle[area]}</h2>
+              <p className="mt-1.5 text-[14px] text-ink-500">{areaHint[area]}</p>
 
               <div className="mt-6 space-y-4">
                 {items.map((item) => (
-                  <Item key={item.key} item={item} />
+                  <Item key={item.key} item={item} text={text} english={english} />
                 ))}
               </div>
             </section>
@@ -227,18 +237,9 @@ export default async function CompliancePage({
         })}
 
         <div className="mt-16 max-w-[80ch] rounded-2xl bg-white p-8 shadow-[0_1px_3px_rgb(23_24_26_/_0.08)]">
-          <h2 className="text-[22px] font-medium leading-tight">Откуда взяты оценки</h2>
-          <p className="mt-4 text-[15px] leading-relaxed text-ink-700">
-            Состояния расставлены по разбору открытых источников: уставы и анкеты организаций,
-            тексты стандартов там, где они открыты, списки членов, регламенты использования
-            знаков. Там, где факт не удалось подтвердить первоисточником, это сказано прямо
-            в самом разборе. Порядок работ и обоснование очерёдности — в отдельном плане.
-          </p>
-          <p className="mt-4 text-[14px] leading-relaxed text-ink-500">
-            Знаки и марки организаций на этой странице не используются: они выдаются по статусу
-            члена или по пройденной проверке, а не за соответствие правилам. Утверждение
-            о собственной работе разрешено всем и без всякого членства — им и ограничиваемся.
-          </p>
+          <h2 className="text-[22px] font-medium leading-tight">{text.sources.title}</h2>
+          <p className="mt-4 text-[15px] leading-relaxed text-ink-700">{text.sources.body}</p>
+          <p className="mt-4 text-[14px] leading-relaxed text-ink-500">{text.sources.marks}</p>
         </div>
       </main>
 
@@ -247,32 +248,41 @@ export default async function CompliancePage({
   )
 }
 
-function Item({ item }: { item: ComplianceItem }) {
+function Item({
+  item,
+  text,
+  english,
+}: {
+  item: ComplianceItem
+  text: CompliancePageText
+  english: boolean
+}) {
   return (
     <div className="rounded-2xl border border-ink-100 p-6">
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
         <div className="min-w-0">
-          <h3 className="text-[17px] font-medium leading-snug">{item.title}</h3>
-          <p className="mt-1 text-[13px] text-ink-500">{item.org}</p>
+          <h3 className="text-[17px] font-medium leading-snug">
+            {english ? item.titleEn : item.title}
+          </h3>
+          <p className="mt-1 text-[13px] text-ink-500">{english ? item.orgEn : item.org}</p>
         </div>
-        <span
-          className={`flex-none rounded-md px-2 py-0.5 text-[12px] ${STATE_CLASS[item.state]}`}
-        >
-          {STATE_LABEL[item.state]}
+        <span className={`flex-none rounded-md px-2 py-0.5 text-[12px] ${STATE_CLASS[item.state]}`}>
+          {(english ? STATE_LABEL_EN : STATE_LABEL)[item.state]}
         </span>
       </div>
 
       <p className="mt-4 max-w-[80ch] text-[14px] leading-relaxed text-ink-700">
-        <span className="text-ink-500">Что требует.</span> {item.what}
+        <span className="text-ink-500">{text.item.what}</span> {english ? item.whatEn : item.what}
       </p>
 
       <p className="mt-2 max-w-[80ch] text-[14px] leading-relaxed text-ink-700">
-        <span className="text-ink-500">Что у нас.</span> {item.ours}
+        <span className="text-ink-500">{text.item.ours}</span> {english ? item.oursEn : item.ours}
       </p>
 
       {item.next && (
         <p className="mt-2 max-w-[80ch] text-[14px] leading-relaxed text-ink-700">
-          <span className="text-ink-500">Что дальше.</span> {item.next}
+          <span className="text-ink-500">{text.item.next}</span>{' '}
+          {english ? item.nextEn : item.next}
         </p>
       )}
 
@@ -284,14 +294,15 @@ function Item({ item }: { item: ComplianceItem }) {
       */}
       {item.external && (
         <p className="mt-2 max-w-[80ch] text-[14px] leading-relaxed text-ink-700">
-          <span className="text-ink-500">Зависит не от нас.</span> {item.external}
+          <span className="text-ink-500">{text.item.external}</span>{' '}
+          {english ? item.externalEn : item.external}
         </p>
       )}
 
       {(item.evidence.length > 0 || item.source) && (
         <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-ink-100 pt-4 text-[13px]">
           {item.evidence.map((e) => (
-            <EvidenceLink key={`${e.kind}:${e.value}`} evidence={e} />
+            <EvidenceLink key={`${e.kind}:${e.value}`} evidence={e} labels={text.evidence} />
           ))}
 
           {item.source && (
@@ -301,7 +312,7 @@ function Item({ item }: { item: ComplianceItem }) {
               rel="noopener noreferrer"
               className="text-ink-500 underline underline-offset-4 transition-colors hover:text-forest-500"
             >
-              {item.source.label} ↗
+              {english ? item.source.labelEn : item.source.label} ↗
             </a>
           )}
         </div>
@@ -332,15 +343,18 @@ function Item({ item }: { item: ComplianceItem }) {
  * ведущую в «страница не найдена», — то есть ровно то, ради чего вся
  * эта страница и написана: битое доказательство хуже отсутствующего.
  */
-function EvidenceLink({ evidence }: { evidence: Evidence }) {
+function EvidenceLink({
+  evidence,
+  labels,
+}: {
+  evidence: Evidence
+  labels: CompliancePageText['evidence']
+}) {
   if (evidence.kind === 'page') {
     const local = isSharedPath(evidence.value.split(/[?#]/)[0]!)
 
     return local ? (
-      <Link
-        href={evidence.value}
-        className="underline underline-offset-4 hover:text-forest-500"
-      >
+      <Link href={evidence.value} className="underline underline-offset-4 hover:text-forest-500">
         {evidence.value}
       </Link>
     ) : (
@@ -357,7 +371,7 @@ function EvidenceLink({ evidence }: { evidence: Evidence }) {
 
   return (
     <span className="text-ink-500">
-      <span className="text-ink-300">{EVIDENCE_LABEL[evidence.kind]}: </span>
+      <span className="text-ink-300">{labels[evidence.kind]}: </span>
       <code className="font-mono text-[12px] text-ink-700">{text}</code>
     </span>
   )

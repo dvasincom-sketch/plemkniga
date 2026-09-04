@@ -5,8 +5,10 @@ import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import { siteMetadata } from '@/lib/seo'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
+import { pick } from '@/lib/i18n/translated'
 import { EconomicAssumptions } from '@/components/EconomicAssumptions'
 import { ECONOMIC_WEIGHTS } from '@/lib/economics'
+import { ECONOMICS_PAGE_TEXT } from '@/lib/economics-page-text'
 import { TRAIT_BASE } from '@/lib/breeding-index'
 
 /*
@@ -52,6 +54,14 @@ export async function generateMetadata({
  * в содержании, и в экономическом счёте рост её корпуса — убыток,
  * а не достоинство. Убрать этот знак с витрины значило бы показать
  * индекс, в котором всё хорошо, — то есть не показать индекс.
+ *
+ * ## Почему весь текст страницы лежит в наборе строк
+ *
+ * Набранный прямо в разметке абзац перевода не видит: заголовок
+ * и подводка приходили переведёнными, а тело оставалось русским,
+ * и английская страница читалась как брошенная на полпути. Слова
+ * страницы теперь в `lib/economics-page-text.ts` — там же, где их можно
+ * перевести целиком и разом.
  */
 export default async function EconomicsPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: raw } = await params
@@ -59,7 +69,26 @@ export default async function EconomicsPage({ params }: { params: Promise<{ loca
 
   const locale: Locale = raw
   const frame = PAGE_MESSAGES[locale].pages.economics
-  const notice = PAGE_MESSAGES[locale].notice
+
+  const picked = pick(ECONOMICS_PAGE_TEXT, locale)
+  const text = picked.value
+
+  /*
+   * Оговорка «текст ниже по-русски» стоит только там, где он и правда
+   * русский. Раньше она показывалась на всех нерусских языках без
+   * разбора — в том числе на английском, где переведено уже всё, — и
+   * извинялась за то, чего нет. Строка, извиняющаяся напрасно, обесценивает
+   * ту же строку там, где она сказана по делу.
+   */
+  const notice = picked.fallback ? PAGE_MESSAGES[locale].notice : null
+
+  /*
+   * Названия признаков идут за языком, на котором показан текст, а не
+   * за языком в адресе: на казахской странице тело русское, и русские
+   * названия рядом с ним на месте, а английские выглядели бы третьим
+   * языком на одной странице.
+   */
+  const english = picked.shown === 'en'
 
   /*
    * Веса берутся из того же места, откуда их берёт расчёт. Переписать
@@ -104,9 +133,9 @@ export default async function EconomicsPage({ params }: { params: Promise<{ loca
          * в соседнем — на одной строке, про одно и то же.
          */
         perStep: Number(value ?? 0) * (trait?.sd ?? 0) * direction,
-        unit: trait?.unit ?? '',
+        unit: (english ? trait?.unitEn : trait?.unit) ?? '',
         sd: trait?.sd ?? 0,
-        label: trait?.label ?? key,
+        label: (english ? trait?.labelEn : trait?.label) ?? key,
       }
     })
     .filter((w) => w.value !== 0)
@@ -119,7 +148,7 @@ export default async function EconomicsPage({ params }: { params: Promise<{ loca
 
   const peak = Math.max(...weights.map((w) => Math.abs(w.perStep)))
   const money = (n: number) =>
-    `${n > 0 ? '+' : '−'}${Math.abs(Math.round(n)).toLocaleString('ru-RU')} ₽`
+    `${n > 0 ? '+' : '−'}${Math.abs(Math.round(n)).toLocaleString(text.numberLocale)} ₽`
 
   return (
     <>
@@ -145,49 +174,37 @@ export default async function EconomicsPage({ params }: { params: Promise<{ loca
         {/* --------------------------- Чем он отличается ------------------------ */}
         <section className="mt-12 max-w-[75ch]">
           <h2 className="text-[24px] font-medium leading-tight sm:text-[28px]">
-            Чем он отличается от обычного индекса
+            {text.compareTitle}
           </h2>
 
-          <p className="mt-5 text-[16px] leading-relaxed text-ink-700">
-            Обычный индекс складывает признаки с весами в долях и отвечает на вопрос
-            «насколько это животное лучше среднего». Ответ верный и непереводимый в решение:
-            зоотехник, выбирая между двумя нетелями, считает не доли, а деньги.
-          </p>
-
-          <p className="mt-4 text-[16px] leading-relaxed text-ink-700">
-            Экономический индекс складывает те же признаки, но веса у него — рубли на единицу
-            признака. Сумма получается в рублях за жизнь животного, и её можно сравнить
-            с ценой нетели, стоимостью лечения и выручкой от выбраковки. Это и есть перевод
-            селекции на язык, на котором принимаются решения.
-          </p>
-
-          <p className="mt-4 text-[16px] leading-relaxed text-ink-700">
-            Профиль Ассоциации при этом не заменяется: он отвечает за породу, а не за деньги
-            одного хозяйства. Оба лежат рядом, и переключение между ними показывает то,
-            что иначе обсуждают на словах, — что «лучшая корова» у породы и у бухгалтерии
-            это разные коровы.
-          </p>
+          {text.comparePara.map((paragraph, i) => (
+            <p
+              key={paragraph.slice(0, 40)}
+              className={`${i === 0 ? 'mt-5' : 'mt-4'} text-[16px] leading-relaxed text-ink-700`}
+            >
+              {paragraph}
+            </p>
+          ))}
         </section>
 
         {/* ------------------------------- Веса --------------------------------- */}
         <section className="mt-14">
           <h2 className="text-[24px] font-medium leading-tight sm:text-[28px]">
-            Сколько стоит единица признака
+            {text.weightsTitle}
           </h2>
 
           <p className="mt-4 max-w-[75ch] text-[16px] leading-relaxed text-ink-700">
-            Рубли за продуктивную жизнь животного. Знак минус означает не «плохой признак»,
-            а расход: за крупную корову платят кормом, а за смертность приплода — телятами.
+            {text.weightsLead}
           </p>
 
           <div className="mt-8 overflow-x-auto">
             <table className="data-table w-full min-w-[560px] text-[14px]">
               <thead>
                 <tr>
-                  <th className="text-left">Признак</th>
-                  <th className="w-[150px] text-right">₽ за единицу</th>
-                  <th className="w-[170px] text-right">₽ за обычный шаг</th>
-                  <th className="w-[220px] text-left">Шаг</th>
+                  <th className="text-left">{text.table.trait}</th>
+                  <th className="w-[150px] text-right">{text.table.perUnit}</th>
+                  <th className="w-[170px] text-right">{text.table.perStep}</th>
+                  <th className="w-[220px] text-left">{text.table.step}</th>
                 </tr>
               </thead>
               <tbody>
@@ -215,7 +232,7 @@ export default async function EconomicsPage({ params }: { params: Promise<{ loca
                          без величины — то же прилагательное, от которых
                          мы отказались на первом экране.
                       */}
-                      {w.sd.toLocaleString('ru-RU')} {w.unit}
+                      {w.sd.toLocaleString(text.numberLocale)} {w.unit}
                       <div className="row-bar mt-1 h-1.5 w-full rounded-full bg-ink-100">
                         <div
                           className={`h-1.5 rounded-full ${
@@ -234,10 +251,7 @@ export default async function EconomicsPage({ params }: { params: Promise<{ loca
           </div>
 
           <p className="mt-5 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
-            «Обычный шаг» — генетическое стандартное отклонение признака: настолько
-            животные расходятся между собой в обычной популяции. Сравнивать веса имеет смысл
-            по второму столбцу, а не по первому: килограммы жира расходятся на десятки,
-            баллы вымени — на единицы, и цена за единицу об этом молчит.
+            {text.stepNote}
           </p>
 
           {/*
@@ -245,15 +259,18 @@ export default async function EconomicsPage({ params }: { params: Promise<{ loca
              Вопрос «а откуда взято это отклонение» возникает ровно тогда,
              когда человек прочитал про обычный шаг и понял, что от него
              зависит весь второй столбец.
+
+             Адрес остаётся русским: сам разбор написан по-русски, и вести
+             на несуществующий перевод было бы хуже, чем честно сказать
+             об этом в подписи.
           */}
           <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
-            Откуда взяты сами отклонения, что означает версия базы и где у источника
-            не нашлось нужного признака —{' '}
+            {text.sourceLead}{' '}
             <Link
               href="/ru/razbory/baza-sravneniya"
               className="font-medium text-forest-600 underline underline-offset-4 hover:text-forest-500"
             >
-              разбор базы сравнения
+              {text.sourceLink}
             </Link>
             .
           </p>
@@ -262,34 +279,27 @@ export default async function EconomicsPage({ params }: { params: Promise<{ loca
         {/* ------------------------------- Цены --------------------------------- */}
         <section className="mt-14">
           <h2 className="text-[24px] font-medium leading-tight sm:text-[28px]">
-            Из каких цен это собрано
+            {text.pricesTitle}
           </h2>
 
           <p className="mt-4 max-w-[75ch] text-[16px] leading-relaxed text-ink-700">
-            Ни одно из чисел выше не взято из воздуха: каждое считается из цен ниже. Это
-            допущения по рынку 2026 года, а не истина — у хозяйства цифры свои, и под них
-            заводится свой профиль.
+            {text.pricesLead}
           </p>
 
           <div className="mt-8">
-            <EconomicAssumptions wide />
+            {/* Блоку цен передаётся тот язык, на котором показан текст страницы. */}
+            <EconomicAssumptions wide locale={picked.shown} />
           </div>
         </section>
 
         <section className="mt-14 max-w-[75ch] rounded-2xl border border-brand-100 bg-brand-50 p-8 sm:p-10">
-          <h2 className="text-[22px] font-medium leading-tight sm:text-[26px]">
-            Где это в книге
-          </h2>
-          <p className="mt-4 text-[16px] leading-relaxed text-ink-700">
-            Профиль стоит рядом с остальными в разделе индекса племенной ценности:
-            его берут за основу и правят цены под своё хозяйство. Веса пересчитываются
-            сразу, и видно, как от цены молока меняется место животного в списке.
-          </p>
+          <h2 className="text-[22px] font-medium leading-tight sm:text-[26px]">{text.whereTitle}</h2>
+          <p className="mt-4 text-[16px] leading-relaxed text-ink-700">{text.whereBody}</p>
           <Link
             href={`/${locale}/breeds`}
             className="mt-5 inline-block text-[15px] font-medium text-forest-600 underline underline-offset-4 hover:text-forest-500"
           >
-            Какие породы книга умеет вести →
+            {text.whereLink}
           </Link>
         </section>
       </main>

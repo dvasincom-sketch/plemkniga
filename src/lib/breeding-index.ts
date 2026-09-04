@@ -55,6 +55,19 @@ export type TraitBase = {
   key: TraitKey
   label: string
   unit: string
+  /**
+   * Название и единица по-английски — для витрины.
+   *
+   * Полем рядом с русским названием, а не отдельным словарём по ключу.
+   * Словарь живёт в другом файле и разъезжается молча: признак добавили
+   * здесь, перевести забыли, и на английской странице появляется строка
+   * «Композит ног» — ровно та неряшливость, ради которой заведён весь
+   * слой переводов. Обязательное поле нельзя забыть: без него не соберётся.
+   *
+   * Кабинет остаётся русским и этих полей не видит.
+   */
+  labelEn: string
+  unitEn: string
   /** Среднее по референтной группе: у базы племенных ценностей оно нулевое. */
   mean: number
   /** Генетическое стандартное отклонение признака. */
@@ -90,6 +103,8 @@ export const TRAIT_BASE: TraitBase[] = [
     key: 'milk',
     label: 'Удой',
     unit: 'кг',
+    labelEn: 'Milk yield',
+    unitEn: 'kg',
     mean: 0,
     sd: 257.1,
     heritability: 0.3,
@@ -100,6 +115,8 @@ export const TRAIT_BASE: TraitBase[] = [
     key: 'fatKg',
     label: 'Жир',
     unit: 'кг',
+    labelEn: 'Fat',
+    unitEn: 'kg',
     mean: 0,
     sd: 11.29,
     heritability: 0.3,
@@ -110,6 +127,8 @@ export const TRAIT_BASE: TraitBase[] = [
     key: 'proteinKg',
     label: 'Белок',
     unit: 'кг',
+    labelEn: 'Protein',
+    unitEn: 'kg',
     mean: 0,
     sd: 6.93,
     heritability: 0.3,
@@ -120,6 +139,8 @@ export const TRAIT_BASE: TraitBase[] = [
     key: 'productiveLongevity',
     label: 'Продуктивное долголетие',
     unit: 'мес.',
+    labelEn: 'Productive life',
+    unitEn: 'months',
     mean: 0,
     sd: 1.7,
     heritability: 0.085,
@@ -133,6 +154,8 @@ export const TRAIT_BASE: TraitBase[] = [
     key: 'udderHealth',
     label: 'Здоровье вымени',
     unit: 'балл',
+    labelEn: 'Udder health',
+    unitEn: 'point',
     mean: 0,
     sd: 0.14 * 7.14, // шкала признака в системе крупнее логарифмической SCS
     heritability: 0.12,
@@ -143,6 +166,8 @@ export const TRAIT_BASE: TraitBase[] = [
     key: 'fertility',
     label: 'Фертильность',
     unit: '%',
+    labelEn: 'Fertility',
+    unitEn: '%',
     mean: 0,
     sd: 1.37,
     heritability: 0.04,
@@ -153,6 +178,8 @@ export const TRAIT_BASE: TraitBase[] = [
     key: 'calvingEase',
     label: 'Лёгкость отёла',
     unit: 'балл',
+    labelEn: 'Calving ease',
+    unitEn: 'point',
     mean: 0,
     sd: 1.3,
     heritability: 0.08,
@@ -163,6 +190,8 @@ export const TRAIT_BASE: TraitBase[] = [
     key: 'calfMortality',
     label: 'Смертность приплода',
     unit: '%',
+    labelEn: 'Calf mortality',
+    unitEn: '%',
     mean: 0,
     sd: 1.62,
     heritability: 0.02,
@@ -174,6 +203,8 @@ export const TRAIT_BASE: TraitBase[] = [
     key: 'bodyComposite',
     label: 'Композит тела',
     unit: 'балл',
+    labelEn: 'Body weight composite',
+    unitEn: 'point',
     mean: 0,
     sd: 0.76,
     heritability: 0.28,
@@ -184,6 +215,8 @@ export const TRAIT_BASE: TraitBase[] = [
     key: 'udderComposite',
     label: 'Композит вымени',
     unit: 'балл',
+    labelEn: 'Udder composite',
+    unitEn: 'point',
     mean: 0,
     sd: 0.65,
     heritability: 0.28,
@@ -194,6 +227,8 @@ export const TRAIT_BASE: TraitBase[] = [
     key: 'legsComposite',
     label: 'Композит ног',
     unit: 'балл',
+    labelEn: 'Feet and legs composite',
+    unitEn: 'point',
     mean: 0,
     sd: 0.53,
     heritability: 0.15,

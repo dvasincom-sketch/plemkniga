@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { DEFAULT_LOCALE, type Locale } from '@/lib/i18n/locales'
+import { pick, type Translated } from '@/lib/i18n/translated'
 
 /**
  * Справочник API на странице.
@@ -46,6 +48,85 @@ type ScalarGlobal = {
 }
 
 /**
+ * На каком языке говорит сама библиотека.
+ *
+ * ## Почему не «язык страницы» напрямую
+ *
+ * Встроенных словарей у Scalar восемь: `en`, `ru`, `es`, `fr`, `de`,
+ * `zh-CN`, `ar`, `pt` (`@scalar/types`, `ApiReferenceBuiltInLocale`).
+ * Языков союза среди них нет ни одного, кроме русского. Передать
+ * `kk` значило бы попросить словарь, которого не существует: библиотека
+ * молча откатится на английский, и казахская страница получит
+ * английский справочник вместо русского — то есть менее понятный
+ * читателю из союза, а не более.
+ *
+ * ## Почему для остальных пяти именно русский
+ *
+ * По той же причине, по которой русский вообще выбран запасным языком
+ * союза (`i18n/locales.ts`): вероятность, что зоотехник из страны ЕАЭС
+ * читает по-русски, выше, чем что он читает по-английски. И текст
+ * страницы вокруг справочника на этих языках всё равно показывается
+ * русский — английский справочник посреди него читался бы как чужая
+ * вставка.
+ *
+ * Свой словарь для казахского здесь не заводится намеренно: это
+ * полторы сотни подписей чужого интерфейса, которые придётся тянуть
+ * за каждой версией библиотеки.
+ */
+const SCALAR_LOCALE: Record<Locale, 'ru' | 'en'> = {
+  ru: 'ru',
+  en: 'en',
+  kk: 'ru',
+  hy: 'ru',
+  be: 'ru',
+  ky: 'ru',
+}
+
+/**
+ * Слова самого компонента: пока грузится и если не загрузилось.
+ *
+ * Их четыре, и лежат они здесь, а не в наборе строк страницы: они
+ * говорят о библиотеке, а не о нашем API, и меняются вместе с этим
+ * файлом. Откат на русский — общий (`i18n/translated.ts`).
+ */
+type ReferenceText = {
+  loading: string
+  missing: { lead: string; tail: string; fixLead: string; fixMid: string; fixTail: string }
+  /** Чем заменяется шутка авторов в поле для токена. */
+  tokenPlaceholder: string
+}
+
+const TEXT: Translated<ReferenceText> = {
+  ru: {
+    loading: 'Загружаем справочник…',
+    missing: {
+      lead:
+        'Интерактивный справочник не загрузился: файлы библиотеки не попали в сборку. ' +
+        'Само описание при этом на месте и от библиотеки не зависит — откройте',
+      tail: 'и подключите его в Postman, Insomnia или в генератор клиента.',
+      fixLead: 'Чинится установкой пакета:',
+      fixMid: '— файл копируется в',
+      fixTail: 'перед сборкой.',
+    },
+    tokenPlaceholder: 'вставьте значение',
+  },
+  en: {
+    loading: 'Loading the reference…',
+    missing: {
+      lead:
+        'The interactive reference did not load: the library files did not make it into ' +
+        'the build. The description itself is in place and does not depend on the ' +
+        'library — open',
+      tail: 'and load it into Postman, Insomnia or a client generator.',
+      fixLead: 'Fixed by installing the package:',
+      fixMid: '— the file is copied into',
+      fixTail: 'before the build.',
+    },
+    tokenPlaceholder: 'paste a value',
+  },
+}
+
+/**
  * Подписи, до которых не дотягивается словарь библиотеки.
  *
  * ## Почему это вообще понадобилось
@@ -80,27 +161,47 @@ type ScalarGlobal = {
  * под правило больше не подходит, поэтому наблюдатель не зацикливается
  * на собственной правке.
  */
-const RUSSIFY: { attr: 'placeholder' | 'aria-label'; from: RegExp; to: (m: RegExpMatchArray) => string }[] = [
+type PatchRule = {
+  attr: 'placeholder' | 'aria-label'
+  from: RegExp
+  to: (m: RegExpMatchArray) => string
+}
+
+/**
+ * Правила подмены зависят от языка справочника, а не страницы.
+ *
+ * Шутка в поле для токена зашита в разметку и показывается на любом
+ * языке — её подменяем всегда. А подписи флажков переводятся только
+ * там, где справочник говорит по-русски: на английском они и так
+ * английские, и переписывать их значило бы спорить с библиотекой
+ * о её собственном языке.
+ */
+const patchRules = (scalarLocale: 'ru' | 'en', text: ReferenceText): PatchRule[] => [
   {
     attr: 'placeholder',
     from: /^QUxMIFlPVVIgQkFTRSBBUkUgQkVMT05HIFRPIFVT$/,
-    to: () => 'вставьте значение',
+    to: () => text.tokenPlaceholder,
   },
-  {
-    attr: 'aria-label',
-    from: /^Include (.+) in request$/,
-    /*
-     * `row` — не имя параметра, а заглушка библиотеки для строки без имени.
-     * Переносить её в русскую подпись значило бы произносить читалкой
-     * «Включить „роу“ в запрос»: имя параметра оставляем как есть,
-     * потому что оно и в запросе такое, а заглушку переводим.
-     */
-    to: (m) => (m[1] === 'row' ? 'Включить строку в запрос' : `Включить «${m[1]}» в запрос`),
-  },
+  ...(scalarLocale === 'ru'
+    ? [
+        {
+          attr: 'aria-label' as const,
+          from: /^Include (.+) in request$/,
+          /*
+           * `row` — не имя параметра, а заглушка библиотеки для строки без имени.
+           * Переносить её в русскую подпись значило бы произносить читалкой
+           * «Включить „роу“ в запрос»: имя параметра оставляем как есть,
+           * потому что оно и в запросе такое, а заглушку переводим.
+           */
+          to: (m: RegExpMatchArray) =>
+            m[1] === 'row' ? 'Включить строку в запрос' : `Включить «${m[1]}» в запрос`,
+        },
+      ]
+    : []),
 ]
 
-const russify = (root: HTMLElement): void => {
-  for (const rule of RUSSIFY) {
+const patchLabels = (root: HTMLElement, rules: PatchRule[]): void => {
+  for (const rule of rules) {
     for (const el of root.querySelectorAll<HTMLElement>(`[${rule.attr}]`)) {
       const value = el.getAttribute(rule.attr) ?? ''
       const match = value.match(rule.from)
@@ -109,9 +210,18 @@ const russify = (root: HTMLElement): void => {
   }
 }
 
-export function ApiReference({ specUrl }: { specUrl: string }) {
+export function ApiReference({
+  specUrl,
+  locale = DEFAULT_LOCALE,
+}: {
+  specUrl: string
+  locale?: Locale
+}) {
   const mount = useRef<HTMLDivElement>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'missing'>('loading')
+
+  const text = pick(TEXT, locale).value
+  const scalarLocale = SCALAR_LOCALE[locale]
 
   useEffect(() => {
     let cancelled = false
@@ -137,7 +247,7 @@ export function ApiReference({ specUrl }: { specUrl: string }) {
         url: specUrl,
 
         /*
-         * Русский у библиотеки встроенный — свой словарь писать не нужно.
+         * Словари у библиотеки встроенные — свой писать не нужно.
          *
          * Сначала я собирался переводить подписи через `translations`,
          * подставляя их по одной. Оказалось, что в бандле уже лежат семь
@@ -146,11 +256,17 @@ export function ApiReference({ specUrl }: { specUrl: string }) {
          * Свой перевод рядом с ним означал бы вторую версию тех же строк,
          * которая отстанет от библиотеки на первой же новой подписи.
          *
+         * Язык был зашит русским, и на `/en/api-docs` английская страница
+         * кончалась русским справочником: «Аутентификация», «Попробовать»,
+         * «Скопировать шаблон» — там, где всё остальное переведено.
+         * Какие языки библиотека знает и почему пяти языкам союза
+         * достаётся русский — в `SCALAR_LOCALE` выше.
+         *
          * `translations` оставлены для точечных поправок: словарь общий
          * на всех, а у нас книга, и кое-где уместнее своё слово.
          */
         localization: {
-          locale: 'ru',
+          locale: scalarLocale,
           translations: {
             /*
              * «Работает на Scalar» — строка подвала бокового меню.
@@ -234,9 +350,10 @@ export function ApiReference({ specUrl }: { specUrl: string }) {
        * что появилось, и на этом успокаивается — переписанное под правило
        * больше не подходит.
        */
-      russify(mount.current)
+      const rules = patchRules(scalarLocale, text)
+      patchLabels(mount.current, rules)
       observer = new MutationObserver(() => {
-        if (mount.current) russify(mount.current)
+        if (mount.current) patchLabels(mount.current, rules)
       })
       observer.observe(mount.current, {
         subtree: true,
@@ -259,22 +376,21 @@ export function ApiReference({ specUrl }: { specUrl: string }) {
       theme.remove()
       script.remove()
     }
-  }, [specUrl])
+  }, [specUrl, scalarLocale, text])
 
   if (state === 'missing') {
     return (
       <div className="card mt-8">
         <p className="max-w-[70ch] text-[15px] leading-relaxed text-ink-700">
-          Интерактивный справочник не загрузился: файлы библиотеки не попали в сборку.
-          Само описание при этом на месте и от библиотеки не зависит — откройте{' '}
+          {text.missing.lead}{' '}
           <a href={specUrl} className="underline underline-offset-4">
             {specUrl}
           </a>{' '}
-          и подключите его в Postman, Insomnia или в генератор клиента.
+          {text.missing.tail}
         </p>
         <p className="mt-3 max-w-[70ch] text-[14px] leading-relaxed text-ink-500">
-          Чинится установкой пакета: <code>npm i @scalar/api-reference</code> — файл
-          копируется в <code>public/scalar</code> перед сборкой.
+          {text.missing.fixLead} <code>npm i @scalar/api-reference</code> {text.missing.fixMid}{' '}
+          <code>public/scalar</code> {text.missing.fixTail}
         </p>
       </div>
     )
@@ -282,9 +398,7 @@ export function ApiReference({ specUrl }: { specUrl: string }) {
 
   return (
     <div className="mt-10">
-      {state === 'loading' && (
-        <p className="text-[14px] text-ink-500">Загружаем справочник…</p>
-      )}
+      {state === 'loading' && <p className="text-[14px] text-ink-500">{text.loading}</p>}
       {/*
          Своей рамки у справочника нет, в отличие от прежнего Swagger UI.
          Тот рисовал по своим правилам и на светлом фоне книги терялся,

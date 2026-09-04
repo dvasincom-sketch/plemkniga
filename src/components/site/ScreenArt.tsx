@@ -1,3 +1,6 @@
+import { DEFAULT_LOCALE, type Locale } from '@/lib/i18n/locales'
+import { screensText } from '@/lib/book-screens-text'
+
 /**
  * Как выглядит книга внутри — нарисованное вёрсткой, а не снимком.
  *
@@ -33,6 +36,15 @@
  * Их тринадцать, и все они переводятся вместе с остальной витриной.
  * Держать их внутри компонента значило бы завести четырнадцатое место,
  * где живут строки, и первое, которое забудут перевести.
+ *
+ * ## Почему кличка приходит не оттуда же
+ *
+ * Подписи — слова страницы, кличка — значение внутри рисунка, и стоит
+ * она в трёх местах сразу: здесь, в родословной и в подборе пар. Одно
+ * животное на трёх экранах — это утверждение, и разъехаться оно
+ * не должно; поэтому кличка берётся из общего набора строк экранов
+ * (`lib/book-screens-text.ts`), где на английской странице она
+ * транслитерирована, а не переведена: `Romashka`, а не `Camomile`.
  */
 
 export type ScreenLabels = {
@@ -76,12 +88,14 @@ function Row({ label, value, mono = true }: { label: string; value: string; mono
  * Полоска нужна другому: она отделяет показанное от страницы, иначе
  * таблица посреди текста выглядит частью самой витрины.
  */
-export function AnimalScreen({ labels }: { labels: ScreenLabels }) {
-  const tests: [date: string, milk: string, fat: string][] = [
-    ['12.04', '34,2', '3,82'],
-    ['14.05', '32,8', '3,75'],
-    ['11.06', '30,1', '3,91'],
-  ]
+export function AnimalScreen({
+  labels,
+  locale = DEFAULT_LOCALE,
+}: {
+  labels: ScreenLabels
+  locale?: Locale
+}) {
+  const card = screensText(locale).card
 
   return (
     /*
@@ -99,7 +113,7 @@ export function AnimalScreen({ labels }: { labels: ScreenLabels }) {
              а не число, и выравнивать его по разрядам незачем. Заодно
              сразу видно, что запись выдумана.
           */}
-          <Row label={labels.name} value="Ромашка" mono={false} />
+          <Row label={labels.name} value={card.name} mono={false} />
           <Row label={labels.born} value="14.03.2021" />
           <Row label={labels.breed} value="HOL" />
           <Row label={labels.father} value="USAM 000132745901" />
@@ -117,7 +131,7 @@ export function AnimalScreen({ labels }: { labels: ScreenLabels }) {
             <span className="text-right">{labels.fat}</span>
           </div>
 
-          {tests.map(([d, m, f]) => (
+          {card.tests.map(([d, m, f]) => (
             <div
               key={d}
               className="grid grid-cols-3 gap-x-4 border-b border-ink-100 py-1.5 font-mono text-[14px] tabular-nums text-ink-900"
@@ -130,8 +144,8 @@ export function AnimalScreen({ labels }: { labels: ScreenLabels }) {
 
           <div className="grid grid-cols-3 gap-x-4 pt-2 text-[14px] font-medium">
             <span className="text-ink-500">{labels.total}</span>
-            <span className="text-right font-mono tabular-nums">9 640</span>
-            <span className="text-right font-mono tabular-nums">3,83</span>
+            <span className="text-right font-mono tabular-nums">{card.total[0]}</span>
+            <span className="text-right font-mono tabular-nums">{card.total[1]}</span>
           </div>
 
           <div className="mt-5 flex items-baseline gap-3 rounded-xl bg-brand-50 px-4 py-3">

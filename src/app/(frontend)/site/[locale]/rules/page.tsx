@@ -4,8 +4,9 @@ import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import { siteMetadata } from '@/lib/seo'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
+import { pick } from '@/lib/i18n/translated'
 import { CHECKS, CHECK_GROUPS, type CheckSpec } from '@/lib/checks-registry'
-import { plural } from '@/lib/format'
+import { RULES_PAGE_TEXT } from '@/lib/rules-page-text'
 
 /*
  * Заголовок, описание и указание основной страницы — из одного места
@@ -53,6 +54,18 @@ export async function generateMetadata({
  * Страница витринная, и ходить в базу ей незачем: правила — это текст
  * реестра, а не данные. Заодно она открывается на домене, где базы
  * может не быть вовсе.
+ *
+ * ## Почему весь текст страницы лежит в наборе строк
+ *
+ * Набранный прямо в разметке абзац перевода не видит: заголовок
+ * и подводка приходили переведёнными, а тело оставалось русским —
+ * вместе с самими правилами, то есть с тем, ради чего страницу
+ * и открывают. Английская страница про открытость правил, наполовину
+ * написанная по-русски, опровергает себя первым же экраном.
+ *
+ * Слова страницы теперь в `lib/rules-page-text.ts`, слова правил —
+ * английскими полями реестра, и там они обязательные: правило без
+ * перевода не соберётся.
  */
 export default async function RulesPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: raw } = await params
@@ -60,7 +73,26 @@ export default async function RulesPage({ params }: { params: Promise<{ locale: 
 
   const locale: Locale = raw
   const frame = PAGE_MESSAGES[locale].pages.rules
-  const notice = PAGE_MESSAGES[locale].notice
+
+  const picked = pick(RULES_PAGE_TEXT, locale)
+  const text = picked.value
+
+  /*
+   * Оговорка «текст ниже по-русски» стоит только там, где он и правда
+   * русский. Раньше она показывалась на всех нерусских языках без
+   * разбора — в том числе на английском, где переведено уже всё, — и
+   * извинялась за то, чего нет. Строка, извиняющаяся напрасно, обесценивает
+   * ту же строку там, где она сказана по делу.
+   */
+  const notice = picked.fallback ? PAGE_MESSAGES[locale].notice : null
+
+  /*
+   * Сами правила идут за языком, на котором показан текст страницы,
+   * а не за языком в адресе: на казахской странице тело русское,
+   * и русские формулировки правил рядом с ним на месте, а английские
+   * выглядели бы третьим языком на одной странице.
+   */
+  const english = picked.shown === 'en'
 
   const rules = CHECKS as readonly CheckSpec[]
 
@@ -88,10 +120,10 @@ export default async function RulesPage({ params }: { params: Promise<{ locale: 
   const withThreshold = rules.filter((c) => c.threshold).length
 
   const NUMBERS = [
-    { value: String(rules.length), label: 'правил в реестре' },
-    { value: String(fix), label: 'останавливают подачу до исправления' },
-    { value: String(note), label: 'предупреждают, но не мешают работать' },
-    { value: String(withThreshold), label: 'имеют числовую границу, названную вслух' },
+    { value: String(rules.length), label: text.numbers.total },
+    { value: String(fix), label: text.numbers.fix },
+    { value: String(note), label: text.numbers.note },
+    { value: String(withThreshold), label: text.numbers.threshold },
   ]
 
   return (
@@ -132,33 +164,27 @@ export default async function RulesPage({ params }: { params: Promise<{ locale: 
         {/* ---------------------------- Два веса правил ------------------------- */}
         <section className="mt-12 max-w-[75ch]">
           <h2 className="text-[24px] font-medium leading-tight sm:text-[28px]">
-            Почему не все находки одинаковы
+            {text.weightTitle}
           </h2>
 
-          <p className="mt-5 text-[16px] leading-relaxed text-ink-700">
-            Правило либо останавливает подачу, либо предупреждает. Разница не в строгости,
-            а в том, может ли правило ошибаться. «Отец моложе потомка» ошибаться не может —
-            это противоречие, и запись с ним не должна уходить в реестр. «Удой выше двадцати
-            пяти тысяч» ошибаться может: такая корова редка, но возможна, и запретить её
-            значило бы поручиться за то, чего мы не знаем.
-          </p>
-
-          <p className="mt-4 text-[16px] leading-relaxed text-ink-700">
-            Поэтому предупреждение остаётся предупреждением, и решение — за человеком.
-            Правило, которое всегда право, и правило, которое обычно право, различаются
-            в книге по существу, а не оттенком плашки.
-          </p>
+          {text.weightPara.map((paragraph, i) => (
+            <p
+              key={paragraph.slice(0, 40)}
+              className={`${i === 0 ? 'mt-5' : 'mt-4'} text-[16px] leading-relaxed text-ink-700`}
+            >
+              {paragraph}
+            </p>
+          ))}
         </section>
 
         {/* ------------------------------- Каталог ------------------------------ */}
         <section className="mt-14">
-          <h2 className="text-[24px] font-medium leading-tight sm:text-[28px]">Список</h2>
+          <h2 className="text-[24px] font-medium leading-tight sm:text-[28px]">
+            {text.listTitle}
+          </h2>
 
           <p className="mt-3 max-w-[75ch] text-[15px] leading-relaxed text-ink-500">
-            У каждого правила есть номер — на него можно сослаться в письме или в разговоре
-            с поддержкой: «правило 45». Номер отражает место в реестре и меняется, если
-            в середину списка добавят новое; неизменный ключ правила — его код, он уезжает
-            в выгрузки и остаётся прежним навсегда.
+            {text.listLead}
           </p>
 
           <div className="mt-8 space-y-12">
@@ -170,12 +196,14 @@ export default async function RulesPage({ params }: { params: Promise<{ locale: 
                 <div key={group.key}>
                   <div className="max-w-[75ch]">
                     <h3 className="text-[19px] font-medium leading-tight">
-                      {group.label}
+                      {english ? group.labelEn : group.label}
                       <span className="ml-3 text-[14px] font-normal text-ink-400">
-                        {items.length} {plural(items.length, 'правило', 'правила', 'правил')}
+                        {text.ruleCount(items.length)}
                       </span>
                     </h3>
-                    <p className="mt-2 text-[15px] leading-relaxed text-ink-500">{group.intro}</p>
+                    <p className="mt-2 text-[15px] leading-relaxed text-ink-500">
+                      {english ? group.introEn : group.intro}
+                    </p>
                   </div>
 
                   <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -191,7 +219,7 @@ export default async function RulesPage({ params }: { params: Promise<{ locale: 
                             >
                               {numberOf.get(c.code)}
                             </span>
-                            {c.label}
+                            {english ? c.labelEn : c.label}
                           </h4>
                           {/*
                              Вес правила назван словом, а не цветом: цвет
@@ -205,16 +233,20 @@ export default async function RulesPage({ params }: { params: Promise<{ locale: 
                                 : 'bg-amber-50 text-amber-800'
                             }`}
                           >
-                            {c.severity === 'fix' ? 'исправить' : 'предупреждение'}
+                            {text.severity[c.severity]}
                           </span>
                         </div>
 
-                        <p className="mt-3 text-[14px] leading-relaxed text-ink-700">{c.what}</p>
-                        <p className="mt-2 text-[13px] leading-relaxed text-ink-500">{c.why}</p>
+                        <p className="mt-3 text-[14px] leading-relaxed text-ink-700">
+                          {english ? c.whatEn : c.what}
+                        </p>
+                        <p className="mt-2 text-[13px] leading-relaxed text-ink-500">
+                          {english ? c.whyEn : c.why}
+                        </p>
 
                         {c.threshold && (
                           <p className="mt-3 border-t border-ink-100 pt-2 text-[12px] tabular-nums text-ink-400">
-                            Граница: {c.threshold}
+                            {text.thresholdLabel} {english ? c.thresholdEn : c.threshold}
                           </p>
                         )}
 
@@ -226,8 +258,7 @@ export default async function RulesPage({ params }: { params: Promise<{ locale: 
                         */}
                         {c.dbGuard && (
                           <p className="mt-2 text-[12px] leading-snug text-ink-400">
-                            Такие данные не пропускает и сама база — правило остаётся
-                            для записей, пришедших со стороны.
+                            {text.dbGuardNote}
                           </p>
                         )}
                       </div>

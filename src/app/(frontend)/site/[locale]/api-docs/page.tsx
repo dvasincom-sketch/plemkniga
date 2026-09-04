@@ -5,6 +5,8 @@ import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import { siteMetadata } from '@/lib/seo'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
+import { pick } from '@/lib/i18n/translated'
+import { API_DOCS_PAGE_TEXT, type CodeParts } from '@/lib/api-docs-page-text'
 import { ApiReference } from '@/components/ApiReference'
 
 /*
@@ -50,6 +52,23 @@ export const dynamic = 'force-dynamic'
  * не делает, — и он же тот самый, на котором бросают. Три сценария ниже
  * закрывают, по нашему опыту переписки с хозяйствами, почти все первые
  * обращения.
+ *
+ * ## Почему текст страницы лежит в наборе строк
+ *
+ * Набранный прямо в разметке абзац перевода не видит: заголовок
+ * и подводка приходили переведёнными, а три карточки и три сценария
+ * оставались русскими, и английская страница читалась как брошенная
+ * на полпути. Слова страницы теперь в `lib/api-docs-page-text.ts`,
+ * команды — рядом с разметкой: они не переводятся.
+ *
+ * ## Чего этот перевод не касается
+ *
+ * Самого описания OpenAPI. Оно собирается из коллекций — названия
+ * разделов и ручек, пояснения к полям — и написано по-русски; справочник
+ * ниже показывает его как есть. Это отдельная работа, и делать её
+ * наполовину хуже, чем не начинать: страница с английской рамкой
+ * и русским описанием внутри честнее, чем описание, переведённое
+ * до середины.
  */
 
 /**
@@ -72,6 +91,22 @@ export const dynamic = 'force-dynamic'
  * Адрес с условиями отбора — не команда, а строка запроса, и её перенос
  * ничего не искажает: читают её глазами, а не вставляют в терминал.
  */
+/**
+ * Подпись, внутри которой часть слов набрана шрифтом кода.
+ *
+ * Имена полей и параметров — `token`, `depth=0`, `$BASE` — внутри фразы
+ * не переводятся, а фраза вокруг них у каждого языка своя, и порядок слов
+ * у неё свой тоже. Поэтому подпись приходит кусками: чётные — текст,
+ * нечётные — код (`lib/api-docs-page-text.ts`).
+ */
+function Coded({ parts }: { parts: CodeParts }) {
+  return (
+    <>
+      {parts.map((part, i) => (i % 2 ? <code key={i}>{part}</code> : part))}
+    </>
+  )
+}
+
 function Snippet({ children, wrap = false }: { children: React.ReactNode; wrap?: boolean }) {
   return (
     <pre
@@ -84,6 +119,39 @@ function Snippet({ children, wrap = false }: { children: React.ReactNode; wrap?:
   )
 }
 
+/**
+ * Команды трёх сценариев — в том же порядке, что и слова к ним.
+ *
+ * Здесь они потому, что не переводятся: `curl`, имена ручек и параметры
+ * одинаковы на любом языке, и положить их в набор строк значило бы
+ * просить перевести то, что при переводе перестанет выполняться.
+ *
+ * Порядок связывает пример со сценарием (`lib/api-docs-page-text.ts`),
+ * и это единственное, чем они связаны, — поэтому список короткий
+ * и стоит целиком на виду.
+ */
+const EXAMPLES: string[] = [
+  `BASE=https://…
+
+curl -X POST \\
+  "$BASE/api/users/login" \\
+  -H content-type:application/json \\
+  -d '{"email":"…","password":"…"}'`,
+
+  `curl "$BASE/api/animals\\
+?where[archived][not_equals]=true\\
+&limit=200&depth=0" \\
+  -H "Authorization: JWT $TOKEN"`,
+
+  /* -X POST не нужен: с -d curl и так шлёт POST, а строка короче */
+  `curl "$BASE/api/milk-tests" \\
+  -H "Authorization: JWT $TOKEN" \\
+  -H content-type:application/json \\
+  -d '{"animal":123,
+      "date":"2026-08-01",
+      "milkYield":28.4}'`,
+]
+
 export default async function ApiDocsPage({
   params,
 }: {
@@ -94,7 +162,21 @@ export default async function ApiDocsPage({
 
   const locale: Locale = raw
   const frame = PAGE_MESSAGES[locale].pages.api
-  const notice = PAGE_MESSAGES[locale].notice
+
+  const picked = pick(API_DOCS_PAGE_TEXT, locale)
+  const text = picked.value
+
+  /*
+   * Оговорка «текст ниже по-русски» стоит только там, где он и правда
+   * русский. Раньше она показывалась на всех нерусских языках без
+   * разбора — в том числе на английском, — и извинялась за то, чего нет.
+   *
+   * Само описание OpenAPI при этом остаётся русским на всех языках,
+   * и на английской странице оговорка молчит о нём намеренно: она
+   * относится к тексту страницы. Перевод описания — отдельная работа,
+   * и до неё честнее не обещать ничего.
+   */
+  const notice = picked.fallback ? PAGE_MESSAGES[locale].notice : null
 
   return (
     <>
@@ -117,143 +199,89 @@ export default async function ApiDocsPage({
           )}
 
           <p className="mt-4 max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
-            У книги два интерфейса поверх одной модели: REST и GraphQL. Описание ниже
-            собрано из тех же коллекций, из которых построен сам API, и обновляется вместе
-            с ними — расходиться им негде. Машинное описание лежит по адресу{' '}
+            {text.introLead}{' '}
             <Link href="/api-docs/openapi.json" className="underline underline-offset-4">
               /api-docs/openapi.json
             </Link>{' '}
-            в формате OpenAPI 3.1: его принимают Postman, Insomnia и генераторы клиентов.
+            {text.introTail}
           </p>
 
           <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
             <div className="card">
-              <h2 className="panel-heading">Как войти</h2>
+              <h2 className="panel-heading">{text.auth.title}</h2>
               <p className="text-[14px] leading-relaxed text-ink-700">
-                <code>POST /api/users/login</code> с почтой и паролем возвращает токен.
-                Дальше его передают заголовком:
+                <code>POST /api/users/login</code> {text.auth.body}
               </p>
-              <Snippet>Authorization: JWT &lt;токен&gt;</Snippet>
-              <p className="mt-3 text-[13px] leading-snug text-ink-500">
-                Браузеру проще: та же ручка ставит cookie, и дальше он ходит с ней сам.
-              </p>
+              {/*
+                 Заголовок запроса приходит из набора строк целиком:
+                 переводится в нём одно слово — заполнитель «токен»,
+                 который читатель заменяет своим.
+              */}
+              <Snippet>{text.auth.snippet}</Snippet>
+              <p className="mt-3 text-[13px] leading-snug text-ink-500">{text.auth.note}</p>
             </div>
 
             <div className="card">
-              <h2 className="panel-heading">Почему ответы разные</h2>
-              <p className="text-[14px] leading-relaxed text-ink-700">
-                Одна и та же ручка отдаёт разное разным: хозяйство видит свои записи
-                и публичные, Ассоциация — все, аноним — только публичные. Это правила
-                доступа, а не схема ответа, и в описании их не выразить.
-              </p>
-              <p className="mt-3 text-[13px] leading-snug text-ink-500">
-                Пустая выдача чаще означает «вам это не видно», чем «этого нет».
-              </p>
+              <h2 className="panel-heading">{text.access.title}</h2>
+              <p className="text-[14px] leading-relaxed text-ink-700">{text.access.body}</p>
+              <p className="mt-3 text-[13px] leading-snug text-ink-500">{text.access.note}</p>
             </div>
 
             <div className="card">
-              <h2 className="panel-heading">Отбор</h2>
-              <p className="text-[14px] leading-relaxed text-ink-700">
-                Условия передаются вложенными параметрами:
-              </p>
+              <h2 className="panel-heading">{text.filter.title}</h2>
+              <p className="text-[14px] leading-relaxed text-ink-700">{text.filter.body}</p>
               <Snippet wrap>
                 ?where[state][equals]=alive{'\n'}&where[birthDate][greater_than]=2020-01-01
               </Snippet>
-              <p className="mt-3 text-[13px] leading-snug text-ink-500">
-                Стандартными средствами OpenAPI этот язык не описывается — в спецификации
-                он объявлен строкой, чтобы не выглядеть точнее, чем есть.
-              </p>
+              <p className="mt-3 text-[13px] leading-snug text-ink-500">{text.filter.note}</p>
             </div>
           </div>
 
           {/* ------------------------- Сценарии ------------------------- */}
 
           <section className="mt-14">
-            <h2 className="section-title mb-3">С чего начать</h2>
+            <h2 className="section-title mb-3">{text.start.title}</h2>
             <p className="max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
-              Три задачи, с которыми к нам приходят чаще всего. Дальше справочник:
-              в нём девяносто ручек, и он отвечает тому, кто уже знает, что ищет.
+              {text.start.lead}
             </p>
 
+            {/*
+               Пример и слова к нему стоят рядом по одному списку: команды
+               здесь, подписи — в наборе строк, и связывает их порядок,
+               а не внимательность. Сценарий без примера или пример
+               без сценария невозможны по устройству.
+            */}
             <div className="mt-7 grid grid-cols-1 gap-6 lg:grid-cols-3">
-              <div className="card">
-                <h3 className="panel-heading">1. Войти и получить токен</h3>
-                <p className="text-[14px] leading-relaxed text-ink-700">
-                  С него начинается всё остальное: без токена ручки отдают только
-                  публичное.
-                </p>
-                <Snippet>
-                  {`BASE=https://…
-
-curl -X POST \\
-  "$BASE/api/users/login" \\
-  -H content-type:application/json \\
-  -d '{"email":"…","password":"…"}'`}
-                </Snippet>
-                <p className="mt-3 text-[13px] leading-snug text-ink-500">
-                  В <code>BASE</code> — адрес этой системы. В ответе поле{' '}
-                  <code>token</code>, срок жизни — в поле <code>exp</code>.
-                </p>
-              </div>
-
-              <div className="card">
-                <h3 className="panel-heading">2. Выгрузить своё стадо</h3>
-                <p className="text-[14px] leading-relaxed text-ink-700">
-                  Владельца в условии называть не нужно: выдача и так ограничена вашим
-                  хозяйством — правилами доступа, а не параметром запроса.
-                </p>
-                <Snippet>
-                  {`curl "$BASE/api/animals\\
-?where[archived][not_equals]=true\\
-&limit=200&depth=0" \\
-  -H "Authorization: JWT $TOKEN"`}
-                </Snippet>
-                <p className="mt-3 text-[13px] leading-snug text-ink-500">
-                  <code>depth=0</code> отдаёт связи идентификаторами — быстрее
-                  и предсказуемее, если сами связанные записи не нужны.
-                </p>
-              </div>
-
-              <div className="card">
-                <h3 className="panel-heading">3. Записать контрольную дойку</h3>
-                <p className="text-[14px] leading-relaxed text-ink-700">
-                  То, ради чего API чаще всего и подключают: дойки приходят каждый месяц
-                  и тысячами строк.
-                </p>
-                {/* -X POST не нужен: с -d curl и так шлёт POST, а строка короче */}
-                <Snippet>
-                  {`curl "$BASE/api/milk-tests" \\
-  -H "Authorization: JWT $TOKEN" \\
-  -H content-type:application/json \\
-  -d '{"animal":123,
-      "date":"2026-08-01",
-      "milkYield":28.4}'`}
-                </Snippet>
-                <p className="mt-3 text-[13px] leading-snug text-ink-500">
-                  Записать можно только животное своего хозяйства — это проверяется
-                  на сервере, а не в форме.
-                </p>
-              </div>
+              {text.steps.map((step, i) => (
+                <div key={step.title} className="card">
+                  <h3 className="panel-heading">{step.title}</h3>
+                  <p className="text-[14px] leading-relaxed text-ink-700">{step.body}</p>
+                  <Snippet>{EXAMPLES[i]}</Snippet>
+                  <p className="mt-3 text-[13px] leading-snug text-ink-500">
+                    {typeof step.note === 'string' ? step.note : <Coded parts={step.note} />}
+                  </p>
+                </div>
+              ))}
             </div>
 
             <p className="mt-6 max-w-[80ch] text-[13px] leading-relaxed text-ink-500">
-              В примерах два подставляемых значения: <code>$BASE</code> — адрес,
-              по которому открыта эта страница, и <code>$TOKEN</code> — то, что вернул
-              вход. В справочнике ниже подставлять не нужно ничего: адрес там уже наш,
-              а токен вводится один раз кнопкой авторизации.
+              <Coded parts={text.substitutions} />
             </p>
           </section>
 
-          <ApiReference specUrl="/api-docs/openapi.json" />
+          {/*
+             Язык передаётся справочнику отдельно: его подписи рисует
+             библиотека, и о языке страницы она не знает ничего. Без
+             этого английская страница кончалась русским справочником.
+          */}
+          <ApiReference specUrl="/api-docs/openapi.json" locale={locale} />
 
           <p className="mt-8 max-w-[80ch] text-[13px] leading-relaxed text-ink-500">
-            Рядом с REST работает GraphQL —{' '}
+            {text.graphqlLead}{' '}
             <Link href="/api/graphql-playground" className="underline underline-offset-4">
               /api/graphql-playground
             </Link>
-            . Это та же модель и те же правила доступа, другой способ спрашивать: за один
-            запрос можно взять животное вместе с отёлами и родословной, не собирая его
-            из трёх обращений.
+            . {text.graphqlTail}
           </p>
         </div>
       </main>

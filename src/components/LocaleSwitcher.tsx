@@ -63,8 +63,19 @@ export function LocaleSwitcher({
   active,
   label,
   hrefs,
+  on = 'light',
 }: {
   active: Locale
+  /**
+   * На чём стоит переключатель: на светлой странице или на тёмной полосе.
+   *
+   * Меняется только закрытая часть — подпись и кнопка. Раскрытый список
+   * остаётся белым намеренно: шесть слов шестью письменностями читают
+   * глазами, и тёмная подложка под мелким текстом разных алфавитов
+   * читается хуже. Список к тому же всплывает поверх страницы, а не
+   * лежит в полосе, и белым он принадлежит странице, а не шапке.
+   */
+  on?: 'light' | 'dark'
   /** Подпись на языке страницы: «Язык», «Language», «Тіл». */
   label: string
   /**
@@ -188,9 +199,14 @@ export function LocaleSwitcher({
     }
   }
 
+  const dark = on === 'dark'
+
   return (
     <div className="flex items-center gap-2">
-      <span id={`${id}-label`} className="text-[13px] text-ink-500">
+      <span
+        id={`${id}-label`}
+        className={`text-[13px] ${dark ? 'text-white/50' : 'text-ink-500'}`}
+      >
         {label}
       </span>
 
@@ -208,9 +224,13 @@ export function LocaleSwitcher({
           }}
           onKeyDown={onButtonKey}
           className={
-            'flex items-center gap-2 rounded-lg border border-ink-200 bg-white py-1.5 pl-3 pr-2.5 ' +
-            'text-[14px] text-ink-900 transition-colors hover:border-forest-500 ' +
-            'focus:border-forest-500 focus:outline-none focus:ring-2 focus:ring-forest-500/30'
+            'flex items-center gap-2 rounded-lg border py-1.5 pl-3 pr-2.5 text-[14px] ' +
+            'transition-colors focus:outline-none focus:ring-2 ' +
+            (dark
+              ? 'border-white/20 bg-white/10 text-white hover:border-white/40 ' +
+                'focus:border-white/60 focus:ring-white/25'
+              : 'border-ink-200 bg-white text-ink-900 hover:border-forest-500 ' +
+                'focus:border-forest-500 focus:ring-forest-500/30')
           }
         >
           <span id={`${id}-value`} lang={active}>
@@ -220,7 +240,9 @@ export function LocaleSwitcher({
           <svg
             aria-hidden="true"
             viewBox="0 0 20 20"
-            className={`h-4 w-4 text-ink-400 transition-transform ${open ? 'rotate-180' : ''}`}
+            className={`h-4 w-4 transition-transform ${dark ? 'text-white/60' : 'text-ink-400'} ${
+              open ? 'rotate-180' : ''
+            }`}
             fill="none"
             stroke="currentColor"
             strokeWidth="1.6"

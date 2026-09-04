@@ -5,6 +5,9 @@ import Link from 'next/link'
 import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import { ProductFailed } from '@/components/site/ProductError'
 import { SITE_HOSTS } from '@/lib/hosts'
+import { DEFAULT_LOCALE, isLocale, type Locale } from '@/lib/i18n/locales'
+import { pick } from '@/lib/i18n/translated'
+import { PRODUCT_ERROR_TEXT } from '@/lib/product-error-text'
 
 /**
  * Экран отказа для публичной части.
@@ -43,21 +46,48 @@ export default function FrontendError({
     typeof window !== 'undefined' &&
     SITE_HOSTS.includes(window.location.hostname.toLowerCase())
 
+  /*
+   * Язык — из адресной строки, и другого источника здесь нет.
+   *
+   * Cookie с выбранным языком читается на сервере, а сюда дело доходит
+   * уже в браузере и без серверных заголовков — по той же причине,
+   * по которой хост берётся из `window`. Приставка в адресе отвечает
+   * на тот же вопрос и отвечает точнее: человек стоял на `/en/breeds`,
+   * значит английскую страницу ему и показывали.
+   *
+   * Когда приставки нет — отказ случился на корне или на служебном
+   * адресе — остаётся русский, запасной язык союза (`i18n/locales.ts`).
+   * Догадываться по `navigator.language` не стоит: страница отказа
+   * не место, где уместно ошибиться ещё и с языком.
+   */
+  const locale: Locale = (() => {
+    if (typeof window === 'undefined') return DEFAULT_LOCALE
+    const first = window.location.pathname.split('/')[1]
+    return isLocale(first) ? first : DEFAULT_LOCALE
+  })()
+
   if (onSite) {
     return (
       <>
-        <ProductHeader />
+        <ProductHeader locale={locale} />
         <main className="container-page pb-16">
-          <ProductFailed digest={error.digest} />
+          <ProductFailed digest={error.digest} locale={locale} />
+          {/*
+             Кнопка повтора стоит здесь, а не внутри `ProductFailed`:
+             перезапуск умеет только граница ошибок, и утаскивать
+             в компонент подпись без действия значило бы разложить
+             одну кнопку по двум файлам. Подпись при этом берётся
+             из того же набора строк, что и текст над ней.
+          */}
           <button
             type="button"
             onClick={reset}
             className="mt-8 rounded-xl bg-forest-500 px-6 py-3 text-[15px] text-white transition-colors hover:bg-forest-600"
           >
-            Попробовать снова
+            {pick(PRODUCT_ERROR_TEXT, locale).value.failed.retry}
           </button>
         </main>
-        <ProductFooter />
+        <ProductFooter lang={locale} />
       </>
     )
   }

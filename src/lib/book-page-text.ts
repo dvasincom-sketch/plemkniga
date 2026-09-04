@@ -18,14 +18,14 @@ import type { Translated } from '@/lib/i18n/translated'
  * рисовать, то есть переводить перерисовкой. Снаружи она обычный абзац:
  * язык меняется, картинка остаётся.
  *
- * ## Чего здесь пока нет
+ * ## Слова внутри самих рисунков
  *
- * Слов внутри самих нарисованных экранов. Они изображают рабочее место
- * на русском языке, и на английской странице остаются русскими —
- * это видно и названо в `docs/lokalizatsiya.md`. Подпись при этом
- * английская и объясняет, что на рисунке происходит, так что читатель
- * не остаётся с непонятной картинкой; но работа не закончена, и делать
- * вид, что закончена, нельзя.
+ * Их здесь нет и не должно быть: у экранов свой набор строк
+ * (`lib/book-screens-text.ts`), потому что подписи полей и колонок живут
+ * вместе с рисунком, а не со страницей вокруг него. Какое-то время
+ * экраны оставались русскими на всех языках, и английская страница
+ * выходила текстом на одном языке и картинкой на другом; теперь они
+ * переводятся вместе.
  */
 
 export type BookPageText = {
@@ -39,6 +39,8 @@ export type BookPageText = {
   ctaMail: string
   /** Заголовок вкладки браузера: имя раздела плюс это. */
   titleSuffix: string
+  /** Заголовок вкладки, когда раздела с таким адресом нет. */
+  unknown: string
   /** Подпись под рисунком, по слугу раздела. */
   note: Record<string, string>
   /** Заголовок и приписка оконной рамки, по слугу раздела. */
@@ -54,6 +56,7 @@ const RU: BookPageText = {
   ctaOpen: 'Открыть племенную книгу',
   ctaMail: 'Написать нам',
   titleSuffix: 'что внутри племенной книги',
+  unknown: 'Раздел книги',
   note: {
     animal:
       'Одна карточка, три прочтения. Разница не в оформлении, а в правах: посторонний видит то, что хозяйство открыло, владелец — работу, а у быка другой предмет разговора. Нарисовано вёрсткой; значения показаны для примера.',
@@ -100,6 +103,7 @@ const EN: BookPageText = {
   ctaOpen: 'Open the herdbook',
   ctaMail: 'Write to us',
   titleSuffix: 'inside the herdbook',
+  unknown: 'Book section',
   note: {
     animal:
       'One record, three readings. The difference is not in styling but in rights: an outsider sees what the farm has opened, the owner sees the work, and a bull is a different subject altogether. Drawn in markup; the values are illustrative.',
@@ -132,14 +136,23 @@ const EN: BookPageText = {
    * заголовок на одном языке, а содержимое на другом. Заголовок остаётся
    * тем же, переведена только приписка о том, что открыто.
    */
+  /*
+   * Заголовок окна теперь тоже английский: внутри окна английский экран
+   * (`lib/book-screens-text.ts`), и кириллица в его шапке читалась бы
+   * как недоделка — та самая, ради которой всё и переводилось.
+   *
+   * Кличка транслитерирована, а не заменена: это имя того же животного,
+   * что и на рисунке, и назвать его в шапке иначе значило бы показать
+   * два разных животных в одном окне. Номер и вовсе не переводится.
+   */
   frame: {
-    pedigree: { title: 'Ромашка · RU 4512 087', subtitle: 'pedigree' },
-    index: { title: 'Ромашка · RU 4512 087', subtitle: 'association profile' },
-    conformation: { title: 'Ромашка · RU 4512 087', subtitle: 'linear scoring' },
-    mating: { title: 'Ромашка · RU 4512 087', subtitle: 'sire selection' },
-    reports: { title: 'Стадо ООО «Рассвет» · 231 корова', subtitle: 'report' },
-    access: { title: 'Ромашка · RU 4512 087', subtitle: 'access' },
-    submissions: { title: 'Заявка № 3184 · ООО «Заря»', subtitle: 'package review' },
+    pedigree: { title: 'Romashka · RU 4512 087', subtitle: 'pedigree' },
+    index: { title: 'Romashka · RU 4512 087', subtitle: 'association profile' },
+    conformation: { title: 'Romashka · RU 4512 087', subtitle: 'linear scoring' },
+    mating: { title: 'Romashka · RU 4512 087', subtitle: 'sire selection' },
+    reports: { title: 'Rassvet farm herd · 231 cows', subtitle: 'report' },
+    access: { title: 'Romashka · RU 4512 087', subtitle: 'access' },
+    submissions: { title: 'Submission no. 3184 · Zarya farm', subtitle: 'package review' },
   },
 }
 
