@@ -4,6 +4,7 @@ import { BOOK_HOST, SITE_HOSTS, isSiteHost } from '@/lib/hosts'
 import { LOCALE_CODES } from '@/lib/i18n/locales'
 import { BOOK_FEATURES } from '@/lib/book-features'
 import { BREED_PAGES } from '@/lib/breed-pages'
+import { NOTES } from '@/lib/notes'
 
 /**
  * Карта сайта.
@@ -89,6 +90,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...BREED_PAGES.map((b) => ({
       url: `${base}/ru/breeds/${b.slug}`,
       lastModified: now,
+      priority: 0.7,
+    })),
+    /*
+     * Разборы — как породные страницы: по-русски и без языковых копий.
+     * Дата правки у них своя, а не «сегодня»: разбор это высказывание
+     * с датой, и объявлять его свежим каждую ночь значило бы врать
+     * роботу ровно так же, как читателю.
+     */
+    { url: `${base}/ru/razbory`, lastModified: now, priority: 0.7 },
+    ...NOTES.map((n) => ({
+      url: `${base}/ru/razbory/${n.slug}`,
+      lastModified: new Date(n.date),
       priority: 0.7,
     })),
     { url: `${base}/evolution`, lastModified: now, priority: 0.4 },

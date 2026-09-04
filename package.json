@@ -108,6 +108,7 @@
     "check:ade-generic": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-ade-generic.ts",
     "check:breeds": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-breeds.ts",
     "check:screens": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-screens.ts",
+    "check:notes": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-notes.ts",
     "audit:slow": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/audit-slow.ts"
   },
   "dependencies": {

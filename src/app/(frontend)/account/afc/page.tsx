@@ -11,6 +11,7 @@ import { denyAssociation } from '@/lib/association'
 import { relId } from '@/lib/visibility'
 import { afcStats } from '@/lib/afc-stats'
 import { AFC_REFERENCE_META, referenceShare } from '@/lib/afc-reference'
+import { SITE_URL } from '@/lib/hosts'
 
 export const metadata: Metadata = { title: 'Возраст первого отёла' }
 export const dynamic = 'force-dynamic'
@@ -192,7 +193,19 @@ export default async function AfcPage() {
                   месяце тысячи, здесь — сотни, и помесячная разбивка показывала бы шум
                   вместо разницы. «Дожили до 2-го отёла» считается по факту наличия
                   второго отёла в системе: у коров, отелившихся недавно, второго ещё
-                  не было, и доля по свежим группам занижена.
+                  не было, и доля по свежим группам занижена.{' '}
+                  {/*
+                     Ссылка на разбор стоит под таблицей, а не в шапке отчёта:
+                     сомнение в справочной колонке возникает после того,
+                     как человек сравнил себя с ней, а не до.
+                  */}
+                  <a
+                    href={`${SITE_URL}/ru/razbory/nabor-isthema`}
+                    className="underline underline-offset-4 hover:text-forest-500"
+                  >
+                    Разбор набора: откуда он, что сошлось с публикацией и что нет
+                  </a>
+                  .
                 </p>
               </section>
 
