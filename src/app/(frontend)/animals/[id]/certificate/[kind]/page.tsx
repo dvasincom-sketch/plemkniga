@@ -398,7 +398,7 @@ export default async function CertificatePage({
         <Block title="Племенная ценность">
           <Row label="ИПЦ" value={signed(view.ipc)} />
           <Row label="Дата генетической оценки" value={dateRu(view.evaluationDate)} />
-          <Row label="Достоверность оценки, R %" value={nf(view.reliability, 1)} />
+          <Row label="Надёжность оценки, R %" value={nf(view.reliability, 1)} />
           <Row label="Процентиль" value={nf(view.percentile, 0)} />
         </Block>
 

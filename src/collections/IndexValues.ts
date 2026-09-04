@@ -189,9 +189,10 @@ export const IndexValues: CollectionConfig = {
       index: true,
     },
     {
+      /* Та же R, что у оценок признаков, — и слово у неё то же. */
       name: 'reliability',
       type: 'number',
-      label: 'Достоверность, %',
+      label: 'Надёжность, R %',
     },
     {
       /*

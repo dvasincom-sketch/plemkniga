@@ -1,4 +1,5 @@
 import type { IcarMapText } from '@/lib/i18n/data/icar-map'
+import { ADE_COLLECTIONS } from '@/lib/ade/core'
 
 /**
  * Английские слова карты ICAR: названия разделов, «о чём» и «как в книге»,
@@ -97,7 +98,8 @@ export const ICAR_MAP_EN: IcarMapText = {
         'open ADE standard on JSON and REST, its specification held on GitHub under Apache 2.0.',
       ours:
         'Exchange with FGIAS PR over the twenty templates of the registry — export and reverse ' +
-        'import. A REST interface of the book’s own. Seven ADE collections served at the paths ' +
+        'import. A REST interface of the book’s own. ' +
+        `${ADE_COLLECTIONS.length} ADE collections served at the paths ` +
         'of the specification: animals, test days, calvings, inseminations, conformation scores, ' +
         'weights, breeding values, arrivals, departures, deaths, pregnancy checks. POST intake ' +
         'on four of them — test days, calvings, inseminations, weights — with repeat submissions ' +

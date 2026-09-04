@@ -540,7 +540,7 @@ export type Contribution = {
   weight: number
   /** Вклад признака в итоговое значение индекса. */
   points: number
-  /** Достоверность оценки по признаку, %. */
+  /** Надёжность оценки по признаку, R %. */
   reliability: number | null
 }
 
@@ -549,7 +549,7 @@ export type IndexResult = {
   baseVersion: string
   /** Итоговое значение индекса. */
   value: number
-  /** Достоверность индекса, %. */
+  /** Надёжность индекса, R %. */
   reliability: number
   /** Сколько признаков из профиля удалось учесть. */
   used: number

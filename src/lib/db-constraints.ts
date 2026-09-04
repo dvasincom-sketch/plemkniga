@@ -124,23 +124,23 @@ export const DOMAIN_RULES: DomainRule[] = [
   {
     table: 'animals',
     name: 'chk_animals_production_reliability',
-    // Достоверность оценки — шкала 1…5 (ТЗ, Таблица №3). Не путать
-    // с уровнем достоверности данных: та про происхождение записи,
-    // эта про надёжность прогноза.
+    // Уровень оценки по документу — шкала 1…5 (ТЗ, Таблица №3). Ни то
+    // ни другое из соседних: не уровень достоверности данных (тот про
+    // подтверждение записи) и не надёжность R (та посчитана нами).
     expr: range('production_reliability_level', 1, 5),
-    note: 'достоверность оценки продуктивности 1…5',
+    note: 'уровень оценки продуктивности по документу 1…5',
   },
   {
     table: 'animals',
     name: 'chk_animals_health_reliability',
     expr: range('health_reliability_level', 1, 5),
-    note: 'достоверность оценки здоровья 1…5',
+    note: 'уровень оценки здоровья по документу 1…5',
   },
   {
     table: 'animals',
     name: 'chk_animals_ipc_r',
     expr: range('ipc_details_r', 0, 100),
-    note: 'достоверность ИПЦ 0…100 %',
+    note: 'надёжность ИПЦ 0…100 %',
   },
   {
     table: 'animals',
@@ -184,7 +184,7 @@ export const DOMAIN_RULES: DomainRule[] = [
     table: 'calvings',
     name: 'chk_calvings_calf_weight',
     expr: positive('calf_weight'),
-    note: 'вес телёнка больше нуля',
+    note: 'живая масса телёнка больше нуля',
   },
 
   /* ------------------------------ Осеменения ------------------------------ */
@@ -232,7 +232,7 @@ export const DOMAIN_RULES: DomainRule[] = [
     table: 'index_values',
     name: 'chk_index_values_reliability',
     expr: range('reliability', 0, 100),
-    note: 'достоверность индекса 0…100 %',
+    note: 'надёжность индекса 0…100 %',
   },
   {
     table: 'index_values',

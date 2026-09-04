@@ -542,18 +542,40 @@
     padding-right: 1.25rem;
   }
   /*
+   * Строка-заголовок группы: разделитель, а не запись.
+   *
+   * Заливка стоит здесь, а не утилитой на ячейке, и это не вкусовщина.
+   * Утилиты лежат вне слоя и перебивают правила таблицы, поэтому при
+   * наведении заливка от утилиты оставалась светлой, а цвет текста
+   * менялся на белый — и заголовок группы пропадал с экрана целиком.
+   * Пока заливка и подсветка живут в одном слое, спорить им не о чем.
+   *
+   * Перенос строк тоже здесь: таблица целиком набрана в одну строку
+   * (`white-space: nowrap`), а у заголовка группы под именем стоит
+   * фраза о том, что эта группа значит, и обрезать её нельзя.
+   */
+  .data-table tbody tr.is-group td {
+    background: var(--color-ink-50);
+    white-space: normal;
+  }
+
+  /*
    * Подсветка строки — обещание «сюда можно нажать». Строка-заглушка
    * с сообщением о пустом результате никуда не ведёт, поэтому она
    * исключена: подсвеченная и не реагирующая на клик строка выглядит
    * как сломанная.
+   *
+   * По той же причине исключён и заголовок группы. Имена у исключений
+   * разные, потому что это разные вещи — пустой результат и разделитель,
+   * — а общее у них одно: ни то ни другое не строка данных.
    */
-  .data-table tbody tr:not(.is-empty):hover td {
+  .data-table tbody tr:not(.is-empty):not(.is-group):hover td {
     background: var(--color-brand-500);
     color: #fff;
     border-bottom-color: var(--color-brand-500);
   }
-  .data-table tbody tr:not(.is-empty):hover td .ipc-positive,
-  .data-table tbody tr:not(.is-empty):hover td .ipc-negative {
+  .data-table tbody tr:not(.is-empty):not(.is-group):hover td .ipc-positive,
+  .data-table tbody tr:not(.is-empty):not(.is-group):hover td .ipc-negative {
     color: #fff;
   }
   /*
@@ -565,8 +587,8 @@
    * у самих ссылок он задан утилитами, а те лежат вне слоя и иначе
    * перебивают подсветку.
    */
-  .data-table tbody tr:not(.is-empty):hover td a,
-  .data-table tbody tr:not(.is-empty):hover td .row-chip {
+  .data-table tbody tr:not(.is-empty):not(.is-group):hover td a,
+  .data-table tbody tr:not(.is-empty):not(.is-group):hover td .row-chip {
     color: #fff !important;
   }
   /*
@@ -587,8 +609,8 @@
    * `!important` не от лени: цвета внутри ячеек ставятся утилитами,
    * а те лежат вне слоя и обычное правило перебивают.
    */
-  .data-table tbody tr:not(.is-empty):hover td,
-  .data-table tbody tr:not(.is-empty):hover td * {
+  .data-table tbody tr:not(.is-empty):not(.is-group):hover td,
+  .data-table tbody tr:not(.is-empty):not(.is-group):hover td * {
     color: #fff !important;
   }
   /*
@@ -599,10 +621,10 @@
    * Дорожка становится белой в четверть силы, заполнение — сплошным
    * белым, и соотношение длин остаётся читаемым.
    */
-  .data-table tbody tr:not(.is-empty):hover td .row-bar {
+  .data-table tbody tr:not(.is-empty):not(.is-group):hover td .row-bar {
     background: rgb(255 255 255 / 0.25) !important;
   }
-  .data-table tbody tr:not(.is-empty):hover td .row-bar > div {
+  .data-table tbody tr:not(.is-empty):not(.is-group):hover td .row-bar > div {
     background: #fff !important;
   }
   /*
@@ -613,11 +635,11 @@
    * задана утилитой, а утилиты лежат вне слоя и перебивают обычное
    * правило: снимать её приходится так же жёстко, как ставился цвет.
    */
-  .data-table tbody tr:not(.is-empty):hover td .row-chip {
+  .data-table tbody tr:not(.is-empty):not(.is-group):hover td .row-chip {
     background: rgb(255 255 255 / 0.18) !important;
     border-color: rgb(255 255 255 / 0.45) !important;
   }
-  .data-table tbody tr:not(.is-empty):hover td a {
+  .data-table tbody tr:not(.is-empty):not(.is-group):hover td a {
     text-decoration-color: rgb(255 255 255 / 0.6);
   }
 
@@ -632,7 +654,7 @@
   .data-table td.col-active {
     background: var(--color-brand-50);
   }
-  .data-table tbody tr:not(.is-empty):hover td.col-active {
+  .data-table tbody tr:not(.is-empty):not(.is-group):hover td.col-active {
     background: var(--color-brand-500);
     color: #fff;
   }

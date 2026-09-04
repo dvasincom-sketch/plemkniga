@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 import { checkSpecByCode } from '@/lib/checks-registry'
+import { trustLabel } from '@/lib/dictionaries'
 import { numOf, poolOf, type SqlPool } from '@/lib/sql'
 
 /**
@@ -82,13 +83,16 @@ async function safeQuery(
   }
 }
 
-const TRUST_LABEL: Record<number, string> = {
-  [-1]: 'Отклонено',
-  0: 'Черновик',
-  1: 'Проверено собственником',
-  2: 'Подтверждено лабораторией',
-  3: 'Верифицировано ассоциацией',
-}
+/*
+ * Своей таблицы подписей здесь нет.
+ *
+ * Она была, и первая ступень называлась в ней «Проверено собственником»,
+ * тогда как в `TRUST_LEVELS` та же ступень — «Заявлено хозяйством». Разница
+ * не в словах: «проверено» обещает проверку, которой на первой ступени нет
+ * ни одной, там хозяйство только ручается своим именем. Сводка качества
+ * книги — единственное место, где эти подписи стоят столбиком все пять
+ * подряд, и именно там расхождение читалось как разные шкалы.
+ */
 
 export async function bookQuality(payload: Payload): Promise<BookQuality | null> {
   const pool = poolOf(payload)
@@ -257,7 +261,7 @@ export async function bookQuality(payload: Payload): Promise<BookQuality | null>
     ].filter((x): x is 'issues' | 'trust' | 'queues' => x !== null),
     trust: (trust ?? []).map((t) => ({
       level: numOf(t.level),
-      label: TRUST_LABEL[numOf(t.level)] ?? String(t.level),
+      label: trustLabel(numOf(t.level)),
       count: numOf(t.total),
     })),
     issues: rows,

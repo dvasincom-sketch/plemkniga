@@ -28,7 +28,7 @@ import { TRUST_LEVELS, trustLabel } from '@/lib/dictionaries'
 const TONE: Record<number, string> = {
   [-1]: 'bg-[#c0392b] text-white', // отклонено
   0: 'bg-[#4a4d52] text-white', // черновик
-  1: 'bg-[#8a8f96] text-white', // проверено собственником
+  1: 'bg-[#8a8f96] text-white', // заявлено хозяйством
   2: 'bg-[#e08a1e] text-white', // подтверждено лабораторией
   3: 'bg-forest-500 text-white', // верифицировано ассоциацией
 }

@@ -31,7 +31,13 @@ import { relId } from '@/lib/visibility'
  * 21 колонку неизменившегося экстерьера при каждой переоценке EBV.
  */
 
-/** Пара «прогноз / достоверность» — как в карточке животного. */
+/**
+ * Пара «прогноз / надёжность» — как в карточке животного.
+ *
+ * Подпись R приведена к той, что стоит в `animals`: одно и то же число,
+ * записанное здесь и скопированное туда снимком, под разными словами
+ * означало бы для читателя две разные величины.
+ */
 const forecast = (key: string, label: string, unit?: string) => ({
   type: 'row' as const,
   fields: [
@@ -40,7 +46,7 @@ const forecast = (key: string, label: string, unit?: string) => ({
       type: 'number' as const,
       label: `${label}${unit ? `, ${unit}` : ''}`,
     },
-    { name: `${key}R`, type: 'number' as const, label: 'R, %', min: 0, max: 100 },
+    { name: `${key}R`, type: 'number' as const, label: 'Надёжность, R %', min: 0, max: 100 },
   ],
 })
 
@@ -131,7 +137,7 @@ export const AnimalEvaluations: CollectionConfig = {
           type: 'row',
           fields: [
             { name: 'ipc', type: 'number', label: 'ИПЦ' },
-            { name: 'ipcR', type: 'number', label: 'Достоверность, %', min: 0, max: 100 },
+            { name: 'ipcR', type: 'number', label: 'Надёжность, R %', min: 0, max: 100 },
             { name: 'ipcPercentile', type: 'number', label: 'Процентиль', min: 0, max: 100 },
           ],
         },
@@ -143,9 +149,13 @@ export const AnimalEvaluations: CollectionConfig = {
       label: 'Продуктивность',
       fields: [
         {
+          /*
+           * Ступень из документа расчётного центра, а не наш расчёт.
+           * Подпись та же, что у снимка в `animals`: величина одна.
+           */
           name: 'productionReliabilityLevel',
           type: 'number',
-          label: 'Уровень достоверности оценки',
+          label: 'Уровень оценки по документу, 1…5',
           min: 1,
           max: 5,
         },
@@ -153,8 +163,14 @@ export const AnimalEvaluations: CollectionConfig = {
         {
           type: 'row',
           fields: [
-            { name: 'fertilityForecast', type: 'number', label: 'Воспроизводительная способность' },
-            { name: 'fertilityR', type: 'number', label: 'R, %', min: 0, max: 100 },
+            /*
+             * Подпись приведена к карточке: снимок этой строки ложится
+             * в `animals.reproduction.fertility`, и «воспроизводительная
+             * способность» здесь против «фертильности дочерей» там читалась
+             * как два разных признака у одного числа.
+             */
+            { name: 'fertilityForecast', type: 'number', label: 'Фертильность дочерей, балл' },
+            { name: 'fertilityR', type: 'number', label: 'Надёжность, R %', min: 0, max: 100 },
           ],
         },
       ],
@@ -167,7 +183,7 @@ export const AnimalEvaluations: CollectionConfig = {
         {
           name: 'healthReliabilityLevel',
           type: 'number',
-          label: 'Уровень достоверности оценки',
+          label: 'Уровень оценки по документу, 1…5',
           min: 1,
           max: 5,
         },

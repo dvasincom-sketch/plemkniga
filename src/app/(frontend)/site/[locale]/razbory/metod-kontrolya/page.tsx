@@ -277,8 +277,8 @@ export default async function MilkRecordingNotePage({
               <tbody>
                 {GROUPS.map((g) => (
                   <Fragment key={g.field}>
-                    <tr>
-                      <td colSpan={2} className="bg-ink-50">
+                    <tr className="is-group">
+                      <td colSpan={2}>
                         <span className="font-medium">{g.title}</span>
                         <span className="ml-2 text-ink-500">·</span>{' '}
                         <code className="text-[12px] text-ink-500">{g.field}</code>

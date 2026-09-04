@@ -373,7 +373,7 @@ function CalvingForm({ date, setDate, onBack, onRepeat }: FormProps) {
         <Field label="Мертворождённых">
           <input name="stillborn" inputMode="numeric" className="field field-on-light" />
         </Field>
-        <Field label="Масса телёнка, кг">
+        <Field label="Живая масса телёнка, кг">
           <input name="calfWeight" inputMode="decimal" className="field field-on-light" />
         </Field>
         <Field label="Дата запуска">
