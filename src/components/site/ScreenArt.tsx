@@ -84,17 +84,13 @@ export function AnimalScreen({ labels }: { labels: ScreenLabels }) {
   ]
 
   return (
-    <figure className="overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-[0_1px_3px_rgb(23_24_26_/_0.08)]">
-      <div className="flex items-center gap-2 border-b border-ink-100 bg-ink-50 px-5 py-2.5">
-        <span
-          aria-hidden="true"
-          className="h-2 w-2 rounded-full bg-forest-500"
-        />
-        <span className="text-[12px] font-bold uppercase tracking-[0.08em] text-ink-500">
-          {labels.card}
-        </span>
-      </div>
-
+    /*
+       Своей рамки и своей шапки у карточки больше нет: и то и другое
+       даёт общее окно (`WindowFrame`). Прежде заголовок «Карточка
+       животного» стоял внутри окна прямо под одноимённой вкладкой —
+       одно и то же дважды в двух сантиметрах друг от друга.
+    */
+    <>
       <div className="grid grid-cols-1 gap-x-8 gap-y-6 p-5 sm:p-6 lg:grid-cols-2">
         <div>
           <Row label={labels.number} value="RU 4512 087" />
@@ -146,6 +142,6 @@ export function AnimalScreen({ labels }: { labels: ScreenLabels }) {
           </div>
         </div>
       </div>
-    </figure>
+    </>
   )
 }

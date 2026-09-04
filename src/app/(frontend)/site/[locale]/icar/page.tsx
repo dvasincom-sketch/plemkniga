@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
+import { siteMetadata } from '@/lib/seo'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
 import {
@@ -16,7 +17,20 @@ import { plural } from '@/lib/format'
 import { ADE_COLLECTIONS } from '@/lib/ade/core'
 import { ADE_WRITABLE } from '@/lib/ade/parse'
 
-export const metadata: Metadata = { title: 'Руководства ICAR' }
+/*
+ * Заголовок, описание и указание основной страницы — из одного места
+ * (`lib/seo.ts`). Описание берётся из подводки самой страницы: она уже
+ * написана и переведена, а второе описание для робота никто не читает
+ * и потому никто не правит.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> {
+  const { locale } = await params
+  return siteMetadata(locale, 'icar', '/icar')
+}
 
 /**
  * Соответствие руководствам ICAR — карта, а не перевод.

@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
+import { siteMetadata } from '@/lib/seo'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
 import {
@@ -24,7 +25,20 @@ import {
 import { plural } from '@/lib/format'
 import { BOOK_URL, isSharedPath } from '@/lib/hosts'
 
-export const metadata: Metadata = { title: 'Соответствие' }
+/*
+ * Заголовок, описание и указание основной страницы — из одного места
+ * (`lib/seo.ts`). Описание берётся из подводки самой страницы: она уже
+ * написана и переведена, а второе описание для робота никто не читает
+ * и потому никто не правит.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> {
+  const { locale } = await params
+  return siteMetadata(locale, 'compliance', '/compliance')
+}
 
 /**
  * Соответствие: чему книга следует и чем это подтверждается.

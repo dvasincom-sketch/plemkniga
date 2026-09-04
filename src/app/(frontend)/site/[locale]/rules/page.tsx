@@ -1,13 +1,27 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
+import { siteMetadata } from '@/lib/seo'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
 import { CHECKS, CHECK_GROUPS, type CheckSpec } from '@/lib/checks-registry'
 import { unbounded } from '@/lib/fonts'
 import { plural } from '@/lib/format'
 
-export const metadata: Metadata = { title: 'Проверки данных' }
+/*
+ * Заголовок, описание и указание основной страницы — из одного места
+ * (`lib/seo.ts`). Описание берётся из подводки самой страницы: она уже
+ * написана и переведена, а второе описание для робота никто не читает
+ * и потому никто не правит.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> {
+  const { locale } = await params
+  return siteMetadata(locale, 'rules', '/rules')
+}
 
 /**
  * Каталог правил, по которым книга спорит с записью.

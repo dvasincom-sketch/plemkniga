@@ -1,3 +1,4 @@
+import { pageMetadata } from '@/lib/seo'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
@@ -5,7 +6,11 @@ import { currentTenant } from '@/lib/tenant-server'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 
-export const metadata: Metadata = { title: 'Политика обработки персональных данных' }
+export const metadata: Metadata = pageMetadata({
+  title: 'Политика обработки данных',
+  description:
+    'Правила обработки данных о племенных животных: кто владеет записями, кому они открыты и что происходит при расставании с платформой.',
+})
 
 /**
  * Политика обработки персональных данных.

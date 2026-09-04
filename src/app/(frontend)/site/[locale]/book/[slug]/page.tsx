@@ -5,18 +5,43 @@ import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
 import { BOOK_FEATURES, featureBySlug } from '@/lib/book-features'
+import { pageMetadata } from '@/lib/seo'
 import { CertificateArt } from '@/components/site/CertificateArt'
 import {
   AnimalStates,
+  ConformationScreen,
   ExchangeScreen,
   IndexScreen,
+  MatingScreen,
   MilkScreen,
   PedigreeScreen,
   QualityScreen,
 } from '@/components/site/BookScreens'
+import { WindowFrame } from '@/components/site/WindowFrame'
 import { BOOK_URL, PRODUCT_MAIL } from '@/lib/hosts'
 
-export const metadata: Metadata = { title: 'Раздел книги' }
+/*
+ * Заголовок и описание берутся у самого раздела: у него уже есть имя
+ * и короткая строка о том, что он делает. Общий заголовок «Раздел
+ * книги» на двенадцати страницах означал, что в выдаче они неотличимы
+ * друг от друга — и человек, искавший «подбор пар инбридинг», видел
+ * двенадцать одинаковых строк.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string; slug: string }>
+}): Promise<Metadata> {
+  const { locale, slug } = await params
+  const feature = featureBySlug(slug)
+  if (!feature) return { title: 'Раздел книги' }
+
+  return pageMetadata({
+    title: `${feature.title} — что внутри племенной книги`,
+    description: feature.short,
+    path: `/${locale}/book/${slug}`,
+  })
+}
 
 /**
  * Разбор одного раздела книги.
@@ -110,7 +135,9 @@ export default async function BookFeaturePage({
         {feature.slug === 'pedigree' && (
           <section className="mt-10">
             <div className="max-w-[75ch]">
-              <PedigreeScreen />
+              <WindowFrame title="Ромашка · RU 4512 087" subtitle="происхождение">
+                <PedigreeScreen />
+              </WindowFrame>
             </div>
             <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
               Подтверждённое ДНК помечено, неизвестный предок показан пунктиром. Скрывать
@@ -147,11 +174,44 @@ export default async function BookFeaturePage({
         {feature.slug === 'index' && (
           <section className="mt-10">
             <div className="max-w-[75ch]">
-              <IndexScreen />
+              <WindowFrame title="Ромашка · RU 4512 087" subtitle="профиль Ассоциации">
+                <IndexScreen />
+              </WindowFrame>
             </div>
             <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
               Показано не число, а из чего оно сложилось — включая вклад со знаком минус.
               Индекс без разбора нечем проверить и не с чем спорить.
+            </p>
+          </section>
+        )}
+
+        {feature.slug === 'conformation' && (
+          <section className="mt-10">
+            <div className="max-w-[75ch]">
+              <WindowFrame title="Ромашка · RU 4512 087" subtitle="линейная оценка">
+                <ConformationScreen />
+              </WindowFrame>
+            </div>
+            <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
+              Линейная шкала описывает, а не хвалит: девятка означает «очень», а не «лучше».
+              У роста желаемое ближе к краю, у постановки ног — посередине, и абзацем это
+              не объясняется так же быстро, как одной полосой.
+            </p>
+          </section>
+        )}
+
+        {feature.slug === 'mating' && (
+          <section className="mt-10">
+            <div className="max-w-[75ch]">
+              <WindowFrame title="Ромашка · RU 4512 087" subtitle="подбор быка">
+                <MatingScreen />
+              </WindowFrame>
+            </div>
+            <p className="mt-3 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
+              Список отсортирован по индексу, а предупреждение стоит у первой строки: лучший
+              по числу бык здесь и есть худший выбор. В каталоге поставщика этого не видно
+              вовсе — там у быка одно число, — а видно только там, где обе родословные лежат
+              рядом и инбридинг считается для потомка, которого ещё нет.
             </p>
           </section>
         )}

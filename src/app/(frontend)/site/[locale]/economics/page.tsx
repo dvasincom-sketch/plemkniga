@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
+import { siteMetadata } from '@/lib/seo'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
 import { EconomicAssumptions } from '@/components/EconomicAssumptions'
@@ -9,7 +10,20 @@ import { ECONOMIC_WEIGHTS } from '@/lib/economics'
 import { TRAIT_BASE } from '@/lib/breeding-index'
 import { unbounded } from '@/lib/fonts'
 
-export const metadata: Metadata = { title: 'Экономический индекс' }
+/*
+ * Заголовок, описание и указание основной страницы — из одного места
+ * (`lib/seo.ts`). Описание берётся из подводки самой страницы: она уже
+ * написана и переведена, а второе описание для робота никто не читает
+ * и потому никто не правит.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> {
+  const { locale } = await params
+  return siteMetadata(locale, 'economics', '/economics')
+}
 
 /**
  * Экономический индекс — своей страницей на витрине.

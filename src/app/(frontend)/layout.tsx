@@ -1,7 +1,10 @@
 import type { Metadata } from 'next'
-import React from 'react'
+import React, { Suspense } from 'react'
 import './globals.css'
 import { currentTenant } from '@/lib/tenant-server'
+import { Metrika } from '@/components/Metrika'
+import { BOOK_HOST, SITE_HOSTS, isSiteHost } from '@/lib/hosts'
+import { headers } from 'next/headers'
 
 /*
  * Заголовок и язык берутся у книги, а не вписаны.
@@ -18,13 +21,42 @@ import { currentTenant } from '@/lib/tenant-server'
 export async function generateMetadata(): Promise<Metadata> {
   const t = await currentTenant()
 
+  /*
+   * Основание для относительных адресов в разметке для поисковых систем.
+   *
+   * Без него `canonical: '/ru/breeds'` уезжает в разметку как есть,
+   * а относительный адрес там не принимается — страница остаётся
+   * без указания основной, и поисковая система решает сама, какую
+   * из копий считать главной.
+   *
+   * Домен берётся из заголовка запроса, а не у книги: на витрине
+   * и в книге он разный, а раскладка одна на оба домена. Взяв его
+   * у книги, мы проставили бы витринным страницам книжный адрес —
+   * то есть отдали бы поисковой системе указание считать главной
+   * страницу на чужом домене.
+   */
+  const host = isSiteHost((await headers()).get('host')) ? SITE_HOSTS[0]! : BOOK_HOST
+
   return {
+    metadataBase: new URL(`https://${host}`),
     title: {
       default: `Племенная книга — ${t.org.full}`,
       template: '%s — Племенная книга',
     },
     description:
       'Информационная система для сбора, хранения и анализа данных о крупном рогатом скоте (КРС) с целью определения наиболее перспективных быков-производителей для селекции.',
+    /*
+     * Разметка для соцсетей и мессенджеров. Ссылку на книгу присылают
+     * в переписке чаще, чем набирают руками, и без этих полей она
+     * разворачивается голым адресом — то есть выглядит подозрительно
+     * ровно там, где решают, открывать её или нет.
+     */
+    openGraph: {
+      type: 'website',
+      locale: t.lang === 'ru' ? 'ru_RU' : 'en_US',
+      siteName: t.org.full,
+    },
+    robots: { index: true, follow: true },
   }
 }
 
@@ -33,7 +65,18 @@ export default async function FrontendLayout({ children }: { children: React.Rea
 
   return (
     <html lang={t.lang}>
-      <body className="min-h-screen bg-canvas antialiased">{children}</body>
+      <body className="min-h-screen bg-canvas antialiased">
+        {children}
+        {/*
+           Счётчик читает адрес страницы, а он в Next доступен только
+           внутри границы ожидания: без неё сборка страниц заранее
+           падает целиком. Разбор, где счётчик молчит и почему, —
+           в самом компоненте.
+        */}
+        <Suspense fallback={null}>
+          <Metrika id={process.env.YANDEX_METRIKA_ID} />
+        </Suspense>
+      </body>
     </html>
   )
 }

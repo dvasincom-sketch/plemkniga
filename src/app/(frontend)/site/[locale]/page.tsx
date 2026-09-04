@@ -19,6 +19,7 @@ import { RankScale } from '@/components/site/RankScale'
 import { DemoVideo } from '@/components/site/DemoVideo'
 import { AnimalScreen } from '@/components/site/ScreenArt'
 import { ScreenSlider } from '@/components/site/ScreenSlider'
+import { WindowFrame } from '@/components/site/WindowFrame'
 import { IndexScreen, PedigreeScreen } from '@/components/site/BookScreens'
 import { ADE_MAP } from '@/lib/ade-schema-map'
 import { PRODUCT_MESSAGES } from '@/lib/i18n/product-messages'
@@ -591,18 +592,45 @@ export default async function SitePage({ params }: { params: Promise<{ locale: s
           */}
           <div className="mt-8">
             <ScreenSlider
+              /*
+                 Все три экрана в одной оконной рамке, и заголовок у неё
+                 один — кличка с номером. Прежде рамка была только
+                 у карточки, и переключение показывало не три экрана
+                 одной системы, а три куска вёрстки.
+
+                 В заголовке животное, а не название раздела: раздел уже
+                 назван на вкладке прямо над окном, а кличка связывает
+                 три экрана в один — видно, что родословная и оценка
+                 про то же животное.
+              */
               items={[
                 {
                   key: 'card',
                   label: s.screen.tabs.card,
-                  screen: <AnimalScreen labels={s.screen} />,
+                  screen: (
+                    <WindowFrame title="Ромашка · RU 4512 087" subtitle="запись хозяйства">
+                      <AnimalScreen labels={s.screen} />
+                    </WindowFrame>
+                  ),
                 },
                 {
                   key: 'pedigree',
                   label: s.screen.tabs.pedigree,
-                  screen: <PedigreeScreen />,
+                  screen: (
+                    <WindowFrame title="Ромашка · RU 4512 087" subtitle="происхождение">
+                      <PedigreeScreen />
+                    </WindowFrame>
+                  ),
                 },
-                { key: 'index', label: s.screen.tabs.index, screen: <IndexScreen /> },
+                {
+                  key: 'index',
+                  label: s.screen.tabs.index,
+                  screen: (
+                    <WindowFrame title="Ромашка · RU 4512 087" subtitle="профиль Ассоциации">
+                      <IndexScreen />
+                    </WindowFrame>
+                  ),
+                },
               ]}
             />
           </div>

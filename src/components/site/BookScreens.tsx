@@ -155,7 +155,9 @@ export function AnimalStates() {
 /** Родословная: сколько поколений видно и что помечено. */
 export function PedigreeScreen() {
   return (
-    <div className="overflow-hidden rounded-2xl border border-ink-100 bg-white p-4">
+    /* Обводку даёт окно переключателя; своя вторая рамка внутри
+       выглядела бы вложенным окном. */
+    <div className="p-4">
       <div className="grid grid-cols-3 gap-x-3 gap-y-2 text-[11px]">
         <div className="space-y-2">
           <div className="rounded-lg border border-ink-100 px-2 py-1.5">
@@ -320,7 +322,7 @@ export function IndexScreen() {
   const peak = Math.max(...parts.map(([, v]) => Math.abs(v)))
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-ink-100 bg-white">
+    <div>
       <div className="flex items-baseline justify-between border-b border-ink-100 px-4 py-3">
         <span className="text-[13px] font-medium">Индекс племенной ценности</span>
         <span className="text-[15px] font-medium tabular-nums text-forest-600">+460</span>
@@ -399,6 +401,167 @@ export function ExchangeScreen() {
 }`}
         </pre>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Линейная оценка экстерьера: шкала описывает, а не хвалит.
+ *
+ * ## Что здесь визуальный код
+ *
+ * Самое частое недоразумение с линейной оценкой в том, что её читают
+ * как отметку в школе: пять — посредственно, девять — отлично. А это
+ * шкала **описания**: у роста девятка означает «очень высокая»,
+ * и хорошо это или плохо, зависит от того, чего добивается хозяйство.
+ * У постановки ног обе крайности плохи, и лучшее — середина.
+ *
+ * Поэтому у признаков нарисована полоса желаемого, и она стоит
+ * в разных местах шкалы. Одним рисунком снимается вопрос, который
+ * абзацем не снимается никогда.
+ *
+ * ## Почему подписаны оба конца
+ *
+ * Без них шкала читается как «мало — много», то есть снова как отметка.
+ * «Слоновость — саблистость» не оставляет такой возможности: обе
+ * подписи называют недостаток, и становится видно, что оценка тут
+ * не про количество.
+ */
+export function ConformationScreen() {
+  const traits: {
+    name: string
+    low: string
+    high: string
+    /** Оценка животного, 1–9. */
+    value: number
+    /** Где лежит желаемое: от и до по той же шкале. */
+    want: [number, number]
+  }[] = [
+    { name: 'Рост', low: 'низкая', high: 'высокая', value: 7, want: [6, 8] },
+    { name: 'Глубина туловища', low: 'мелкое', high: 'глубокое', value: 6, want: [5, 8] },
+    { name: 'Постановка задних ног', low: 'слоновость', high: 'саблистость', value: 5, want: [4, 6] },
+    { name: 'Прикрепление вымени', low: 'слабое', high: 'плотное', value: 8, want: [7, 9] },
+  ]
+
+  /* Девять делений: доля от левого края до середины деления. */
+  const at = (v: number) => ((v - 0.5) / 9) * 100
+
+  return (
+    <div className="space-y-4 p-4">
+      {traits.map((t) => (
+        <div key={t.name}>
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-[12px] font-medium">{t.name}</span>
+            <span className="text-[11px] tabular-nums text-ink-500">{t.value} из 9</span>
+          </div>
+
+          <div className="relative mt-2 h-4">
+            {/* полоса желаемого */}
+            <div
+              className="absolute top-1 h-2 rounded-full bg-brand-50"
+              style={{
+                left: `${at(t.want[0])}%`,
+                width: `${at(t.want[1]) - at(t.want[0])}%`,
+              }}
+            />
+            <div className="absolute top-[7px] h-0.5 w-full rounded-full bg-ink-100" />
+            {/* деления */}
+            {Array.from({ length: 9 }, (_, i) => i + 1).map((n) => (
+              <span
+                key={n}
+                className="absolute top-[5px] h-1.5 w-px bg-ink-200"
+                style={{ left: `${at(n)}%` }}
+              />
+            ))}
+            <span
+              className="absolute top-0 h-4 w-1.5 -translate-x-1/2 rounded-full bg-forest-500"
+              style={{ left: `${at(t.value)}%` }}
+            />
+          </div>
+
+          <div className="mt-1 flex justify-between text-[10px] text-ink-400">
+            <span>{t.low}</span>
+            <span>{t.high}</span>
+          </div>
+        </div>
+      ))}
+
+      <p className="border-t border-ink-100 pt-3 text-[11px] leading-snug text-ink-400">
+        Светлая полоса — желаемое, и она стоит в разных местах шкалы: у роста ближе к краю,
+        у постановки ног посередине. Девятка не значит «лучше»; она значит «очень».
+      </p>
+    </div>
+  )
+}
+
+/**
+ * Подбор пар: индекс и родство рядом, а не по очереди.
+ *
+ * ## Что здесь визуальный код
+ *
+ * Что лучший по индексу бык может оказаться худшим выбором. В каталоге
+ * поставщика этого не видно вовсе — там у быка одно число, — а видно
+ * только у того, кто держит обе родословные разом и считает инбридинг
+ * **будущего** потомка, которого ещё нет.
+ *
+ * Поэтому строки отсортированы по индексу, а помечен цветом другой
+ * столбец: глаз идёт сверху вниз и на первой же строке спотыкается
+ * о предупреждение. Это и есть то, ради чего раздел существует.
+ *
+ * ## Почему назван общий предок
+ *
+ * «Инбридинг 8,2 %» — число, с которым нельзя ничего сделать. «Общий
+ * предок: RR Linus, отец матери» — повод посмотреть остальных быков
+ * этой линии и выбрать другого. Предупреждение без причины
+ * не предупреждение, а помеха.
+ */
+export function MatingScreen() {
+  const bulls: { name: string; index: string; f: number; common?: string }[] = [
+    { name: 'RR Linus', index: '+512', f: 8.2, common: 'общий предок: Progenesis Lighter, отец матери' },
+    { name: 'Gywer RDC', index: '+486', f: 1.6 },
+    { name: 'Bandares', index: '+455', f: 0.4 },
+  ]
+
+  return (
+    <div className="p-4">
+      <div className="flex items-baseline justify-between gap-3 border-b border-ink-100 pb-2">
+        <span className="text-[12px] font-medium">Подбор к корове Ромашка</span>
+        <span className="text-[11px] text-ink-400">порог 6,25 %</span>
+      </div>
+
+      <div className="mt-3 space-y-2">
+        {bulls.map((b) => {
+          const over = b.f > 6.25
+          return (
+            <div
+              key={b.name}
+              className={`rounded-lg border px-3 py-2 ${
+                over ? 'border-[#e3c4bb] bg-[#fdf3f0]' : 'border-ink-100'
+              }`}
+            >
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-[12px] font-medium">{b.name}</span>
+                <span className="flex items-baseline gap-3 text-[11px] tabular-nums">
+                  <span className="text-ink-500">ИПЦ {b.index}</span>
+                  <span className={over ? 'font-medium text-[#9e3520]' : 'text-forest-600'}>
+                    F потомка {b.f.toLocaleString('ru-RU')} %
+                  </span>
+                </span>
+              </div>
+
+              {b.common && (
+                <p className="mt-1 text-[10px] leading-snug text-[#9e3520]">{b.common}</p>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      <p className="mt-3 border-t border-ink-100 pt-2 text-[11px] leading-snug text-ink-400">
+        Список отсортирован по индексу, а предупреждение стоит у первой строки: лучший
+        по числу бык здесь и есть худший выбор. Увидеть это можно только там, где обе
+        родословные лежат рядом.
+      </p>
     </div>
   )
 }

@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import { unbounded } from '@/lib/fonts'
+import { siteMetadata } from '@/lib/seo'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
 import {
@@ -49,11 +50,19 @@ import { plural } from '@/lib/format'
  * точность.
  */
 
-export const metadata: Metadata = {
-  title: 'Чем проверяется обмен по ICAR ADE',
-  description:
-    'Одиннадцать ресурсов книги сверяются с настоящими схемами ICAR: 77 схем участвуют ' +
-    'в сверке, 303 лежат в дереве. Что проверяется, что нет и почему.',
+/*
+ * Заголовок, описание и указание основной страницы — из одного места
+ * (`lib/seo.ts`). Описание берётся из подводки самой страницы: она уже
+ * написана и переведена, а второе описание для робота никто не читает
+ * и потому никто не правит.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> {
+  const { locale } = await params
+  return siteMetadata(locale, 'ade', '/ade')
 }
 
 /* ------------------------------------------------------------------ */

@@ -1,3 +1,4 @@
+import { pageMetadata } from '@/lib/seo'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { SiteHeader } from '@/components/SiteHeader'
@@ -13,7 +14,11 @@ import { compareBulls, KINSHIP_DEPTH, MAX_BULLS, type BullRow } from '@/lib/bull
 import { BULL_COMPARISON_MIN } from '@/lib/bull-proof'
 import { signed } from '@/lib/format'
 
-export const metadata: Metadata = { title: 'Сравнение быков' }
+export const metadata: Metadata = pageMetadata({
+  title: 'Сравнение быков',
+  description:
+    'Быки рядом по одним и тем же признакам: племенная ценность, достоверность, дочери в книге, наличие семени.',
+})
 export const dynamic = 'force-dynamic'
 
 /**

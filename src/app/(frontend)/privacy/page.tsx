@@ -1,10 +1,15 @@
+import { pageMetadata } from '@/lib/seo'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { currentTenant } from '@/lib/tenant-server'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
 
-export const metadata: Metadata = { title: 'Политика конфиденциальности' }
+export const metadata: Metadata = pageMetadata({
+  title: 'Политика конфиденциальности',
+  description:
+    'Какие персональные данные собирает племенная книга, зачем они нужны, сколько хранятся и как их удалить.',
+})
 
 export default async function PrivacyPage() {
   /*
