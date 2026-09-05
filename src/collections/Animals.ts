@@ -13,7 +13,7 @@ import {
   STATES,
   toOptions,
 } from '@/lib/dictionaries'
-import { validateIdentNumber, type IdFormat } from '@/lib/animal-id'
+import { INBREEDING_MANUAL_APPROVAL, validateIdentNumber, type IdFormat } from '@/lib/animal-id'
 import { COUNTRIES, buildInternationalId } from '@/lib/aiid'
 import { AUTH_METHODS, ISAG_LOCI, isagField } from '@/lib/isag'
 import { animalMutate, animalRead, isAdmin } from '@/access'
@@ -1388,7 +1388,7 @@ export const Animals: CollectionConfig = {
                 {
                   name: 'inbreedingNeedsApproval',
                   type: 'checkbox',
-                  label: 'Требует ручного подтверждения (инбридинг > 25%)',
+                  label: `Требует ручного подтверждения (инбридинг > ${INBREEDING_MANUAL_APPROVAL} %)`,
                   defaultValue: false,
                   admin: { readOnly: true },
                 },
@@ -1777,6 +1777,27 @@ export const Animals: CollectionConfig = {
            */
           'access-grants',
           'access-views',
+          /*
+           * Всё, что заведено позже и тоже требует животного.
+           *
+           * У каждой из этих коллекций поле `animal` объявлено
+           * обязательным, а внешний ключ Payload делает `ON DELETE SET
+           * NULL`, — то есть удаление животного падало на первой же такой
+           * записи с тем самым «null value in column animal_id». Список
+           * писался, когда этих коллекций ещё не было, и каждая новая
+           * ломала удаление молча: увидеть это можно было только попыткой
+           * удалить животное с оценкой экстерьера или взвешиванием.
+           *
+           * Перемещения уходят вместе с животным по тому же доводу, что
+           * и события: запись «продано хозяйству N» без самого животного
+           * ничего не доказывает, а держать её ради истории нельзя —
+           * поле обязательное.
+           */
+          'animal-exteriors',
+          'animal-evaluations',
+          'weighings',
+          'gradings',
+          'movements',
         ] as const
 
         for (const collection of dependents) {
@@ -1958,9 +1979,20 @@ export const Animals: CollectionConfig = {
           s.fatProteinSum = Math.round((s.fatKg + s.proteinKg) * 10) / 10
         }
 
-        // Инбридинг выше 25% — запись сохраняется, но требует ручного утверждения
+        /*
+         * Инбридинг выше порога — запись сохраняется, но требует ручного
+         * утверждения. Порог именем, а не числом: он же стоит в карточке
+         * (`INBREEDING_MANUAL_APPROVAL`), и совпадали они по случайности.
+         *
+         * Настраиваемое значение Ассоциации (`inbreedingHigh`) сюда
+         * не читается намеренно: хук выполняется на каждом сохранении
+         * животного, и обращение к порогам добавило бы запрос к базе
+         * в самый частый путь записи. Настройка меняет находки проверок,
+         * а этот флажок — заслон в форме, и он остаётся на умолчании.
+         */
         const f = typeof data.inbreeding === 'number' ? data.inbreeding : originalDoc?.inbreeding
-        data.inbreedingNeedsApproval = typeof f === 'number' && f > 25
+        data.inbreedingNeedsApproval =
+          typeof f === 'number' && f > INBREEDING_MANUAL_APPROVAL
 
         // Транслитерация клички по ISO-9 для международного обмена
         if (data.name) {

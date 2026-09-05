@@ -207,18 +207,33 @@ export async function findOrCreateCounterparty(
  */
 export function movementEffect(input: {
   kind: MovementKind
-  animal: Pick<Animal, 'owner' | 'state' | 'herd'>
+  animal: Pick<Animal, 'owner' | 'state' | 'herd' | 'disposalDate'>
   to: number | null
   toHerd: number | null
+  /** Дата самого перемещения — она же дата выбытия, если оно выбытие. */
+  date?: string | null
   /** Ведёт ли получатель свои записи в системе. */
   receiverKeepsBook: boolean
-}): Partial<Pick<Animal, 'owner' | 'state' | 'herd'>> {
-  const { kind, animal, to, toHerd, receiverKeepsBook } = input
-  const patch: Partial<Pick<Animal, 'owner' | 'state' | 'herd'>> = {}
+}): Partial<Pick<Animal, 'owner' | 'state' | 'herd' | 'disposalDate'>> {
+  const { kind, animal, to, toHerd, date, receiverKeepsBook } = input
+  const patch: Partial<Pick<Animal, 'owner' | 'state' | 'herd' | 'disposalDate'>> = {}
 
+  /*
+   * Выбытие ставит и дату выбытия, а не только состояние.
+   *
+   * Все отчёты о выбытии считают по `disposalDate` (`culledYear`
+   * в `sql-herd.ts`), и хозяйство, записывающее выбраковку и падёж
+   * перемещениями, для них переставало терять коров вовсе. Заодно
+   * проверка `state-vs-disposal` срабатывала на каждой такой записи:
+   * состояние выбывшее, даты нет.
+   *
+   * Дата не перетирается: если она уже стоит, значит выбытие записали
+   * раньше другим путём, и первая запись честнее второй.
+   */
   const retired = RETIRES[kind]
   if (retired) {
     patch.state = retired
+    if (date && !animal.disposalDate) patch.disposalDate = date
     return patch
   }
 
@@ -233,6 +248,11 @@ export function movementEffect(input: {
      */
     patch.state = receiverKeepsBook ? 'alive' : 'sold'
     patch.herd = toHerd
+    /*
+     * Продажа тому, кто книгу не ведёт, — для книги тоже выбытие,
+     * и дата у него та же: день сделки.
+     */
+    if (!receiverKeepsBook && date && !animal.disposalDate) patch.disposalDate = date
     return patch
   }
 

@@ -90,10 +90,17 @@ export type Response = {
   unit: string
   /** Вес признака в профиле, доля влияния. Ноль — веса не давали. */
   weight: number
-  /** Ожидаемый сдвиг за поколение в долях σ. */
+  /** Ожидаемый сдвиг за поколение в долях σ, в «желательную» сторону. */
   sigma: number
-  /** То же в единицах признака. */
+  /**
+   * То же в единицах самого признака — со знаком этих единиц.
+   *
+   * У перевёрнутых признаков знак противоположен `sigma`: улучшение
+   * смертности приплода это её уменьшение.
+   */
   units: number
+  /** Рост значения признака — ухудшение. */
+  inverted: boolean
 }
 
 /**
@@ -161,13 +168,25 @@ export function correlatedResponse(
   return KEYS.map((key) => {
     const trait = byKey.get(key)!
     const sigma = (intensity * rb[key]) / sd
+    /*
+     * `sigma` — отклик в «желательную» сторону, `units` — в единицах
+     * самого признака, и у перевёрнутых признаков это разные знаки.
+     *
+     * Прежде `units` считались просто `sigma * sd`, и строка выглядела
+     * так: «Смертность приплода +0,4 %», зелёным. Читалось это как рост
+     * смертности, а означало ровно обратное — что смертность падает
+     * на 0,4 %. У признака, где рост значения есть ухудшение, знак
+     * в его собственных единицах обязан быть перевёрнут.
+     */
+    const direction = trait.inverted ? -1 : 1
     return {
       key,
       label: trait.label,
       unit: trait.unit,
       weight: b[key],
       sigma,
-      units: sigma * trait.sd,
+      units: sigma * trait.sd * direction,
+      inverted: Boolean(trait.inverted),
     }
   }).sort((x, y) => Math.abs(y.sigma) - Math.abs(x.sigma))
 }

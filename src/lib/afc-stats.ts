@@ -1,7 +1,9 @@
 import type { Payload } from 'payload'
 import { AFC_PLAUSIBLE } from '@/lib/afc'
+import { resolveThresholds } from '@/lib/check-thresholds'
+import { PLAUSIBLE } from '@/lib/checks-registry'
 import { poolOf } from '@/lib/sql'
-import { calvingEvent } from '@/lib/sql-herd'
+import { afcMonths, nthCalvingCte } from '@/lib/sql-lactation'
 
 /**
  * Возраст первого отёла по стаду хозяйства и в разрезе быков.
@@ -52,7 +54,12 @@ export const AFC_BANDS = [
   { key: 'early', label: 'до 24 мес.', from: AFC_PLAUSIBLE.min, to: 24 },
   { key: 'target', label: '25–27 мес.', from: 25, to: 27 },
   { key: 'late', label: '28–30 мес.', from: 28, to: 30 },
-  { key: 'veryLate', label: 'старше 30 мес.', from: 31, to: AFC_PLAUSIBLE.max },
+  /*
+   * Подпись полосы — «31 и старше», а не «старше 30»: рядом стоит доля
+   * «30 месяцев и старше», и два разных числа под похожими словами
+   * читались как ошибка в расчёте.
+   */
+  { key: 'veryLate', label: '31 мес. и старше', from: 31, to: AFC_PLAUSIBLE.max },
 ] as const
 
 export type AfcBandKey = (typeof AFC_BANDS)[number]['key']
@@ -135,27 +142,16 @@ const num = (v: unknown): number | null => {
  * по группе вниз молча.
  */
 const COWS_CTE = `
-  with first_calving as (
-    select distinct on (c.animal_id) c.animal_id, c.date
-      from calvings c
-     where c."number" = 1 and c.date is not null and ${calvingEvent('c')}
-     order by c.animal_id, c.date
-  ),
-  second_calving as (
-    select distinct on (c.animal_id) c.animal_id, c.date
-      from calvings c
-     where c."number" = 2 and c.date is not null and ${calvingEvent('c')}
-     order by c.animal_id, c.date
-  ),
+  with ${nthCalvingCte('first_calving', 1)},
+  ${nthCalvingCte('second_calving', 2)},
   cows as (
     select
       a.id,
       a.father_id,
-      (extract(year  from age(f.date, a.birth_date)) * 12
-     + extract(month from age(f.date, a.birth_date)))::int   as afc,
-      s.date is not null                                     as survived2,
-      case when s.date is not null
-           then (s.date::date - f.date::date)
+      ${afcMonths()}::int                                    as afc,
+      s."date" is not null                                   as survived2,
+      case when s."date" is not null
+           then (s."date"::date - f."date"::date)
       end                                                    as interval_days
     from animals a
     join first_calving  f on f.animal_id = a.id
@@ -163,6 +159,12 @@ const COWS_CTE = `
     where a.owner_id = $1
       and a.birth_date is not null
       and a.archived is not true
+      /*
+       * Только самки. Прежде пол не проверялся вовсе: бык с записанным
+       * «отёлом» — ошибка данных, но попадать в средний возраст первого
+       * отёла она не должна.
+       */
+      and a.sex = 'female'
   ),
   valid as (select * from cows where afc between $2 and $3)
 `
@@ -171,7 +173,18 @@ export async function afcStats(payload: Payload, organizationId: number): Promis
   const pool = poolOf(payload)
   if (!pool) return EMPTY
 
-  const bounds = [organizationId, AFC_PLAUSIBLE.min, AFC_PLAUSIBLE.max]
+  /*
+   * Границы правдоподобия — настроенные Ассоциацией, а не умолчания.
+   *
+   * Здесь стояли константы `AFC_PLAUSIBLE`, а проверки стада давно берут
+   * `afcMin` и `afcMax` из порогов. После первой правки порога отчёт
+   * и находка расходились: хозяйство видело замечание «возраст первого
+   * отёла вне границ» у коровы, которую этот же отчёт учитывал в среднем.
+   * Умолчания порогов равны константам, поэтому смысл не меняется, пока
+   * Ассоциация их не тронет.
+   */
+  const t = await resolveThresholds(payload)
+  const bounds = [organizationId, t.afcMin, t.afcMax]
 
   /*
    * Три набора считаются тремя запросами, а не одним с группировкой
@@ -226,7 +239,8 @@ export async function afcStats(payload: Payload, organizationId: number): Promis
           */
          round(100.0 * count(*) filter (where survived2) / nullif(count(*), 0), 1) as survived2,
          round(avg(interval_days) filter (
-           where interval_days between 250 and 900
+           where interval_days
+                 between ${PLAUSIBLE.calvingInterval.min} and ${PLAUSIBLE.calvingInterval.max}
          )::numeric, 0)                                               as interval_days
        from valid
        group by 1

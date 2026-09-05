@@ -28,10 +28,24 @@ import type { Payload } from 'payload'
 
 export type MembershipGate = { allowed: boolean; reason?: string }
 
-const NOT_MEMBER =
+const PENDING =
   'Действие доступно членам Ассоциации. Ваша заявка на рассмотрении — до решения ' +
   'вы можете вести и выгружать свои данные, но публикация в общей книге и верификация ' +
   'записей недоступны.'
+
+/*
+ * Отказ и «ещё не подавали» — разные состояния, и текст у них разный.
+ *
+ * Прежде оба получали строку про заявку на рассмотрении. Хозяйство,
+ * которому Ассоциация отказала (`membership: 'none'` с основанием
+ * в решении), читало, что его заявку рассматривают, и ждало ответа,
+ * который уже дан.
+ */
+const NOT_MEMBER =
+  'Действие доступно членам Ассоциации, а ваше хозяйство в ней не состоит. ' +
+  'Вести и выгружать свои данные можно как обычно; публикация в общей книге ' +
+  'и верификация записей — только членам. Если по заявке было решение, ' +
+  'основание указано в профиле организации.'
 
 const SUSPENDED =
   'Членство приостановлено, поэтому действие недоступно. Причина указана в решении ' +
@@ -56,5 +70,6 @@ export async function membershipGate(
   if (!org) return { allowed: false, reason: 'Организация не найдена' }
   if (org.membership === 'member') return { allowed: true }
 
-  return { allowed: false, reason: org.membership === 'suspended' ? SUSPENDED : NOT_MEMBER }
+  if (org.membership === 'suspended') return { allowed: false, reason: SUSPENDED }
+  return { allowed: false, reason: org.membership === 'pending' ? PENDING : NOT_MEMBER }
 }

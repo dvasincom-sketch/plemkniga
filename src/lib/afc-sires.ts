@@ -1,7 +1,7 @@
 import type { Payload } from 'payload'
-import { AFC_PLAUSIBLE } from '@/lib/afc'
+import { resolveThresholds } from '@/lib/check-thresholds'
 import { poolOf } from '@/lib/sql'
-import { calvingEvent } from '@/lib/sql-herd'
+import { afcMonths, nthCalvingCte } from '@/lib/sql-lactation'
 
 /**
  * Возраст первого отёла по быкам — по всей книге, а не по одному стаду.
@@ -101,20 +101,14 @@ export async function afcSireBook(payload: Payload): Promise<AfcSireBook> {
    * 27 месяцев в одном отчёте и 28 в другом.
    */
   const sql = `
-    with first_calving as (
-      select distinct on (c.animal_id) c.animal_id, c."date"
-        from calvings c
-       where c."number" = 1 and c."date" is not null and ${calvingEvent('c')}
-       order by c.animal_id, c."date"
-    ),
+    with ${nthCalvingCte('first_calving', 1)},
     valid as (
       select
         a.id,
         a.father_id,
         a.herd_id,
         a.owner_id,
-        ((extract(year  from age(f."date", a.birth_date)) * 12
-        + extract(month from age(f."date", a.birth_date))))::numeric as afc
+        ${afcMonths()}::numeric as afc
       from animals a
       join first_calving f on f.animal_id = a.id
       where a.birth_date is not null
@@ -161,18 +155,19 @@ export async function afcSireBook(payload: Payload): Promise<AfcSireBook> {
     having count(*) >= $3
     order by avg(d.dev) nulls last`
 
-  const bounds = [AFC_PLAUSIBLE.min, AFC_PLAUSIBLE.max, AFC_SIRE_MIN_DAUGHTERS]
+  /*
+   * Границы — настроенные Ассоциацией: сводка по быкам смотрит на те же
+   * записи, что и проверки, и расходиться с ними не должна. Разбор —
+   * в `afc-stats.ts`.
+   */
+  const t = await resolveThresholds(payload)
+  const bounds = [t.afcMin, t.afcMax, AFC_SIRE_MIN_DAUGHTERS]
 
   const [main, totals] = await Promise.all([
     pool.query(sql, bounds).catch(() => null),
     pool
       .query(
-        `with first_calving as (
-           select distinct on (c.animal_id) c.animal_id, c."date"
-             from calvings c
-            where c."number" = 1 and c."date" is not null and ${calvingEvent('c')}
-            order by c.animal_id, c."date"
-         ),
+        `with ${nthCalvingCte('first_calving', 1)},
          ok as (
            select a.id, a.father_id
              from animals a
@@ -180,8 +175,7 @@ export async function afcSireBook(payload: Payload): Promise<AfcSireBook> {
             where a.birth_date is not null
               and a.archived is not true
               and a.sex = 'female'
-              and ((extract(year  from age(f."date", a.birth_date)) * 12
-                  + extract(month from age(f."date", a.birth_date)))) between $1 and $2
+              and ${afcMonths()} between $1 and $2
          )
          select
            count(*)::int as cows,

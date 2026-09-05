@@ -1,6 +1,12 @@
 import type { Payload } from 'payload'
 import { poolOf } from '@/lib/sql'
-import { calvingsCount, lastCalvingDate, liveFemale, notArchived } from '@/lib/sql-herd'
+import {
+  calvingsCount,
+  lastCalvingDate,
+  lastInsemination,
+  liveFemale,
+  notArchived,
+} from '@/lib/sql-herd'
 
 /**
  * Календарь стада: запуск, отёл, проверка стельности.
@@ -145,21 +151,15 @@ const BASE = `
    * Последнее осеменение после последнего отёла — и его результат.
    * Берётся именно последнее: у коровы, осеменённой трижды, вопрос
    * стоит про третью попытку, а не про первую.
+   *
+   * Кусок общий (sql-herd.ts): то же правило отвечает на вопрос
+   * «стельная ли она сейчас» в списке выбраковки и в подборе пар,
+   * и там оно было записано иначе — «есть хоть одно плодотворное».
    */
   last_ins as (
     select c.id, c.lactation, c.last_calving, i.at, i.result_code, i.checked
       from calv c
-      left join lateral (
-        select i."date" as at,
-               r.code   as result_code,
-               i.pregnancy_check_date is not null as checked
-          from inseminations i
-          left join insemination_results r on r.id = i.result_id
-         where i.animal_id = c.id
-           and (c.last_calving is null or i."date" > c.last_calving)
-         order by i."date" desc
-         limit 1
-      ) i on true
+      left join lateral ${lastInsemination('c', 'c.last_calving')} i on true
   ),
   /*
    * Плодотворным считается последнее осеменение после отёла с кодом 1.

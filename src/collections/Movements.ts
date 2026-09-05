@@ -297,6 +297,7 @@ export const Movements: CollectionConfig = {
           animal,
           to,
           toHerd: relId(doc.toHerd),
+          date: typeof doc.date === 'string' ? doc.date : null,
           receiverKeepsBook,
         })
 

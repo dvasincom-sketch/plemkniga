@@ -1,6 +1,13 @@
 import type { Payload } from 'payload'
 import { numOrNull, poolOf } from '@/lib/sql'
-import { finishedLactation, hasMilk305, lactationGroup } from '@/lib/sql-lactation'
+import {
+  afcMonths,
+  finishedLactation,
+  hasMilk305,
+  lactationGroup,
+  nthCalvingCte,
+} from '@/lib/sql-lactation'
+import { AFC_PLAUSIBLE } from '@/lib/afc'
 import { liveFemale, notArchived } from '@/lib/sql-herd'
 
 /**
@@ -121,18 +128,20 @@ export async function sireSummary(
        group by grp
     ),
     /*
-     * Возраст первого отёла дочерей — в месяцах, по первому отёлу.
-     * Считается здесь, а не берётся из отчёта AFC: тот группирует
-     * по быку всю книгу, а вопрос стоит про это стадо.
+     * Возраст первого отёла дочерей — в месяцах. Отбор коров свой:
+     * отчёт AFC группирует по быку всю книгу, а вопрос здесь про это
+     * стадо. Само определение первого отёла и способ счёта месяцев —
+     * общие (sql-lactation.ts), иначе тот же бык показывал бы в отчёте
+     * по производителям одно число, а в своей карточке другое.
      */
+    ${nthCalvingCte('first_calving', 1)},
     afc as (
-      select m.id, m.father_id,
-             extract(year from age(k."date", a.birth_date)) * 12
-             + extract(month from age(k."date", a.birth_date)) as months
+      select m.id, m.father_id, ${afcMonths('f', 'a')} as months
         from mine m
         join animals a on a.id = m.id
-        join calvings k on k.animal_id = m.id and k."number" = 1
+        join first_calving f on f.animal_id = m.id
        where a.birth_date is not null
+         and ${afcMonths('f', 'a')} between ${AFC_PLAUSIBLE.min} and ${AFC_PLAUSIBLE.max}
     ),
     scc as (
       select m.id, m.father_id,

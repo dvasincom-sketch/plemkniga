@@ -2,6 +2,7 @@ import type { Payload } from 'payload'
 import { checkSpecByCode } from '@/lib/checks-registry'
 import { trustLabel } from '@/lib/dictionaries'
 import { numOf, poolOf, type SqlPool } from '@/lib/sql'
+import { resolveThresholds } from '@/lib/check-thresholds'
 
 /**
  * Качество книги — сводка по всей базе, а не по выборке.
@@ -103,6 +104,17 @@ export async function bookQuality(payload: Payload): Promise<BookQuality | null>
    * по отцу и по матери, — и это те же два соединения, которые сделала бы
    * каждая отдельная проверка; собранные вместе, они читают таблицу один раз.
    */
+  /*
+   * Пороги — те, что настроила Ассоциация, а не числа в этом файле.
+   *
+   * Здесь стояли литералы 500 / 25 000 и 25 %, и после первой же правки
+   * порога сводка качества книги начинала расходиться с проверками:
+   * Ассоциация видела «573 записи с неправдоподобным удоем», а хозяйства
+   * в своих находках — ни одной, и наоборот. Читаются пороги один раз
+   * на всю сводку.
+   */
+  const t = await resolveThresholds(payload)
+
   const [issues, trust, queues] = await Promise.all([
     safeQuery(
       pool,
@@ -129,7 +141,7 @@ export async function bookQuality(payload: Payload): Promise<BookQuality | null>
         count(*) filter (where a.id = a.father_id or a.id = a.mother_id) as self_parent,
         count(*) filter (
           where a.summary_milk_yield is not null
-            and (a.summary_milk_yield < 500 or a.summary_milk_yield > 25000)
+            and (a.summary_milk_yield < ${t.milkMin} or a.summary_milk_yield > ${t.milkMax})
         )                                                              as milk_implausible,
         count(*) filter (
           where a.blood_percent is not null
@@ -137,7 +149,7 @@ export async function bookQuality(payload: Payload): Promise<BookQuality | null>
         )                                                              as blood_out_of_range,
         count(*) filter (where a.disposal_reason_id is not null and a.state = 'alive')
                                                                        as disposal_vs_state,
-        count(*) filter (where a.inbreeding is not null and a.inbreeding > 25)
+        count(*) filter (where a.inbreeding is not null and a.inbreeding > ${t.inbreedingHigh})
                                                                        as high_inbreeding,
         count(*) filter (where a.birth_date > now())                   as birth_in_future
       from animals a

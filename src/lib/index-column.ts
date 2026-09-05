@@ -1,5 +1,6 @@
 import type { Payload, Where } from 'payload'
-import { computeIndex, type IndexProfile } from '@/lib/breeding-index'
+import { computeIndex, type Base, type IndexProfile } from '@/lib/breeding-index'
+import { loadActiveBase } from '@/lib/index-base'
 import type { Animal, IndexValue, User } from '@/payload-types'
 
 /**
@@ -39,10 +40,22 @@ export type IndexColumn = {
   cap: number
 }
 
-/** Значения индекса для уже полученной страницы — порядок при этом чужой. */
-export function indexValues(animals: Animal[], profile: IndexProfile): Record<number, number> {
+/**
+ * Значения индекса для уже полученной страницы — порядок при этом чужой.
+ *
+ * База сравнения передаётся, а не берётся по умолчанию. Хранимые значения
+ * (`index-values.ts`) считаются на активной базе, а этот путь работал
+ * на заимствованной из кода: пока строк по профилю нет, колонка и карточка
+ * показывали числа, посчитанные по разным σ, — и подпись объясняла только
+ * усечение выборки, но не разницу в базе.
+ */
+export function indexValues(
+  animals: Animal[],
+  profile: IndexProfile,
+  base?: Base,
+): Record<number, number> {
   const out: Record<number, number> = {}
-  for (const a of animals) out[a.id as number] = computeIndex(a, profile).value
+  for (const a of animals) out[a.id as number] = computeIndex(a, profile, base).value
   return out
 }
 
@@ -148,7 +161,7 @@ export async function findRankedByProfile({
   })
 
   const docs = pool.docs as Animal[]
-  const values = indexValues(docs, profile)
+  const values = indexValues(docs, profile, await loadActiveBase(payload))
 
   const ordered = [...docs].sort(
     (a, b) => (values[b.id as number] ?? 0) - (values[a.id as number] ?? 0),

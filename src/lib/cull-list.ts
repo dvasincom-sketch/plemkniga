@@ -1,6 +1,12 @@
 import type { Payload } from 'payload'
 import { SCC_LABEL, SCC_THRESHOLD } from '@/lib/herd-analytics'
-import { calvingsCount, lastCalvingDate, liveFemale, notArchived } from '@/lib/sql-herd'
+import {
+  calvingsCount,
+  isPregnant,
+  lastCalvingDate,
+  liveFemale,
+  notArchived,
+} from '@/lib/sql-herd'
 import { numOrNull, poolOf } from '@/lib/sql'
 import { finishedLactation, hasMilk305 } from '@/lib/sql-lactation'
 
@@ -201,13 +207,14 @@ const BODY = `
            (select count(*) from inseminations i
              where i.animal_id = c.id
                and (c.last_calving is null or i."date" > c.last_calving))::int as services,
-           exists (
-             select 1 from inseminations i
-               left join insemination_results r on r.id = i.result_id
-              where i.animal_id = c.id
-                and (c.last_calving is null or i."date" > c.last_calving)
-                and r.code = '1'
-           ) as pregnant
+           /*
+            * Стельность — общим предикатом (sql-herd.ts). Здесь стояло
+            * «есть хоть одно плодотворное осеменение после отёла»,
+            * и корова, которую после подтверждённой стельности осеменяли
+            * снова, оставалась для этого списка стельной, хотя календарь
+            * тем же утром звал её переосеменять.
+            */
+           ${isPregnant('c', 'c.last_calving')} as pregnant
       from calv c
   ),
   latest_scc as (

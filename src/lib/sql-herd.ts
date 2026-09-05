@@ -145,3 +145,52 @@ export const isHeifer = (
  */
 export const culledYear = (a = 'a') =>
   `(${a}.disposal_date is not null and ${a}.disposal_date > now() - interval '12 months')`
+
+/* ------------------------------------------------------------------ *
+ *  Стельность                                                        *
+ * ------------------------------------------------------------------ */
+
+/**
+ * Последнее осеменение после последнего отёла — вместе с результатом.
+ *
+ * Боковым запросом, а не подзапросом на каждое поле: спрашивают о нём
+ * сразу три вещи — когда, чем кончилось и проверяли ли стельность, —
+ * и три подзапроса по одной таблице означали бы три прохода и три случая
+ * забыть условие.
+ */
+export const lastInsemination = (a = 'a', lastCalving = lastCalvingDate(a)) => `(
+    select i."date"                                as at,
+           r.code                                  as result_code,
+           i.pregnancy_check_date is not null      as checked
+      from inseminations i
+      left join insemination_results r on r.id = i.result_id
+     where i.animal_id = ${a}.id
+       and (${lastCalving} is null or i."date" > ${lastCalving})
+     order by i."date" desc
+     limit 1
+  )`
+
+/**
+ * Стельная сейчас: **последнее** осеменение после отёла оказалось
+ * плодотворным.
+ *
+ * Слово «последнее» здесь и есть всё правило. Определений было три,
+ * и они расходились ровно на той корове, ради которой их и смотрят:
+ * календарь брал последнее осеменение, а список выбраковки и подбор пар —
+ * «есть хоть одно плодотворное после отёла». Корова, у которой стельность
+ * подтвердили, а потом осеменили снова (перегуляла, потеряла), для одного
+ * экрана оставалась стельной, для другого нет: подбор исключал её как
+ * стельную, а календарь тем же утром звал переосеменять.
+ *
+ * Осеменение без результата стельной не делает: пустой результат — это
+ * «не знаем», а не «нет». Такую корову зовёт к себе список проверки
+ * стельности, и это верно.
+ */
+export const isPregnant = (a = 'a', lastCalving = lastCalvingDate(a)) =>
+  `((select r.code
+       from inseminations i
+       left join insemination_results r on r.id = i.result_id
+      where i.animal_id = ${a}.id
+        and (${lastCalving} is null or i."date" > ${lastCalving})
+      order by i."date" desc
+      limit 1) = '1')`

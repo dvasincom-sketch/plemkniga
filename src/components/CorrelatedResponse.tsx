@@ -55,6 +55,17 @@ export function CorrelatedResponse({ profile, base }: { profile: IndexProfile; b
                   <td>
                     <span className="text-[14px]">{r.label}</span>
                     <span className="ml-1.5 text-[12px] text-ink-500">{r.unit}</span>
+                    {/*
+                       У перевёрнутого признака улучшение — это уменьшение,
+                       и в его собственных единицах отклик идёт со знаком
+                       минус при зелёной полосе. Без пометки это читается
+                       как противоречие.
+                    */}
+                    {r.inverted && (
+                      <span className="ml-2 rounded bg-canvas px-1.5 py-0.5 text-[11px] text-ink-500">
+                        меньше — лучше
+                      </span>
+                    )}
                     {noWeight && (
                       <span className="ml-2 rounded bg-canvas px-1.5 py-0.5 text-[11px] text-ink-500">
                         веса нет

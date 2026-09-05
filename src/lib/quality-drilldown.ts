@@ -1,5 +1,8 @@
 import type { Payload } from 'payload'
 import { poolOf } from '@/lib/sql'
+import { resolveThresholds, type Thresholds } from '@/lib/check-thresholds'
+import { checkSpecByCode } from '@/lib/checks-registry'
+import { nf } from '@/lib/format'
 
 /**
  * Разбор одного противоречия: кто именно.
@@ -40,10 +43,16 @@ export type Drilldown = {
  * строку: для «мать моложе дочери» это номер матери и обе даты, иначе
  * человеку придётся открывать карточку, чтобы понять, о чём речь.
  */
-const RULES: Record<
-  string,
-  { label: string; severity: 'fix' | 'note'; where: string; detail?: string }
-> = {
+type Rule = { label: string; severity: 'fix' | 'note'; where: string; detail?: string }
+
+/*
+ * Правила зависят от настроенных порогов, поэтому собираются функцией,
+ * а не лежат готовой картой. Числа 500, 25 000 и 25 % стояли здесь
+ * литералами — и в подписи, и в условии, — а Ассоциация их настраивает:
+ * после первой правки порога список расходился со сводкой, из которой
+ * в него приходят.
+ */
+const rulesFor = (t: Thresholds): Record<string, Rule> => ({
   'self-parent': {
     label: 'Животное записано собственным родителем',
     severity: 'fix',
@@ -89,10 +98,11 @@ const RULES: Record<
     where: 'a.birth_date is null',
   },
   'milk-implausible': {
-    label: 'Удой вне правдоподобных границ (500…25 000 кг)',
+    label: `Удой вне правдоподобных границ (${nf(t.milkMin)}…${nf(t.milkMax)} кг)`,
     severity: 'fix',
     where:
-      'a.summary_milk_yield is not null and (a.summary_milk_yield < 500 or a.summary_milk_yield > 25000)',
+      'a.summary_milk_yield is not null and ' +
+      `(a.summary_milk_yield < ${t.milkMin} or a.summary_milk_yield > ${t.milkMax})`,
     detail: "round(a.summary_milk_yield)::text || ' кг'",
   },
   'blood-out-of-range': {
@@ -107,9 +117,15 @@ const RULES: Record<
     where: "a.disposal_reason_id is not null and a.state = 'alive'",
   },
   'high-inbreeding': {
-    label: 'Инбридинг выше 25 %',
-    severity: 'note',
-    where: 'a.inbreeding is not null and a.inbreeding > 25',
+    label: `Инбридинг выше ${nf(t.inbreedingHigh)} %`,
+    /*
+     * Существенность — из реестра проверок, а не своя. Здесь стояло
+     * «на усмотрение», в реестре и в сводке — «требует исправления»,
+     * и один и тот же заголовок приходил к эксперту с разным весом
+     * в зависимости от того, откуда он на него посмотрел.
+     */
+    severity: checkSpecByCode('high-inbreeding')?.severity === 'fix' ? 'fix' : 'note',
+    where: `a.inbreeding is not null and a.inbreeding > ${t.inbreedingHigh}`,
     detail: "round(a.inbreeding, 1)::text || ' %'",
   },
   'no-parents': {
@@ -124,7 +140,7 @@ const RULES: Record<
     severity: 'note',
     where: 'a.breed_id is null',
   },
-}
+})
 
 /** Список записей по одному правилу. Ограничен: сводка про масштаб, список — про разбор. */
 export async function drilldown(
@@ -132,7 +148,7 @@ export async function drilldown(
   code: string,
   limit = 200,
 ): Promise<Drilldown | null> {
-  const rule = RULES[code]
+  const rule = rulesFor(await resolveThresholds(payload))[code]
   if (!rule) return null
 
   const pool = poolOf(payload)

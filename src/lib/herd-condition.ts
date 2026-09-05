@@ -182,8 +182,16 @@ export async function herdConditions(payload: Payload): Promise<Map<number, Herd
       (count(*) filter (where ${liveCow} and s.value is not null))::int as scc_measured,
       (count(*) filter (where ${liveCow} and s.value > $2))::int as scc_above,
 
-      (count(*) filter (where ${culledYear()}))::int as culled_total,
-      (count(*) filter (where ${culledYear()} and coalesce(k.n, 0) <= 1))::int as culled_first
+      /*
+       * Только самки и только не архив — тем же отбором, что в кабинете
+       * хозяйства (herd-analytics.culling). Пол здесь не проверялся,
+       * и в «выбыло за год» у Ассоциации попадали проданные бычки.
+       */
+      (count(*) filter (where ${notArchived()} and a.sex = 'female' and ${culledYear()}))::int
+        as culled_total,
+      (count(*) filter (
+        where ${notArchived()} and a.sex = 'female' and ${culledYear()} and coalesce(k.n, 0) <= 1
+      ))::int as culled_first
 
       from animals a
       left join calved k on k.animal_id = a.id

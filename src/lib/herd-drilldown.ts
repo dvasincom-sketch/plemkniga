@@ -228,6 +228,8 @@ const RULES: Record<string, Rule> = {
       from animals a
       left join disposal_reasons r on r.id = a.disposal_reason_id
      where a.owner_id = $1
+       and ${notArchived()}
+       and a.sex = 'female'
        and ${culledYear()}`,
     detail: `
       coalesce(r.name, 'Причина не указана')
@@ -255,6 +257,8 @@ const RULES: Record<string, Rule> = {
       from animals a
       left join disposal_reasons r on r.id = a.disposal_reason_id
      where a.owner_id = $1
+       and ${notArchived()}
+       and a.sex = 'female'
        and ${culledYear()}
        and ${CALVINGS} <= 1`,
     detail: `

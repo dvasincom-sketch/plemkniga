@@ -1667,15 +1667,22 @@ async function importEvents(
 
   const existingIds = indexedIds(mine)
   if (existingIds.length) {
-    const { docs } = await payload
-      .find({
-        collection: collection as never,
-        where: { animal: { in: existingIds } },
-        limit: 50_000,
-        depth: 0,
-        overrideAccess: true,
-      })
-      .catch(() => ({ docs: [] as Record<string, unknown>[] }))
+    /*
+     * Отказ выборки — не «дублей нет».
+     *
+     * Здесь стоял `.catch(() => ({ docs: [] }))`, и любая неудача запроса
+     * означала пустой набор уже записанного: файл ложился в книгу второй
+     * раз целиком, а хозяйство видело обычный отчёт загрузки. Заслон
+     * от дублей, который молчит при отказе, хуже отсутствующего —
+     * на него полагаются.
+     */
+    const { docs } = await payload.find({
+      collection: collection as never,
+      where: { animal: { in: existingIds } },
+      limit: 50_000,
+      depth: 0,
+      overrideAccess: true,
+    })
 
     for (const d of docs as Record<string, unknown>[]) {
       const aid =
@@ -1685,8 +1692,23 @@ async function importEvents(
       /* У оценок экстерьера дата зовётся `assessedAt` — заслон от дублей общий. */
       const date = (d.date ?? d.assessedAt) as string | undefined
       if (!aid || !date) continue
+      /*
+       * Различитель читается тем же правилом, что и пишется. У взвешиваний
+       * это признак (`sign`), и он здесь не читался вовсе: ключ уже
+       * записанного строился без него, ключ новой строки — с ним, совпасть
+       * они не могли никогда, и повторная загрузка файла взвешиваний
+       * удваивала всю историю.
+       */
       seen.add(
-        keyOf(aid, date, ds.key === 'milkTests' ? (d.dailyYield as number | null) : null),
+        keyOf(
+          aid,
+          date,
+          ds.key === 'milkTests'
+            ? (d.dailyYield as number | null)
+            : ds.key === 'weighings'
+              ? ((d.sign as string | null) ?? null)
+              : null,
+        ),
       )
     }
   }

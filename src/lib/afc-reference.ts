@@ -97,7 +97,7 @@ export const AFC_REFERENCE_BANDS = [
   { key: 'early', label: 'до 24 мес.', cows: 48551, share: 12.2 },
   { key: 'target', label: '25–27 мес.', cows: 114904, share: 29.0 },
   { key: 'late', label: '28–30 мес.', cows: 101180, share: 25.5 },
-  { key: 'veryLate', label: 'старше 30 мес.', cows: 131836, share: 33.3 },
+  { key: 'veryLate', label: '31 мес. и старше', cows: 131836, share: 33.3 },
 ] as const
 
 /** Помесячно: распределение и сырые кривые исходов. */

@@ -62,6 +62,7 @@
     "check:herd": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-herd-analytics.ts",
     "check:drilldown": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-drilldown.ts",
     "check:service-period": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-service-period.ts",
+    "check:afc": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-afc.ts",
     "check:condition": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-condition.ts",
     "check:ranking": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-ranking.ts",
     "check:i18n": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-i18n.ts",

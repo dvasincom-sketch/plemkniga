@@ -242,6 +242,11 @@ async function main() {
   })
   check(relId(after.owner) === outsider.id, 'владелец — карточка вне книги')
   check(after.state === 'sold', 'для книги животное выбыло: записей о нём больше не придёт')
+  check(
+    Boolean(after.disposalDate),
+    'дата выбытия проставлена: иначе продажа наружу не попадёт в отчёты о выбытии',
+    `disposalDate: ${String(after.disposalDate)}`,
+  )
 
   console.log('\nЗапись задним числом\n')
 
@@ -272,6 +277,59 @@ async function main() {
     overrideAccess: true,
   })
   check(relId(after.owner) === outsider.id, 'запись задним числом не вернула прежнего владельца')
+
+  console.log('\nВыбраковка ставит дату выбытия\n')
+
+  /*
+   * Отчёты о выбытии считают по `disposalDate`, а не по состоянию.
+   * Пока перемещение её не ставило, хозяйство, ведущее выбраковку
+   * и падёж перемещениями, не теряло коров ни в одном отчёте — и при
+   * этом получало находку «выбытие без причины» на каждой такой записи.
+   */
+  const retired = await payload.create({
+    collection: 'animals',
+    overrideAccess: true,
+    data: {
+      identNumber: `9${suffix}1`,
+      name: `${TAG} Выбраковка`,
+      sex: 'female',
+      owner: outsider.id,
+      state: 'alive',
+      publicVisible: false,
+      publicDetails: false,
+    } as never,
+  })
+
+  await payload.create({
+    collection: 'movements',
+    overrideAccess: true,
+    data: {
+      animal: retired.id,
+      date: '2026-06-10T00:00:00.000Z',
+      kind: 'cull',
+      from: outsider.id,
+    },
+  })
+
+  const afterCull = await payload.findByID({
+    collection: 'animals',
+    id: retired.id,
+    depth: 0,
+    overrideAccess: true,
+  })
+  check(afterCull.state === 'culled', 'состояние стало «выбраковано»')
+  check(
+    Boolean(afterCull.disposalDate),
+    'дата выбытия проставлена — иначе животное не попадёт ни в один отчёт о выбытии',
+    `disposalDate: ${String(afterCull.disposalDate)}`,
+  )
+
+  await payload.delete({
+    collection: 'movements',
+    where: { animal: { equals: retired.id } },
+    overrideAccess: true,
+  })
+  await payload.delete({ collection: 'animals', id: retired.id, overrideAccess: true })
 
   console.log('\nПроверки формы\n')
 

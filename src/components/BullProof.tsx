@@ -369,12 +369,17 @@ export function BullProofBlock({ data, bullId }: { data: Proof; bullId?: number 
               <tr>
                 <td>Жир, %</td>
                 <td className="text-right tabular-nums">{nf(data.fatMean, 2)}</td>
-                <td className="text-right tabular-nums">{nf(data.withMilk)}</td>
+                {/*
+                   Своё число записей у каждой строки. Здесь стояло число
+                   дочерей с удоем — одно на все три показателя, — и жир
+                   с белком выглядели посчитанными по всем, кто дал молоко.
+                */}
+                <td className="text-right tabular-nums">{nf(data.withFat)}</td>
               </tr>
               <tr>
                 <td>Белок, %</td>
                 <td className="text-right tabular-nums">{nf(data.proteinMean, 2)}</td>
-                <td className="text-right tabular-nums">{nf(data.withMilk)}</td>
+                <td className="text-right tabular-nums">{nf(data.withProtein)}</td>
               </tr>
               {/*
                  Строка возраста первого отёла показывается, только если

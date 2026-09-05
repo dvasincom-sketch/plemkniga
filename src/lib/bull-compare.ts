@@ -2,6 +2,8 @@ import type { Payload } from 'payload'
 import { BULL_COMPARISON_MIN } from '@/lib/bull-proof'
 import { numOf, poolOf } from '@/lib/sql'
 import { liveFemale, notArchived } from '@/lib/sql-herd'
+import { AFC_PLAUSIBLE } from '@/lib/afc'
+import { afcMonths, nthCalvingCte } from '@/lib/sql-lactation'
 
 /**
  * Сравнение быков между собой (ТЗ, требование №5).
@@ -189,22 +191,27 @@ export async function compareBulls(
       [ids],
     ),
     ask(
-      `select
-         a.father_id                                        as bull,
-         count(*)::int                                      as afc_cows,
-         avg((extract(year  from age(c.date, a.birth_date)) * 12
-            + extract(month from age(c.date, a.birth_date))))  as afc_mean
+      /*
+       * Возраст первого отёла — общим куском с карточкой быка и отчётом
+       * хозяйства (`sql-lactation.ts`). Здесь стоял свой запрос, и он
+       * отличался от карточного тремя вещами сразу: без `distinct on`,
+       * без рамки правдоподобия и без пола. Отсечка «отёл позже рождения»
+       * теперь не нужна: рамка её включает.
+       */
+      `with ${nthCalvingCte('first_calving', 1)}
+       select
+         a.father_id            as bull,
+         count(*)::int          as afc_cows,
+         avg(${afcMonths()})    as afc_mean
        from animals a
-       join calvings c on c.animal_id = a.id and c.number = 1
+       join first_calving f on f.animal_id = a.id
       where a.father_id = any($1)
         and a.archived is not true
+        and a.sex = 'female'
         and a.birth_date is not null
-        -- Отёл раньше рождения — перепутанная дата. В карточке быка эта
-        -- отсечка стояла, здесь её не было, и один и тот же бык показывал
-        -- в карточке и в сравнении разный возраст первого отёла дочерей
-        and c."date" > a.birth_date
+        and ${afcMonths()} between $2 and $3
       group by a.father_id`,
-      [ids],
+      [ids, AFC_PLAUSIBLE.min, AFC_PLAUSIBLE.max],
     ),
     /*
      * Родство с вашим стадом — рекурсивный обход вверх от каждой коровы

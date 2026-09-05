@@ -6,6 +6,7 @@ import type { Payload } from 'payload'
  */
 import { SERVICE_MAX, SERVICE_MIN } from '@/lib/fgias-export'
 import { NBSP, nf } from '@/lib/format'
+import { PLAUSIBLE } from '@/lib/checks-registry'
 import { numOf, numOrNull, poolOf } from '@/lib/sql'
 import {
   ageMonths,
@@ -115,6 +116,16 @@ export async function lactationStructure(
       least(calvings, 4) as bucket,
       count(*)::int      as cows,
       /*
+       * Сумма отёлов по ведру — для средней лактации.
+       *
+       * Считать среднее по номеру ведра нельзя: четвёртое ведро — это
+       * «четвёртая и старше», и корова седьмого отёла давала в среднее
+       * четыре. Стадо с долгоживущими коровами выглядело моложе, чем есть,
+       * и сравнение двух хозяйств по этому числу было в пользу того,
+       * где коров дольше четвёртого отёла нет вовсе.
+       */
+      sum(calvings)::int as calvings_sum,
+      /*
        * Внутри нулевого ведра — две разные вещи, и путать их нельзя.
        *
        * Ноль отёлов у тёлки это её возраст, у коровы — пробел в данных.
@@ -140,9 +151,15 @@ export async function lactationStructure(
     [organizationId],
   )
 
-  const rows = (res.rows ?? []) as { bucket: unknown; cows: unknown; mature: unknown }[]
+  const rows = (res.rows ?? []) as {
+    bucket: unknown
+    cows: unknown
+    mature: unknown
+    calvings_sum: unknown
+  }[]
   const byBucket = new Map(rows.map((r) => [numOf(r.bucket), numOf(r.cows)]))
   const matureByBucket = new Map(rows.map((r) => [numOf(r.bucket), numOf(r.mature)]))
+  const calvingsTotal = rows.reduce((sum, r) => sum + numOf(r.calvings_sum), 0)
 
   const LABELS: Record<number, string> = {
     1: 'Первотёлки',
@@ -165,10 +182,7 @@ export async function lactationStructure(
    * у кого отёлов в книге нет, мы получили бы не «стадо молодое»,
    * а «данные неполные» — и выдали бы второе за первое.
    */
-  const meanLactation =
-    withCalvings > 0
-      ? byLactation.reduce((sum, r) => sum + r.lactation * r.cows, 0) / withCalvings
-      : null
+  const meanLactation = withCalvings > 0 ? calvingsTotal / withCalvings : null
 
   const zeroAll = byBucket.get(0) ?? 0
   const zeroMature = matureByBucket.get(0) ?? 0
@@ -432,6 +446,19 @@ export async function culling(
 
   const res = await pool.query(
     `
+    /*
+     * Выбытие считается по самкам, и это правка, а не придирка.
+     *
+     * Пол здесь не проверялся вовсе, а знаменатель доли — живые коровы —
+     * проверялся. Хозяйство, продающее бычков, получало долю выбытия
+     * заметно выше настоящей, а строка «Из них первотёлок» считала
+     * первотёлками проданных бычков и павших телят: у них ноль отёлов,
+     * то есть lactations <= 1. Сигнал после этого советовал искать беду
+     * в раздое.
+     *
+     * Архив исключён по той же причине, что и в знаменателе: числитель
+     * и знаменатель одной доли обязаны отбираться одинаково.
+     */
     with gone as (
       select a.id,
              coalesce(r.name, 'Причина не указана') as reason,
@@ -439,6 +466,8 @@ export async function culling(
         from animals a
         left join disposal_reasons r on r.id = a.disposal_reason_id
        where a.owner_id = $1
+         and ${notArchived()}
+         and a.sex = 'female'
          and ${culledYear()}
     ),
     /*
@@ -471,6 +500,8 @@ export async function culling(
       from animals a
       left join disposal_reasons r on r.id = a.disposal_reason_id
      where a.owner_id = $1
+       and ${notArchived()}
+       and a.sex = 'female'
        and ${culledYear()}
      group by 1
      order by count desc`,
@@ -773,7 +804,8 @@ export async function reproduction(
        * охоты, а корова, о которой забыли на восемь месяцев.
        */
       (select round(avg(first_days), 0) from service
-        where first_days between 20 and 250) as first_service,
+        where first_days between ${PLAUSIBLE.firstService.min} and ${PLAUSIBLE.firstService.max})
+                                                                 as first_service,
       /*
        * Только промежутки, закрывшиеся за последний год.
        *
@@ -784,7 +816,8 @@ export async function reproduction(
        * ведётся.
        */
       (select round(avg(days), 0) from intervals
-        where days between 300 and 600 and at > now() - interval '12 months') as calving_interval,
+        where days between ${PLAUSIBLE.calvingInterval.min} and ${PLAUSIBLE.calvingInterval.max}
+          and at > now() - interval '12 months')                  as calving_interval,
       (select total from ins)                                    as ins_total,
       (select ok from ins)                                       as ins_ok,
       (select count(*)::int from calvings k join mine m on m.id = k.animal_id

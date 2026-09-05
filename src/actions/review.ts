@@ -205,6 +205,22 @@ export async function decideSubmissionAction(
 
   const total = (submission.animals ?? []).length || submission.intake?.rows || 0
 
+  /*
+   * «С ошибками» — это записи, а не находки.
+   *
+   * Здесь стояло число находок уровня «требует исправления»: на одну
+   * запись их бывает несколько, а бывают и находки без животного вовсе.
+   * Рядом «Принято» равнялось всем строкам пакета независимо от находок,
+   * и три числа в протоколе не сходились между собой: принято плюс
+   * с ошибками не равнялось всего.
+   */
+  const flagged = new Set(
+    findings
+      .filter((f) => (f.severity ?? 'fix') === 'fix')
+      .map((f) => (typeof f.animal === 'object' && f.animal ? f.animal.id : f.animal))
+      .filter((id): id is number => typeof id === 'number'),
+  )
+
   await payload.update({
     collection: 'data-submissions',
     id: submission.id,
@@ -221,8 +237,8 @@ export async function decideSubmissionAction(
         checkedAt: new Date().toISOString(),
         comment: comment || undefined,
         totalRows: total,
-        acceptedRows: decision === 'checked' ? total : 0,
-        rejectedRows: blocking,
+        acceptedRows: decision === 'checked' ? Math.max(total - flagged.size, 0) : 0,
+        rejectedRows: flagged.size,
       },
     } as never,
   })

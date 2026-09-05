@@ -36,6 +36,7 @@ import { describeFilter } from '@/lib/filter-labels'
 import { PresetIcon } from '@/components/PresetIcons'
 import { loadProfileChoices, selectProfile } from '@/lib/index-profiles'
 import { RANKING_CAP, indexValues, rankByProfile } from '@/lib/index-column'
+import { loadActiveBase } from '@/lib/index-base'
 import { indexValuesLag } from '@/lib/index-values'
 import type { Animal, Organization } from '@/payload-types'
 import { plural } from '@/lib/format'
@@ -212,7 +213,13 @@ export default async function HerdbookPage({
   const columnValues = profile
     ? 'values' in result
       ? result.values
-      : indexValues(animals, profile)
+      : /*
+           База — активная, та же, на которой считаются хранимые значения
+           и карточка. Прежде здесь бралась заимствованная база из кода,
+           и колонка расходилась с карточкой ровно у тех, для кого строки
+           значений ещё не посчитаны.
+        */
+        indexValues(animals, profile, await loadActiveBase(payload))
     : undefined
   const rankingCapped = 'capped' in result ? result.capped : false
 

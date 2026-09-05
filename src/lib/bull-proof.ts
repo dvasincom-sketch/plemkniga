@@ -1,5 +1,7 @@
 import type { Payload } from 'payload'
 import { numOf, poolOf } from '@/lib/sql'
+import { AFC_PLAUSIBLE } from '@/lib/afc'
+import { afcMonths, nthCalvingCte } from '@/lib/sql-lactation'
 
 /**
  * Что известно о быке по его дочерям.
@@ -68,6 +70,9 @@ export type BullProof = {
   vsMates: number | null
   /** Сколько дочерей удалось сравнить со сверстницами. */
   compared: number
+  /** Сколько дочерей дали жир и белок — числа свои у каждого показателя. */
+  withFat: number
+  withProtein: number
 
   /** Возраст первого отёла дочерей, месяцев. */
   afcMean: number | null
@@ -96,7 +101,14 @@ export async function bullProof(payload: Payload, bullId: number): Promise<BullP
     ask(
       `select
          count(*)::int                                              as daughters,
+         /*
+          * Счётчики по каждому показателю отдельно. Прежде считался один —
+          * по удою, — и колонка «Записей» показывала его во всех трёх
+          * строках: «жир 3,9 % по 55 записям», когда жир заполнен у двенадцати.
+          */
          count(*) filter (where a.summary_milk_yield is not null)::int as with_milk,
+         count(*) filter (where a.summary_fat_percent is not null)::int as with_fat,
+         count(*) filter (where a.summary_protein_percent is not null)::int as with_protein,
          count(distinct a.herd_id)::int                             as herds,
          count(distinct a.owner_id)::int                            as farms,
          avg(a.summary_milk_yield)                                  as milk_mean,
@@ -136,22 +148,24 @@ export async function bullProof(payload: Payload, bullId: number): Promise<BullP
       [bullId],
     ),
     /*
-     * Возраст считается `age()`, а не делением разницы дат на среднюю длину
-     * месяца. Разница не косметическая: календарные месяцы разной длины,
-     * и деление на 30,44 даёт то 22, то 23 месяца на одной и той же паре
-     * дат. Тот же приём, что в `monthsBetween` на стороне TypeScript.
+     * Возраст первого отёла дочерей — тем же куском, что в отчёте
+     * хозяйства и в сводке Ассоциации (`sql-lactation.ts`). Здесь стоял
+     * свой запрос: без `distinct on` (корова с двумя записями «первого
+     * отёла» считалась дважды), без рамки правдоподобия (отёл на 60-м
+     * месяце тянул среднее вверх) и без пола. Один бык показывал
+     * на четырёх страницах четыре разных возраста.
      */
     ask(
-      `select count(*)::int as cows,
-              avg(extract(year from age(c."date", a.birth_date)) * 12
-                + extract(month from age(c."date", a.birth_date))) as months
+      `with ${nthCalvingCte('first_calving', 1)}
+       select count(*)::int as cows, avg(${afcMonths()}) as months
          from animals a
-         join calvings c on c.animal_id = a.id and c.number = 1
+         join first_calving f on f.animal_id = a.id
         where a.father_id = $1
           and a.archived is not true
+          and a.sex = 'female'
           and a.birth_date is not null
-          and c."date" > a.birth_date`,
-      [bullId],
+          and ${afcMonths()} between $2 and $3`,
+      [bullId, AFC_PLAUSIBLE.min, AFC_PLAUSIBLE.max],
     ),
     ask(
       `select extract(year from a.birth_date at time zone 'UTC')::int as year,
@@ -176,6 +190,8 @@ export async function bullProof(payload: Payload, bullId: number): Promise<BullP
     return {
       daughters: 0,
       withMilk: 0,
+      withFat: 0,
+      withProtein: 0,
       herds: 0,
       farms: 0,
       sons: 0,
@@ -201,6 +217,8 @@ export async function bullProof(payload: Payload, bullId: number): Promise<BullP
   return {
     daughters,
     withMilk: numOf(h.with_milk),
+    withFat: numOf(h.with_fat),
+    withProtein: numOf(h.with_protein),
     herds: numOf(h.herds),
     farms: numOf(h.farms),
     sons,

@@ -117,6 +117,7 @@ export async function AnimalEventsTab({ animal }: { animal: Animal }) {
   type Totals = {
     yield: number
     fatKg: number
+    yieldFull: number
     proteinKg: number
     fatSum: number
     fatN: number
@@ -126,7 +127,8 @@ export async function AnimalEventsTab({ animal }: { animal: Animal }) {
 
   const totals = lactations.reduce<Totals>(
     (acc, l) => {
-      acc.yield += l.milk305 ?? l.milkYield ?? 0
+      acc.yield += l.milk305 ?? 0
+      acc.yieldFull += l.milkYield ?? 0
       acc.fatKg += l.fatKg ?? 0
       acc.proteinKg += l.proteinKg ?? 0
       if (typeof l.fat305 === 'number') {
@@ -139,7 +141,7 @@ export async function AnimalEventsTab({ animal }: { animal: Animal }) {
       }
       return acc
     },
-    { yield: 0, fatKg: 0, proteinKg: 0, fatSum: 0, fatN: 0, protSum: 0, protN: 0 },
+    { yield: 0, yieldFull: 0, fatKg: 0, proteinKg: 0, fatSum: 0, fatN: 0, protSum: 0, protN: 0 },
   )
 
   const lactWord =
@@ -222,7 +224,16 @@ export async function AnimalEventsTab({ animal }: { animal: Animal }) {
                 <th>Дата начала</th>
                 <th>Дата окончания</th>
                 <th>Кол-во дней</th>
-                <th className="text-right">Удой, кг</th>
+                {/*
+                   Две колонки вместо одной. Прежде здесь стоял «Удой, кг»,
+                   а в ячейку шло `milk305 ?? milkYield`: у одной коровы
+                   строка за строкой показывала то удой за 305 дней, то
+                   за всю лактацию — в зависимости от того, что заполнено.
+                   Итог складывал разнородные величины, а зоотехник видел
+                   «падение» там, где сменился способ учёта.
+                */}
+                <th className="text-right">За 305 дн., кг</th>
+                <th className="text-right">За лактацию, кг</th>
                 <th className="text-right">Ж,%</th>
                 <th className="text-right">Б,%</th>
                 <th className="text-right">Ж,кг</th>
@@ -230,14 +241,15 @@ export async function AnimalEventsTab({ animal }: { animal: Animal }) {
               </tr>
             </thead>
             <tbody>
-              {lactations.length === 0 && <Empty cols={9} text="Данные о лактациях отсутствуют" />}
+              {lactations.length === 0 && <Empty cols={10} text="Данные о лактациях отсутствуют" />}
               {lactations.map((l, i) => (
                 <tr key={l.id ?? i}>
                   <td>{l.number ?? i + 1}</td>
                   <td>{dateRu(l.calvingDate)}</td>
                   <td>{dateRu(l.endDate ?? l.dryOffDate)}</td>
                   <td className="tabular-nums">{l.dd ?? '—'}</td>
-                  <td className="text-right tabular-nums">{nf(l.milk305 ?? l.milkYield, 0)}</td>
+                  <td className="text-right tabular-nums">{nf(l.milk305, 0)}</td>
+                  <td className="text-right tabular-nums">{nf(l.milkYield, 0)}</td>
                   <td className="text-right tabular-nums">{nf(l.fat305, 2)}</td>
                   <td className="text-right tabular-nums">{nf(l.protein305, 2)}</td>
                   <td className="text-right tabular-nums">{nf(l.fatKg, 1)}</td>
@@ -252,6 +264,7 @@ export async function AnimalEventsTab({ animal }: { animal: Animal }) {
                     {lactations.length} {lactWord}
                   </td>
                   <td className="text-right tabular-nums">{nf(totals.yield, 0)}</td>
+                  <td className="text-right tabular-nums">{nf(totals.yieldFull, 0)}</td>
                   <td className="text-right tabular-nums">
                     {totals.fatN ? nf(totals.fatSum / totals.fatN, 2) : '—'}
                   </td>

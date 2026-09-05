@@ -7,6 +7,7 @@ import {
   lastCalvingDate,
   liveFemale,
   notArchived,
+  isPregnant,
 } from '@/lib/sql-herd'
 import { poolOf } from '@/lib/sql'
 
@@ -138,14 +139,14 @@ const COWS = `
          ${hasCalved()}
          or (a.birth_date is not null and ${ageMonths()} >= 13)
        )
-       and not exists (
-         select 1
-           from inseminations i
-           left join insemination_results r on r.id = i.result_id
-          where i.animal_id = a.id
-            and r.code = '1'
-            and i."date" > coalesce(${lastCalvingDate()}, '-infinity'::timestamptz)
-       )
+       /*
+        * Стельные исключены общим предикатом (sql-herd.ts). Здесь
+        * стояло «есть хоть одно плодотворное осеменение после отёла»:
+        * корова, потерявшая стельность и осеменённая заново, из подбора
+        * выпадала навсегда — то есть именно та, ради которой подбор
+        * и открывают.
+        */
+       and not ${isPregnant()}
   )
 `
 

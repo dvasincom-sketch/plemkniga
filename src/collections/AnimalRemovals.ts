@@ -1,4 +1,5 @@
 import type { CollectionConfig } from 'payload'
+import { isAssociation } from '@/access'
 import { relId } from '@/lib/visibility'
 
 /**
@@ -65,7 +66,16 @@ export const AnimalRemovals: CollectionConfig = {
     read: ({ req }) => {
       const user = req.user as { role?: string | null; organization?: unknown } | null
       if (!user) return false
-      if (user.role === 'admin' || user.role === 'association') return true
+      /*
+       * Роли `association` в книге нет: у Ассоциации две роли — `expert`
+       * и `admin` (`lib/dictionaries.ts`, `ASSOCIATION_ROLES`). Сравнение
+       * с несуществующим значением означало, что эксперт не видел ни этой
+       * коллекции, ни ссылок на просмотр: организации у него нет,
+       * и правило отвечало отказом. Опечатка в строке — не ошибка ни для
+       * типов, ни для сборки: сравнение допустимо, ветка просто никогда
+       * не выполняется.
+       */
+      if (isAssociation(user)) return true
       const org = orgOf(user)
       return org ? { owner: { equals: org } } : false
     },

@@ -437,15 +437,23 @@ async function OverviewTab({ orgId }: { orgId?: number }) {
           value: nf(summary.total, 0),
           note: summary.archived > 0 ? `в архиве ещё ${nf(summary.archived, 0)}` : undefined,
         },
-        { label: 'Коров в стаде', value: nf(summary.cows, 0) },
-        { label: 'Быков-производителей', value: nf(summary.bulls, 0) },
+        /*
+           Подписи названы по тому, что считается. «Коров в стаде» стояло
+           над числом всех живых самок — вместе с тёлками и телятами,
+           а «Быков-производителей» над всеми самцами, включая бычков
+           и павших. Считать иначе нельзя: коровой животное делает отёл,
+           а отёлы у сводки не спрошены; менять расчёт значило бы менять
+           и «Средний удой по N из M», где M — то же множество.
+        */
+        { label: 'Самок в стаде', value: nf(summary.cows, 0) },
+        { label: 'Самцов в работе', value: nf(summary.bulls, 0) },
         {
           label: 'Средний удой, кг',
           value: summary.milkYield === null ? '—' : nf(summary.milkYield, 0),
           note:
             summary.milkYield === null
               ? 'нет ни одной записи с удоем'
-              : `по ${nf(summary.milkBasis, 0)} из ${nf(summary.cows, 0)} коров`,
+              : `по ${nf(summary.milkBasis, 0)} из ${nf(summary.cows, 0)} живых самок`,
         },
         {
           label: 'Жир / белок, %',
