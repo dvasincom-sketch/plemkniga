@@ -564,6 +564,170 @@ export const NOTES: Note[] = [
       },
     ],
   },
+  /* ------------------- Шесть отчётов по стаду ------------------------------
+   *
+   * Отчётов на экране семь, разборов шесть. «Структура по лактациям» своего
+   * разбора не получила намеренно: там три числа и ни одного решения,
+   * которое требовалось бы объяснять, — а всё, что о ней стоит сказать,
+   * говорится внутри разбора о выбытии, где эта же структура и объясняет
+   * перекос.
+   *
+   * Жанр тот же, что у остальных разборов: не «как пользоваться отчётом»,
+   * а как считается число, из чего оно складывается и чего не означает.
+   * Каждый разбор берёт числа и пороги из того же кода, что рисует отчёт
+   * (`lib/herd-analytics.ts`), — иначе страница и экран разошлись бы,
+   * и разошлись бы молча.
+   */
+  {
+    slug: 'otchet-molodnyak',
+    title: 'Ремонтный молодняк: почему тёлка «в передержке» — не упрёк, а счёт',
+    lead:
+      'Отчёт делит тёлок на три состояния и одно из них называет передержкой. ' +
+      'Разбираем, откуда берутся границы, почему возраст без живой массы советует ' +
+      'неправильно и во что обходится каждый лишний месяц.',
+    date: '2026-09-05',
+    author: NOTE_AUTHOR,
+    authorUrl: NOTE_AUTHOR_URL,
+    passport: [
+      { label: 'Что разбирается', value: 'Отчёт «Ремонтный молодняк» в разделе «Стадо → Отчёты»' },
+      { label: 'Откуда числа', value: 'lib/herd-analytics.ts, lib/afc.ts, lib/economics.ts' },
+      { label: 'Границы', value: 'Возраст первого отёла 19…48 месяцев, полосы до 24, 25–27, 28–30' },
+    ],
+    terms: ['vozrast-pervogo-otela', 'zhivaya-massa', 'servis-period'],
+    sources: [
+      {
+        title: 'ICAR Guidelines, Section 2 — Identification and recording of young stock',
+        url: 'https://www.icar.org/index.php/icar-recording-guidelines/',
+      },
+    ],
+  },
+  {
+    slug: 'otchet-vosproizvodstvo',
+    title: 'Воспроизводство: четыре числа, которые нельзя читать порознь',
+    lead:
+      'Сервис-период, дни до первого осеменения, индекс осеменения и межотельный период ' +
+      'на одном экране. Разбираем, что каждое из них измеряет, почему разница между ' +
+      'первыми двумя и есть цена неудачных попыток и как эти числа улучшаются на бумаге.',
+    date: '2026-09-05',
+    author: NOTE_AUTHOR,
+    authorUrl: NOTE_AUTHOR_URL,
+    passport: [
+      { label: 'Что разбирается', value: 'Отчёт «Воспроизводство» в разделе «Стадо → Отчёты»' },
+      { label: 'Откуда числа', value: 'lib/herd-analytics.ts, lib/fgias-export.ts, lib/economics.ts' },
+      { label: 'Сходимость', value: 'check:service-period сверяет экран с выгрузкой в реестр' },
+    ],
+    terms: [
+      'servis-period',
+      'dney-do-pervogo-osemeneniya',
+      'indeks-osemeneniya',
+      'mezhotelnyy-period',
+      'dobrovolnyy-period-ozhidaniya',
+    ],
+    sources: [
+      {
+        title: 'ICAR Guidelines, Section 5 — Milk recording and reproduction data',
+        url: 'https://www.icar.org/index.php/icar-recording-guidelines/',
+      },
+      { title: 'Шаблоны «Сервис-период» и «Межотельный период» ФГИАС ПР, версия 2.6.0' },
+    ],
+  },
+  {
+    slug: 'otchet-zdorove-vymeni',
+    title: 'Здоровье вымени: почему среднее по стаду лечит не тех',
+    lead:
+      'Отчёт показывает средний счёт соматических клеток и число коров выше порога. ' +
+      'Разбираем, почему среднее здесь считается не так, как в школе, отчего стадо ' +
+      '«здоровеет» вместе с ухудшением учёта и что делать с числом выше порога.',
+    date: '2026-09-05',
+    author: NOTE_AUTHOR,
+    authorUrl: NOTE_AUTHOR_URL,
+    passport: [
+      { label: 'Что разбирается', value: 'Отчёт «Здоровье вымени» в разделе «Стадо → Отчёты»' },
+      { label: 'Откуда числа', value: 'lib/herd-analytics.ts, collections/MilkTests.ts' },
+      { label: 'Порог', value: 'Показывается число коров выше порога соматических клеток' },
+    ],
+    terms: ['somaticheskie-kletki', 'kontrolnoe-doenie', 'metod-kontrolya-produktivnosti'],
+    sources: [
+      {
+        title: 'ICAR Guidelines, Section 11 — Somatic cell counting',
+        url: 'https://www.icar.org/index.php/icar-recording-guidelines/',
+      },
+    ],
+  },
+  {
+    slug: 'otchet-vybytie',
+    title: 'Выбытие за год: доля, причина и первотёлки отдельно',
+    lead:
+      'Отчёт называет долю выбывших, раскладывает по причинам и отдельно считает ' +
+      'первотёлок. Разбираем, почему первотёлки вынесены отдельно, что доля выбытия ' +
+      'говорит о стаде и почему её нельзя понижать напрямую.',
+    date: '2026-09-05',
+    author: NOTE_AUTHOR,
+    authorUrl: NOTE_AUTHOR_URL,
+    passport: [
+      { label: 'Что разбирается', value: 'Отчёт «Выбытие за год» в разделе «Стадо → Отчёты»' },
+      { label: 'Откуда числа', value: 'lib/herd-analytics.ts, lib/movements.ts' },
+      { label: 'Рядом', value: 'Структура по лактациям: тот же перекос с другой стороны' },
+    ],
+    terms: ['vozrast-pervogo-otela', 'laktatsiya-za-305-dney', 'servis-period'],
+    sources: [
+      {
+        title: 'ICAR Guidelines, Section 2 — Disposal and culling reasons',
+        url: 'https://www.icar.org/index.php/icar-recording-guidelines/',
+      },
+    ],
+  },
+  {
+    slug: 'otchet-geneticheskiy-trend',
+    title: 'Генетический тренд и инбридинг: что показывает наклон линии',
+    lead:
+      'Отчёт рисует, как менялась средняя оценка по годам рождения, и рядом ставит ' +
+      'средний инбридинг. Разбираем, почему наклон линии — не заслуга и не приговор, ' +
+      'что делает с ним смена базы сравнения и как читать долю выше порога родства.',
+    date: '2026-09-05',
+    author: NOTE_AUTHOR,
+    authorUrl: NOTE_AUTHOR_URL,
+    passport: [
+      { label: 'Что разбирается', value: 'Отчёт «Генетический тренд и инбридинг»' },
+      { label: 'Откуда числа', value: 'lib/herd-analytics.ts, lib/ancestry.ts, lib/index-base.ts' },
+      { label: 'Порог', value: 'Инбридинг: граница внимания 6,25 %' },
+    ],
+    terms: [
+      'koeffitsient-inbridinga',
+      'baza-sravneniya',
+      'plemennaya-tsennost',
+      'polnota-rodoslovnoy',
+    ],
+    sources: [
+      {
+        title: 'Interbull: валидация генетического тренда, методы I–III',
+        url: 'https://interbull.org/ib/geneval',
+      },
+    ],
+  },
+  {
+    slug: 'otchet-udoy-po-gruppam',
+    title: 'Удой по группам лактации: что сравнивается и с чем',
+    lead:
+      'Отчёт делит стадо на первотёлок, вторую лактацию и третью со старше и показывает ' +
+      'удой за 305 дней в каждой группе. Разбираем, почему группы именно такие, что ' +
+      'значит «в ходу» рядом с ними и почему рост числа не всегда рост продуктивности.',
+    date: '2026-09-05',
+    author: NOTE_AUTHOR,
+    authorUrl: NOTE_AUTHOR_URL,
+    passport: [
+      { label: 'Что разбирается', value: 'Отчёт «Удой за 305 дней по группам»' },
+      { label: 'Откуда числа', value: 'lib/herd-analytics.ts, lib/sql-lactation.ts' },
+      { label: 'Оговорка', value: 'Лактация хранится числом; книга её не вычисляет из доений' },
+    ],
+    terms: ['laktatsiya-za-305-dney', 'udoy-za-laktatsiyu', 'kontrolnoe-doenie'],
+    sources: [
+      {
+        title: 'ICAR Guidelines, Section 2 — Computing 305-day lactation records',
+        url: 'https://www.icar.org/index.php/icar-recording-guidelines/',
+      },
+    ],
+  },
 ]
 
 export const noteBySlug = (slug: string): Note | undefined => NOTES.find((n) => n.slug === slug)
