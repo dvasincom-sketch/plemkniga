@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { attempt, attemptDetail } from '@/lib/access-attempt'
 import type { User } from '@/payload-types'
 import { newInviteToken, resolveInvite } from '@/lib/invitations'
 
@@ -27,10 +28,24 @@ const check = (ok: boolean, what: string, detail = '') => {
   }
 }
 
-const tried = async (fn: () => Promise<unknown>): Promise<boolean> =>
-  fn()
-    .then(() => true)
-    .catch(() => false)
+/**
+ * Попытка сделать запрещённое — с разбором причины отказа.
+ *
+ * Прежде здесь стояло `fn().then(() => true).catch(() => false)`, и любая
+ * неудача читалась как «нельзя»: отсутствующая колонка, непрошедшая
+ * валидация, обрыв соединения. Утверждение «чужой НЕ может» становилось
+ * истинным от поломки запроса — то есть прогон отвечал зелёным ровно
+ * тогда, когда проверять было нечем. Разбор — в `lib/access-attempt.ts`.
+ */
+const denies = async (fn: () => Promise<unknown>, what: string) => {
+  const a = await attempt(fn)
+  check(a.denied, what, attemptDetail(a))
+}
+
+const allows = async (fn: () => Promise<unknown>, what: string) => {
+  const a = await attempt(fn)
+  check(a.allowed, what, a.error ?? '')
+}
 
 async function main() {
   const payload = await getPayload({ config })
@@ -98,13 +113,13 @@ async function main() {
 
   console.log('Что может каждая роль\n')
 
-  check(await tried(() => milkTest(head, '1')), 'руководитель вносит дойку')
-  check(await tried(() => milkTest(operator, '2')), 'зоотехник вносит дойку')
-  check(!(await tried(() => milkTest(viewer, '3'))), 'наблюдатель дойку НЕ вносит')
+  await allows(() => milkTest(head, '1'), 'руководитель вносит дойку')
+  await allows(() => milkTest(operator, '2'), 'зоотехник вносит дойку')
+  await denies(() => milkTest(viewer, '3'), 'наблюдатель дойку НЕ вносит')
 
-  check(!(await tried(() => movement(operator, '4'))), 'зоотехник перемещение НЕ оформляет')
-  check(!(await tried(() => movement(viewer, '5'))), 'наблюдатель перемещение НЕ оформляет')
-  check(await tried(() => movement(head, '6')), 'руководитель оформляет перемещение')
+  await denies(() => movement(operator, '4'), 'зоотехник перемещение НЕ оформляет')
+  await denies(() => movement(viewer, '5'), 'наблюдатель перемещение НЕ оформляет')
+  await allows(() => movement(head, '6'), 'руководитель оформляет перемещение')
 
   const rename = (user: User, name: string) =>
     payload.update({
@@ -115,8 +130,8 @@ async function main() {
       data: { name },
     })
 
-  check(await tried(() => rename(operator, `${TAG} Правка зоотехника`)), 'зоотехник правит карточку')
-  check(!(await tried(() => rename(viewer, `${TAG} Правка наблюдателя`))), 'наблюдатель карточку НЕ правит')
+  await allows(() => rename(operator, `${TAG} Правка зоотехника`), 'зоотехник правит карточку')
+  await denies(() => rename(viewer, `${TAG} Правка наблюдателя`), 'наблюдатель карточку НЕ правит')
 
   console.log('\nБлокировка\n')
 
@@ -134,8 +149,8 @@ async function main() {
     overrideAccess: true,
   })) as User
 
-  check(!(await tried(() => milkTest(blocked, '7'))), 'заблокированный дойку НЕ вносит')
-  check(!(await tried(() => rename(blocked, `${TAG} Правка заблокированного`))), 'заблокированный карточку НЕ правит')
+  await denies(() => milkTest(blocked, '7'), 'заблокированный дойку НЕ вносит')
+  await denies(() => rename(blocked, `${TAG} Правка заблокированного`), 'заблокированный карточку НЕ правит')
 
   const stillThere = await payload.find({
     collection: 'milk-tests',

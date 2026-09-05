@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import { RU_ONLY_FILES, RU_ONLY_SECTIONS } from '@/lib/i18n/ru-only'
 
 /**
  * Английская витрина остаётся английской.
@@ -51,19 +52,31 @@ const TEXT_DIR = 'src/lib'
 /**
  * Разделы, живущие по-русски намеренно.
  *
- * Список короткий и должен таким остаться: каждая строка здесь — обещание
- * читателю на другом языке, что он увидит русский текст.
+ * Список не здесь: он объявлен в `lib/i18n/ru-only.ts` — там же, откуда
+ * шапка и подвал берут подписи ссылок на эти разделы. Пока список стоял
+ * в прогоне отдельной копией, он отставал: словарь, исследования
+ * и страницы шаблонов реестра завели позже, ссылки на них закрыли
+ * условием `lang === 'ru'`, а прогон о них не узнал — и покраснел
+ * на десяти файлах сразу. Красная проверка, которую терпят, перестаёт
+ * быть проверкой: следующее настоящее непереведённое место утонет
+ * среди привычных строк.
+ *
+ * Здесь остаются только те два адреса, у которых нет ни ссылки в меню,
+ * ни своего раздела: «Эволюция продукта» стоит на всех языках намеренно,
+ * а `site/razbory` — старая заглушка-перенаправление.
  */
 const RU_ONLY = [
-  'site/[locale]/razbory',
-  'site/[locale]/breeds/[slug]',
+  ...RU_ONLY_SECTIONS.map((s) => s.dir).filter(Boolean),
+  ...RU_ONLY_FILES,
   'site/evolution',
   'site/razbory',
-  'components/site/NoteFrame.tsx',
 ]
 
 /** Имя продукта и знак: не текст страницы, а название. */
 const BRAND = ['ПЛЕМ online', 'ПЛЕМ', 'Разборы']
+
+/** Файлы механизма переводов: сами они наборами строк не являются. */
+const MACHINERY = ['i18n/translated.ts', 'i18n/data-text.ts', 'i18n/ru-only.ts']
 
 const CYRILLIC = /[А-Яа-яЁё]/
 
@@ -136,12 +149,21 @@ let sets = 0
 
 for (const file of walk(TEXT_DIR, ['.ts'])) {
   const src = readFileSync(file, 'utf8')
-  if (!/Translated</.test(src)) continue
-  /* Сам файл с механикой перевода набором строк не является. */
-  if (file.endsWith('i18n/translated.ts')) continue
+  /*
+   * Файлы самого механизма переводов набором строк не являются.
+   *
+   * `data-text.ts` попал сюда именно так: слова `Translated<` в его
+   * шапке хватало, чтобы прогон счёл его набором строк и потребовал
+   * английскую ветку. Проверка спотыкалась о собственный комментарий —
+   * то, чего она сама и не должна делать.
+   */
+  if (MACHINERY.some((m) => file.endsWith(m))) continue
+
+  const body = stripComments(src)
+  /* Признак набора ищется в коде, а не в комментариях над ним. */
+  if (!/Translated</.test(body)) continue
 
   sets += 1
-  const body = stripComments(src)
 
   if (!/\ben:\s*EN\b|\ben:\s*\{/.test(body)) {
     fail(`${file} — набор строк без английской ветки`)

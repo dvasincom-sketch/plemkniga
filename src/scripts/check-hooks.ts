@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from 'fs'
+import { existsSync, readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 
 /**
@@ -46,6 +46,31 @@ import { join } from 'path'
 
 const DIR = 'src/collections'
 const OPS = ['update', 'create', 'delete', 'find', 'findByID', 'count']
+
+/**
+ * Помощники, которых зовут из хуков.
+ *
+ * Хук редко пишет сам: он зовёт `syncTrustFromLab`, `recordOperation`,
+ * `snapshotEvaluation` — и запрос уходит уже оттуда. Проверка смотрела
+ * только в папку коллекций и такие обращения не видела вовсе: тот самый
+ * повтор решения №20, ради которого она написана, был возможен на один
+ * файл в сторону.
+ *
+ * Список — те модули `lib`, которые импортируются из коллекций и ходят
+ * в базу. Правило для них мягче и точнее: спрашивается не со всего файла,
+ * а с тех функций, которые `req` принимают. Функция без него позвана
+ * не из хука (страницей, действием, скриптом), и требовать от неё
+ * транзакцию бессмысленно — а требовать со всего файла значило бы
+ * получить красные строки там, где никакой транзакции нет.
+ *
+ * Внутри такой функции запрос обязан прокидываться: `req` ключом или
+ * `...(req ? { req } : {})`.
+ */
+const HELPERS = [
+  'src/lib/trust.ts',
+  'src/lib/evaluation-snapshot.ts',
+  'src/lib/index-values.ts',
+]
 
 let failures = 0
 
@@ -139,6 +164,109 @@ for (const file of files) {
 }
 
 check(calls > 0, 'обращения к Payload в коллекциях нашлись', `найдено ${calls}`)
+
+/* ------------------ Помощники, которых зовут из хуков ------------------ */
+
+console.log('\nОбращения к Payload из помощников, вызываемых хуками\n')
+
+let helperCalls = 0
+
+for (const file of HELPERS) {
+  if (!existsSync(file)) {
+    check(false, `${file}: файла нет — список помощников отстал от кода`)
+    continue
+  }
+
+  const src = readFileSync(file, 'utf8')
+  /*
+   * Хотя бы одна функция файла обязана принимать `req` — иначе помощник
+   * в транзакции не позвать вовсе, и список помощников отстал от кода.
+   */
+  if (!/\breq\??:\s*PayloadRequest/.test(src)) {
+    check(false, `${file}: ни одна функция не принимает req`)
+    continue
+  }
+
+  /*
+   * Границы функций, принимающих `req`: от объявления до закрывающей
+   * скобки нулевого уровня. Разбор грубый и достаточный — файлы наши,
+   * и объявления в них стоят с начала строки.
+   */
+  const zones: [start: number, end: number][] = []
+  /*
+   * Объявления двух видов: обычная функция и стрелка в `const`.
+   * Второй вид пропускался, и файл со стрелками выглядел как «функции
+   * с req не разобрались» — то есть проверка честно говорила, что
+   * ничего не смотрела, но искать причину пришлось бы вручную.
+   */
+  const decl = /^(?:export\s+)?(?:(?:async\s+)?function\s+\w+|const\s+\w+\s*=\s*(?:async\s*)?)\s*\(/gm
+  for (;;) {
+    const m = decl.exec(src)
+    if (!m) break
+    const open = src.indexOf('(', m.index)
+    const { end: paramsEnd } = topLevelKeys(src, open)
+    const params = src.slice(open, paramsEnd + 1)
+    if (!/\breq\b/.test(params)) continue
+
+    const bodyStart = src.indexOf('{', paramsEnd)
+    if (bodyStart === -1) continue
+    const { end: bodyEnd } = topLevelKeys(src, bodyStart)
+    zones.push([bodyStart, bodyEnd])
+  }
+
+  if (zones.length === 0) {
+    check(false, `${file}: функции с req не разобрались — проверка ничего не смотрела`)
+    continue
+  }
+
+  /*
+   * Имена, за которыми прячется тот же `req`: `const scope = req ? { req } : {}`
+   * и потом `...scope` в вызове. Форма законная и читается лучше, чем
+   * повтор условия в каждом обращении, — но для поиска по тексту она
+   * выглядит как вызов без запроса.
+   */
+  const scopeNames = [...src.matchAll(/const\s+(\w+)\s*=\s*req\s*\?\s*\{\s*req\s*\}\s*:\s*\{\s*\}/g)].map(
+    (m) => m[1]!,
+  )
+
+  for (const op of OPS) {
+    const needle = `payload.${op}({`
+    let from = 0
+
+    for (;;) {
+      const at = src.indexOf(needle, from)
+      if (at === -1) break
+      from = at + needle.length
+
+      const inZone = zones.some(([a, b]) => at > a && at < b)
+      if (!inZone) continue
+
+      const brace = at + needle.length - 1
+      const { keys, end } = topLevelKeys(src, brace)
+      helperCalls += 1
+
+      /*
+       * `...(req ? { req } : {})` — законная форма: ключа `req` в разборе
+       * верхнего уровня нет, но запрос прокидывается. Ищется она прямо
+       * в тексте вызова.
+       */
+      const body = src.slice(at, end)
+      const spread = scopeNames.some((n) => body.includes(`...${n}`))
+      if (!keys.includes('req') && !/\.\.\.\(req\s*\?/.test(body) && !spread) {
+        const line = src.slice(0, at).split('\n').length
+        check(false, `${file}: payload.${op} без req`, `строка ${line}`)
+      }
+
+      from = end
+    }
+  }
+}
+
+check(
+  helperCalls > 0,
+  'обращения к Payload в помощниках нашлись',
+  `найдено ${helperCalls}`,
+)
 
 /*
  * Отдельно: хотя бы одно обращение должно быть в файлах, где хуки точно

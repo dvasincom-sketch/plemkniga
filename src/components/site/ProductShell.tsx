@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { ruOnlySection } from '@/lib/i18n/ru-only'
 import { PlemLogo } from '@/components/PlemLogo'
 import { LocaleSwitcher } from '@/components/LocaleSwitcher'
 import { HeaderMenu } from '@/components/site/HeaderMenu'
@@ -89,7 +90,14 @@ export function ProductHeader({
    */
   const menu: { href: string; label: string }[] = [
     { href: `/${locale}/breeds`, label: l.nav.breeds },
-    ...(locale === 'ru' ? [{ href: '/ru/razbory', label: 'Разборы' }] : []),
+    /*
+     * Русские разделы объявлены одним списком (`i18n/ru-only.ts`):
+     * оттуда же о них узнаёт прогон `check:english`. Пока подпись стояла
+     * здесь строкой, а исключение прогона — в самом прогоне, они
+     * разъезжались, и прогон краснел на разделах, которые русские
+     * по решению.
+     */
+    ...(locale === 'ru' ? [ruOnlySection('/ru/razbory')] : []),
   ]
 
   return (
@@ -212,7 +220,7 @@ export function ProductFooter({ lang = 'ru' }: { lang?: Locale }) {
      * языках, — и это её долг, а не образец: там страница одна и о ней
      * знают, сюда же читателя зовут читать.
      */
-    ...(lang === 'ru' ? [{ href: '/ru/razbory', label: 'Разборы' }] : []),
+    ...(lang === 'ru' ? [ruOnlySection('/ru/razbory')] : []),
     /*
      * «Исследования» стоят рядом с разборами и по той же причине
      * только на русском: раздел написан по-русски и переводиться
@@ -221,7 +229,7 @@ export function ProductFooter({ lang = 'ru' }: { lang?: Locale }) {
      * текстовых раздела витрины, и читатель, дочитавший разбор,
      * идёт искать следующий текст туда же, где нашёл первый.
      */
-    ...(lang === 'ru' ? [{ href: '/ru/issledovaniya', label: 'Исследования' }] : []),
+    ...(lang === 'ru' ? [ruOnlySection('/ru/issledovaniya')] : []),
     /*
      * Словарь стоит в подвале, а не в шапке, хотя ходят в него чаще,
      * чем в иной раздел. Шапка отвечает на вопрос «куда пойти прямо
@@ -232,7 +240,7 @@ export function ProductFooter({ lang = 'ru' }: { lang?: Locale }) {
      * Русский, как и разборы: восемь десятков определений на шесть
      * языков — это пять сотен машинных переводов терминологии.
      */
-    ...(lang === 'ru' ? [{ href: '/ru/slovar', label: 'Словарь' }] : []),
+    ...(lang === 'ru' ? [ruOnlySection('/ru/slovar')] : []),
   ]
 
   return (

@@ -1,7 +1,17 @@
 import Link from 'next/link'
 import { Moment } from '@/components/Moment'
 import { InfoTip } from '@/components/InfoTip'
-import { AREA_LABEL, AREA_ORDER, CHECKS, PROBE_COUNT, checkSpec } from '@/lib/check-registry'
+import {
+  AREA_LABEL,
+  AREA_ORDER,
+  CHECKS,
+  CHECK_COUNT,
+  CHECK_REPORTS,
+  CHECK_SERVER,
+  CHECK_WRITES,
+  PROBE_COUNT,
+  checkSpec,
+} from '@/lib/check-registry'
 import { FRESH_HOURS, type CheckRunView } from '@/lib/check-report'
 
 /**
@@ -98,6 +108,16 @@ const TONE: Record<string, { dot: string; text: string; label: string }> = {
   failed: { dot: 'bg-[#c0392b]', text: 'text-[#c0392b]', label: 'есть находки' },
   stale: { dot: 'bg-ink-300', text: 'text-ink-500', label: 'устарело' },
   never: { dot: 'bg-ink-200', text: 'text-ink-400', label: 'не гонялась' },
+  /*
+   * Отчёт — не зелёный и не красный.
+   *
+   * Пять записей реестра считают и печатают, но упасть не могут:
+   * `audit:gate`, `check:cow`, `check:fgias-readiness`, `audit:slow`
+   * и `check:import-formats`. Пока они стояли в общей таблице,
+   * их строки были зелёными всегда — то есть страница утверждала
+   * «проверено и сошлось» там, где просто ничего не проверялось.
+   */
+  report: { dot: 'bg-ink-200', text: 'text-ink-400', label: 'отчёт' },
 }
 
 /** Почему проверка не попала в прогон — одной фразой. */
@@ -291,23 +311,29 @@ export function EvolutionChecks({
           <InfoTip label="Почему не все проверки в ночном прогоне">
             <p className="mb-2 font-medium text-ink-900">Почему не все гоняются сами</p>
             <p className="mb-2">
-              Около половины проверок <b>пишет в базу</b>: заводит организации, животных,
-              приглашения и потом удаляет. Ночной прогон на боевой книге означал бы,
+              {CHECK_WRITES} проверок <b>пишут в базу</b>: заводят организации, животных,
+              приглашения и потом удаляют. Ночной прогон на боевой книге означал бы,
               что каждую ночь в ней появляются и исчезают записи, а обрыв посреди
               прогона оставлял бы мусор, неотличимый от настоящих данных.
             </p>
-            <p>
-              Ещё три ходят по страницам снаружи и требуют живого сервера. Внутри
+            <p className="mb-2">
+              Ещё {CHECK_SERVER} ходят по страницам снаружи и требуют живого сервера. Внутри
               самого сервера им не место: проверяющий, живущий внутри проверяемого,
               не заметит, что проверяемый не отвечает. Им место в ночном действии
               рядом с прогоном, а не в нём.
             </p>
+            <p>
+              И {CHECK_REPORTS} записи — отчёты, а не проверки: они считают и печатают,
+              но упасть не могут. В прогон они не входят и зелёными не бывают: ответ,
+              который не бывает другим, ничего не сообщает.
+            </p>
           </InfoTip>
         </div>
         <p className="mb-6 max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
-          Всего проверок {CHECKS.length}, из них {PROBE_COUNT} умеет прогнать само
+          Всего проверок {CHECK_COUNT}, из них {PROBE_COUNT} умеет прогнать само
           приложение — они и попадают в ночной прогон. Остальные запускаются командой
           и здесь перечислены, чтобы было видно не только что проверено, но и что нет.
+          Рядом с ними {CHECK_REPORTS} отчёта: они читаются глазами и помечены отдельно.
         </p>
 
         <div className="space-y-8">
@@ -333,8 +359,9 @@ export function EvolutionChecks({
                         const seen = byCode.get(spec.code) ?? []
                         const bad = seen.filter((s) => !s.ok && !s.skipped)
                         const onlySkipped = seen.length > 0 && seen.every((s) => s.skipped)
-                        const outcome =
-                          seen.length === 0
+                        const outcome = spec.report
+                          ? 'report'
+                          : seen.length === 0
                             ? 'never'
                             : onlySkipped
                               ? 'stale'
@@ -357,7 +384,9 @@ export function EvolutionChecks({
                                   className={`inline-block h-2 w-2 shrink-0 translate-y-[-1px] rounded-full ${tone.dot}`}
                                 />
                                 <span className={tone.text}>
-                                  {outcome === 'never'
+                                  {outcome === 'report'
+                                    ? 'отчёт: читается глазами, упасть не может'
+                                    : outcome === 'never'
                                     ? spec.probe
                                       ? 'ещё не гонялась'
                                       : whyManual(spec.code)

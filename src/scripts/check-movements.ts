@@ -3,6 +3,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import type { User } from '@/payload-types'
 import { relId } from '@/lib/visibility'
+import { attempt, attemptDetail } from '@/lib/access-attempt'
 
 /**
  * Сквозная проверка перемещений на живой базе.
@@ -109,8 +110,8 @@ async function main() {
    * сторона»: получатель тоже сторона, и одного этого было достаточно,
    * чтобы забрать любую карточку книги.
    */
-  const grab = await payload
-    .create({
+  const grab = await attempt(() =>
+    payload.create({
       collection: 'movements',
       user: buyerUser,
       overrideAccess: false,
@@ -121,13 +122,12 @@ async function main() {
         from: seller.id,
         to: buyer.id,
       },
-    })
-    .then(() => true)
-    .catch((e: unknown) => (e instanceof Error ? e.message : String(e)))
+    }),
+  )
   check(
-    grab !== true && /владелец/.test(String(grab)),
+    grab.denied && /владелец/.test(grab.error ?? ''),
     'получатель НЕ может записать продажу чужого животного себе',
-    String(grab),
+    attemptDetail(grab),
   )
   const ownerAfterGrab = await payload.findByID({
     collection: 'animals',
@@ -208,17 +208,21 @@ async function main() {
     .catch(() => null)
   check(cardForSeller !== null, 'карточка проданного животного продавцу видна')
 
-  const editBySeller = await payload
-    .update({
+  /*
+   * Отказ должен быть отказом по правам, а не любой неудачей: иначе
+   * утверждение «продавец больше не может» становится истинным
+   * от опечатки в поле. Разбор — в `lib/access-attempt.ts`.
+   */
+  const editBySeller = await attempt(() =>
+    payload.update({
       collection: 'animals',
       id: animal.id,
       user: sellerUser,
       overrideAccess: false,
       data: { name: 'Переименовано продавцом' },
-    })
-    .then(() => true)
-    .catch(() => false)
-  check(editBySeller === false, 'продавец больше не может править карточку')
+    }),
+  )
+  check(editBySeller.denied, 'продавец больше не может править карточку', attemptDetail(editBySeller))
 
   console.log('\nПродажа тому, кто книгу не ведёт\n')
 
@@ -333,18 +337,21 @@ async function main() {
 
   console.log('\nПроверки формы\n')
 
-  const noBuyer = await payload
-    .create({
+  const noBuyer = await attempt(() =>
+    payload.create({
       collection: 'movements',
       overrideAccess: true,
       data: { animal: animal.id, date: '2026-06-01T00:00:00.000Z', kind: 'sale', from: seller.id },
-    })
-    .then(() => true)
-    .catch(() => false)
-  check(noBuyer === false, 'продажа без покупателя не записывается')
+    }),
+  )
+  check(
+    !noBuyer.allowed && /покупател/i.test(noBuyer.error ?? ''),
+    'продажа без покупателя не записывается',
+    noBuyer.allowed ? 'запись прошла' : `отказ не тот: ${noBuyer.error ?? '—'}`,
+  )
 
-  const future = await payload
-    .create({
+  const future = await attempt(() =>
+    payload.create({
       collection: 'movements',
       overrideAccess: true,
       data: {
@@ -353,10 +360,13 @@ async function main() {
         kind: 'cull',
         from: seller.id,
       },
-    })
-    .then(() => true)
-    .catch(() => false)
-  check(future === false, 'перемещение будущей датой не записывается')
+    }),
+  )
+  check(
+    !future.allowed && /будущ/i.test(future.error ?? ''),
+    'перемещение будущей датой не записывается',
+    future.allowed ? 'запись прошла' : `отказ не тот: ${future.error ?? '—'}`,
+  )
 
   // ------------------------------ уборка ------------------------------ //
   await payload.delete({

@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { attempt, attemptDetail } from '@/lib/access-attempt'
 import type { User } from '@/payload-types'
 import { OPERATIONS, recordOperation } from '@/lib/operations'
 
@@ -26,10 +27,24 @@ const check = (ok: boolean, what: string, detail = '') => {
   }
 }
 
-const tried = async (fn: () => Promise<unknown>): Promise<boolean> =>
-  fn()
-    .then(() => true)
-    .catch(() => false)
+/**
+ * Попытка сделать запрещённое — с разбором причины отказа.
+ *
+ * Прежде здесь стояло `fn().then(() => true).catch(() => false)`, и любая
+ * неудача читалась как «нельзя»: отсутствующая колонка, непрошедшая
+ * валидация, обрыв соединения. Утверждение «чужой НЕ может» становилось
+ * истинным от поломки запроса — то есть прогон отвечал зелёным ровно
+ * тогда, когда проверять было нечем. Разбор — в `lib/access-attempt.ts`.
+ */
+const denies = async (fn: () => Promise<unknown>, what: string) => {
+  const a = await attempt(fn)
+  check(a.denied, what, attemptDetail(a))
+}
+
+const allows = async (fn: () => Promise<unknown>, what: string) => {
+  const a = await attempt(fn)
+  check(a.allowed, what, a.error ?? '')
+}
 
 async function main() {
   const payload = await getPayload({ config })
@@ -123,20 +138,19 @@ async function main() {
 
   console.log('\nЖурнал не подделывается\n')
 
-  check(
-    !(await tried(() =>
+  await denies(
+    () =>
       payload.create({
         collection: 'operations',
         user: expert,
         overrideAccess: false,
         data: { at: new Date().toISOString(), action: 'login', actorName: 'Кто угодно' },
       }),
-    )),
     'даже Ассоциация НЕ может вписать строку через API',
   )
 
-  check(
-    !(await tried(() =>
+  await denies(
+    () =>
       payload.update({
         collection: 'operations',
         id: row!.id,
@@ -144,7 +158,6 @@ async function main() {
         overrideAccess: false,
         data: { summary: 'переписано' },
       }),
-    )),
     'строку журнала НЕЛЬЗЯ переписать',
   )
 
