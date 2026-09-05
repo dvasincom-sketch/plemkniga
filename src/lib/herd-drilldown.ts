@@ -11,6 +11,7 @@ import {
   calvingsCount,
   culledYear,
   isHeifer,
+  lastCalvingDate,
   liveFemale,
   notArchived,
 } from '@/lib/sql-herd'
@@ -337,9 +338,7 @@ function lactationRule(k: number, label: string): Rule {
        and least(${CALVINGS}, 4) = $2`,
     detail: `
       ${CALVINGS}::text
-      || coalesce(' · ' || to_char(
-           (select max(k."date") from calvings k where k.animal_id = a.id),
-           'DD.MM.YYYY'), '')`,
+      || coalesce(' · ' || to_char(${lastCalvingDate()}, 'DD.MM.YYYY'), '')`,
     order: `${CALVINGS} desc, a.ident_number`,
     params: [k],
   }

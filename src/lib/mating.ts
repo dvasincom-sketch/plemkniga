@@ -206,31 +206,46 @@ export async function matingPlan(
      * боковым соединением из пары значений, а не двумя ветками union.
      * Тот же приём в расчёте родства со стадом.
      */
+    /*
+     * Вместе с предком хранится сам путь — список животных, через которых
+     * к нему пришли, начиная с корня. Формула Райта суммирует только пути,
+     * в которых ни одно животное не встречается дважды, а счётчик
+     * «столько-то путей длиной столько-то» не помнит, через кого путь
+     * прошёл: с ним вклад общего предка складывался со вкладами всех его
+     * предков, и коэффициент выходил завышенным тем сильнее, чем полнее
+     * родословная. То же исправление — в lib/ancestry.ts, и оба расчёта
+     * сверяет check:mating на животных с дедами.
+     *
+     * Путь, упирающийся в уже пройденное животное, обрывается: в правильной
+     * родословной такого не бывает, в испорченной это защита от круга.
+     */
     up as (
-      select r.id as root, p.pid as anc, 1 as gen
+      select r.id as root, p.pid as anc, 1 as gen, array[r.id] as via
         from roots r
         join animals a on a.id = r.id
         cross join lateral (values (a.father_id), (a.mother_id)) as p(pid)
-       where p.pid is not null
+       where p.pid is not null and p.pid <> r.id
       union all
-      select u.root, p.pid, u.gen + 1
+      select u.root, p.pid, u.gen + 1, u.via || u.anc
         from up u
         join animals x on x.id = u.anc
         cross join lateral (values (x.father_id), (x.mother_id)) as p(pid)
-       where p.pid is not null and u.gen < $4::int
+       where p.pid is not null
+         and u.gen < $4::int
+         and p.pid <> u.anc
+         and not (p.pid = any(u.via))
     ),
     /*
-     * Само животное — свой предок нулевого колена. Без этой строки
-     * спаривание отца с дочерью дало бы ноль: общего предка выше быка
-     * у них нет, а сам бык в свой список не попадает.
+     * Само животное — свой предок нулевого колена с пустым путём. Без этой
+     * строки спаривание отца с дочерью дало бы ноль: общего предка выше
+     * быка у них нет, а сам бык в свой список не попадает.
      */
     paths as (
-      select r.side, u.root, u.anc, u.gen, count(*)::int as n
+      select r.side, u.root, u.anc, u.gen, u.via
         from up u
         join roots r on r.id = u.root
-       group by 1, 2, 3, 4
       union all
-      select side, id, id, 0, 1 from roots
+      select side, id, id, 0, '{}'::int[] from roots
     ),
     pairs as (
       /*
@@ -238,17 +253,22 @@ export async function matingPlan(
        * нельзя умножить на numeric без приведения — база откажет.
        * Приводить в одну сторону надёжнее, чем полагаться на то, какой
        * тип победит.
+       *
+       * Пара путей входит в сумму, только если их списки не пересекаются.
+       * Корни лежат в списках, поэтому путь «корова → бык → дед быка»
+       * в паре с путём «бык → дед быка» отбрасывается той же проверкой,
+       * что и общий дед, — отдельного правила для отца и дочери не нужно.
        */
       select c.root as cow, b.root as bull,
              sum(
-               (c.n * b.n)::numeric
-               * power(0.5::numeric, (c.gen + b.gen + 1)::numeric)
+               power(0.5::numeric, (c.gen + b.gen + 1)::numeric)
                * (1 + coalesce(a.inbreeding, 0)::numeric / 100)
              ) as coi
         from paths c
         join paths b on b.anc = c.anc and b.side = 'b'
         join animals a on a.id = c.anc
        where c.side = 'c'
+         and not (c.via && b.via)
        group by 1, 2
     )
     select p.id, p.ident_number, p.name, p.lactation,

@@ -1,5 +1,5 @@
 import type { CollectionConfig } from 'payload'
-import { isAssociation } from '@/access'
+import { isAssociationAccess } from '@/access'
 import { THRESHOLDS } from '@/lib/check-thresholds'
 
 /**
@@ -44,9 +44,17 @@ export const CheckThresholds: CollectionConfig = {
   },
   access: {
     read: () => true,
-    create: isAssociation,
-    update: isAssociation,
-    delete: isAssociation,
+    /*
+     * `isAssociationAccess`, а не `isAssociation`: правило доступа получает
+     * `{ req }`, а `isAssociation` ждёт пользователя — с аргументом-запросом
+     * оно отвечало `false` всегда, и пороги через админку и API не заводил
+     * никто, включая администратора. Форма кабинета работала — она идёт
+     * с `overrideAccess`, — поэтому поломка была видна только тем, кто
+     * пошёл другой дорогой, которую комментарий выше называет законной.
+     */
+    create: isAssociationAccess,
+    update: isAssociationAccess,
+    delete: isAssociationAccess,
   },
   defaultSort: 'key',
   fields: [

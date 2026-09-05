@@ -17,7 +17,7 @@ import {
 } from '@/lib/check-settings'
 import { IDENT_CORE_MIN, IDENT_FIELD_LABEL, IDENT_VALUES_SQL } from '@/lib/animal-id'
 import { numOf, poolOf } from '@/lib/sql'
-import { liveFemale, notArchived } from '@/lib/sql-herd'
+import { calvingEvent, liveFemale, notArchived } from '@/lib/sql-herd'
 
 /**
  * Проверки, у которых предмет — стадо, а не запись.
@@ -242,7 +242,7 @@ export async function herdIssues(
          join animals a on a.id = c.animal_id
         where a.owner_id = $1
           and a.archived is not true
-          and (c.event_type is null or c.event_type = 'calving')
+          and ${calvingEvent('c')}
         group by 1
         order by 1`,
       org,

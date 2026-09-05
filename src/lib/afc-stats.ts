@@ -1,6 +1,7 @@
 import type { Payload } from 'payload'
 import { AFC_PLAUSIBLE } from '@/lib/afc'
 import { poolOf } from '@/lib/sql'
+import { calvingEvent } from '@/lib/sql-herd'
 
 /**
  * Возраст первого отёла по стаду хозяйства и в разрезе быков.
@@ -137,13 +138,13 @@ const COWS_CTE = `
   with first_calving as (
     select distinct on (c.animal_id) c.animal_id, c.date
       from calvings c
-     where c."number" = 1 and c.date is not null
+     where c."number" = 1 and c.date is not null and ${calvingEvent('c')}
      order by c.animal_id, c.date
   ),
   second_calving as (
     select distinct on (c.animal_id) c.animal_id, c.date
       from calvings c
-     where c."number" = 2 and c.date is not null
+     where c."number" = 2 and c.date is not null and ${calvingEvent('c')}
      order by c.animal_id, c.date
   ),
   cows as (

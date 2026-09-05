@@ -9,6 +9,7 @@ import { NBSP, nf } from '@/lib/format'
 import { numOf, numOrNull, poolOf } from '@/lib/sql'
 import {
   ageMonths,
+  calvingEvent,
   calvingsCount,
   culledYear,
   isHeifer,
@@ -107,7 +108,7 @@ export async function lactationStructure(
       select
         c.id,
         c.age_group,
-        (select count(*) from calvings k where k.animal_id = c.id) as calvings
+        ${calvingsCount('c')} as calvings
         from cows c
     )
     select
@@ -637,7 +638,7 @@ export const serviceSql = (since?: string) => `
         * заведённая до появления типов: других событий тогда не было,
         * и такая запись считается отёлом.
         */
-       where k.event_type is null or k.event_type = 'calving'
+       where ${calvingEvent()}
     ),
     service as (
       select l.animal_id,
@@ -720,7 +721,7 @@ export async function reproduction(
              k."date" as at
         from calvings k
         join mine m on m.id = k.animal_id
-       where k.event_type is null or k.event_type = 'calving'
+       where ${calvingEvent()}
     ),
     /*
      * Осеменения за год: всего и плодотворных.
@@ -787,7 +788,8 @@ export async function reproduction(
       (select total from ins)                                    as ins_total,
       (select ok from ins)                                       as ins_ok,
       (select count(*)::int from calvings k join mine m on m.id = k.animal_id
-        where k."date" > now() - interval '12 months')           as calvings_year`,
+        where k."date" > now() - interval '12 months'
+          and ${calvingEvent()})                                 as calvings_year`,
     [organizationId],
   )
 

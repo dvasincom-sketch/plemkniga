@@ -79,11 +79,20 @@ export {
 } from '@/lib/ade/query'
 
 import { DATE_FIELD, type AdeQuery } from '@/lib/ade/query'
+import { fieldForScheme } from '@/lib/ade/accept'
 
 /** Плоское животное из документа Payload — вход для отображения. */
-type Rel = { id?: number; identNumber?: string | null; name?: string | null } | number | null | undefined
+type Rel =
+  | { id?: number; identNumber?: string | null; name?: string | null; code?: string | null }
+  | number
+  | null
+  | undefined
 
 const relOf = (v: Rel) => (v && typeof v === 'object' ? v : null)
+
+/** Код справочника методов → слово, которое понимает `adeInsemination`. */
+const methodCodeOf = (code: string | null | undefined): string | null =>
+  code === '2' ? 'natural' : code === '3' ? 'embryo' : null
 
 export function animalInput(doc: Record<string, unknown>): AnimalInput {
   const fgias = doc.fgias as { baseUuid?: string | null } | undefined
@@ -206,17 +215,8 @@ export async function findAnimalId(
   ident: { scheme: string; id: string },
   orgId: number,
 ): Promise<number | null> {
-  const field =
-    ident.scheme === SCHEME.animal
-      ? 'identNumber'
-      : ident.scheme === SCHEME.accounting
-        ? 'accountingNumber'
-        : ident.scheme === SCHEME.iso11785
-          ? 'altIds.chipNumber'
-          : ident.scheme === SCHEME.fgias
-            ? 'fgias.baseUuid'
-            : null
-
+  // Список полей один с приёмом — см. `fieldForScheme` в `accept.ts`
+  const field = fieldForScheme(ident.scheme)
   if (!field) return null
 
   const { docs } = await payload.find({
@@ -485,7 +485,13 @@ export function adeMapDocs(
             animal,
             date: String(d.date),
             attemptNumber: (d.attemptNumber as number | null) ?? null,
-            method: (d.method as string | null) ?? null,
+            /*
+             * Метод — связь со справочником, и наружу нужен его код,
+             * а не номер строки. Прежде сюда уходила сама связь, и
+             * `adeInsemination` не узнавал в ней ни `natural`, ни `embryo`:
+             * всякое осеменение отдавалось как `Insemination`.
+             */
+            method: methodCodeOf(relOf(d.method as Rel)?.code as string | null | undefined),
             bullIdentNumber: bull?.identNumber ?? null,
             bullName: bull?.name ?? null,
             technician: (d.technician as string | null) ?? null,

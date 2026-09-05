@@ -64,25 +64,44 @@ export const ageMonths = (a = 'a') =>
   `(extract(year from age(now(), ${a}.birth_date)) * 12` +
   ` + extract(month from age(now(), ${a}.birth_date)))`
 
+/**
+ * Запись в `calvings` — отёл, а не аборт и не запуск.
+ *
+ * В таблице отёлов лежат три события, различаемые типом; пустой тип —
+ * старый отёл, записанный до появления типа (`lib/calving.ts`,
+ * `isCalvingEvent`). Всё, что считает отёлы, обязано ставить это условие,
+ * и предикаты ниже ставят его сами. Появилось оно здесь поздно: тип
+ * события завёлся, проверки, сервис-период и межотельный за ним пошли,
+ * а общие предикаты стада — нет. У хозяйства, ведущего аборты записями,
+ * тёлка с абортом переставала быть тёлкой во всех списках молодняка,
+ * аборт прибавлял лактацию в структуре стада, выбраковке, рейтинге
+ * и подборе, а календарь считал «дней после отёла» от запуска.
+ * `check:condition` этого не видел: он сверял два расчёта с одной
+ * и той же ошибкой.
+ */
+export const calvingEvent = (k = 'k') =>
+  `(${k}.event_type is null or ${k}.event_type = 'calving')`
+
 /** Сколько отёлов записано. */
 export const calvingsCount = (a = 'a') =>
-  `(select count(*) from calvings k where k.animal_id = ${a}.id)`
+  `(select count(*) from calvings k where k.animal_id = ${a}.id and ${calvingEvent()})`
 
 /** Дата последнего отёла. */
 export const lastCalvingDate = (a = 'a') =>
-  `(select max(k."date") from calvings k where k.animal_id = ${a}.id)`
+  `(select max(k."date") from calvings k where k.animal_id = ${a}.id and ${calvingEvent()})`
 
 /**
  * Отелилась хотя бы раз.
  *
- * Это одно из трёх определений коровы, которые ходят по книге: есть ещё
- * вид животного (`kind`) и возрастная группа (`age_group`). Здесь названо
- * ровно то, что проверяется, — факт отёла, — и объединять три определения
- * в одно `isCow` намеренно не стали: пока не решено, какое из них главное,
- * общее имя закрепило бы путаницу вместо того, чтобы её убрать.
+ * Это одно из двух определений коровы, которые ходят по книге: есть ещё
+ * возрастная группа (`age_group`); третье — вид животного `kind` —
+ * убрано миграцией групп. Здесь названо ровно то, что проверяется, —
+ * факт отёла, — и объединять определения в одно `isCow` намеренно
+ * не стали: пока не решено, какое из них главное, общее имя закрепило бы
+ * путаницу вместо того, чтобы её убрать.
  */
 export const hasCalved = (a = 'a') =>
-  `exists (select 1 from calvings k where k.animal_id = ${a}.id)`
+  `exists (select 1 from calvings k where k.animal_id = ${a}.id and ${calvingEvent()})`
 
 /**
  * Тёлка: живая самка с известной датой рождения и без единого отёла.
@@ -107,7 +126,7 @@ export const hasCalved = (a = 'a') =>
  */
 export const isHeifer = (
   a = 'a',
-  calved = `exists (select 1 from calvings k where k.animal_id = ${a}.id)`,
+  calved = hasCalved(a),
 ) =>
   /*
    * Скобки вокруг довода обязательны. Без них `not k.animal_id is not

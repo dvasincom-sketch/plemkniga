@@ -206,3 +206,38 @@ export const associationIssuesOnly: CollectionBeforeChangeHook = ({ data, req, o
 
   return data
 }
+
+/**
+ * Документ, выданный Ассоциацией, хозяйство не правит.
+ *
+ * `associationIssuesOnly` сторожит только само поле «кто выдал». Всего
+ * остального у выданного документа он не касался, а правило `update`
+ * пускает владельца животного ко всей записи. Через `PATCH /api/documents`
+ * хозяйство могло обнулить `revoked` у отозванного свидетельства — отзыв,
+ * который даже Ассоциации переписывать запрещено, — подменить файл (для
+ * `media` эту дверь закрыли, а ссылка документа осталась открытой),
+ * переписать снимок и публичный код, а зарегистрированный протокол
+ * лаборатории перепривязать к любому своему животному, и `syncTrustFromLab`
+ * честно поднял бы тому вторую ступень.
+ *
+ * Поле за полем это не закрыть: список забывают, а каждое новое поле
+ * выданного документа рождается открытым. Поэтому правило одно: заполнен
+ * `issuedBy` — правит только Ассоциация. Законные пути хозяйства (выпуск,
+ * регистрация протокола, отзыв) идут действиями с `overrideAccess`
+ * и без `req.user` в хуке, правило их не касается.
+ */
+export const issuedDocumentLocked: CollectionBeforeChangeHook = ({
+  data,
+  req,
+  operation,
+  originalDoc,
+}) => {
+  if (operation !== 'update') return data
+  const user = req.user as U | null
+  if (!user) return data
+  if (isAssociation(user)) return data
+  if (relId((originalDoc as { issuedBy?: unknown })?.issuedBy) !== null) {
+    throw new Error('Документ, выданный Ассоциацией, хозяйство не изменяет')
+  }
+  return data
+}

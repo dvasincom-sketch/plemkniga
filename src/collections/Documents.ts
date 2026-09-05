@@ -1,7 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { DOCUMENT_TYPES, toOptions } from '@/lib/dictionaries'
 import { documentMutate, documentRead, isAdmin, isAuthenticated } from '@/access'
-import { associationIssuesOnly, requireOwnOrganization } from '@/access/guards'
+import { associationIssuesOnly, issuedDocumentLocked, requireOwnOrganization } from '@/access/guards'
 import { LAB_PROTOCOL_TYPE, animalIdOf, syncTrustFromLab } from '@/lib/trust'
 
 export const Documents: CollectionConfig = {
@@ -20,7 +20,7 @@ export const Documents: CollectionConfig = {
     delete: isAdmin,
   },
   hooks: {
-    beforeChange: [requireOwnOrganization, associationIssuesOnly],
+    beforeChange: [requireOwnOrganization, associationIssuesOnly, issuedDocumentLocked],
     /*
      * Вторая ступень достоверности выводится из протокола лаборатории,
      * и выводится здесь — в хуке коллекции, а не в действии, которое

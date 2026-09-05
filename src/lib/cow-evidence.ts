@@ -57,7 +57,13 @@ export async function cowEvidence(payload: Payload, animalId: number): Promise<C
   const [calvings, tests, animal] = await Promise.all([
     payload.count({
       collection: 'calvings',
-      where: { animal: { equals: animalId } },
+      // Отёлы, а не аборты и запуски: в таблице лежат три события
+      where: {
+        and: [
+          { animal: { equals: animalId } },
+          { or: [{ eventType: { exists: false } }, { eventType: { equals: 'calving' } }] },
+        ],
+      },
       overrideAccess: true,
     }),
     payload.count({

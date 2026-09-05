@@ -100,6 +100,43 @@ async function main() {
     `штамп: ${JSON.stringify((beforeSale as { ownerOrg?: unknown }).ownerOrg)}`,
   )
 
+  console.log('\nЧужое животное себе\n')
+
+  /*
+   * Покупатель пробует записать продажу чужой коровы самому себе —
+   * от своего лица, как это пришло бы прямым запросом к `/api/movements`.
+   * Хук обязан спросить владельца животного, а не только «моя ли это
+   * сторона»: получатель тоже сторона, и одного этого было достаточно,
+   * чтобы забрать любую карточку книги.
+   */
+  const grab = await payload
+    .create({
+      collection: 'movements',
+      user: buyerUser,
+      overrideAccess: false,
+      data: {
+        animal: animal.id,
+        date: '2026-02-20T00:00:00.000Z',
+        kind: 'sale',
+        from: seller.id,
+        to: buyer.id,
+      },
+    })
+    .then(() => true)
+    .catch((e: unknown) => (e instanceof Error ? e.message : String(e)))
+  check(
+    grab !== true && /владелец/.test(String(grab)),
+    'получатель НЕ может записать продажу чужого животного себе',
+    String(grab),
+  )
+  const ownerAfterGrab = await payload.findByID({
+    collection: 'animals',
+    id: animal.id,
+    depth: 0,
+    overrideAccess: true,
+  })
+  check(relId(ownerAfterGrab.owner) === seller.id, 'владелец после попытки не изменился')
+
   console.log('\nПродажа члену Ассоциации\n')
 
   await payload.create({

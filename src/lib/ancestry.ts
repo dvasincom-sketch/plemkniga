@@ -21,10 +21,24 @@ import type { Animal } from '@/payload-types'
  *    Уровень целиком забирается одним запросом `id in (…)`, поэтому девять
  *    колен стоят девять запросов, а не тысячу.
  *
- * 2. Кратности вместо путей. Число путей до предка растёт экспоненциально,
- *    и перечислять их нельзя. Вместо списка путей хранится счётчик:
- *    «сюда ведёт 6 путей длиной 7». Все нужные формулы — суммы по путям,
- *    и с кратностями они считаются так же точно.
+ * 2. Пути, а не кратности. Прежде обход хранил только счётчик «сюда
+ *    ведёт 6 путей длиной 7» — для доли крови этого достаточно, для
+ *    инбридинга нет. Формула Райта суммирует только пути, в которых
+ *    ни одно животное не встречается дважды, а счётчик не помнит, через
+ *    кого путь прошёл. Из-за этого вклад общего предка P считался вместе
+ *    со вкладами всех предков P — путь «отец → P → дед → P → мать» проходит
+ *    через P дважды и в формулу входить не должен: собственные предки P
+ *    учтены множителем (1 + F_P). Потомок полных сибсов получал 37,5 %
+ *    вместо 25 %, отец × дочь при полной родословной — к 50 % вместо 25 %,
+ *    и чем полнее была родословная, тем сильнее завышение. Число при этом
+ *    оставалось правдоподобным, и семь проверочных животных без дедов
+ *    его не ловили.
+ *
+ *    Путей на глубину девять не больше 2⁸ = 256 с каждой стороны — это
+ *    не «нельзя перечислить», как считалось раньше, а несколько десятков
+ *    тысяч пар в худшем случае. Поэтому каждый путь хранится списком
+ *    пройденных животных, и пара путей входит в сумму, только если списки
+ *    не пересекаются.
  */
 
 export const ANCESTRY_DEPTH = 9
@@ -69,47 +83,56 @@ const relId = (v: unknown): number | null => {
   return null
 }
 
-/** Кратности: id предка → колено → число путей. */
-type Counts = Map<number, Map<number, number>>
+/**
+ * Путь от корня обхода до предка: колено предка и все животные, через
+ * которых путь прошёл, включая сам корень. Предок в список не входит —
+ * он конец пути, и у пары путей с обеих сторон он общий по построению.
+ */
+type PathTo = { gen: number; via: number[] }
 
-const addCount = (counts: Counts, id: number, generation: number, paths: number) => {
-  const byGen = counts.get(id) ?? new Map<number, number>()
-  byGen.set(generation, (byGen.get(generation) ?? 0) + paths)
-  counts.set(id, byGen)
-}
+/** id предка → пути до него. */
+type Paths = Map<number, PathTo[]>
 
 /**
- * Обход вширь от одного корня.
+ * Обход вширь от одного корня с перечислением путей.
  *
- * На каждом шаге в работе — множество различных предков текущего колена
- * с числом путей до каждого. Родители всего колена забираются одним
- * запросом, кратности складываются.
+ * На каждом шаге в работе — список путей текущего колена. Родители всего
+ * колена по-прежнему забираются одним запросом, поэтому девять колен
+ * стоят девять запросов, а не тысячу. Путь, который упёрся бы в животное,
+ * уже пройденное им же, обрывается: в правильной родословной такого
+ * не бывает, а в испорченной это единственная защита от бесконечного
+ * обхода по кругу.
  */
 async function walk(
   fetchLevel: (ids: number[]) => Promise<Map<number, Animal>>,
   startId: number | null,
   depth: number,
-): Promise<Counts> {
-  const counts: Counts = new Map()
-  if (!startId) return counts
+): Promise<Paths> {
+  const paths: Paths = new Map()
+  if (!startId) return paths
 
-  let frontier = new Map<number, number>([[startId, 1]])
+  let frontier: { id: number; via: number[] }[] = [{ id: startId, via: [] }]
   let generation = 1
 
-  while (frontier.size > 0 && generation <= depth) {
-    for (const [id, paths] of frontier) addCount(counts, id, generation, paths)
+  while (frontier.length > 0 && generation <= depth) {
+    for (const { id, via } of frontier) {
+      const list = paths.get(id) ?? []
+      list.push({ gen: generation, via })
+      paths.set(id, list)
+    }
 
     if (generation === depth) break
 
-    const docs = await fetchLevel([...frontier.keys()])
-    const next = new Map<number, number>()
+    const docs = await fetchLevel([...new Set(frontier.map((f) => f.id))])
+    const next: { id: number; via: number[] }[] = []
 
-    for (const [id, paths] of frontier) {
+    for (const { id, via } of frontier) {
       const doc = docs.get(id)
       if (!doc) continue
       for (const parent of [relId(doc.father), relId(doc.mother)]) {
         if (parent === null) continue
-        next.set(parent, (next.get(parent) ?? 0) + paths)
+        if (parent === id || via.includes(parent)) continue
+        next.push({ id: parent, via: [...via, id] })
       }
     }
 
@@ -117,7 +140,14 @@ async function walk(
     generation++
   }
 
-  return counts
+  return paths
+}
+
+/** Число путей до предка по коленам — то, чем считаются доля крови и кратность. */
+const byGeneration = (list: PathTo[]): Map<number, number> => {
+  const out = new Map<number, number>()
+  for (const p of list) out.set(p.gen, (out.get(p.gen) ?? 0) + 1)
+  return out
 }
 
 /**
@@ -162,19 +192,23 @@ function createLevelLoader(payload: Payload) {
  * Вклад общего предка в коэффициент инбридинга (формула Райта).
  *
  * F = Σ (1/2)^(p+q+1) · (1 + F_A), где p и q — число поколений от отца
- * и от матери до общего предка A. В обходе колено считается от самого
- * животного, поэтому p = колено − 1, и показатель степени сворачивается
- * до (колено_отца + колено_матери − 1).
+ * и от матери до общего предка A, а сумма идёт по парам путей, в которых
+ * ни одно животное не встречается дважды. В обходе колено считается
+ * от самого животного, поэтому p = колено − 1, и показатель степени
+ * сворачивается до (колено_отца + колено_матери − 1).
+ *
+ * Пересечение проверяется по спискам пройденных животных: в них входят
+ * и сами корни обхода, поэтому путь через отца к его же отцу и обратно
+ * через мать-дочь отбрасывается той же проверкой, что и путь через
+ * общего деда, — отдельного правила для «отец × дочь» не нужно.
  */
-const contribution = (
-  fromSire: Map<number, number>,
-  fromDam: Map<number, number>,
-  ownCoi: number,
-): number => {
+const contribution = (fromSire: PathTo[], fromDam: PathTo[], ownCoi: number): number => {
   let sum = 0
-  for (const [p, pathsP] of fromSire) {
-    for (const [q, pathsQ] of fromDam) {
-      sum += pathsP * pathsQ * 0.5 ** (p + q - 1) * (1 + ownCoi)
+  for (const s of fromSire) {
+    const seen = new Set(s.via)
+    for (const d of fromDam) {
+      if (d.via.some((id) => seen.has(id))) continue
+      sum += 0.5 ** (s.gen + d.gen - 1) * (1 + ownCoi)
     }
   }
   return sum
@@ -220,9 +254,9 @@ export async function analyzeAncestry(
         walk(fetchLevel, f, Math.max(1, depth - 2)),
         walk(fetchLevel, m, Math.max(1, depth - 2)),
       ])
-      for (const [ancestorId, byGen] of fp) {
+      for (const [ancestorId, list] of fp) {
         const other = mp.get(ancestorId)
-        if (other) value += contribution(byGen, other, 0)
+        if (other) value += contribution(list, other, 0)
       }
     }
 
@@ -246,9 +280,9 @@ export async function analyzeAncestry(
     let bloodShare = 0
     const generations = new Set<number>()
 
-    for (const byGen of [fromSire, fromDam]) {
-      if (!byGen) continue
-      for (const [generation, paths] of byGen) {
+    for (const list of [fromSire, fromDam]) {
+      if (!list) continue
+      for (const [generation, paths] of byGeneration(list)) {
         occurrences += paths
         bloodShare += paths * 0.5 ** generation
         generations.add(generation)

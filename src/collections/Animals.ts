@@ -574,7 +574,14 @@ export const Animals: CollectionConfig = {
                   min: -1,
                   max: 3,
                   index: true,
-                  access: { update: () => false },
+                  /*
+                   * Закрыто и создание: правило `update` не действует на
+                   * `POST /api/animals`, и зоотехник мог завести животное
+                   * сразу «верифицированным» — `beforeChange` поле не
+                   * сбрасывал, а `check:security` пробовал только PATCH.
+                   * Умолчание ноль подставляется само.
+                   */
+                  access: { create: () => false, update: () => false },
                   admin: {
                     readOnly: true,
                     description:
@@ -588,7 +595,7 @@ export const Animals: CollectionConfig = {
                   name: 'trustCheckedAt',
                   type: 'date',
                   label: 'Дата подтверждения',
-                  access: { update: () => false },
+                  access: { create: () => false, update: () => false },
                   admin: { readOnly: true },
                 },
               ],

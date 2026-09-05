@@ -1,5 +1,5 @@
 import type { CollectionConfig } from 'payload'
-import { anyone, isAdmin, ownOrganization } from '@/access'
+import { anyone, isAdmin, isAuthenticated, ownOrganization } from '@/access'
 import { REGIONS } from '@/lib/dictionaries'
 import { orgNameKey } from '@/lib/movements'
 
@@ -14,7 +14,15 @@ export const Organizations: CollectionConfig = {
   access: {
     // Названия хозяйств показываются в публичной таблице «Владелец».
     read: anyone,
-    create: anyone,
+    /*
+     * Заводит вошедший, а не кто угодно. Регистрация создаёт организацию
+     * с `overrideAccess` (`actions/auth.ts`), контрагентов — действия
+     * и импорт; ни одному из этих путей `anyone` не нужен. А нужен он
+     * был только тому, кто без входа завёл бы «Действующего члена»
+     * с готовым решением: поля членства закрыты на `update`, но не
+     * на `create`, и правило `create: anyone` открывало их всем.
+     */
+    create: isAuthenticated,
     update: ownOrganization,
     delete: isAdmin,
   },
@@ -122,7 +130,10 @@ export const Organizations: CollectionConfig = {
          * Признак меняет Ассоциация, разбирая очередь новых карточек.
          * Открыть его хозяйству значило бы позволить объявить себя
          * ведущим книгу — или, наоборот, пометить так конкурента.
+         * На создании закрыто по той же причине: единственный путь,
+         * ставящий «только упомянуто», идёт с `overrideAccess`.
          */
+        create: () => false,
         update: () => false,
       },
     },
@@ -211,7 +222,11 @@ export const Organizations: CollectionConfig = {
          * Менять членство себе нельзя. Поле лежит в записи организации,
          * а её правит само хозяйство — без этого ограничения подтверждение
          * Ассоциации ставилось бы одним запросом из браузера.
+         *
+         * Закрыто и создание: правило `update` не действует на `POST`,
+         * и организация заводилась сразу «Действующим членом».
          */
+        create: () => false,
         update: () => false,
       },
     },
@@ -234,7 +249,7 @@ export const Organizations: CollectionConfig = {
        * (`src/actions/membership.ts`) с `overrideAccess: true` — правилами
        * полей оно не ограничено.
        */
-      access: { update: () => false },
+      access: { create: () => false, update: () => false },
       fields: [
         {
           type: 'row',

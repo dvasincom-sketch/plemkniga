@@ -3,7 +3,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { getClient, getCurrentUser } from '@/lib/payload'
-import { isAnimalLocked, viewerOf } from '@/lib/visibility'
+import { isAnimalLocked, relId, viewerOf } from '@/lib/visibility'
 import {
   CERTIFICATE_KINDS,
   DOCUMENT_TYPE_OF,
@@ -147,8 +147,23 @@ export default async function CertificatePage({
     issued = (await payload
       .findByID({ collection: 'documents', id: documentParam, depth: 0, overrideAccess: true })
       .catch(() => null)) as Document | null
-    if (issued && String(issued.animal) !== String(animal.id) && typeof issued.animal === 'object') {
-      if (issued.animal?.id !== animal.id) issued = null
+    /*
+     * Документ обязан быть об этом животном и этого вида.
+     *
+     * Прежняя проверка требовала `typeof issued.animal === 'object'`,
+     * а при `depth: 0` связь приходит числом — ветка не срабатывала
+     * никогда, и под адресом любого животного открывался снимок любого
+     * документа книги, в том числе закрытого владельцем: замок
+     * проверяется у животного из адреса, а не у того, чей снимок.
+     * Вид сверяется по той же причине: ссылка на племенное свидетельство
+     * не должна отдавать протокол лаборатории.
+     */
+    if (
+      issued &&
+      (relId(issued.animal) !== Number(animal.id) ||
+        issued.type !== DOCUMENT_TYPE_OF[kind as CertificateKind])
+    ) {
+      issued = null
     }
   } else {
     const found = await payload

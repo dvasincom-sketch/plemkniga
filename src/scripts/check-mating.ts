@@ -2,6 +2,7 @@ import 'dotenv/config'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { MATING_DEPTH, matingPlan } from '@/lib/mating'
+import { analyzeAncestry } from '@/lib/ancestry'
 
 /**
  * Подбор пар — проверка на случаях с известным ответом.
@@ -24,12 +25,26 @@ import { MATING_DEPTH, matingPlan } from '@/lib/mating'
  * и ошибка тихая: у отца с дочерью нет общего предка **выше** отца,
  * а сам он в свой список предков не попадает.
  *
+ * ## Почему у отца и матери есть свои родители
+ *
+ * Первая редакция заводила семерых без дедов, и четыре случая сходились
+ * с учебником при расчёте, который завышал коэффициент на всякой
+ * родословной глубже двух колен: пути через одного общего предка
+ * считались дважды. Без дедов таких путей нет, и проверка была зелёной
+ * ровно там, где ошибка не могла проявиться. Теперь у отца и матери
+ * по два родителя, и те же четыре ответа обязаны сойтись при известных
+ * дедах — старый расчёт давал бы полным сибсам 37,5 %.
+ *
+ * Тем же случаем сверяется и обход в карточке (`analyzeAncestry`):
+ * два расчёта одной величины обязаны быть сверены прогоном, а не
+ * доверием друг к другу.
+ *
  * ## Что скрипт делает с базой
  *
- * Заводит семь животных с номерами `TEST-MATING-*`, считает, сверяет
- * и удаляет их — независимо от того, сошлись числа или нет. Оставить
- * их значило бы каждым прогоном добавлять в книгу по семь фальшивых
- * записей, а они выглядят настоящими.
+ * Заводит двенадцать животных с номерами `TEST-MATING-*`, считает,
+ * сверяет и удаляет их — независимо от того, сошлись числа или нет.
+ * Оставить их значило бы каждым прогоном добавлять в книгу фальшивые
+ * записи, а они выглядят настоящими.
  *
  *   npm run check:mating
  */
@@ -91,13 +106,19 @@ async function main() {
    * (девятнадцать месяцев). Впритык ставить нельзя: проверка сломалась бы
    * от любого ужесточения правила, и виновата была бы не она.
    */
-  const BORN = { old: '2018-01-01', young: '2021-01-01' } as const
+  const BORN = {
+    eldest: '2015-01-01',
+    old: '2018-01-01',
+    young: '2021-01-01',
+    youngest: '2024-01-01',
+  } as const
 
   const animal = async (
     suffix: string,
     sex: 'male' | 'female',
     father?: number,
     mother?: number,
+    born: keyof typeof BORN = father || mother ? 'young' : 'old',
   ): Promise<number> => {
     const doc = await payload.create({
       collection: 'animals',
@@ -123,7 +144,7 @@ async function main() {
          * по возрасту. Поколение определяется наличием родителей —
          * у кого они есть, тот младше.
          */
-        birthDate: new Date(father || mother ? BORN.young : BORN.old).toISOString(),
+        birthDate: new Date(BORN[born]).toISOString(),
         owner: orgId,
         father,
         mother,
@@ -167,8 +188,13 @@ async function main() {
      *   ОТЕЦ + МАТЬ ── СЕСТРА, БРАТ            → полные сибсы
      *   ЧУЖОЙ (без родни) × ДОЧЬ-А             → не родственники
      */
-    const father = await animal('FATHER', 'male')
-    const mother = await animal('MOTHER', 'female')
+    const gf1 = await animal('GF-1', 'male', undefined, undefined, 'eldest')
+    const gm1 = await animal('GM-1', 'female', undefined, undefined, 'eldest')
+    const gf2 = await animal('GF-2', 'male', undefined, undefined, 'eldest')
+    const gm2 = await animal('GM-2', 'female', undefined, undefined, 'eldest')
+
+    const father = await animal('FATHER', 'male', gf1, gm1, 'old')
+    const mother = await animal('MOTHER', 'female', gf2, gm2, 'old')
     const other = await animal('OTHER', 'female')
 
     const halfA = await animal('HALF-A', 'female', father)
@@ -188,6 +214,23 @@ async function main() {
       check('Полусибсы (общий отец)', coi(halfA, brother), 12.5)
       check('Полные сибсы', coi(sister, brother), 25)
       check('Отец и дочь', coi(halfA, father), 25)
+    }
+
+    /*
+     * Тот же ответ от обхода карточки. Потомок полных сибсов и потомок
+     * отца с дочерью заводятся как настоящие животные — обход считает
+     * инбридинг по родителям записи, а не по паре.
+     */
+    console.log('\nОбход родословной в карточке\n')
+    const ofSibs = await animal('OF-SIBS', 'female', brother, sister, 'youngest')
+    const ofFather = await animal('OF-FATHER', 'female', father, halfA, 'youngest')
+    for (const [what, id, want] of [
+      ['Потомок полных сибсов', ofSibs, 25],
+      ['Потомок отца и дочери', ofFather, 25],
+    ] as const) {
+      const doc = await payload.findByID({ collection: 'animals', id, depth: 0, overrideAccess: true })
+      const report = await analyzeAncestry(payload, doc)
+      check(what, report.coi, want)
     }
   } finally {
     await cleanup()

@@ -9,6 +9,7 @@ import { OPEN_VERIFICATION_STATUSES } from '@/collections/VerificationRequests'
 import { dismissKey, heldAnimals } from '@/lib/verification-gate'
 import { assertCan } from '@/lib/roles'
 import { recordOperation } from '@/lib/operations'
+import { plural } from '@/lib/format'
 
 /**
  * Полный цикл верификации: хозяйство подаёт — Ассоциация решает.
@@ -513,7 +514,42 @@ export async function decideVerificationAction(
    */
   const held = heldAnimals(request as never)
 
-  const all = (request.animals ?? []).map((a) => relId(a)).filter((n): n is number => n !== null)
+  const listed = (request.animals ?? [])
+    .map((a) => relId(a))
+    .filter((n): n is number => n !== null)
+
+  /*
+   * Подпись ставится только на животных хозяйства-заявителя.
+   *
+   * Хук коллекции сверяет принадлежность при подаче, но заявка живёт
+   * долго, и животное за это время могли продать; заявки, поданные
+   * до появления хука, принадлежности не проверял никто. Решение —
+   * последняя граница перед `trustLevel: 3`, и опираться здесь на то,
+   * что «на входе уже проверили», значит подписывать чужие данные
+   * от имени Ассоциации, если проверка на входе хоть раз промолчала.
+   */
+  const requestOrg = relId(request.organization)
+  const owned = listed.length
+    ? (
+        await payload.find({
+          collection: 'animals',
+          where: { and: [{ id: { in: listed } }, { owner: { equals: requestOrg } }] },
+          limit: listed.length,
+          depth: 0,
+          overrideAccess: true,
+        })
+      ).docs.map((d) => d.id)
+    : []
+  const foreign = listed.filter((id) => !owned.includes(id))
+  if (decision === 'approved' && foreign.length) {
+    return {
+      error:
+        `В заявке ${foreign.length} ${plural(foreign.length, 'запись', 'записи', 'записей')} другого хозяйства ` +
+        '(животное продано или заявка подана в обход формы). Подтвердить такую заявку нельзя — ' +
+        'отклоните её, хозяйство подаст заново по своему стаду.',
+    }
+  }
+  const all = listed
 
   /*
    * Автоматические проверки — часть решения, а не справка рядом с ним.

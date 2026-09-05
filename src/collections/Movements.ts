@@ -165,7 +165,7 @@ export const Movements: CollectionConfig = {
        * поэтому «свой ли это документ» там выяснить нечем. Тот же приём
        * применён в `requireOwnAnimal` (`src/access/guards.ts`).
        */
-      ({ data, req, operation }) => {
+      async ({ data, req, operation }) => {
         if (operation !== 'create') return data
         // Серверный скрипт: пользователя нет, проверять не от чьего лица.
         // То же соглашение, что в `requireOwnAnimal` (`src/access/guards.ts`).
@@ -182,8 +182,45 @@ export const Movements: CollectionConfig = {
         }
         const org = orgOf(req.user)
         if (!org) throw new Error('Записать перемещение может только хозяйство')
-        if (relId(data?.from) !== org && relId(data?.to) !== org) {
-          throw new Error('Записать перемещение может только его сторона — отправитель или получатель')
+        /*
+         * Проверяется не «моя ли это сторона», а «моё ли животное».
+         *
+         * Прежде хук довольствовался тем, что `from` или `to` — моя
+         * организация. Этого мало: получатель тоже сторона, и любой
+         * руководитель хозяйства мог одним запросом к `/api/movements`
+         * записать продажу чужой коровы самому себе — `afterChange` честно
+         * переписал бы владельца. Действие (`src/actions/movements.ts`)
+         * с самого начала спрашивало владельца животного; хук отставал
+         * от него, а прямой запрос идёт мимо действия.
+         *
+         * Правило то же, что в действии: поступление извне записывает
+         * получатель (у животного владельца ещё нет или это он сам),
+         * всё остальное — владелец, и он же обязан стоять в `from`.
+         */
+        const animalId = relId(data?.animal)
+        if (!animalId) throw new Error('Не указано животное')
+        const animal = await req.payload.findByID({
+          collection: 'animals',
+          id: animalId,
+          depth: 0,
+          overrideAccess: true,
+          req,
+        })
+        const owner = relId(animal?.owner)
+        if (data?.kind === 'import') {
+          if (owner !== null && owner !== org) {
+            throw new Error('Поступление записывает то хозяйство, к которому животное поступило')
+          }
+          if (relId(data?.to) !== org) {
+            throw new Error('Поступление извне записывается на своё хозяйство')
+          }
+        } else {
+          if (owner !== org) {
+            throw new Error('Записать перемещение может только хозяйство-владелец')
+          }
+          if (relId(data?.from) !== org) {
+            throw new Error('Отправитель перемещения — хозяйство-владелец')
+          }
         }
         return data
       },

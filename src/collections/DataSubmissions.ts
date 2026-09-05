@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
-import { isAdmin, isAuthenticated, organizationScopedRead } from '@/access'
+import { isAdmin, isAssociationAccess, isAuthenticated, organizationScopedRead } from '@/access'
+import { requireOwnOrganization } from '@/access/guards'
 
 export const SUBMISSION_STATUSES = [
   { value: 'uploaded', label: 'Загружено' },
@@ -39,7 +40,18 @@ export const DataSubmissions: CollectionConfig = {
      */
     read: organizationScopedRead,
     create: isAuthenticated,
-    update: isAuthenticated,
+    /*
+     * Статус пакета меняет Ассоциация, и только она.
+     *
+     * Здесь стояло `isAuthenticated` — тот же изъян, что был у заявок
+     * на верификацию и описан там же. Через `PATCH /api/data-submissions`
+     * хозяйство само ставило себе «Проверено сотрудниками Ассоциации»,
+     * после чего кнопка публикации честно пускала: она смотрит только
+     * на статус. Все переходы, которые делает хозяйство (публикация,
+     * согласие), идут через серверные действия с `overrideAccess`,
+     * и им это правило не мешает.
+     */
+    update: isAssociationAccess,
     delete: isAdmin,
   },
   defaultSort: '-submittedAt',
@@ -341,6 +353,9 @@ export const DataSubmissions: CollectionConfig = {
 
   hooks: {
     beforeChange: [
+      // Пакет заводится только от имени своей организации: прямой запрос
+      // мог завести пакет «от чужого имени» с готовым списком животных.
+      requireOwnOrganization,
       ({ data, req, operation, originalDoc }) => {
         if (operation === 'create') {
           if (!data.number) {

@@ -353,10 +353,27 @@ const parseParturition = (body: Record<string, unknown>, errors: AdeError[]) => 
       ? body.progeny
       : []
 
+  /*
+   * Номер отёла — `damParity`: в него мы этот номер и кладём при отдаче.
+   * У нас поле обязательное, а стандарт его не требует, поэтому здесь
+   * оно необязательно: чего не прислали, приём досчитает по отёлам
+   * животного (`accept.ts`). Отказывать из-за него нельзя — это значило
+   * бы принимать отёлы только от тех, кто взял их у нас же.
+   */
+  const parity = parseNumber(body.damParity)
+  if (parity !== null && (!Number.isInteger(parity) || parity < 1)) {
+    errors.push(
+      adeError(400, ADE_CODE.fieldValue, 'Поле damParity: ожидается номер отёла от 1', undefined, {
+        field: 'damParity',
+      }),
+    )
+  }
+
   if (details.length > 0) {
     const alive = details.filter((p) => isObj(p) && p.birthStatus === 'Alive')
     return {
       date,
+      parity,
       ease: easeRaw,
       liveHeifers: alive.filter((p) => isObj(p) && p.gender === 'Female').length,
       liveBulls: alive.filter((p) => isObj(p) && p.gender === 'Male').length,
@@ -370,7 +387,7 @@ const parseParturition = (body: Record<string, unknown>, errors: AdeError[]) => 
   const totalCount = parseNumber(body.totalProgeny)
 
   if (liveCount === null && totalCount === null) {
-    return { date, ease: easeRaw, progenyKnown: false, sexKnown: false }
+    return { date, parity, ease: easeRaw, progenyKnown: false, sexKnown: false }
   }
 
   const still =
@@ -378,6 +395,7 @@ const parseParturition = (body: Record<string, unknown>, errors: AdeError[]) => 
 
   return {
     date,
+    parity,
     ease: easeRaw,
     stillborn: still ?? undefined,
     progenyKnown: still !== null,

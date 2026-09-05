@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { getClient, getCurrentUser } from '@/lib/payload'
 import { relId } from '@/lib/visibility'
+import { isCalvingEvent } from '@/lib/calving'
 
 /**
  * Ввод отёлов, осеменений и контрольных доек по одному.
@@ -103,9 +104,21 @@ async function calvingCount(
     overrideAccess: true,
   })
 
-  const top = docs.reduce((max, c) => (typeof c.number === 'number' && c.number > max ? c.number : max), 0)
+  /*
+   * Считаются отёлы, а не все записи таблицы. Аборт и запуск носят номер
+   * той лактации, в которой случились, и в `top` они уже учтены; но
+   * в `docs.length` они входили как отдельные события, и после аборта
+   * следующий отёл получал в форме номер на единицу больше, чем ставит
+   * хук группы и импорт, — а вслед за ним сдвигались номера лактаций
+   * у доек и осеменений.
+   */
+  const calvings = docs.filter((c) => isCalvingEvent(c.eventType))
+  const top = calvings.reduce(
+    (max, c) => (typeof c.number === 'number' && c.number > max ? c.number : max),
+    0,
+  )
   // Отёлы могли быть записаны без номеров вовсе — тогда считаем по их числу
-  return Math.max(top, docs.length)
+  return Math.max(top, calvings.length)
 }
 
 /* ------------------------------------------------------------------ */

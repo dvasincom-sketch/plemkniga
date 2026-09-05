@@ -204,6 +204,49 @@ async function main() {
 
   await payload.delete({ collection: 'animals', id: own.id, overrideAccess: true })
 
+  /*
+   * Тот же вопрос на создании. Правило `update` на `POST` не действует,
+   * и животное заводилось сразу верифицированным — эта проверка год
+   * смотрела только на PATCH и была зелёной.
+   */
+  const born = await payload
+    .create({
+      collection: 'animals',
+      user: outsider,
+      overrideAccess: false,
+      data: {
+        identNumber: `${TAG}-TRUST-NEW-${suffix}`,
+        idFormat: 'internal',
+        name: 'Проверка уровня при создании',
+        sex: 'female',
+        state: 'alive',
+        ageGroup: 'cow2',
+        birthDate: new Date('2020-01-01').toISOString(),
+        owner: other.id,
+        trustLevel: 3,
+        trustCheckedAt: new Date().toISOString(),
+      } as never,
+    })
+    .catch(() => null)
+
+  if (born) {
+    const reread = await payload.findByID({
+      collection: 'animals',
+      id: born.id,
+      depth: 0,
+      overrideAccess: true,
+    })
+    check(
+      reread.trustLevel !== 3,
+      'хозяйство НЕ завело животное сразу верифицированным',
+      `уровень стал ${reread.trustLevel}`,
+    )
+    check(!reread.trustCheckedAt, 'дата подтверждения НЕ проставлена при создании')
+    await payload.delete({ collection: 'animals', id: born.id, overrideAccess: true })
+  } else {
+    check(false, 'создание животного от имени хозяйства должно проходить (проверка не состоялась)')
+  }
+
   console.log('\nФайлы\n')
 
   const csv = Buffer.from('ident;kg\n123;30\n', 'utf8')

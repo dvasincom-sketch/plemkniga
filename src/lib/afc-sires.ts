@@ -1,6 +1,7 @@
 import type { Payload } from 'payload'
 import { AFC_PLAUSIBLE } from '@/lib/afc'
 import { poolOf } from '@/lib/sql'
+import { calvingEvent } from '@/lib/sql-herd'
 
 /**
  * Возраст первого отёла по быкам — по всей книге, а не по одному стаду.
@@ -103,7 +104,7 @@ export async function afcSireBook(payload: Payload): Promise<AfcSireBook> {
     with first_calving as (
       select distinct on (c.animal_id) c.animal_id, c."date"
         from calvings c
-       where c."number" = 1 and c."date" is not null
+       where c."number" = 1 and c."date" is not null and ${calvingEvent('c')}
        order by c.animal_id, c."date"
     ),
     valid as (
@@ -169,7 +170,7 @@ export async function afcSireBook(payload: Payload): Promise<AfcSireBook> {
         `with first_calving as (
            select distinct on (c.animal_id) c.animal_id, c."date"
              from calvings c
-            where c."number" = 1 and c."date" is not null
+            where c."number" = 1 and c."date" is not null and ${calvingEvent('c')}
             order by c.animal_id, c."date"
          ),
          ok as (

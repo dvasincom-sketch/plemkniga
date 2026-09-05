@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { ADE_VERSION } from '@/lib/ade/core'
 import { isDataset } from '@/lib/ade/datasets'
-import { isAdeWritable } from '@/lib/ade/parse'
+import { isAdeWritable, parseAdeResource } from '@/lib/ade/parse'
 import { ADE_CODE, adeError, adeErrors, type AdeError } from '@/lib/ade/errors'
 import { acceptAdeResource } from '@/lib/ade/accept'
 import { adeAuth, adeBody, adeReadOnly } from '@/lib/ade/gate'
@@ -164,6 +164,19 @@ export async function adePush(request: Request, datasetRaw: string): Promise<Nex
       errors.push(
         adeError(404, ADE_CODE.locationForbidden, `Ресурс ${i + 1}: локация не найдена или недоступна`),
       )
+      continue
+    }
+
+    /*
+     * Тело ресурса разбирается здесь же, до первой записи, — а не внутри
+     * `acceptAdeResource` в цикле записи, как было. Иначе негодная дата
+     * в пятом ресурсе обнаруживалась после того, как четыре уже легли
+     * в книгу, а ответ говорил «ничего не сохранено». Заголовок этого
+     * раздела обещал разбор всей посылки заранее; теперь он выполняется.
+     */
+    const parsed = parseAdeResource(dataset, r)
+    if (!parsed.ok) {
+      errors.push(...parsed.errors.map((e) => ({ ...e, title: `Ресурс ${i + 1}: ${e.title}` })))
       continue
     }
 

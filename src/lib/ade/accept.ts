@@ -2,6 +2,7 @@ import type { Payload, Where } from 'payload'
 import { SCHEME } from '@/lib/ade/core'
 import { ADE_CODE, adeError, type AdeError } from '@/lib/ade/errors'
 import { type AdeIncoming, type AdeWritable, parseAdeResource } from '@/lib/ade/parse'
+import { isCalvingEvent } from '@/lib/calving'
 
 /**
  * Приём данных по ICAR ADE: от разобранного ресурса до записи в книге.
@@ -79,17 +80,7 @@ async function findAnimal(
       overrideAccess: true,
     })
 
-  const field =
-    ident.scheme === SCHEME.animal
-      ? 'identNumber'
-      : ident.scheme === SCHEME.accounting
-        ? 'accountingNumber'
-        : ident.scheme === SCHEME.iso11785
-          ? 'altIds.chipNumber'
-          : ident.scheme === SCHEME.fgias
-            ? 'fgias.baseUuid'
-            : null
-
+  const field = fieldForScheme(ident.scheme)
   if (!field) return null
 
   const { docs } = await byField(field)
@@ -103,6 +94,94 @@ async function findAnimal(
   if (docs.length !== 1) return null
 
   return Number(docs[0]!.id)
+}
+
+/**
+ * Поле карточки, под которым живёт номер данной схемы.
+ *
+ * Список один на приём и на фильтры отдачи (`serve.ts`): пока их было
+ * два, они разошлись — оба искали учётный идентификатор в поле
+ * `accountingNumber`, которого у животного нет и не было. Наружу
+ * под схемой `accountingid` уходит `animals.uuid` (`resources.ts`),
+ * а обратно по нему ничего не находилось: событие с тем самым номером,
+ * который мы же и отдали, получало «животное не найдено». Единственное
+ * место, где поле существовало, — мок в `check:ade-accept`, и потому
+ * прогон был зелёным.
+ */
+export const fieldForScheme = (scheme: string): string | null =>
+  scheme === SCHEME.animal
+    ? 'identNumber'
+    : scheme === SCHEME.accounting
+      ? 'uuid'
+      : scheme === SCHEME.iso11785
+        ? 'altIds.chipNumber'
+        : scheme === SCHEME.fgias
+          ? 'fgias.baseUuid'
+          : null
+
+/**
+ * Бык осеменения — по любой из присланных схем, в любом хозяйстве.
+ *
+ * Не `findAnimal`: тот ищет у одной локации, а бык принадлежит станции
+ * или другому хозяйству. Ненайденный бык — не отказ: осеменение
+ * записывается без связи, как это делает и импорт файлов, но об этом
+ * сказано в ответе.
+ */
+async function findBull(
+  payload: Payload,
+  ident: { scheme: string; id: string } | null,
+): Promise<number | null> {
+  if (!ident) return null
+  const field = fieldForScheme(ident.scheme)
+  if (!field) return null
+  const { docs } = await payload.find({
+    collection: 'animals',
+    where: { and: [{ [field]: { equals: ident.id } }, { sex: { equals: 'male' } }] },
+    limit: 2,
+    depth: 0,
+    overrideAccess: true,
+  })
+  return docs.length === 1 ? Number(docs[0]!.id) : null
+}
+
+/**
+ * Метод воспроизводства — записью справочника по коду: у осеменения
+ * это связь, а не строка. Коды те же, что засевает `dictionaries-data.ts`.
+ */
+const METHOD_CODE: Record<string, string> = { natural: '2', embryo: '3' }
+
+async function methodId(payload: Payload, method: string | null): Promise<number | null> {
+  const code = method ? METHOD_CODE[method] : undefined
+  if (!code) return null
+  const { docs } = await payload.find({
+    collection: 'reproduction-methods',
+    where: { code: { equals: code } },
+    limit: 1,
+    depth: 0,
+    overrideAccess: true,
+  })
+  return docs[0] ? Number(docs[0].id) : null
+}
+
+/**
+ * Номер отёла, если его не прислали: следующий за последним записанным.
+ * То же правило, что у формы (`actions/reproduction.ts`) и импорта.
+ */
+async function nextCalvingNumber(payload: Payload, animalId: number): Promise<number> {
+  const { docs } = await payload.find({
+    collection: 'calvings',
+    where: { animal: { equals: animalId } },
+    limit: 50,
+    sort: '-number',
+    depth: 0,
+    overrideAccess: true,
+  })
+  const calvings = docs.filter((c) => isCalvingEvent(c.eventType))
+  const top = calvings.reduce(
+    (max, c) => (typeof c.number === 'number' && c.number > max ? c.number : max),
+    0,
+  )
+  return Math.max(top, calvings.length) + 1
 }
 
 /* ------------------------------------------------------------------ *
@@ -141,6 +220,7 @@ function fieldsFor(
   collection: AdeWritable,
   animalId: number,
   v: Record<string, unknown>,
+  linked: { number?: number; bull?: number | null; method?: number | null },
 ): Record<string, unknown> {
   const common = { animal: animalId }
 
@@ -165,6 +245,16 @@ function fieldsFor(
       return {
         ...common,
         date: v.date,
+        /*
+         * Номер отёла обязателен у коллекции, а стандарт его не требует.
+         * Без этой строки приём отёлов не мог записать ни одной строки:
+         * `payload.create` падал на валидации, ответ был 500 «Запись
+         * не сохранена», а соответствие, карта ICAR и OpenAPI обещали
+         * приём отёлов. `check:ade-accept` этого не видел — он сверяет
+         * круг «отдача → разбор», до записи не доходя.
+         */
+        number: linked.number,
+        eventType: 'calving',
         ease: easeIn(v.ease) ?? undefined,
         /*
          * Приплод записывается ровно в той полноте, в какой он прислан.
@@ -188,6 +278,14 @@ function fieldsFor(
         ...common,
         date: v.date,
         attemptNumber: v.rank ?? undefined,
+        /*
+         * Бык и метод пишутся, а не выбрасываются. Разбор их читал,
+         * запись — нет: клиент получал 201, а в книге лежало осеменение
+         * без быка, которое затем уезжало в ФГИАС придержанным
+         * по «Базовому номеру быка».
+         */
+        bull: linked.bull ?? undefined,
+        method: linked.method ?? undefined,
         source: 'api',
       }
 
@@ -275,8 +373,24 @@ export async function acceptAdeResource(
     return { ok: true, action: 'deleted', id: Number(found.id) }
   }
 
+  const linked: { number?: number; bull?: number | null; method?: number | null } = {}
+  if (collection === 'parturitions') {
+    const parity = inc.values.parity as number | null | undefined
+    const already = (found as { number?: unknown } | undefined)?.number
+    linked.number =
+      typeof parity === 'number'
+        ? parity
+        : typeof already === 'number'
+          ? already
+          : await nextCalvingNumber(payload, animalId)
+  }
+  if (collection === 'inseminations') {
+    linked.bull = await findBull(payload, (inc.values.bullIdentifier as never) ?? null)
+    linked.method = await methodId(payload, (inc.values.method as string | null) ?? null)
+  }
+
   const data = {
-    ...fieldsFor(collection, animalId, inc.values),
+    ...fieldsFor(collection, animalId, inc.values, linked),
     ade: { source: inc.source, sourceId: inc.sourceId },
   }
 

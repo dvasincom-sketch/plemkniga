@@ -1,6 +1,6 @@
 import type { Payload } from 'payload'
 import { numOf, numOrNull, poolOf } from '@/lib/sql'
-import { ageMonths, isHeifer, liveFemale, notArchived } from '@/lib/sql-herd'
+import { ageMonths, calvingEvent, isHeifer, liveFemale, notArchived } from '@/lib/sql-herd'
 
 /**
  * Рейтинг животных по индексу — поимённо, по всей книге.
@@ -172,7 +172,8 @@ export async function loadRanking(
     `
     with calved as (
       select animal_id, count(*)::int as n
-        from calvings
+        from calvings k
+       where ${calvingEvent()}
        group by animal_id
     ),
     ranked as (

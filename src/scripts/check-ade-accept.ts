@@ -1,7 +1,8 @@
 import { ADE_READ_ONLY_REASON, ADE_WRITABLE, isAdeWritable, parseAdeResource } from '@/lib/ade/parse'
 import { ADE_CODE } from '@/lib/ade/errors'
 import { ADE_COLLECTIONS } from '@/lib/ade/core'
-import { adeParturition, adeTestDayResult, adeWeight } from '@/lib/ade/resources'
+import { plural } from '@/lib/format'
+import { adeInsemination, adeParturition, adeTestDayResult, adeWeight } from '@/lib/ade/resources'
 
 /**
  * Разбор входящих данных ADE — на негодных телах и на своей же выгрузке.
@@ -32,10 +33,16 @@ import { adeParturition, adeTestDayResult, adeWeight } from '@/lib/ade/resources
 const fails: string[] = []
 const fail = (m: string) => fails.push(m)
 
+/*
+ * Поля мока — те, что есть у настоящей карточки. Здесь стоял
+ * `accountingNumber`, которого у животного нет: приём искал по нему
+ * учётный идентификатор, находил его в моке — и прогон был зелёным там,
+ * где живой запрос отвечал «животное не найдено».
+ */
 const animal = {
   id: 1,
   identNumber: '1234567890',
-  accountingNumber: '77',
+  uuid: '1b4e28ba-2fa1-11d2-883f-0016d3cca427',
   name: 'Ромашка',
   sex: 'female' as const,
   birthDate: '2021-03-14',
@@ -81,6 +88,20 @@ const ROUND: [name: string, collection: (typeof ADE_WRITABLE)[number], resource:
     'weights',
     adeWeight({ id: 13, animal, date: '2026-01-10', weight: 512, updatedAt: null }),
   ],
+  [
+    'осеменение',
+    'inseminations',
+    adeInsemination({
+      id: 14,
+      animal,
+      date: '2026-05-03',
+      attemptNumber: 1,
+      method: 'natural',
+      bullIdentNumber: '5555555555',
+      bullName: 'Атлант',
+      updatedAt: '2026-05-03T10:00:00.000Z',
+    }),
+  ],
 ]
 
 for (const [name, collection, resource] of ROUND) {
@@ -114,10 +135,24 @@ for (const [name, collection, resource] of ROUND) {
     if (v.liveHeifers !== 1 || v.liveBulls !== 0) {
       fail(`${name}: приплод после круга — тёлочек ${String(v.liveHeifers)}, бычков ${String(v.liveBulls)}`)
     }
+    /*
+     * Номер отёла обязан пережить круг: у коллекции он обязательный,
+     * и отдача кладёт его в `damParity`. Пока разбор его не читал,
+     * приём отёлов не мог записать ни одной строки — а этот прогон
+     * был зелёным, потому что до записи не доходит.
+     */
+    if (v.parity !== 2) fail(`${name}: номер отёла после круга — ${String(v.parity)}, ожидалось 2`)
+  }
+
+  if (collection === 'inseminations') {
+    const v = r.value.values
+    const bull = v.bullIdentifier as { id?: string } | null
+    if (bull?.id !== '5555555555') fail(`${name}: бык после круга — ${JSON.stringify(bull)}`)
+    if (v.method !== 'natural') fail(`${name}: метод после круга — ${String(v.method)}, ожидалось natural`)
   }
 }
 
-console.log(`Круг «выгрузка → приём»: ${ROUND.length} ресурса`)
+console.log(`Круг «выгрузка → приём»: ${ROUND.length} ${plural(ROUND.length, 'ресурс', 'ресурса', 'ресурсов')}`)
 
 /* ------------------------------------------------------------------ *
  *  Негодные тела                                                     *

@@ -4,6 +4,7 @@ import type { SignalInput } from '@/lib/herd-signals'
 import { numOf, poolOf } from '@/lib/sql'
 import {
   ageMonths,
+  calvingEvent,
   culledYear,
   isHeifer,
   liveFemale,
@@ -148,7 +149,8 @@ export async function herdConditions(payload: Payload): Promise<Map<number, Herd
     `
     with calved as (
       select animal_id, count(*)::int as n
-        from calvings
+        from calvings k
+       where ${calvingEvent()}
        group by animal_id
     ),
     scc as (

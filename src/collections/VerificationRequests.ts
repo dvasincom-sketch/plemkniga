@@ -1,6 +1,14 @@
 import type { CollectionConfig } from 'payload'
-import { isAdmin, isAssociationAccess, isAuthenticated, organizationScopedRead } from '@/access'
+import {
+  isAdmin,
+  isAssociation,
+  isAssociationAccess,
+  isAuthenticated,
+  organizationScopedRead,
+} from '@/access'
 import { requireOwnOrganization } from '@/access/guards'
+import { relId } from '@/lib/visibility'
+import { VERIFICATION_LIMIT } from '@/lib/verification-limit'
 
 export const VERIFICATION_STATUSES = [
   { value: 'new', label: 'Подано' },
@@ -337,6 +345,38 @@ export const VerificationRequests: CollectionConfig = {
       requireOwnOrganization,
       async ({ data, req, operation }) => {
         if (operation !== 'create') return data
+
+        /*
+         * Животные заявки — только свои, и не больше потолка.
+         *
+         * Действие (`actions/verification.ts`) это проверяло с самого
+         * начала, а хук сверял одну организацию. Через `POST
+         * /api/verification-requests` можно было подать заявку на чужих
+         * животных, и решение эксперта поставило бы им «Проверено
+         * ассоциацией»: эксперт видит номера, но кому они принадлежат,
+         * страница не подсвечивает. Проверка молчит без пользователя —
+         * так ходят сид и скрипты.
+         */
+        if (req.user && !isAssociation(req.user)) {
+          const org = relId((req.user as { organization?: unknown }).organization)
+          const ids = ((data.animals ?? []) as unknown[])
+            .map((a) => relId(a))
+            .filter((n): n is number => n !== null)
+          if (ids.length > VERIFICATION_LIMIT) {
+            throw new Error(`За раз можно подать не больше ${VERIFICATION_LIMIT} записей`)
+          }
+          if (ids.length) {
+            const { totalDocs } = await req.payload.count({
+              collection: 'animals',
+              where: { and: [{ id: { in: ids } }, { owner: { equals: org } }] },
+              overrideAccess: true,
+              req,
+            })
+            if (totalDocs !== new Set(ids).size) {
+              throw new Error('В заявке есть записи другого хозяйства')
+            }
+          }
+        }
 
         if (req.user && !data.requestedBy) data.requestedBy = req.user.id
         if (!data.requestedAt) data.requestedAt = new Date().toISOString()
