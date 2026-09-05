@@ -2,6 +2,7 @@ import type { CollectionConfig } from 'payload'
 import { ACCESS_SCOPES, toOptions } from '@/lib/dictionaries'
 import { accessGrantIssue, accessGrantRead, isAdmin } from '@/access'
 import { forgetGrants } from '@/lib/grants'
+import { denyAccess } from '@/access/denied'
 import { relId } from '@/lib/visibility'
 
 /**
@@ -206,11 +207,11 @@ export const AccessGrants: CollectionConfig = {
           }
 
           if (user?.role !== 'admin' && owner !== myOrg) {
-            throw new Error('Открыть можно только свои данные')
+            denyAccess('Открыть можно только свои данные')
           }
 
           if (owner === relId(data.grantee)) {
-            throw new Error('Выдавать доступ самому себе незачем — свои данные и так видны')
+            denyAccess('Выдавать доступ самому себе незачем — свои данные и так видны')
           }
 
           data.owner = owner

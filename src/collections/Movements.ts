@@ -2,6 +2,7 @@ import type { Access, CollectionConfig, Where } from 'payload'
 import { isAdmin, isAssociation, isAssociationAccess, isAuthenticated } from '@/access'
 import { MOVEMENT_KINDS, movementEffect, type MovementKind } from '@/lib/movements'
 import { relId } from '@/lib/visibility'
+import { denyAccess } from '@/access/denied'
 import { can } from '@/lib/roles'
 
 type U = { id: number | string; role?: string; organization?: number | string | { id: number } }
@@ -178,10 +179,10 @@ export const Movements: CollectionConfig = {
          * ровно столько, сколько проверок написано.
          */
         if (!can(req.user as never, 'move')) {
-          throw new Error('Оформлять перемещения может руководитель хозяйства')
+          denyAccess('Оформлять перемещения может руководитель хозяйства')
         }
         const org = orgOf(req.user)
-        if (!org) throw new Error('Записать перемещение может только хозяйство')
+        if (!org) denyAccess('Записать перемещение может только хозяйство')
         /*
          * Проверяется не «моя ли это сторона», а «моё ли животное».
          *
@@ -209,17 +210,17 @@ export const Movements: CollectionConfig = {
         const owner = relId(animal?.owner)
         if (data?.kind === 'import') {
           if (owner !== null && owner !== org) {
-            throw new Error('Поступление записывает то хозяйство, к которому животное поступило')
+            denyAccess('Поступление записывает то хозяйство, к которому животное поступило')
           }
           if (relId(data?.to) !== org) {
-            throw new Error('Поступление извне записывается на своё хозяйство')
+            denyAccess('Поступление извне записывается на своё хозяйство')
           }
         } else {
           if (owner !== org) {
-            throw new Error('Записать перемещение может только хозяйство-владелец')
+            denyAccess('Записать перемещение может только хозяйство-владелец')
           }
           if (relId(data?.from) !== org) {
-            throw new Error('Отправитель перемещения — хозяйство-владелец')
+            denyAccess('Отправитель перемещения — хозяйство-владелец')
           }
         }
         return data

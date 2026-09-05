@@ -1,4 +1,5 @@
 import type { CollectionBeforeChangeHook } from 'payload'
+import { denyAccess } from '@/access/denied'
 import { isAssociation } from '@/access'
 import { relId } from '@/lib/visibility'
 import { can } from '@/lib/roles'
@@ -54,7 +55,7 @@ export const requireOwnAnimal: CollectionBeforeChangeHook = async ({ data, req, 
   if (isAssociation(user)) return data
 
   const org = orgOf(user)
-  if (!org) throw new Error('У вашей учётной записи нет организации')
+  if (!org) denyAccess('У вашей учётной записи нет организации')
 
   /*
    * Роль внутри хозяйства проверяется здесь, а не в каждом действии.
@@ -65,7 +66,7 @@ export const requireOwnAnimal: CollectionBeforeChangeHook = async ({ data, req, 
    * Одна проверка вместо восьми, и новая коллекция получает её даром.
    */
   if (!can(user as never, 'data')) {
-    throw new Error('Наблюдатель не может вносить данные. Попросите руководителя сменить роль.')
+    denyAccess('Наблюдатель не может вносить данные. Попросите руководителя сменить роль.')
   }
 
   const animalId = relId(data?.animal) ?? relId((originalDoc as { animal?: unknown })?.animal)
@@ -80,7 +81,7 @@ export const requireOwnAnimal: CollectionBeforeChangeHook = async ({ data, req, 
   })
 
   if (relId((animal as { owner?: unknown })?.owner) !== org) {
-    throw new Error('Изменять можно только записи своего стада')
+    denyAccess('Изменять можно только записи своего стада')
   }
 
   return data
@@ -150,13 +151,13 @@ export const requireOwnOrganization: CollectionBeforeChangeHook = async ({
   if (isAssociation(user)) return data
 
   const org = orgOf(user)
-  if (!org) throw new Error('У вашей учётной записи нет организации')
+  if (!org) denyAccess('У вашей учётной записи нет организации')
 
   const stated =
     relId(data?.organization) ?? relId((originalDoc as { organization?: unknown })?.organization)
 
   if (stated !== null) {
-    if (stated !== org) throw new Error('Записывать можно только в свою организацию')
+    if (stated !== org) denyAccess('Записывать можно только в свою организацию')
     return data
   }
 
@@ -171,7 +172,7 @@ export const requireOwnOrganization: CollectionBeforeChangeHook = async ({
       req,
     })
     if (relId((animal as { owner?: unknown })?.owner) !== org) {
-      throw new Error('Изменять можно только записи своего стада')
+      denyAccess('Изменять можно только записи своего стада')
     }
     return data
   }
@@ -201,7 +202,7 @@ export const associationIssuesOnly: CollectionBeforeChangeHook = ({ data, req, o
   const after = relId(data?.issuedBy)
 
   if (after !== before) {
-    throw new Error('Поле «кто выдал» заполняет Ассоциация, а не хозяйство')
+    denyAccess('Поле «кто выдал» заполняет Ассоциация, а не хозяйство')
   }
 
   return data
@@ -237,7 +238,7 @@ export const issuedDocumentLocked: CollectionBeforeChangeHook = ({
   if (!user) return data
   if (isAssociation(user)) return data
   if (relId((originalDoc as { issuedBy?: unknown })?.issuedBy) !== null) {
-    throw new Error('Документ, выданный Ассоциацией, хозяйство не изменяет')
+    denyAccess('Документ, выданный Ассоциацией, хозяйство не изменяет')
   }
   return data
 }

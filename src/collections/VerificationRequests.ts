@@ -8,6 +8,7 @@ import {
 } from '@/access'
 import { requireOwnOrganization } from '@/access/guards'
 import { relId } from '@/lib/visibility'
+import { denyAccess } from '@/access/denied'
 import { VERIFICATION_LIMIT } from '@/lib/verification-limit'
 
 export const VERIFICATION_STATUSES = [
@@ -363,7 +364,7 @@ export const VerificationRequests: CollectionConfig = {
             .map((a) => relId(a))
             .filter((n): n is number => n !== null)
           if (ids.length > VERIFICATION_LIMIT) {
-            throw new Error(`За раз можно подать не больше ${VERIFICATION_LIMIT} записей`)
+            denyAccess(`За раз можно подать не больше ${VERIFICATION_LIMIT} записей`)
           }
           if (ids.length) {
             const { totalDocs } = await req.payload.count({
@@ -373,7 +374,7 @@ export const VerificationRequests: CollectionConfig = {
               req,
             })
             if (totalDocs !== new Set(ids).size) {
-              throw new Error('В заявке есть записи другого хозяйства')
+              denyAccess('В заявке есть записи другого хозяйства')
             }
           }
         }
