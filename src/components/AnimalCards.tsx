@@ -8,9 +8,9 @@ import { ANONYMOUS, LOCK_HINT, isAnimalLocked, type Viewer } from '@/lib/visibil
 /**
  * Карточки вместо таблицы на узком экране.
  *
- * Таблица книги — четырнадцать колонок; на телефоне она превращается
+ * Таблица книги — полтора десятка колонок; на телефоне она превращается
  * в горизонтальный скролл, по которому невозможно сравнивать животных.
- * Карточка показывает то же самое в порядке важности.
+ * Карточка показывает главное в порядке важности.
  */
 export function AnimalCards({
   animals,
@@ -34,7 +34,14 @@ export function AnimalCards({
         const ipc = a.ipc ?? null
 
         const metrics: { label: string; value: string }[] = [
-          { label: 'Удой, л', value: nf(s?.milkYield) },
+          /*
+           * Килограммы, а не литры: поле одно и то же, что в таблице
+           * и в загрузке (`import-format.ts` объясняет, почему молоко
+           * учитывается по массе). Подпись «Удой, л» стояла только здесь,
+           * и одна величина называлась двумя единицами в зависимости
+           * от ширины экрана.
+           */
+          { label: 'Удой, кг', value: nf(s?.milkYield) },
           { label: 'Жир, %', value: nf(s?.fatPercent, 2) },
           { label: 'Белок, %', value: nf(s?.proteinPercent, 2) },
           { label: 'СБП, кг', value: nf(s?.fatProteinSum) },

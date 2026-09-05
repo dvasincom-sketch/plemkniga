@@ -72,8 +72,23 @@ import type { Locale } from '@/lib/i18n/locales'
 
 export type SiteMessages = {
   eyebrow: string
-  /** Четыре числа под первым экраном. Каждое проверяемо. */
-  proof: { value: string; label: string }[]
+  /**
+   * Четыре числа под первым экраном. Каждое проверяемо.
+   *
+   * Адрес разбора лежит рядом с числом, а не отдельным списком.
+   * Список был индексным — `['/fgias', '/ade', '/rules', '/breeds']`, —
+   * и работал, пока числа на всех языках были одни и те же. Потом
+   * появилось решение «язык и страна — разные оси», и у каждого языка
+   * встали свои числа: доля племенного скота, разница по продуктивности,
+   * средний надой. Порядок разъехался молча, и на пяти языках из шести
+   * под числом про ICAR открывался каталог правил, а под ISO 11785 —
+   * породы. Заметить это нельзя было ни на одной русской странице.
+   *
+   * `href: null` — число без разбора: страновая цифра из чужого отчёта,
+   * которой у нас своей страницы нет. Плашка тогда не нажимается,
+   * и подпись «Разобрать» не показывается.
+   */
+  proof: { value: string; label: string; href: string | null }[]
   /**
    * Подпись-приглашение на плашке с числом: ведёт на разбор.
    *
@@ -296,10 +311,10 @@ export type SiteMessages = {
 const ru: SiteMessages = {
   eyebrow: 'Племенная книга для породы и хозяйства',
   proof: [
-    { value: '20 / 20', label: 'шаблонов государственного реестра' },
-    { value: '11', label: 'коллекций международного обмена' },
-    { value: '50+', label: 'правил проверки данных' },
-    { value: '55', label: 'пород молочного направления в каталоге' },
+    { value: '20 / 20', label: 'шаблонов государственного реестра', href: '/fgias' },
+    { value: '11', label: 'коллекций международного обмена', href: '/ade' },
+    { value: '50+', label: 'правил проверки данных', href: '/rules' },
+    { value: '55', label: 'пород молочного направления в каталоге', href: '/breeds' },
   ],
   proofMore: 'Разобрать',
   layers: {
@@ -511,10 +526,10 @@ standard: {
 const en: SiteMessages = {
   eyebrow: 'A herdbook for a breed and a farm',
   proof: [
-    { value: '11', label: 'international exchange collections' },
-    { value: '50+', label: 'data validation rules' },
-    { value: '10', label: 'ICAR Guidelines sections mapped' },
-    { value: 'ISO 11785', label: 'international animal ID format' },
+    { value: '11', label: 'international exchange collections', href: '/ade' },
+    { value: '50+', label: 'data validation rules', href: '/rules' },
+    { value: '10', label: 'ICAR Guidelines sections mapped', href: '/icar' },
+    { value: 'ISO 11785', label: 'international animal ID format', href: '/compliance' },
   ],
   proofMore: 'See the analysis',
   layers: {
@@ -723,10 +738,14 @@ standard: {
 const kk: SiteMessages = {
   eyebrow: 'Сүтті малдың асыл тұқым есебі',
 proof: [
-      { value: '11', label: 'халықаралық алмасу жинағы' },
-      { value: '50+', label: 'деректерді тексеру ережесі' },
-      { value: '11%', label: 'ел бойынша асыл тұқымды ІҚМ үлесі — қалған 89% есепсіз' },
-      { value: '12', label: 'субсидия үшін жылына сүт сынамасы — ай сайын, әр сиырдан' },
+      { value: '11', label: 'халықаралық алмасу жинағы', href: '/ade' },
+      { value: '50+', label: 'деректерді тексеру ережесі', href: '/rules' },
+      { value: '11%', label: 'ел бойынша асыл тұқымды ІҚМ үлесі — қалған 89% есепсіз', href: null },
+      {
+        value: '12',
+        label: 'субсидия үшін жылына сүт сынамасы — ай сайын, әр сиырдан',
+        href: null,
+      },
     ],
   proofMore: 'Талдауын көру',
   layers: {
@@ -931,10 +950,14 @@ standard: {
 const hy: SiteMessages = {
   eyebrow: 'Կաթնատու անասունների ցեղային հաշվառում',
 proof: [
-      { value: '11', label: 'միջազգային փոխանակման հավաքածու' },
-      { value: '50+', label: 'տվյալների ստուգման կանոն' },
-      { value: '99%', label: 'ԽԵԱ-ն բնակչության տնտեսություններում է' },
-      { value: '×2,5', label: 'ներկրված մաքրացեղ կենդանիների և տեղականների մթերատվության տարբերությունը' },
+      { value: '11', label: 'միջազգային փոխանակման հավաքածու', href: '/ade' },
+      { value: '50+', label: 'տվյալների ստուգման կանոն', href: '/rules' },
+      { value: '99%', label: 'ԽԵԱ-ն բնակչության տնտեսություններում է', href: null },
+      {
+        value: '×2,5',
+        label: 'ներկրված մաքրացեղ կենդանիների և տեղականների մթերատվության տարբերությունը',
+        href: null,
+      },
     ],
   proofMore: 'Տեսնել վերլուծությունը',
   layers: {
@@ -1139,10 +1162,14 @@ standard: {
 const be: SiteMessages = {
   eyebrow: 'Пляменны ўлік малочнай жывёлы',
 proof: [
-      { value: '11', label: 'калекцыі міжнароднага абмену' },
-      { value: '50+', label: 'правілаў праверкі даных' },
-      { value: '1%', label: 'народжаных пляменных бычкоў трапляе ў маштабную селекцыю' },
-      { value: '28 дзён', label: 'нарматыўны інтэрвал кантролю прадукцыйнасці' },
+      { value: '11', label: 'калекцыі міжнароднага абмену', href: '/ade' },
+      { value: '50+', label: 'правілаў праверкі даных', href: '/rules' },
+      {
+        value: '1%',
+        label: 'народжаных пляменных бычкоў трапляе ў маштабную селекцыю',
+        href: null,
+      },
+      { value: '28 дзён', label: 'нарматыўны інтэрвал кантролю прадукцыйнасці', href: null },
     ],
   proofMore: 'Паглядзець разбор',
   layers: {
@@ -1347,10 +1374,10 @@ standard: {
 const ky: SiteMessages = {
   eyebrow: 'Сүт багытындагы малдын асыл тукум эсеби',
 proof: [
-      { value: '11', label: 'эл аралык алмашуу жыйнагы' },
-      { value: '50+', label: 'маалыматтарды текшерүү эрежеси' },
-      { value: '+73 кг', label: 'орточо саам он алты жылда: 2 041-ден 2 114 кг чейин' },
-      { value: '3–5', label: 'баш мал орточо короодо, анын 1–3ү саан уй' },
+      { value: '11', label: 'эл аралык алмашуу жыйнагы', href: '/ade' },
+      { value: '50+', label: 'маалыматтарды текшерүү эрежеси', href: '/rules' },
+      { value: '+73 кг', label: 'орточо саам он алты жылда: 2 041-ден 2 114 кг чейин', href: null },
+      { value: '3–5', label: 'баш мал орточо короодо, анын 1–3ү саан уй', href: null },
     ],
   proofMore: 'Талдоону көрүү',
   layers: {

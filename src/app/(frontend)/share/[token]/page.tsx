@@ -5,7 +5,7 @@ import { SiteFooter } from '@/components/SiteFooter'
 import { getClient } from '@/lib/payload'
 import { resolveShare, noteShareOpen, SHARE_GONE } from '@/lib/share-links'
 import { ACCESS_SCOPES, labelOf } from '@/lib/dictionaries'
-import { dateRu, nf } from '@/lib/format'
+import { dateRu, nf, plural } from '@/lib/format'
 import { after } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -96,7 +96,7 @@ export default async function SharePage({
         <div className="mt-8 max-w-[80ch]">
           <p className="text-[12px] uppercase tracking-[0.09em] text-ink-500">Ссылка на просмотр</p>
           <h1 className="mt-1 text-[30px] font-medium leading-tight sm:text-[36px]">
-            {animals.length} {animals.length === 1 ? 'запись' : 'записей'}
+            {animals.length} {plural(animals.length, 'запись', 'записи', 'записей')}
             {org?.name ? ` хозяйства «${org.name}»` : ''}
           </h1>
 

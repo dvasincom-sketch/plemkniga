@@ -42,9 +42,21 @@ export default function FrontendError({
     console.error('[plemkniga]', error)
   }, [error])
 
+  /*
+   * Витрину узнаём по хосту, а если не узнали — по языковой приставке.
+   *
+   * `SITE_HOSTS` читается из переменной среды, а переменная без приставки
+   * `NEXT_PUBLIC_` в браузер не попадает: в клиентской сборке здесь всегда
+   * стоит список по умолчанию. На предпросмотре, где домен временный
+   * и переменная переопределена, отказ на витрине показывал бы обвязку
+   * книги — с чужим знаком и ссылкой в кабинет, которого на этом домене
+   * нет. Приставка языка в адресе бывает только у витринных страниц
+   * и от переменных не зависит.
+   */
   const onSite =
     typeof window !== 'undefined' &&
-    SITE_HOSTS.includes(window.location.hostname.toLowerCase())
+    (SITE_HOSTS.includes(window.location.hostname.toLowerCase()) ||
+      isLocale(window.location.pathname.split('/')[1] ?? ''))
 
   /*
    * Язык — из адресной строки, и другого источника здесь нет.

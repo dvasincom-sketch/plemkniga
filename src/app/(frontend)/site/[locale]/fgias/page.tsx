@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import { siteMetadata } from '@/lib/seo'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
+import { noticeFor } from '@/lib/i18n/translated'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
 import { EvolutionFgias } from '@/components/EvolutionFgias'
 
@@ -48,7 +49,14 @@ export default async function FgiasPage({ params }: { params: Promise<{ locale: 
 
   const locale: Locale = raw
   const frame = PAGE_MESSAGES[locale].pages.fgias
-  const notice = PAGE_MESSAGES[locale].notice
+  /*
+   * Оговорка здесь всегда об откате, а не о качестве перевода: разбор
+   * шаблонов рисует русский компонент `EvolutionFgias`, языка у него нет
+   * вовсе. Прежде бралась строка «переведено, но не вычитано» — то есть
+   * английскому читателю обещали английский текст и извинялись за термины,
+   * а он получал русскую таблицу без единого слова о причине.
+   */
+  const notice = noticeFor(locale, locale !== 'ru')
 
   return (
     <>

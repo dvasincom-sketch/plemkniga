@@ -1,6 +1,22 @@
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
+/*
+ * Числа экскурсии берутся из тех же реестров, из которых работает книга.
+ *
+ * Набраны они были словами и отстали молча: «тридцать четыре линейных
+ * признака и десять композитов» при восемнадцати и трёх, «over seven
+ * collections» при одиннадцати — при том что то же число на главной
+ * подставляется из кода и стоит рядом со ссылкой сюда. Экскурсия —
+ * единственная страница для тех, кто не читает по-русски, и обещание
+ * «настоящие числа из кода» на ней было неправдой.
+ */
+import { EXTERIOR_COMPOSITES, EXTERIOR_TRAITS } from '@/lib/dictionaries'
+import { ADE_COLLECTIONS } from '@/lib/ade/core'
+import { COMPLIANCE, countByState } from '@/lib/compliance'
+import { ICAR_SECTIONS } from '@/lib/icar-map'
+import { TRAIT_BASE } from '@/lib/breeding-index'
+import { FGIAS_TEMPLATES } from '@/lib/fgias-templates'
 import { BOOK_URL } from '@/lib/hosts'
 import { PRODUCT_MAIL } from '@/lib/hosts'
 
@@ -243,7 +259,10 @@ export default function TourPage() {
 
         {/* ---------------------------------------------------------- */}
 
-        <Section eyebrow="Conformation" title="Thirty-four linear traits, ten composites">
+        <Section
+          eyebrow="Conformation"
+          title={`${EXTERIOR_TRAITS.length} linear traits, ${EXTERIOR_COMPOSITES.length} composites`}
+        >
           <p>
             Classification is recorded trait by trait on the linear scale, and the composite scores
             are computed from them. Who did the classifying is stored with the record — a score
@@ -274,15 +293,18 @@ export default function TourPage() {
               ))}
             </div>
             <p className="mt-4 text-[12px] text-ink-400">
-              10 of 34 linear traits shown. Composites: frame, dairy strength, feet and legs, udder,
-              final score.
+              10 of {EXTERIOR_TRAITS.length} linear traits shown. Composites:{' '}
+              {EXTERIOR_COMPOSITES.map((c) => c.key.replace('Composite', '')).join(', ')}.
             </p>
           </Screen>
         </Section>
 
         {/* ---------------------------------------------------------- */}
 
-        <Section eyebrow="Breeding value" title="Eleven traits, and a choice of what to weigh them by">
+        <Section
+          eyebrow="Breeding value"
+          title={`${TRAIT_BASE.length} traits, and a choice of what to weigh them by`}
+        >
           <p>
             An index is an opinion about what matters, expressed as weights. Rather than hide one
             opinion inside a single number, the system carries several published profiles side by
@@ -387,21 +409,13 @@ export default function TourPage() {
         <Section eyebrow="Exchange" title="ICAR ADE, so the data can leave">
           <p>
             Data a farm cannot take with it is data held hostage. The system serves the ICAR Animal
-            Data Exchange interface (version 1.5, JSON Schema 2020-12 and OpenAPI 3.1) over seven
-            collections, location-centric as the standard prescribes.
+            Data Exchange interface (version 1.5, JSON Schema 2020-12 and OpenAPI 3.1) over{' '}
+            {ADE_COLLECTIONS.length} collections, location-centric as the standard prescribes.
           </p>
 
           <Screen title="ADE — collections served">
             <div className="grid gap-x-8 gap-y-1 font-mono text-[13px] sm:grid-cols-2">
-              {[
-                'animals',
-                'test-day-results',
-                'parturitions',
-                'inseminations',
-                'type-classifications',
-                'weights',
-                'breeding-values',
-              ].map((c) => (
+              {ADE_COLLECTIONS.map((c) => (
                 <div key={c} className="border-b border-ink-100 py-1.5">
                   GET /ade/v1/locations/&#123;scheme&#125;/&#123;id&#125;/{c}
                 </div>
@@ -410,8 +424,8 @@ export default function TourPage() {
           </Screen>
 
           <p className="text-[14px] text-ink-500">
-            Where a national registry is mandatory, its exports are generated too — twenty templates
-            in the Russian case. That obligation belongs to a country, not to breeding: a herdbook
+            Where a national registry is mandatory, its exports are generated too —{' '}
+            {FGIAS_TEMPLATES.length} templates in the Russian case. That obligation belongs to a country, not to breeding: a herdbook
             elsewhere simply does not carry it.
           </p>
         </Section>
@@ -420,9 +434,10 @@ export default function TourPage() {
 
         <Section eyebrow="Standards" title="What is done, what is partial, what is not started">
           <p>
-            The system is mapped against ten ICAR guideline sections and twenty-three compliance
-            items, each with its state and the evidence behind it — a check that proves it, a page
-            that shows it, or the code that does it. Six items are partial and ten are not started,
+            The system is mapped against {ICAR_SECTIONS.length} ICAR guideline sections and{' '}
+            {COMPLIANCE.length} compliance items, each with its state and the evidence behind it —
+            a check that proves it, a page that shows it, or the code that does it.{' '}
+            {countByState().partial} items are partial and {countByState().planned} are not started,
             and they are listed as such.
           </p>
           <p>
@@ -433,10 +448,15 @@ export default function TourPage() {
           </p>
 
           <div className="mt-6 flex flex-wrap gap-3">
+            {/*
+               Ссылки с языком: без него они уходят на страницу-редирект
+               и оттуда на русскую копию — то есть единственная английская
+               страница витрины отправляла читателя в русский раздел.
+            */}
             {[
-              { href: '/compliance', label: 'Compliance register' },
-              { href: '/icar', label: 'ICAR section map' },
-              { href: '/api-docs', label: 'API documentation' },
+              { href: '/en/compliance', label: 'Compliance register' },
+              { href: '/en/icar', label: 'ICAR section map' },
+              { href: '/en/api-docs', label: 'API documentation' },
             ].map((l) => (
               <a
                 key={l.href}

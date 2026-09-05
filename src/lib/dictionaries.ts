@@ -111,9 +111,9 @@ export const ID_FORMATS = [
    */
   { value: 'rus', label: 'РФ, международный номер (XXRUS…)' },
   { value: 'icar', label: 'ICAR / ISO-11784' },
-  { value: 'usa', label: 'USA (HOUSA)' },
+  { value: 'usa', label: 'USA/CAN/NLD/DNK (HOUSA…)' },
   { value: 'can', label: 'CAN (HOCAN)' },
-  { value: 'deu', label: 'DEU (HODEU)' },
+  { value: 'deu', label: 'DEU (DEHOL)' },
   { value: 'internal', label: 'Внутрихозяйственный' },
 ] as const
 

@@ -218,7 +218,7 @@ export default async function HerdCheckPage() {
 
           <p className="mt-4 max-w-[80ch] text-[15px] leading-relaxed text-ink-700">
             Те же правила, по которым Ассоциация разбирает заявки, — прогнаны сейчас
-            по вашим неподтверждённым записям. Что это за правила и почему они такие,
+            по всем вашим записям. Что это за правила и почему они такие,
             написано в{' '}
             <Link href="/account/checks" className="underline underline-offset-4">
               списке проверок

@@ -65,6 +65,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { path: '/compliance', priority: 0.7 },
     { path: '/ade', priority: 0.7 },
     { path: '/icar', priority: 0.6 },
+    /*
+     * Разбор пробелов ICAR — своя страница, а не якорь: она отвечает
+     * на отдельный вопрос («чего именно не хватает») и переведена на все
+     * шесть языков. В карте её не было, то есть роботу её никто не звал
+     * показывать, и внутренних ссылок на неё немного.
+     */
+    { path: '/icar/gaps', priority: 0.5 },
     { path: '/api-docs', priority: 0.5 },
     { path: '/org', priority: 0.5 },
     ...BOOK_FEATURES.map((f) => ({ path: `/book/${f.slug}`, priority: 0.6 })),

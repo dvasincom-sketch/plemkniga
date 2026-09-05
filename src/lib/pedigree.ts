@@ -66,13 +66,23 @@ const toPedigreeAnimal = (a: Animal): PedigreeAnimal => ({
 })
 
 /**
+ * Сколько рядов показывает дерево в карточке.
+ *
+ * Три — столько печатает племенное свидетельство, и столько человек
+ * читает глазами. Числом эта глубина стояла в карточке и в замере,
+ * а витрина рядом обещала двенадцать поколений: имени у неё не было,
+ * и сверить обещание было не с чем.
+ */
+export const PEDIGREE_TREE_DEPTH = 3
+
+/**
  * Собирает дерево предков заданной глубины.
  * `depth = 3` даёт три ряда: О/М → ОО/МО/ОМ/ММ → 8 узлов третьего ряда.
  */
 export async function buildPedigree(
   payload: Payload,
   animal: Animal,
-  depth = 3,
+  depth = PEDIGREE_TREE_DEPTH,
 ): Promise<PedigreeNode[]> {
   const load = createAnimalLoader(payload)
 

@@ -3,7 +3,7 @@ import type { Payload } from 'payload'
 import type { Animal } from '@/payload-types'
 import { buildAnimalWhere, resolveSort, type SearchParams } from '@/lib/animal-query'
 import { buildCertificateView } from '@/lib/certificate-view'
-import { buildPedigree } from '@/lib/pedigree'
+import { buildPedigree, PEDIGREE_TREE_DEPTH } from '@/lib/pedigree'
 import { herdSummary } from '@/lib/herd-summary'
 import { EXPORT_LIMIT } from '@/lib/export-formats'
 import { isLocalDatabase, resolveDatabase } from '@/lib/db-url'
@@ -304,7 +304,7 @@ export async function runBench(
     await measure({
       what: 'родословная, три ряда',
       limitMs: 1000,
-      run: async () => (await buildPedigree(payload, animal, 3)).length,
+      run: async () => (await buildPedigree(payload, animal, PEDIGREE_TREE_DEPTH)).length,
     })
     await measure({
       what: 'родословная, девять рядов',

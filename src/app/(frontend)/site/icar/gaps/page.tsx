@@ -1,6 +1,12 @@
-import { redirect } from 'next/navigation'
+import { permanentRedirect } from 'next/navigation'
+import { SITE_URL } from '@/lib/hosts'
 
-/** Старый адрес без языка — ссылки на него уже разошлись. */
+/**
+ * Старый адрес без языка — ссылки на него уже разошлись.
+ *
+ * Постоянное перенаправление и целым адресом: разбор — у соседей
+ * по папке (`site/icar/page.tsx`).
+ */
 export default function RedirectIcarGaps() {
-  redirect('/ru/icar/gaps')
+  permanentRedirect(`${SITE_URL}/ru/icar/gaps`)
 }

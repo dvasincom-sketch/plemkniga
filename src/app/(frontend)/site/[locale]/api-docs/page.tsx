@@ -278,8 +278,18 @@ export default async function ApiDocsPage({
 
           <p className="mt-8 max-w-[80ch] text-[13px] leading-relaxed text-ink-500">
             {text.graphqlLead}{' '}
-            <Link href="/api/graphql-playground" className="underline underline-offset-4">
-              /api/graphql-playground
+            {/*
+               Адрес самого обмена, а не площадки для запросов.
+
+               Здесь стояла ссылка на `/api/graphql-playground`: Payload
+               закрывает её на боевом сервере (`disablePlaygroundInProduction`
+               по умолчанию), и на шести языках витрина вела в «страница
+               не найдена». Открывать площадку на проде ради ссылки нельзя —
+               это лишняя поверхность у машинного обмена; поэтому названо
+               то, что работает всегда.
+            */}
+            <Link href="/api/graphql" className="underline underline-offset-4">
+              /api/graphql
             </Link>
             . {text.graphqlTail}
           </p>

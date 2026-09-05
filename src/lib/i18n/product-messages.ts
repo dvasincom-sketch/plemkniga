@@ -95,7 +95,7 @@ const ru: Messages = {
     items: [
       {
         title: 'Племенная книга',
-        body: 'Регистрация животных, родословные до двенадцати поколений, подтверждение происхождения по ДНК, выпуск племенных свидетельств.',
+        body: 'Регистрация животных, родословные с разбором на девять колен, подтверждение происхождения по ДНК, выпуск племенных свидетельств.',
       },
       {
         title: 'Сдача в государственный реестр',
@@ -169,7 +169,7 @@ const en: Messages = {
     items: [
       {
         title: 'Herdbook',
-        body: 'Animal registration, pedigrees up to twelve generations, DNA parentage verification, issuing of pedigree certificates.',
+        body: 'Animal registration, pedigrees analysed nine generations deep, DNA parentage verification, issuing of pedigree certificates.',
       },
       {
         title: 'Breeding value and index profiles',

@@ -2,11 +2,10 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
-import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
 import { BOOK_FEATURES, featureFor, featureIsFallback, featuresFor } from '@/lib/book-features'
 import { BOOK_PAGE_TEXT } from '@/lib/book-page-text'
-import { FALLBACK_NOTICE, pick } from '@/lib/i18n/translated'
+import { noticeFor, pick } from '@/lib/i18n/translated'
 import { pageMetadata } from '@/lib/seo'
 import { CertificateArt } from '@/components/site/CertificateArt'
 import {
@@ -97,7 +96,6 @@ export default async function BookFeaturePage({
   if (!isLocale(raw)) notFound()
 
   const locale: Locale = raw
-  const notice = PAGE_MESSAGES[locale].notice
   const feature = featureFor(slug, locale)
   if (!feature) notFound()
 
@@ -109,6 +107,16 @@ export default async function BookFeaturePage({
    */
   const text = pick(BOOK_PAGE_TEXT, locale).value
   const fallback = featureIsFallback(slug, locale)
+  /*
+   * Оговорка одна и выбирается `noticeFor`, как на остальных девяти
+   * страницах витрины. Здесь стояли обе сразу: строка о невычитанном
+   * переводе бралась из набора напрямую, минуя признак `reviewed`, —
+   * поэтому английская страница, переведённая и вычитанная, извинялась
+   * за качество перевода, а казахская показывала две оговорки подряд,
+   * противоречащие друг другу: «переведено, но не вычитано» и «перевода
+   * нет, показан русский оригинал».
+   */
+  const notice = noticeFor(locale, fallback)
 
   const others = featuresFor(locale).filter((f) => f.slug !== feature.slug)
 
@@ -174,17 +182,6 @@ export default async function BookFeaturePage({
             </p>
           )}
 
-          {/*
-             Откат на русский назван вслух и стоит там же, где оговорка
-             о непроверенном переводе, — то есть до текста, а не после.
-             Читатель, увидевший кириллицу на английской странице, должен
-             узнать причину раньше, чем решит, что мы неряшливы.
-          */}
-          {fallback && (
-            <p className="mt-3 rounded-xl bg-ink-50 px-4 py-3 text-[14px] leading-relaxed text-ink-500">
-              {FALLBACK_NOTICE}
-            </p>
-          )}
         </section>
 
         <section className="mt-10 max-w-[75ch] space-y-5">

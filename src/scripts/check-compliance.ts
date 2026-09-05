@@ -95,6 +95,16 @@ if (measuredDays > FGIAS_MEASURE_MAX_DAYS) {
   )
 }
 
+/*
+ * Вкладки «Эволюции продукта» читаются из самой страницы: список там
+ * и живёт, а второй его экземпляр здесь разошёлся бы с первым.
+ */
+const evolutionTabs = new Set(
+  [...readFileSync('src/app/(frontend)/site/evolution/page.tsx', 'utf8').matchAll(/key: '([\w-]+)'/g)].map(
+    (m) => m[1]!,
+  ),
+)
+
 let evidence = 0
 
 for (const item of COMPLIANCE) {
@@ -152,6 +162,20 @@ for (const item of COMPLIANCE) {
         const files = pageFiles(e.value)
         if (!files.some((f) => existsSync(f))) {
           fail(`${where}: адресу «${e.value}» не соответствует ни ${files.join(', ни ')}`)
+        }
+        /*
+         * Вкладка проверяется отдельно от страницы.
+         *
+         * Запрос отбрасывается при поиске файла — и правильно: `?tab=`
+         * это та же страница. Но исчезнувшая вкладка отвечает двести
+         * и молча показывает первую: доказательство «/evolution?tab=fgias»
+         * пережило удаление вкладки «ФГИАС ПР» и вместо разбора шаблонов
+         * открывало список версий. Битое доказательство хуже
+         * отсутствующего — на него ссылается страница соответствия.
+         */
+        const tab = /[?&]tab=([\w-]+)/.exec(e.value)?.[1]
+        if (tab && !evolutionTabs.has(tab)) {
+          fail(`${where}: вкладки «${tab}» на странице «Эволюция продукта» нет`)
         }
         break
       }

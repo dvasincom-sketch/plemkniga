@@ -6,6 +6,7 @@ import {
   SITE_LOCALE_HEADER,
   isProductAsset,
   isSiteHost,
+  localeless,
   redirectToSite,
   rewriteToSite,
 } from '@/lib/hosts'
@@ -91,6 +92,20 @@ export function middleware(request: NextRequest) {
     const away = redirectToSite(request.nextUrl.pathname)
     if (away) return NextResponse.redirect(new URL(away), 308)
     return NextResponse.next()
+  }
+
+  /*
+   * Старые адреса без языка уводятся на русскую копию — постоянным
+   * перенаправлением, до переписывания. Разбор в `lib/hosts.ts`
+   * (`localeless`): верхние страницы перебрасывали свои заглушки,
+   * а вложенные — `/razbory/<разбор>`, `/fgias/<шаблон>` — отвечали
+   * «страница не найдена», хотя рассылают чаще как раз их.
+   */
+  const legacy = localeless(request.nextUrl.pathname)
+  if (legacy) {
+    const url = request.nextUrl.clone()
+    url.pathname = legacy
+    return NextResponse.redirect(url, 308)
   }
 
   /*

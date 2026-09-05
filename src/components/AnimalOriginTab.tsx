@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { getClient } from '@/lib/payload'
-import { analyzePedigree, buildPedigree, flattenPedigree } from '@/lib/pedigree'
+import { analyzePedigree, buildPedigree, flattenPedigree, PEDIGREE_TREE_DEPTH } from '@/lib/pedigree'
 import { analyzeAncestry } from '@/lib/ancestry'
 import { PedigreeTree } from './PedigreeTree'
 import { KeyAncestors } from './KeyAncestors'
@@ -34,7 +34,7 @@ export async function AnimalOriginTab({ animal }: { animal: Animal }) {
    * бы непонятно, какому из них верить.
    */
   const [roots, ancestry] = await Promise.all([
-    buildPedigree(payload, animal, 3),
+    buildPedigree(payload, animal, PEDIGREE_TREE_DEPTH),
     analyzeAncestry(payload, animal),
   ])
   const computedCoi = ancestry.coi

@@ -314,7 +314,7 @@ export const COMPLIANCE: ComplianceItem[] = [
     evidence: [
       { kind: 'check', value: 'check:fgias-export' },
       { kind: 'check', value: 'check:fgias-readiness' },
-      { kind: 'page', value: '/evolution?tab=fgias' },
+      { kind: 'page', value: '/fgias' },
       { kind: 'doc', value: 'docs/fgias-karta.md' },
     ],
   },

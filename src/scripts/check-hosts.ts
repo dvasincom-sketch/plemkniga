@@ -10,6 +10,7 @@ import {
   isSharedPath,
   isSiteHost,
   isProductAsset,
+  localeless,
   redirectToSite,
   rewriteToSite,
 } from '@/lib/hosts'
@@ -128,6 +129,36 @@ const REWRITE: [from: string, to: string | null, why: string][] = [
 
 for (const [from, to, why] of REWRITE) {
   const got = rewriteToSite(from)
+  if (got !== to) fail(`«${from}» → ${got}, ожидалось ${to} (${why})`)
+}
+
+/* ------------------------------------------------------------------ *
+ *  Старые адреса без языка                                           *
+ * ------------------------------------------------------------------ */
+
+/*
+ * Вложенные адреса без языка отвечали «страница не найдена»: заглушки
+ * стояли только у верхних страниц раздела. Проверяется здесь потому же,
+ * почему и остальное в этом файле, — обработчик не запустить без
+ * поднятого сервера, а функцию можно.
+ */
+const LEGACY: [from: string, to: string | null, why: string][] = [
+  ['/razbory/baza-sravneniya', '/ru/razbory/baza-sravneniya', 'разбор по старой ссылке'],
+  ['/fgias/otel', '/ru/fgias/otel', 'страница шаблона'],
+  ['/breeds/golshtinskaya', '/ru/breeds/golshtinskaya', 'страница породы'],
+  ['/slovar/servis-period', '/ru/slovar/servis-period', 'статья словаря'],
+  ['/rules', '/ru/rules', 'верхняя страница раздела'],
+  ['/ru/rules', null, 'язык уже назван'],
+  ['/en/breeds/holstein', null, 'язык уже назван, вложенный'],
+  ['/tour', null, 'страница без языковых копий'],
+  ['/evolution', null, 'страница без языковых копий'],
+  ['/ade/v1/datasets', null, 'машинный обмен — не страница витрины'],
+  ['/logo.svg', null, 'файл, а не страница'],
+  ['/animals/123', null, 'адрес книги, не витрины'],
+]
+
+for (const [from, to, why] of LEGACY) {
+  const got = localeless(from)
   if (got !== to) fail(`«${from}» → ${got}, ожидалось ${to} (${why})`)
 }
 

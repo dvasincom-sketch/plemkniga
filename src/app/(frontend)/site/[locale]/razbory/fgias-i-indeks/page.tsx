@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { ANCESTRY_DEPTH } from '@/lib/ancestry'
 import { ProductFooter, ProductHeader } from '@/components/site/ProductShell'
 import { NoteHeader, NoteNeighbours, NoteSources } from '@/components/site/NoteFrame'
 import { TermsSeen } from '@/components/site/TermsSeen'
@@ -253,7 +254,7 @@ export default async function FgiasNotePage({
 
           <p className="mt-5 text-[16px] leading-relaxed text-ink-700">
             Самый показательный шаблон — родословная: три колонки из пятнадцати. Не потому,
-            что книга не знает предков: она их знает и показывает до двенадцати поколений.
+            что книга не знает предков: она их знает и разбирает на {ANCESTRY_DEPTH} колен.
             Все пятнадцать колонок этого шаблона — номера государственного реестра, а поля
             «Идентификатор учётной системы» в нём нет вовсе. Назвать предка своим ключом нельзя,
             а реестровый номер у него появится только после того, как реестр примет его самого.

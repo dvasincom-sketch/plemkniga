@@ -5,7 +5,7 @@ import { currentTenant } from '@/lib/tenant-server'
 import { Metrika } from '@/components/Metrika'
 import { BOOK_HOST, SITE_HOSTS, SITE_LOCALE_HEADER, isSiteHost } from '@/lib/hosts'
 import { headers } from 'next/headers'
-import { isLocale } from '@/lib/i18n/locales'
+import { isLocale, type Locale } from '@/lib/i18n/locales'
 import { PAGE_MESSAGES } from '@/lib/i18n/page-messages'
 
 /*
@@ -89,7 +89,15 @@ export async function generateMetadata(): Promise<Metadata> {
      */
     openGraph: {
       type: 'website',
-      locale: t.lang === 'ru' ? 'ru_RU' : 'en_US',
+      /*
+       * Язык карточки — язык страницы, а не язык арендатора домена.
+       *
+       * Стояло `t.lang`, то есть язык книги, и витрина на всех шести
+       * языках разворачивалась в переписке как русская. Та же ошибка,
+       * что была у `<html lang>`: язык брали у домена, хотя он приходит
+       * заголовком от промежуточного обработчика и уже посчитан выше.
+       */
+      locale: site ? OG_LOCALE[locale] : t.lang === 'ru' ? 'ru_RU' : 'en_US',
       /*
        * Имя сайта — своё у каждого домена, и здесь оно было чужим.
        *
@@ -137,6 +145,23 @@ export async function generateMetadata(): Promise<Metadata> {
     icons: { icon: site ? '/icon-plem.svg' : '/icon-book.png' },
     robots: { index: true, follow: true },
   }
+}
+
+/**
+ * Код языка в разметке для соцсетей: язык и страна, как требует Open Graph.
+ *
+ * Страна выбрана по тому, где на этом языке читают наши страницы, а не
+ * по «главной» стране языка: белорусский — Беларусь, киргизский —
+ * Киргизия, и так далее. Для английского оставлено `en_US` как самое
+ * распространённое написание.
+ */
+const OG_LOCALE: Record<Locale, string> = {
+  ru: 'ru_RU',
+  en: 'en_US',
+  kk: 'kk_KZ',
+  hy: 'hy_AM',
+  be: 'be_BY',
+  ky: 'ky_KG',
 }
 
 export default async function FrontendLayout({ children }: { children: React.ReactNode }) {

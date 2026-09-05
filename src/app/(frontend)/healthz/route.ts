@@ -325,7 +325,17 @@ export async function GET() {
       )
     }
     if (/relation .* does not exist/i.test(message)) {
-      hints.push('Схема не создана — запустите первый деплой с PAYLOAD_DB_PUSH=true')
+      /*
+        * Совет должен работать там, где его прочтут. Здесь стояло
+        * «запустите первый деплой с PAYLOAD_DB_PUSH=true»: на проде
+        * это значение не действует (`lib/db-url.ts` требует ещё
+        * и локальной базы, `docs/razvertyvanie.md` объясняет почему),
+        * и администратор перевыкладывал контейнер, получая ту же ошибку.
+        */
+      hints.push(
+        'Схема не создана — примените миграции: npm run payload migrate против этой базы ' +
+          '(на локальной разработке схему поднимает PAYLOAD_DB_PUSH=true)',
+      )
     }
 
     return json({

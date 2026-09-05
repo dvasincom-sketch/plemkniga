@@ -51,7 +51,7 @@ export const BOOK_FEATURES_EN: Record<string, BookFeature> = {
       'Assembled from every source at once, with parentage confirmed by DNA and conflicts flagged rather than resolved.',
     body: [
       'The pedigree is built by walking sire and dam links, and it is limited not by storage but by how far the data reaches. Technically the chain has no ceiling: every animal points at its parents, and the walk continues while parents are known.',
-      'We display up to twelve generations. That is a limit of legibility, not of the system: a complete twelfth-generation tree holds four thousand ancestors, and no one can read it. Routine work happens with five generations, because that is what relationship coefficients are computed on and what recognition of registration requires.',
+      'The tree in a record shows three rows of ancestors — as many as a herdbook certificate prints and as many as a person can read. Depth is handled by a table instead: nine generations with each ancestor’s blood share and contribution to inbreeding, because a complete ninth-generation tree holds five hundred cells and nobody navigates them. Mating uses a shallower walk: it is computed across the whole herd at once, and deeper the gain in the coefficient is smaller than the cost.',
       'Sources are merged: entered by hand, loaded from the state register, confirmed by a DNA test. A conflict between them is not resolved automatically — it is flagged, because choosing between two candidate sires is a decision for a breeding specialist, not for a program.',
     ],
     limits: [
@@ -162,10 +162,10 @@ export const BOOK_FEATURES_EN: Record<string, BookFeature> = {
     body: [
       'The book issues two forms. The zootechnical certificate follows Regulation (EU) 2016/1012 — the same one under which purebred animals are traded in Europe: fifteen sections and two rows of ancestors, with the order and composition of fields set by the regulation rather than by us. The herdbook certificate is for breeding work: three rows of ancestors with breeding values and lactations.',
       'A document is assembled from the book at the moment of issue and stored together with the code by which it can be verified. What has been issued cannot be altered: editing the data afterwards creates a new document, and the previous one remains, marked as withdrawn.',
-      'Before issue the form checks itself: the system will not release a document if a mandatory field is missing, the pedigree is contradictory, or the lactation was computed from an incomplete series. This is the essential difference from a form typed in a word processor — there the error is noticed by the buyer.',
+      'Before issue the form checks itself: the system will not release a document if a mandatory field is missing, the required rows of the pedigree are incomplete, or a DNA test has excluded the parentage. A complete series of test-day records is required earlier, at verification, without which no certificate is issued at all. This is the essential difference from a form typed in a word processor — there the error is noticed by the buyer.',
       'The document has no legal force, and we do not conceal that: force is conferred by a recognised organisation, not by software. Nor does a recognised third party currently exist for Russian breeding organisations — membership of the European Holstein and Red Holstein Confederation has been suspended since July 2022, and that is the position of the industry, not our omission.',
       'Since external endorsement is unavailable, the weight of the document comes from what the buyer can verify without asking anyone for permission: the form is international and published, the checks run before issue and identically for everyone, what has been issued does not change, and the code allows authenticity to be confirmed in a minute. Trust built this way rests on traceability rather than on a stamp — and that is the one part nobody else can revoke.',
-      'What our arrangement lacks by international rules is listed on the compliance page: external audit of procedures, storage of genotypes, recording of the performance recording method. We name these ourselves, because a list of nothing but ticks is exactly what the first specialist checks — and he checks it on the items that are missing.',
+      'What our arrangement lacks by international rules is listed on the compliance page: external audit of procedures (the ICAR Certificate of Quality), storage of genotypes, participation in the international MACE evaluation. We name these ourselves, because a list of nothing but ticks is exactly what the first specialist checks — and he checks it on the items that are missing.',
     ],
     limits: [
       'Legal force is conferred by the organisation keeping the book, not by the system: we are answerable for the content matching the book at the moment of issue and for the pre-issue checks having been run.',
@@ -213,7 +213,7 @@ export const BOOK_FEATURES_EN: Record<string, BookFeature> = {
       'The confidence level of a record is derived from confirmations rather than assigned: a laboratory report raises it, a withdrawal lowers it. The association’s signature is a separate action, with a name and a date.',
     ],
     limits: [
-      'Verification is work done by people at the association, and its speed depends on them. The system shows the queue and the timelines; it does not replace the decision.',
+      'Verification is work done by people at the association, and its speed depends on them. The system shows the state of a submission; it does not replace the decision and promises no deadline.',
     ],
   },
 }
