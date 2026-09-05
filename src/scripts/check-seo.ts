@@ -113,8 +113,15 @@ for (const file of walk(ROOT)) {
 
   const helper = /siteMetadata\(|pageMetadata\(/.test(src)
   const hasMetadata = /export (const|async function) (metadata|generateMetadata)/.test(src)
-  /* Перенаправление — не страница: у него нет ни текста, ни выдачи. */
-  const redirectOnly = /redirect\(/.test(src) && !/<main|<section|<h1/.test(src)
+  /*
+   * Перенаправление — не страница: у него нет ни текста, ни выдачи.
+   *
+   * Признак ищется без учёта регистра: заглушки старых адресов перевели
+   * с `redirect` на `permanentRedirect`, и восемь из них немедленно
+   * оказались в отчёте как страницы без заголовка и описания. Проверка
+   * споткнулась о переименование, а не о недостачу.
+   */
+  const redirectOnly = /redirect\(/i.test(src) && !/<main|<section|<h1/.test(src)
 
   if (redirectOnly) continue
 

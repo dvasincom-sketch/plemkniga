@@ -414,6 +414,14 @@ export const SHARED_PATHS = [
  */
 export const MACHINE_PATHS = ['/ade/v1'] as const
 
+/**
+ * Машинный адрес витрины: описание интерфейса, которое читают программы.
+ *
+ * Один и в единственном числе — потому и не список: всё прочее на витрине
+ * это страницы, у которых язык есть.
+ */
+export const SITE_MACHINE_PATH = '/api-docs/openapi.json'
+
 /** Сквозная ли это страница — сама или что-то внутри неё. */
 export const isSharedPath = (pathname: string): boolean => {
   if (MACHINE_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return false
@@ -474,6 +482,16 @@ const LOCALISED_SECTIONS = [
 export const localeless = (pathname: string): string | null => {
   if (isPublicFile(pathname)) return null
   if (MACHINE_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return null
+  /*
+   * Машинное описание интерфейса языка не имеет.
+   *
+   * `/api-docs` — раздел витрины и переезжает на `/ru/api-docs`, а вот
+   * `/api-docs/openapi.json` — файл описания, который читают программы:
+   * маршрут у него один, без языка, и переброс уводил его в «страница
+   * не найдена». Ровно та беда, от которой заведён `MACHINE_PATHS`
+   * у домена книги, только с другой стороны.
+   */
+  if (pathname === SITE_MACHINE_PATH) return null
   const [, first] = pathname.split('/')
   if (!first) return null
   if (!(LOCALISED_SECTIONS as readonly string[]).includes(first)) return null

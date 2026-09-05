@@ -64,7 +64,12 @@ const SITE_HEADERS = { host: 'plem.online' }
 
 const get = async (p: string) => {
   const res = await fetch(`${BASE}${p}`, { headers: SITE_HEADERS, redirect: 'manual' })
-  return { status: res.status, body: res.ok ? await res.text() : '' }
+  return {
+    status: res.status,
+    /* Куда ведёт перенаправление: без этого «308» не отличить от «308 не туда». */
+    location: res.headers.get('location'),
+    body: res.ok ? await res.text() : '',
+  }
 }
 
 const readLocal = (p: string) => readFile(path.resolve(process.cwd(), p), 'utf8')
@@ -94,8 +99,26 @@ async function main() {
     check(true, `/scalar/standalone.js (${Math.round(lib.body.length / 1024)} КБ)`)
   }
 
-  const page = await get('/api-docs')
-  check(page.status === 200, 'страница /api-docs отвечает', `ответ ${page.status}`)
+  /*
+   * Короткий адрес и адрес страницы — разные вопросы, и оба стоит задать.
+   *
+   * `/api-docs` — старый адрес без языка: он обязан вести на русскую
+   * копию постоянным перенаправлением (`localeless` в `lib/hosts.ts`).
+   * Прогон ходит с `redirect: 'manual'` и потому видит сам ответ, а не
+   * то, куда он привёл, — раньше это выглядело как «страница не отвечает».
+   *
+   * `/api-docs/openapi.json` языка не имеет вовсе: это файл описания,
+   * который читают программы, и переброс его уводил бы в никуда.
+   */
+  const short = await get('/api-docs')
+  check(
+    short.status === 308 && (short.location ?? '').endsWith('/ru/api-docs'),
+    'короткий адрес /api-docs ведёт на /ru/api-docs',
+    `ответ ${short.status}${short.location ? ` → ${short.location}` : ''}`,
+  )
+
+  const page = await get('/ru/api-docs')
+  check(page.status === 200, 'страница /ru/api-docs отвечает', `ответ ${page.status}`)
   const spec = await get('/api-docs/openapi.json')
   check(spec.status === 200, 'описание отдаётся', `ответ ${spec.status}`)
 

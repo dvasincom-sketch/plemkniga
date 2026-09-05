@@ -185,12 +185,22 @@ export const lastInsemination = (a = 'a', lastCalving = lastCalvingDate(a)) => `
  * Осеменение без результата стельной не делает: пустой результат — это
  * «не знаем», а не «нет». Такую корову зовёт к себе список проверки
  * стельности, и это верно.
+ *
+ * ## Почему `coalesce`, а не голое сравнение
+ *
+ * Без него предикат отвечает NULL там, где осеменений нет вовсе или
+ * результат не проставлен, и `not (…)` тоже даёт NULL — то есть строка
+ * не проходит `where` ни при каком раскладе. В подборе пар это выкосило
+ * из плана всех коров без осеменений, а `check:mating` показал минус
+ * единицу вместо коэффициента: пар в ответе не оказалось совсем.
+ * Трёхзначная логика ошибается молча и в обе стороны, поэтому ответ
+ * здесь двузначный: «не знаем» — это «не стельная».
  */
 export const isPregnant = (a = 'a', lastCalving = lastCalvingDate(a)) =>
-  `((select r.code
+  `coalesce((select r.code
        from inseminations i
        left join insemination_results r on r.id = i.result_id
       where i.animal_id = ${a}.id
         and (${lastCalving} is null or i."date" > ${lastCalving})
       order by i."date" desc
-      limit 1) = '1')`
+      limit 1) = '1', false)`

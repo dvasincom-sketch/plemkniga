@@ -40,8 +40,21 @@ export class AccessDenied extends Error {
  * Читает их `lib/access-attempt.ts`. Ограничения на размер нет намеренно:
  * различных сообщений об отказе в системе десятки, и живут они столько же,
  * сколько процесс.
+ *
+ * ## Почему набор лежит в `globalThis`
+ *
+ * Модуль загружается дважды: один раз — приложением и его хуками через
+ * настройку Payload, другой — прогоном, который зовёт `attempt`. У двух
+ * копий модуля два разных набора, и прогон читал пустой: три верных
+ * запрета отчитались как неопознанные ровно поэтому, а не потому,
+ * что признак плох.
+ *
+ * `globalThis` — единственное, что у копий общее. Приём известный и
+ * применяется для того же: пул соединений и клиент Payload живут в нём
+ * по той же причине.
  */
-export const DENIED_TEXTS = new Set<string>()
+const store = globalThis as typeof globalThis & { __plemDeniedTexts?: Set<string> }
+export const DENIED_TEXTS: Set<string> = (store.__plemDeniedTexts ??= new Set<string>())
 
 /** Бросить отказ по правам. Возвращаемый тип — `never`: дальше кода нет. */
 export function denyAccess(message: string): never {
