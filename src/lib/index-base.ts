@@ -34,12 +34,25 @@ export async function loadActiveBase(payload: Payload): Promise<Base> {
     const doc = res.docs[0] as IndexBaseDoc | undefined
     if (!doc) return DEFAULT_BASE
     return baseOfDoc(doc)
-  } catch {
+  } catch (e) {
     /*
-     * Коллекции может ещё не быть — например, до применения миграции.
-     * Расчёт при этом должен работать: заимствованная база на месте, в коде.
+     * Перехватывается ровно одно: коллекции ещё нет, например до применения
+     * миграции. Расчёт при этом должен работать — заимствованная база
+     * на месте, в коде.
+     *
+     * Здесь стоял `catch` без разбора, и это была самая дорогая тишина
+     * в проекте. Через эту функцию проходят оба тяжёлых прогона —
+     * `backfill:index` и `rebase:index`, — и любой отказ запроса (обрыв,
+     * таймаут, испорченная транзакция) выдавался за «своей базы нет».
+     * Вся книга пересчитывалась на заимствованной таблице CDCB, а в каждой
+     * строке значений оставался `baseVersion`, подтверждающий неправду.
+     * Отличить это можно было по одному слову в строке лога, которую
+     * человек читает один раз за десять минут прогона.
      */
-    return DEFAULT_BASE
+    const text = e instanceof Error ? e.message : String(e)
+    const missing = /relation .* does not exist|42P01|index-bases/i.test(text)
+    if (missing) return DEFAULT_BASE
+    throw e
   }
 }
 

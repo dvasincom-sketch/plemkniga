@@ -39,7 +39,21 @@ import type { Animal, IndexProfile as IndexProfileDoc } from '@/payload-types'
  *   AUDIT_SAMPLE=300 npm run audit:slow
  */
 
-const SAMPLE = Number(process.env.AUDIT_SAMPLE ?? 300)
+/*
+ * Размер выборки. Пустая или испорченная переменная среды давала `NaN`,
+ * а `NaN` в `limit` означает, что все шаги мерили неизвестно что —
+ * и замер молча переставал быть замером.
+ */
+const SAMPLE = (() => {
+  const raw = process.env.AUDIT_SAMPLE
+  if (raw === undefined || raw.trim() === '') return 300
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n <= 0) {
+    console.error(`AUDIT_SAMPLE должно быть положительным числом, получено «${raw}»`)
+    process.exit(1)
+  }
+  return Math.trunc(n)
+})()
 
 const { driverUri, sslConfig } = resolveDatabase()
 const pool = new Pool({ connectionString: driverUri, ssl: sslConfig })
@@ -177,7 +191,12 @@ async function main() {
   }
 
   await pool.end()
-  process.exit(0)
+  /*
+   * Замер помечен в реестре отчётом: порога «медленно» у него нет,
+   * есть разложение по шагам. Единственный ненулевой выход — «замерять
+   * нечего», и он выставляется выше.
+   */
+  process.exit(process.exitCode ?? 0)
 }
 
 main().catch(async (e) => {

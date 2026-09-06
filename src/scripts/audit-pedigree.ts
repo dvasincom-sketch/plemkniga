@@ -130,6 +130,14 @@ const report = (title: string, lines: string[]) => {
  * и строка об этом: молча смерить другим значит объяснять потом,
  * почему прогон и разбор не сошлись.
  */
+/*
+ * Дата печатается по UTC. Даты рождения лежат полуночью UTC, и без
+ * оговорки на сервере западнее Гринвича каждая из них печаталась бы
+ * предыдущим числом — в отчёте, по которому потом ищут запись руками.
+ */
+const day = (ms: number): string =>
+  new Date(ms).toLocaleDateString('ru-RU', { timeZone: 'UTC' })
+
 async function loadThresholds(): Promise<{ t: Thresholds; source: string }> {
   try {
     const { rows } = await pool.query<{ key: string; value: string }>(
@@ -137,8 +145,21 @@ async function loadThresholds(): Promise<{ t: Thresholds; source: string }> {
     )
     if (!rows.length) return { t: defaultThresholds(), source: 'умолчания: настроек в базе нет' }
     return { t: applyThresholdRows(rows), source: `настройки Ассоциации, строк: ${rows.length}` }
-  } catch {
-    return { t: defaultThresholds(), source: 'умолчания: таблица порогов недоступна' }
+  } catch (e) {
+    /*
+     * Отличается «таблицы ещё нет» от «спросить не удалось». Первое —
+     * свежая база, и умолчания там верны. Второе — обрыв, отказ по правам,
+     * переименование: тогда ревизия молча меряет не тем, чем мерит эксперт,
+     * и объяснять расхождение приходится потом. Строка об этом должна
+     * называть причину, а не одно слово «недоступна».
+     */
+    const text = e instanceof Error ? e.message : String(e)
+    const absent = /relation .* does not exist|42P01/i.test(text)
+    if (absent) return { t: defaultThresholds(), source: 'умолчания: таблицы порогов нет' }
+    return {
+      t: defaultThresholds(),
+      source: `умолчания: пороги прочитать не удалось — ${text}`,
+    }
   }
 }
 
@@ -275,8 +296,7 @@ async function main() {
 
       if (parent.birth >= n.birth) {
         bornBeforeParent.push(
-          `${n.ident} (${new Date(n.birth).toLocaleDateString('ru-RU')}) — ` +
-            `${role} ${parent.ident} (${new Date(parent.birth).toLocaleDateString('ru-RU')})`,
+          `${n.ident} (${day(n.birth)}) — ${role} ${parent.ident} (${day(parent.birth)})`,
         )
         continue
       }
@@ -288,7 +308,15 @@ async function main() {
        * просто потому, что правило писали от материнской стороны.
        */
       const months = monthsBetween(parent.birthDate, n.birthDate)
-      if (months === null || months <= 0) continue
+      /*
+       * Ноль месяцев не пропускается. Прежде условие было `months <= 0`,
+       * и самый невозможный случай — родитель на две недели старше
+       * потомка — не попадал никуда: «родился раньше родителя» его
+       * не ловит (родитель вправду старше), а проверка «моложе N мес.»
+       * до него не доходила. Проверка, которая по устройству не может
+       * назвать нулевой возраст, наведена мимо худшего из своих случаев.
+       */
+      if (months === null) continue
 
       if (months < t.parentAgeMinMonths) {
         tooYoung.push(

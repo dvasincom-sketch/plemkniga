@@ -3,6 +3,7 @@ import { getPayload, type Payload } from 'payload'
 import config from '@payload-config'
 import type { User } from '@/payload-types'
 import { relId } from '@/lib/visibility'
+import { attempt, attemptDetail } from '@/lib/access-attempt'
 
 /**
  * Ревизия мультиарендности: не отдаёт ли система чужие записи.
@@ -30,12 +31,33 @@ import { relId } from '@/lib/visibility'
  * события, оценки, значения индекса), наследует его видимость: увидеть
  * надой чужой закрытой коровы — та же утечка, что увидеть её карточку.
  *
- * Скрипт только читает. Ненулевой код возврата означает найденную утечку.
+ * Скрипт читает и пишет: раздел «Прицельная запись в чужое» пробует
+ * переписать чужую строку и намеренно оставляет след, если запись прошла.
+ * В шапке стояло «только читает», и это расходилось с реестром прогонов,
+ * где у ревизии честно стоит `writes: true`, — а шапку читают раньше.
+ *
+ * ## Почему отказ узнаётся по типу, а не по факту исключения
+ *
+ * Все выводы здесь отрицательные: «чужая карточка НЕ читается», «чужая
+ * строка НЕ переписывается». Доказываются они попыткой, и попытка
+ * проваливается по десятку причин: опечатка в имени коллекции,
+ * отсутствующее поле, обрыв соединения, отказ валидации. Голый `catch`
+ * выдавал любую из них за отказ по правам и печатал зелёную строку,
+ * ничего не проверив, — ровно та беда, ради которой заведены
+ * `lib/access-attempt.ts` и `access/denied.ts`. Соседние прогоны
+ * (`check:security`, `check:team`, `check:journal`) ими уже пользуются;
+ * две ревизии доступа — последний рубеж — не пользовались.
+ *
+ * Ненулевой код возврата означает найденную утечку либо пробу, которая
+ * не смогла состояться.
  *
  *   npm run audit:tenancy
  */
 
 const ru = (n: number) => n.toLocaleString('ru-RU')
+
+/** Сколько отрицательных утверждений вправду доказано попыткой. */
+let probes = 0
 
 /** Коллекции, висящие на животном: их видимость равна видимости животного. */
 const ANIMAL_SCOPED = [
@@ -162,22 +184,30 @@ async function main() {
 
     /** Пробуем прочитать документ по id от лица пользователя. */
     const probe = async (collection: string, id: number | string, what: string) => {
-      try {
-        const doc = await payload.findByID({
+      const tried = await attempt(() =>
+        payload.findByID({
           collection: collection as never,
           id,
           depth: 0,
           overrideAccess: false,
           user,
-        })
-        if (doc) {
-          findings.push({ collection, detail: `${what} читается по идентификатору` })
-          console.log(`  ✗  ${collection} — ${what}: отдано`)
-          return
-        }
-      } catch {
-        // Отказ в доступе Payload возвращает исключением — это ожидаемый исход
+        }),
+      )
+
+      if (tried.allowed) {
+        findings.push({ collection, detail: `${what} читается по идентификатору` })
+        console.log(`  ✗  ${collection} — ${what}: отдано`)
+        return
       }
+      if (!tried.denied) {
+        findings.push({
+          collection,
+          detail: `${what}: проба не состоялась — ${tried.error ?? 'причина неизвестна'}`,
+        })
+        console.log(`  ✗  ${collection} — ${what}: ${attemptDetail(tried)}`)
+        return
+      }
+      probes += 1
       console.log(`  ✓  ${collection} — ${what}: отказано`)
     }
 
@@ -227,20 +257,31 @@ async function main() {
     field: string,
     what: string,
   ) => {
-    try {
-      await payload.update({
+    const tried = await attempt(() =>
+      payload.update({
         collection: collection as never,
         id,
         data: { [field]: MARK } as never,
         overrideAccess: false,
         user,
-      })
+      }),
+    )
+
+    if (tried.allowed) {
       findings.push({ collection, detail: `${what} — чужая запись переписана` })
       console.log(`  ✗  ${collection} — ${what}: записалось`)
-    } catch {
-      // Отказ Payload возвращает исключением — ожидаемый исход
-      console.log(`  ✓  ${collection} — ${what}: отказано`)
+      return
     }
+    if (!tried.denied) {
+      findings.push({
+        collection,
+        detail: `${what}: проба записи не состоялась — ${tried.error ?? 'причина неизвестна'}`,
+      })
+      console.log(`  ✗  ${collection} — ${what}: ${attemptDetail(tried)}`)
+      return
+    }
+    probes += 1
+    console.log(`  ✓  ${collection} — ${what}: отказано`)
   }
 
   if (victim) {
@@ -257,7 +298,15 @@ async function main() {
         console.log(`  ·  ${collection} — у этой коровы записей нет, писать некуда`)
         continue
       }
-      await probeWrite(collection, first.id, 'comment', 'запись чужой коровы')
+      /*
+       * Поле берётся по коллекции: `comment` есть у отёлов, осеменений
+       * и событий, а у доек и случаев болезни его нет вовсе. Прежде
+       * во все пять писался `comment`, и для двух коллекций обещание
+       * «строка останется как след» было ложным: писать было некуда,
+       * а зелёная строка печаталась.
+       */
+      const field = collection === 'milk-tests' || collection === 'health-events' ? 'note' : 'comment'
+      await probeWrite(collection, first.id, field, 'запись чужой коровы')
     }
 
     await probeWrite('animals', victim.id, 'notes', 'карточка чужой коровы')
@@ -292,14 +341,26 @@ async function main() {
    * в том, изменится ли поле, которое хозяйство менять не вправе.
    */
   if (myOrg) {
-    try {
-      await payload.update({
+    const triedOwn = await attempt(() =>
+      payload.update({
         collection: 'organizations',
         id: myOrg,
         data: { membershipReview: { comment: MARK, since: '2020-01-01T00:00:00.000Z' } } as never,
         overrideAccess: false,
         user,
+      }),
+    )
+
+    if (!triedOwn.allowed && !triedOwn.denied) {
+      findings.push({
+        collection: 'organizations',
+        detail: `своё решение о членстве: проба не состоялась — ${triedOwn.error ?? '—'}`,
       })
+      console.log(`  ✗  organizations — своё решение о членстве: ${attemptDetail(triedOwn)}`)
+    } else if (!triedOwn.allowed) {
+      probes += 1
+      console.log('  ✓  organizations — своё решение о членстве: отказано')
+    } else {
       const after = await payload.findByID({
         collection: 'organizations',
         id: myOrg,
@@ -314,10 +375,9 @@ async function main() {
         })
         console.log('  ✗  organizations — своё решение о членстве: записалось')
       } else {
+        probes += 1
         console.log('  ✓  organizations — своё решение о членстве: поле не изменилось')
       }
-    } catch {
-      console.log('  ✓  organizations — своё решение о членстве: отказано')
     }
   }
 
@@ -327,8 +387,24 @@ async function main() {
   for (const line of checked) console.log(`  ${line}`)
 
   console.log('')
+  /*
+   * Пустая ревизия — не успех.
+   *
+   * Если подходящей жертвы не нашлось, разделы прицельного чтения
+   * и записи пропускаются целиком, а итог печатал «утечек не найдено» —
+   * то есть утверждение о безопасности, сделанное без единой пробы.
+   */
+  if (probes === 0) {
+    console.log(
+      'Ни одна проба не состоялась: подходящей чужой записи не нашлось.\n' +
+        'Это не «утечек нет», это «проверить было нечем».\n',
+    )
+    process.exitCode = 1
+    return
+  }
+
   if (!findings.length) {
-    console.log('Утечек не найдено: ни один список и ни одно чтение не отдали чужого.\n')
+    console.log(`Утечек не найдено. Проб выполнено: ${ru(probes)}.\n`)
     return
   }
 

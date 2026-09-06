@@ -27,20 +27,36 @@ import {
  * находить противоречие и называть его, а решать, какое из двух чисел
  * правда, — тому, у кого есть первичный документ.
  *
- * Поэтому здесь `--dry` по умолчанию, запись требует явного `--yes`,
- * и в отчёте всегда видно, сколько записей будет переписано и насколько
- * они расходятся.
+ * Поэтому по умолчанию скрипт ничего не пишет и правит только синтетику,
+ * а выход за её пределы требует отдельного ключа.
  *
- *   npm run repair:pta-kg              — только показать
- *   npm run repair:pta-kg -- --yes     — переписать
- *   npm run repair:pta-kg -- --seeded  — только синтетика (uuid 99999999-…)
+ * Умолчание было обратным, и это противоречило абзацу выше: граница
+ * «только синтетика» включалась ключом `--seeded`, то есть опасный режим
+ * стоял по умолчанию, а безопасный — по ключу. Команда, отличающаяся
+ * от безопасной одним словом, переписывала жир и белок у всех животных
+ * с заполненными исходными числами, включая присланные хозяйствами.
+ * Заодно ключ `--dry`, обещанный здесь же, нигде не разбирался: у соседей
+ * (`repair-blood`, `backfill-trust`) он настоящий и перебивает `--yes`,
+ * а тут `--dry --yes` записал бы.
+ *
+ *   npm run repair:pta-kg              — только показать, только синтетику
+ *   npm run repair:pta-kg -- --yes     — переписать синтетику
+ *   npm run repair:pta-kg -- --all     — считать по всей книге
+ *   npm run repair:pta-kg -- --all --yes — переписать всё; так делать не надо
  *
  * ## Почему прямым запросом, а не через Payload
  *
  * Правятся два числа в сотнях тысяч строк, без хуков и без пересчёта
  * индекса. Через Payload это полмиллиона операций и часы; здесь один
- * `UPDATE`. Индекс после этого станет устаревшим — и книга сама об этом
- * скажет: устаревшие значения она теперь считает и показывает.
+ * `UPDATE`.
+ *
+ * Индекс после этого становится устаревшим, и книга обязана это заметить.
+ * Замечает она сравнением `animals.updated_at` с временем расчёта
+ * (`indexValuesLag` в `lib/index-values.ts`), а прямой `UPDATE` эту
+ * отметку не двигает: триггеров на таблице нет. То есть обещание
+ * «книга сама скажет» держалось на том, чего скрипт не делал, — после
+ * прогона книга показывала бы ноль устаревших значений при сотнях тысяч
+ * устаревших. Поэтому `updated_at` проставляется здесь же, руками.
  */
 
 const { driverUri, uri, source, sslConfig } = resolveDatabase()
@@ -50,8 +66,9 @@ if (!driverUri) {
   process.exit(1)
 }
 
-const WRITE = process.argv.includes('--yes')
-const SEEDED_ONLY = process.argv.includes('--seeded')
+/* `--dry` перебивает `--yes`: из двух ключей сильнее тот, что запрещает. */
+const WRITE = process.argv.includes('--yes') && !process.argv.includes('--dry')
+const SEEDED_ONLY = !process.argv.includes('--all')
 
 const pool = new Pool({ connectionString: driverUri, ssl: sslConfig })
 
@@ -87,7 +104,11 @@ const proteinOff = `(production_protein_kg_forecast IS NOT NULL
 
 async function main() {
   console.log(`\nБаза: ${maskUri(uri ?? '')} (из ${source})`)
-  console.log(SEEDED_ONLY ? 'Только синтетика (uuid 99999999-…)\n' : 'Все записи с оценкой\n')
+  console.log(
+    SEEDED_ONLY
+      ? 'Только синтетика (uuid 99999999-…)\n'
+      : 'ВСЯ КНИГА, включая присланное хозяйствами (--all)\n',
+  )
 
   const { rows } = await pool.query(`
     SELECT
@@ -125,7 +146,8 @@ async function main() {
   const res = await pool.query(`
     UPDATE animals SET
       production_fat_kg_forecast     = round(${expectedFat}::numeric, 1),
-      production_protein_kg_forecast = round(${expectedProtein}::numeric, 1)
+      production_protein_kg_forecast = round(${expectedProtein}::numeric, 1),
+      updated_at                     = now()
     WHERE ${HAVE_INPUTS} ${SEEDED}
       AND (${fatOff} OR ${proteinOff})`)
 
@@ -139,7 +161,8 @@ async function main() {
    * и покажет сама, но узнать об этом лучше здесь, а не из сообщения
    * на главной.
    */
-  console.log('Индекс этих животных теперь посчитан по прежним числам.')
+  console.log('Индекс этих животных теперь посчитан по прежним числам,')
+  console.log('и книга покажет их в списке устаревших: отметка правки сдвинута.')
   console.log('Пересчёт: npm run backfill:index (или по одному: -- --ident НОМЕР)\n')
 
   await pool.end()

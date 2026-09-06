@@ -37,15 +37,31 @@ import type { Animal, IndexProfile as IndexProfileDoc } from '@/payload-types'
  */
 export const skipRecompute = () => process.env.INDEX_VALUES_SKIP === '1'
 
-/** Все профили, по которым сейчас имеет смысл держать значения. */
+/**
+ * Все профили, по которым сейчас имеет смысл держать значения.
+ *
+ * Список обходится постранично, а не одной выборкой с потолком в тысячу.
+ * Потолок здесь был опаснее обычного: этот же список служит `recomputeAll`
+ * основанием для уборки — всё, чего в нём нет, считается значениями
+ * исчезнувшего профиля и удаляется. Профиль номер 1001 в список
+ * не попал бы, и его значения снесло бы как осиротевшие, одним числом
+ * в строке отчёта.
+ */
 export async function profilesInUse(payload: Payload): Promise<IndexProfile[]> {
-  const own = await payload.find({
-    collection: 'index-profiles',
-    limit: 1000,
-    depth: 0,
-    overrideAccess: true,
-  })
-  return [...BUILTIN_PROFILES, ...(own.docs as IndexProfileDoc[]).map(profileOfDoc)]
+  const own: IndexProfileDoc[] = []
+  for (let page = 1; ; page++) {
+    const res = await payload.find({
+      collection: 'index-profiles',
+      limit: 200,
+      page,
+      sort: 'id',
+      depth: 0,
+      overrideAccess: true,
+    })
+    own.push(...(res.docs as IndexProfileDoc[]))
+    if (!res.hasNextPage) break
+  }
+  return [...BUILTIN_PROFILES, ...own.map(profileOfDoc)]
 }
 
 const rowOf = (animal: Animal, profile: IndexProfile, base: Base) => {
@@ -107,10 +123,12 @@ const requirePool = (payload: Payload): SqlPool => {
  * Чтение при этом остаётся полностью на Payload: обход абстракции
  * ограничен одной операцией, у которой есть измеримая причина.
  */
-async function insertRows(payload: Payload, rows: Row[]): Promise<void> {
-  if (!rows.length) return
+/** Возвращает число вправду вставленных строк, а не намеченных. */
+async function insertRows(payload: Payload, rows: Row[]): Promise<number> {
+  if (!rows.length) return 0
   const pool = requirePool(payload)
 
+  let written = 0
   const CHUNK = 500
   for (let i = 0; i < rows.length; i += CHUNK) {
     const chunk = rows.slice(i, i + CHUNK)
@@ -139,7 +157,7 @@ async function insertRows(payload: Payload, rows: Row[]): Promise<void> {
       })
       .join(',')
 
-    await pool.query(
+    const res = await pool.query(
       `insert into index_values
          (animal_id, profile_key, profile_name, kind, weights, base_version,
           value, reliability, used, computed_at,
@@ -148,7 +166,10 @@ async function insertRows(payload: Payload, rows: Row[]): Promise<void> {
        values ${values}`,
       params,
     )
+    written += res.rowCount ?? 0
   }
+
+  return written
 }
 
 /**
@@ -375,16 +396,28 @@ export async function dropProfileValues(payload: Payload, profileKey: string): P
 /**
  * Пересчитать всё. Используется скриптом заполнения и сидом.
  *
- * Профили обходятся по одному, а не «все профили для каждого животного»:
- * так после сбоя на середине уже посчитанные профили остаются целыми,
- * и видно, на чём именно остановились.
+ * Один проход по книге на все профили сразу — разбор ниже, у самого цикла.
+ * Точки восстановления у пересчёта нет: значения всех профилей сносятся
+ * до начала работы, и обрыв посреди оставляет книгу без индекса
+ * у необойдённой части поголовья. Здесь стояло обратное описание —
+ * «профили обходятся по одному, так после сбоя уже посчитанные остаются
+ * целыми», — то есть шапка обещала точку восстановления, которой нет,
+ * и противоречила комментарию двадцатью строками ниже.
  */
 export async function recomputeAll(
   payload: Payload,
   log: (msg: string) => void = () => {},
+  /*
+   * База можно передать явно. Нужно это ровно одному вызывающему —
+   * пересчёту при смене базы: там новая база записана, но ещё не включена,
+   * и «действующая» вернула бы прежнюю. Включается она после того, как
+   * значения посчитаны все, иначе обрыв оставит книгу с двумя шкалами
+   * под одной вывеской.
+   */
+  opts: { base?: Base } = {},
 ): Promise<{ profiles: number; rows: number; orphans: number }> {
   const profiles = await profilesInUse(payload)
-  const base = await loadActiveBase(payload)
+  const base = opts.base ?? (await loadActiveBase(payload))
   log(`база сравнения: ${base.version}${base === DEFAULT_BASE ? ' (заимствованная)' : ''}`)
   /*
    * Один проход по книге на все профили сразу.
@@ -400,12 +433,16 @@ export async function recomputeAll(
    * до какого профиля он дошёл.
    */
   for (const profile of profiles) await dropProfileValues(payload, profile.key)
+  log(
+    'значения снесены; до конца прогона у необойдённых животных индекса нет — ' +
+      'обрыв оставит книгу в этом состоянии',
+  )
 
   let rows = 0
   const scanned = await eachAnimal(payload, BATCH, async (batch, done, total) => {
     for (const profile of profiles) {
-      await insertRows(payload, batch.map((a) => rowOf(a, profile, base)))
-      rows += batch.length
+      /* Считаются записанные строки, а не намеченные: `insertRows` отдаёт rowCount. */
+      rows += await insertRows(payload, batch.map((a) => rowOf(a, profile, base)))
     }
     log(`посчитано животных: ${done} из ${total}, строк: ${rows}`)
   })

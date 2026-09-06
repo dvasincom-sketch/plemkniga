@@ -15,7 +15,7 @@ import { poolOf } from '@/lib/sql'
  *
  * ## Зачем это отдельным скриптом
  *
- * Проверок под сорок, и почти все написаны без единого запуска: правило
+ * Правил в реестре десятки, и почти все написаны без единого запуска: правило
  * читается глазами, компилируется и выглядит верным. Компиляция здесь
  * не доказывает ничего. `percentile_cont` над `numeric`, остаток от деления
  * денежного типа, `extract` без указания зоны — каждое такое место падает
@@ -400,8 +400,11 @@ async function main() {
   /* ------------------------- Проверки по стаду ------------------------- */
 
   const stats = await farmStats(payload)
-  const orgIds = [...stats.values()]
-    .filter((s) => s.animals > 0 && (onlyOrg === null || s.organizationId === onlyOrg))
+  const withAnimals = [...stats.values()].filter(
+    (s) => s.animals > 0 && (onlyOrg === null || s.organizationId === onlyOrg),
+  )
+  const orgTotal = withAnimals.length
+  const orgIds = withAnimals
     .sort((a, b) => b.animals - a.animals)
     .slice(0, onlyOrg === null ? ORG_CAP : 1)
     .map((s) => s.organizationId)
@@ -605,6 +608,18 @@ async function main() {
   if (!orgIds.length) {
     console.log('  Хозяйств с животными не нашлось — проверять нечего.')
   } else {
+    /*
+     * Знаменатель называется. Раздел смотрит верхние хозяйства по числу
+     * животных, а печаталось только их число — и вывод «правило
+     * не сработало ни разу» читался как вывод по всей книге. Для проверок
+     * по записям такая оговорка уже стояла; для проверок по стаду —
+     * не стояла.
+     */
+    console.log(
+      orgTotal > orgIds.length
+        ? `  Разобрано хозяйств: ${orgIds.length} из ${orgTotal} — самые крупные по поголовью.\n`
+        : `  Разобрано хозяйств: ${orgIds.length} — все, у кого есть животные.\n`,
+    )
     console.log(`  ${pad('код', 34)}${padL('находок', 9)}${padL('хозяйств', 10)}`)
     console.log(`  ${'─'.repeat(53)}`)
     for (const spec of CHECKS.filter((c) => c.group === 'herd')) {
@@ -686,7 +701,16 @@ async function main() {
      * называет долю и предлагает `--all` — единственный способ
      * превратить «не попалось» в «нет».
      */
-    if (animals.length >= bookSize) {
+    if (bookSize === 0) {
+      /*
+       * Пустая книга — не «разобрана вся». Условие `animals.length >= bookSize`
+       * при нулях истинно, и ревизия делала на пустой (или недосчитанной)
+       * базе ровно то утверждение, ради запрета которого этот блок
+       * и переписывали.
+       */
+      console.log('    В книге нет ни одного животного: разбирать было нечего,')
+      console.log('    и «правило не сработало» здесь ничего не значит.')
+    } else if (animals.length >= bookSize) {
       console.log('    Разобрана вся книга: данных, на которых эти правила видно,')
       console.log('    в ней действительно нет.')
     } else {
@@ -714,6 +738,16 @@ async function main() {
   if (!noisy.length && !silent.length) {
     console.log('  Каждая проверка сработала хотя бы раз и ни одна не задела')
     console.log(`  больше ${Math.round(NOISY_SHARE * 100)} % записей.`)
+    /*
+     * Доля считается только при выборке от NOISY_MIN записей: на меньшей
+     * она ничего не значит. Прежде утверждение о доле печаталось и там,
+     * где доля не считалась вовсе, — то есть ревизия сообщала результат
+     * проверки, которой не было.
+     */
+    if (animals.length < NOISY_MIN) {
+      console.log(`  Про долю сказать нечего: разобрано ${animals.length} записей,`)
+      console.log(`  а доля считается от ${NOISY_MIN}.`)
+    }
     console.log('')
   }
 

@@ -1,10 +1,14 @@
 import 'dotenv/config'
-import { getPayload } from 'payload'
+import { getPayload, type Payload } from 'payload'
 import config from '@payload-config'
 import type { User } from '@/payload-types'
 import { forgetGrants } from '@/lib/grants'
 import { ACCESS_SCOPES } from '@/lib/dictionaries'
 import { relId } from '@/lib/visibility'
+import { attempt } from '@/lib/access-attempt'
+
+/** Сколько чужих закрытых записей просматривается в поиске пригодной. */
+const CANDIDATES = 25
 
 /**
  * Ревизия точечного доступа: открывает ли грант ровно то, что обещает.
@@ -88,7 +92,17 @@ function describeError(e: unknown): string {
  */
 const skipped: string[] = []
 
-const ok = (line: string) => console.log(`  ✓  ${line}`)
+/*
+ * Выполненные утверждения считаются: ревизия, не сделавшая ни одного,
+ * не имеет права печатать «ведёт себя как обещано». Пять выходов
+ * «проверять нечего» возвращали ноль, и прогон, ничего не проверивший,
+ * был неотличим от прогона, где всё сошлось.
+ */
+let done = 0
+const ok = (line: string) => {
+  done += 1
+  console.log(`  ✓  ${line}`)
+}
 const bad = (step: string, detail: string) => {
   findings.push({ step, detail })
   console.log(`  ✗  ${detail}`)
@@ -121,11 +135,13 @@ async function main() {
   const viewer = users.docs[0] as User | undefined
   if (!viewer) {
     console.log('\nНет ни одного фермера с организацией — проверять не от чьего лица.\n')
+    process.exitCode = 1
     return
   }
   const myOrg = relId(viewer.organization)
   if (myOrg === null) {
     console.log('\nУ найденного фермера нет организации — грант выдавать некому.\n')
+    process.exitCode = 1
     return
   }
 
@@ -147,7 +163,7 @@ async function main() {
         { or: [{ archived: { equals: false } }, { archived: { exists: false } }] },
       ],
     },
-    limit: 25,
+    limit: CANDIDATES,
     depth: 0,
     overrideAccess: true,
   })
@@ -205,11 +221,13 @@ async function main() {
 
   if (!victim) {
     console.log('\nЧужих закрытых записей в базе нет — проверять нечего.\n')
+    process.exitCode = 1
     return
   }
   const ownerOrg = relId(victim.owner)
   if (ownerOrg === null) {
     console.log('\nУ найденной чужой записи не заполнен владелец — проверять нечего.\n')
+    process.exitCode = 1
     return
   }
 
@@ -233,6 +251,7 @@ async function main() {
   const issuer = issuers.docs[0] as User | undefined
   if (!issuer) {
     console.log(`\nУ хозяйства ${ownerOrg} нет ни одного пользователя — выдавать грант некому.\n`)
+    process.exitCode = 1
     return
   }
 
@@ -241,21 +260,34 @@ async function main() {
   console.log(`Запись:   № ${victim.identNumber}, закрыта, владелец ${ownerOrg}`)
   console.log(`Области:  ${ACCESS_SCOPES.map((s) => s.value).join(', ')}\n`)
 
-  /** Пробуем прочитать документ по идентификатору от лица посетителя. */
+  /**
+   * Пробуем прочитать документ по идентификатору от лица посетителя.
+   *
+   * На этом ответе держатся все отрицательные выводы ревизии: «карточка
+   * закрыта», «область отказала», «истёкший грант ничего не открывает»,
+   * «отозванный закрывает сразу». Прежде здесь стоял голый `catch`,
+   * возвращавший `false`, — и любой сбой (опечатка в имени коллекции,
+   * обрыв соединения, отсутствующая колонка) читался как отказ по правам,
+   * то есть как зелёный ответ. Теперь отказ отличается от поломки:
+   * поломка считается отдельно и краснеет.
+   */
+  let broken = 0
   const readable = async (collection: string, id: number | string): Promise<boolean> => {
-    try {
-      const doc = await payload.findByID({
+    const tried = await attempt(() =>
+      payload.findByID({
         collection: collection as never,
         id,
         depth: 0,
         overrideAccess: false,
         user: viewer,
-      })
-      return Boolean(doc)
-    } catch {
-      // Отказ Payload возвращает исключением — ожидаемый исход
-      return false
+      }),
+    )
+    if (tried.allowed) return true
+    if (!tried.denied) {
+      broken += 1
+      bad(collection, `проба чтения не состоялась: ${tried.error ?? 'причина неизвестна'}`)
     }
+    return false
   }
 
   /** Первая строка коллекции, привязанная к этому животному. */
@@ -431,10 +463,7 @@ async function main() {
 
   /* ------------------------------- Уборка ---------------------------------- */
 
-  for (const id of [grant.id, herdGrant.id]) {
-    await payload.delete({ collection: 'access-grants', id, overrideAccess: true })
-  }
-  forgetGrants()
+  await cleanup(payload, [grant.id, herdGrant.id])
 
   /* -------------------------------- Итог ----------------------------------- */
 
@@ -444,17 +473,28 @@ async function main() {
     console.log(`\nНе проверено: ${skipped.length}\n`)
     for (const line of skipped) console.log(`  · ${line}`)
     console.log(
-      '\nЭто не находки, а пробелы в данных: на выбранной записи такой проверке\n' +
-        'не на чем было выполниться. Ревизия выбирает запись с наибольшим охватом\n' +
-        'из двадцати пяти кандидатов — если пробелы остались, их нет во всей базе.',
+      `\nЭто не находки, а пробелы в данных: на выбранной записи такой проверке\n` +
+        `не на чем было выполниться. Ревизия выбирает запись с наибольшим охватом\n` +
+        `из ${CANDIDATES} кандидатов — то есть пробел означает «не нашлось среди них»,\n` +
+        `а не «нет во всей базе». Прежде здесь стояло второе, и это было неправдой:\n` +
+        `двадцать пять записей ничего не говорят о тысячах.`,
     )
+  }
+
+  if (done === 0) {
+    console.log(
+      '\nНи одно утверждение не проверено: на выбранной записи выполниться\n' +
+        'было нечему. Это не «доступ ведёт себя как обещано».\n',
+    )
+    process.exitCode = 1
+    return
   }
 
   if (!findings.length) {
     console.log(
       skipped.length
-        ? '\nИз выполненных проверок не сработала ни одна: область открывает только своё,\nсрок и отзыв действуют. Пропущенное выше остаётся непроверенным.\n'
-        : '\nТочечный доступ ведёт себя как обещано: область открывает только своё,\nпредки закрыты, срок и отзыв действуют.\n',
+        ? `\nИз ${done} выполненных проверок не сработала ни одна: область открывает только своё,\nсрок и отзыв действуют. Пропущенное выше остаётся непроверенным.\n`
+        : `\nТочечный доступ ведёт себя как обещано (${done} проверок): область открывает\nтолько своё, предки закрыты, срок и отзыв действуют.\n`,
     )
     return
   }
@@ -467,6 +507,21 @@ async function main() {
       'обходится через API: ровно эта ошибка разобрана в решении №24.\n',
   )
   process.exitCode = 1
+}
+
+/*
+ * Уборка вынесена и зовётся из `finally`: висящая ссылка на родителя
+ * бросала исключение посреди проверок, выход уходил в общий `catch`,
+ * и выданные гранты оставались в базе — то есть ревизия доступа
+ * оставляла после себя настоящий доступ.
+ */
+async function cleanup(payload: Payload, ids: (number | string)[]) {
+  for (const id of ids) {
+    await payload
+      .delete({ collection: 'access-grants', id, overrideAccess: true })
+      .catch((e: unknown) => console.error(`  грант ${id} не убран: ${describeError(e)}`))
+  }
+  forgetGrants()
 }
 
 main()

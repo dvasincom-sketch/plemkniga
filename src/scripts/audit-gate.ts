@@ -69,7 +69,13 @@ async function probe(payload: Payload, idents: string[]) {
   console.log(`  Запрошено записей: ${idents.length}, найдено: ${docs.length}`)
   if (missing.length) console.log(`  Нет в книге: ${missing.join(', ')}`)
   if (!docs.length) {
-    console.log('  Проверять нечего.')
+    /*
+     * Ни одной записи не нашлось — значит проба не состоялась. Прежде
+     * это печаталось «Проверять нечего» и давало нулевой код: опечатка
+     * в номере выглядела так же, как заслон, у которого всё в порядке.
+     */
+    console.log('  Ни одной из названных записей в книге нет — проба не состоялась.')
+    process.exitCode = 1
     return
   }
 
@@ -87,8 +93,18 @@ async function probe(payload: Payload, idents: string[]) {
   console.log('')
 
   if (!result.blockers.length) {
-    console.log('  Заслон молчит: подтвердить можно все записи.')
-    console.log('  Это верно только если ни у одной из них нет существенных находок.')
+    /*
+     * «Заслон молчит» осмысленно только рядом с числом разобранных правил.
+     * При нуле разобранных это не «подтвердить можно всё», а «проверять
+     * было нечем», и печатать первое вместо второго нельзя.
+     */
+    if (result.checked === 0) {
+      console.log('  Ни одно правило не разобрано: заслон ничего не смотрел.')
+      process.exitCode = 1
+    } else {
+      console.log(`  Заслон молчит: подтвердить можно все записи (правил разобрано ${result.checked}).`)
+      console.log('  Это верно только если ни у одной из них нет существенных находок.')
+    }
   } else {
     console.log(`  Заслон держит записей: ${result.blockers.length}`)
     for (const b of result.blockers) {
@@ -117,16 +133,25 @@ async function probe(payload: Payload, idents: string[]) {
 }
 
 async function queue(payload: Payload) {
-  const { docs } = await payload.find({
+  const LIMIT = 100
+  const { docs, totalDocs } = await payload.find({
     collection: 'verification-requests',
     where: { status: { in: ['new', 'checking'] } },
-    limit: 100,
+    limit: LIMIT,
     depth: 0,
     overrideAccess: true,
   })
 
   console.log('')
-  console.log(`ОТКРЫТЫЕ ЗАЯВКИ: ${docs.length}`)
+  /*
+   * Печатается размер очереди, а не размер страницы. Прежде стояло
+   * `docs.length`: при ста пятидесяти открытых заявках отчёт говорил
+   * «100» и молчал о полусотне.
+   */
+  console.log(
+    `ОТКРЫТЫЕ ЗАЯВКИ: ${totalDocs}` +
+      (totalDocs > docs.length ? ` (разобрано ${docs.length}, остальные — следующим прогоном)` : ''),
+  )
   console.log('')
 
   if (!docs.length) {
@@ -138,7 +163,13 @@ async function queue(payload: Payload) {
   for (const r of docs) {
     const number = String(r.number ?? `#${r.id}`)
     const result = await approvalBlockers(payload, r as never).catch((e: unknown) => {
+      /*
+       * Отказ разбора — находка, а не пропуск. Заслон, падающий
+       * на каждой заявке, давал зелёный прогон: строка печаталась,
+       * а код возврата оставался нулём.
+       */
       console.log(`  ${pad(number, 14)} разбор не выполнился: ${describeError(e)}`)
+      process.exitCode = 1
       return null
     })
     if (!result) continue
@@ -187,7 +218,12 @@ async function main() {
     await queue(payload)
   }
 
-  process.exit(0)
+  /*
+   * Ревизия помечена в реестре как отчёт (`report: true`): она меряет
+   * состояние очереди, а не проходит или не проходит. Но проба заслона
+   * и упавший разбор — это уже утверждения, и они выставляют код сами.
+   */
+  process.exit(process.exitCode ?? 0)
 }
 
 main().catch((e) => {

@@ -3,7 +3,7 @@ import { getPayload } from 'payload'
 import config from '../payload.config'
 import { maskUri, resolveDatabase } from '../lib/db-url'
 import { TRAIT_BASE, type TraitKey } from '../lib/breeding-index'
-import { loadActiveBase } from '../lib/index-base'
+import { baseOfDoc, loadActiveBase } from '../lib/index-base'
 import { recomputeAll } from '../lib/index-values'
 import type { Animal } from '../payload-types'
 
@@ -44,7 +44,15 @@ const args = process.argv.slice(2)
 const apply = args.includes('--apply')
 const versionArg = (() => {
   const at = args.indexOf('--version')
-  return at >= 0 ? args[at + 1] : undefined
+  const next = at >= 0 ? args[at + 1] : undefined
+  /*
+   * Следующий аргумент — не другой ключ. Без проверки команда
+   * `rebase:index -- --version --apply` записывала базу с версией
+   * «--apply» и не применяла ничего: два слова местами, и книга получает
+   * базу с бессмысленным именем, которое потом стоит в каждой строке
+   * значений. Та же проверка есть у `backfill-index`.
+   */
+  return next && !next.startsWith('--') ? next : undefined
 })()
 
 const { uri, source } = resolveDatabase()
@@ -74,9 +82,16 @@ async function main() {
   console.log(`Действующая база сравнения: ${current.version}\n`)
 
   /*
-   * Служебные записи предков в выборку не берутся: у них оценок нет,
-   * а те, что есть, сгенерированы для построения родословных. База должна
-   * описывать поголовье, а не вспомогательные строки.
+   * Синтетика в выборку не берётся.
+   *
+   * Здесь стояло обещание «служебные записи предков в выборку не берутся»,
+   * и оно было неправдой: единственным условием отбора был архив.
+   * Нарисованные сидом животные — номера с «99», uuid с «99999999-» —
+   * попадали в расчёт средних и стандартных отклонений наравне
+   * с настоящим поголовьем и определяли шкалу индекса для всей книги.
+   * База сравнения, посчитанная по выдуманным числам, — худшее из того,
+   * что может случиться с индексом: она выглядит собственной и меряет
+   * ничем.
    */
   const samples = new Map<TraitKey, { v: number; r: number | null }[]>(
     TRAIT_BASE.map((t) => [t.key, []]),
@@ -87,7 +102,12 @@ async function main() {
   for (;;) {
     const batch = await payload.find({
       collection: 'animals',
-      where: { or: [{ archived: { equals: false } }, { archived: { exists: false } }] },
+      where: {
+        and: [
+          { or: [{ archived: { equals: false } }, { archived: { exists: false } }] },
+          { identNumber: { not_like: '99%' } },
+        ],
+      },
       limit: 500,
       page,
       depth: 0,
@@ -195,6 +215,17 @@ async function main() {
   const now = new Date()
   const version = versionArg ?? `АПГ-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 
+  /*
+   * База пишется неактивной, а включается после пересчёта.
+   *
+   * Прежде `isActive: true` стоял сразу: хук гасил прежнюю базу
+   * и коммитился, и только потом начинался пересчёт двух миллионов
+   * значений — минуты работы. Обрыв в этом промежутке оставлял книгу,
+   * где часть значений посчитана по новой базе, часть по старой,
+   * а действующей числится новая. Выглядят они одинаково достоверно:
+   * версия записана в каждой строке, но ни один список её не сверяет,
+   * и рейтинг сортирует две шкалы вперемешку.
+   */
   const doc = await payload.create({
     collection: 'index-bases',
     overrideAccess: true,
@@ -202,7 +233,7 @@ async function main() {
       version,
       source: 'own',
       note: `Пересчёт по ${animals} животным Ассоциации; признаков с собственным σ — ${ready.length}`,
-      isActive: true,
+      isActive: false,
       animalsUsed: animals,
       computedAt: now.toISOString(),
       traits: ready.map((r) => ({
@@ -216,9 +247,25 @@ async function main() {
     },
   })
 
-  console.log(`\nЗаписана база ${doc.version}. Пересчитываю значения индекса…`)
-  const { profiles, rows: written } = await recomputeAll(payload, (m) => console.log(`  ${m}`))
-  console.log(`\nГотово: профилей ${profiles}, значений ${written}.`)
+  console.log(`\nЗаписана база ${doc.version} (пока не действующая). Пересчитываю значения…`)
+
+  /*
+   * Пересчёт идёт по новой базе явно, а не через «действующую»: она ещё
+   * не включена. Включается она строкой ниже — после того, как значения
+   * посчитаны все.
+   */
+  const { profiles, rows: written } = await recomputeAll(payload, (m) => console.log(`  ${m}`), {
+    base: baseOfDoc(doc),
+  })
+
+  await payload.update({
+    collection: 'index-bases',
+    id: doc.id,
+    overrideAccess: true,
+    data: { isActive: true },
+  })
+
+  console.log(`\nГотово: профилей ${profiles}, значений ${written}. База ${doc.version} включена.`)
   console.log(
     'Прежние базы остались в коллекции: рядом с каждым выпущенным значением\n' +
       'записана версия, и старое число по-прежнему объяснимо.',
