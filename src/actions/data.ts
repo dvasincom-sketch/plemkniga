@@ -1304,6 +1304,50 @@ const ARRAY_SPECS: Record<string, ArraySpec> = {
     },
   },
 
+  /*
+   * Лактации: ключ — номер, а не дата.
+   *
+   * У одной коровы одна лактация под номером три, и повторная заливка
+   * того же файла не должна её удваивать. Дата отёла в ключ не входит
+   * намеренно: её уточняют по документам, а номер не меняется, и ключ,
+   * собранный из уточняемого значения, перестаёт узнавать свою же строку.
+   */
+  lactations: {
+    field: 'lactations',
+    what: 'такая лактация',
+    keyOf: (r) => `№${String(r.number ?? '')}`,
+    build: (get) => {
+      const number = parseNumber(get('number'))
+      if (typeof number.value !== 'number') {
+        return { error: number.problem ?? 'не указан номер лактации' }
+      }
+      if (number.value < 1) return { error: 'номер лактации начинается с единицы' }
+
+      const date = (key: string) => parseDate(get(key)).value ?? undefined
+      const n = (key: string) => {
+        const v = parseNumber(get(key))
+        return typeof v.value === 'number' ? v.value : undefined
+      }
+
+      return {
+        row: {
+          number: number.value,
+          calvingDate: date('calvingDate'),
+          dd: n('dd'),
+          milk305: n('milk305'),
+          milkYield: n('milkYield'),
+          fat305: n('fat305'),
+          protein305: n('protein305'),
+          fatKg: n('fatKg'),
+          proteinKg: n('proteinKg'),
+          scc: n('scc'),
+          dryOffDate: date('dryOffDate'),
+          endDate: date('endDate'),
+        },
+      }
+    },
+  },
+
   dnaTests: {
     field: 'dnaTests',
     what: 'такой тест',
@@ -1553,6 +1597,20 @@ async function importEvents(
   const cols = columnsOf(ds)
   const body = rows.slice(1)
 
+  /*
+   * Справочники грузятся и здесь.
+   *
+   * Дорога событий их не знала: колонки со ссылкой на справочник были
+   * только у животных и у массивов внутри карточки. Событию здоровья
+   * справочник нужен обязательно — тип события ссылка, и без разбора
+   * колонка молча уходила бы в строку, которую база не примет.
+   *
+   * Загрузчик тот же, что у двух других дорог: три копии одного разбора
+   * разошлись бы, и разошлись бы молча — файл, принятый одной дорогой,
+   * отвергался бы другой без объяснения.
+   */
+  const dictionaries = await loadDictionaries(payload, ds, header)
+
   /* --- Свои животные: разрешаются одним запросом на весь файл --- */
 
   const wanted = new Set<string>()
@@ -1646,9 +1704,11 @@ async function importEvents(
           ? 'weighings'
           : ds.key === 'gradings'
             ? 'gradings'
-            : ds.key === 'exteriors'
-              ? 'animal-exteriors'
-              : 'milk-tests'
+            : ds.key === 'healthEvents'
+              ? 'health-events'
+              : ds.key === 'exteriors'
+                ? 'animal-exteriors'
+                : 'milk-tests'
 
   /* --- Заслон от повторной заливки того же файла --- */
 
@@ -1801,10 +1861,24 @@ async function importEvents(
       delete data.date
     }
 
+    /*
+     * Признак «строка не годится» вместо `continue` из вложенного цикла:
+     * пропустить надо саму строку, а не колонку, и сделать это после
+     * разбора остальных колонок нельзя — данные уже собраны наполовину.
+     */
+    let failed = false
+
     for (const col of cols) {
       if (['animal', 'date', 'bull'].includes(col.key)) continue
       const raw = get(col.key)
-      if (raw === undefined || raw === '') continue
+      if (raw === undefined || raw === '') {
+        if (col.kind === 'dictionary' && col.required) {
+          skip(line, `Не указан ${col.title.toLowerCase()}`, rawIdent)
+          failed = true
+          break
+        }
+        continue
+      }
 
       if (col.kind === 'enum') {
         /* То же правило, что у животных: непонятное значение стоит поля, а не строки. */
@@ -1813,6 +1887,29 @@ async function importEvents(
         )
         if (opt) assign(data, col.key, opt.value)
         else unresolved.add(`${col.title.toLowerCase()} «${raw}»`)
+        continue
+      }
+
+      if (col.kind === 'dictionary') {
+        /*
+         * То же правило, что у животных: значение, которого нет
+         * в справочнике, стоит поля, а не строки. Но если справочная
+         * колонка обязательна — как тип события здоровья, — строка
+         * без неё бессмысленна: событие без типа не отличить от любого
+         * другого, и записать его значит завести запись, которую потом
+         * никто не опознает.
+         */
+        const id = dictionaries.get(col.collection ?? '')?.get(norm(raw))
+        if (id) {
+          assign(data, col.key, id)
+        } else {
+          unresolved.add(`${col.title.toLowerCase()} «${raw}»`)
+          if (col.required) {
+            skip(line, `${col.title}: «${raw}» — такого значения нет в справочнике`, rawIdent)
+            failed = true
+            break
+          }
+        }
         continue
       }
 
@@ -1832,6 +1929,8 @@ async function importEvents(
 
       assign(data, col.key, raw)
     }
+
+    if (failed) continue
 
     if (ds.key === 'calvings') {
       if (animal.sex === 'male') {
