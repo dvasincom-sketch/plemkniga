@@ -41,6 +41,22 @@ import { resolveDatabase, shouldPushSchema } from '@/lib/db-url'
  * `text` работает, а недостающая таблица не работает никак. Начинать надо
  * с того, что валит страницу.
  *
+ * ## Обязательность сверяется, и вот почему именно она
+ *
+ * Из всех свойств колонки одно ведёт себя не как остальные: `NOT NULL`
+ * не мешает работать и не ломает страницу — оно тихо разрешает то, что
+ * приложение считает невозможным. Миграция выставок завела «Дата
+ * мероприятия» и «Название» обычными колонками при `required: true`
+ * в коллекции: форма требует, база нет, и первая же строка, положенная
+ * скриптом переноса или руками, оказывается выставкой без названия.
+ * В разработке этого не видно — `next dev` строит схему из полей
+ * и ставит `NOT NULL` сам.
+ *
+ * Поэтому сверяется одно направление: Payload ждёт обязательное, а база
+ * разрешает пустое. Обратное расхождение — база требует, приложение нет —
+ * шумит само: запись падает с ошибкой базы, и искать её не приходится.
+ * Оно уходит в список «есть в базе, но Payload не спрашивает».
+ *
  * Не чинит. Ни автоматически, ни с ключом: миграция — это текст, который
  * читают в обзоре правок, и сочинять его скриптом значит завести привычку
  * не читать.
@@ -118,6 +134,20 @@ const columnsOfTable = (table: unknown): Set<string> => {
   return out
 }
 
+/** Колонки таблицы drizzle, которые Payload объявил обязательными. */
+const requiredOfTable = (table: unknown): Set<string> => {
+  const out = new Set<string>()
+  if (!table || typeof table !== 'object') return out
+
+  for (const value of Object.values(table as Record<string, unknown>)) {
+    if (value && typeof value === 'object') {
+      const col = value as { name?: unknown; notNull?: unknown }
+      if (typeof col.name === 'string' && col.name && col.notNull === true) out.add(col.name)
+    }
+  }
+  return out
+}
+
 async function main() {
   const payload = await getPayload({ config })
   const pool = poolOf(payload)
@@ -141,17 +171,23 @@ async function main() {
    * достаточно одного, и разница видна на глаз даже на своей машине.
    */
   const res = await pool.query(
-    `select table_name, column_name
+    `select table_name, column_name, is_nullable
        from information_schema.columns
       where table_schema = current_schema()`,
   )
 
   const actual = new Map<string, Set<string>>()
+  /** Колонки, которые база разрешает оставить пустыми. */
+  const nullable = new Map<string, Set<string>>()
   for (const row of res.rows ?? []) {
     const t = String(row.table_name)
     const c = String(row.column_name)
     if (!actual.has(t)) actual.set(t, new Set())
     actual.get(t)!.add(c)
+    if (String(row.is_nullable) === 'YES') {
+      if (!nullable.has(t)) nullable.set(t, new Set())
+      nullable.get(t)!.add(c)
+    }
   }
 
   /*
@@ -219,6 +255,25 @@ async function main() {
   }
 
   if (absentColumns === 0) ok('все колонки, которые ждёт Payload, есть в базе')
+
+  /* ------------- Обязательность: ждём, а база разрешает пустое ------------- */
+
+  let looseColumns = 0
+  for (const t of expectedNames) {
+    const free = nullable.get(t)
+    if (!free) continue
+
+    for (const c of requiredOfTable(tables[t])) {
+      if (!free.has(c)) continue
+      looseColumns += 1
+      bad(
+        `колонка «${t}.${c}» обязательна в коллекции, но пуста может быть в базе`,
+        'форма требует, база нет — скрипт и ручной UPDATE пройдут мимо',
+      )
+    }
+  }
+
+  if (looseColumns === 0) ok('обязательные поля обязательны и в базе')
 
   /* ---------------- Лишнее в базе ---------------- */
 

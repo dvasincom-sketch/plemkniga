@@ -5,6 +5,7 @@ import { ownerOrgField, adeOriginField } from '@/collections/shared'
 import { raiseAgeGroup } from '@/lib/age-group'
 import type { AgeGroup } from '@/lib/dictionaries'
 import { BIRTH_TYPES, CALVING_EASE, CALVING_EVENTS, CALVING_RESULTS } from '@/lib/calving'
+import { afterCommit } from '@/lib/after-commit'
 
 /*
  * Списки переехали в `lib/calving.ts` и отдаются отсюда прежними именами.
@@ -42,18 +43,28 @@ export { BIRTH_TYPES, CALVING_EASE, CALVING_EVENTS, CALVING_RESULTS }
  * Уронить его из-за того, что не удалось обновить соседнюю карточку,
  * значило бы потерять событие ради его последствия. Отказ уходит в лог —
  * тот же порядок, что у карантина колонок в решении №159.
+ *
+ * Обещание это долго было неправдой. Правка карточки шла с `req`, то есть
+ * внутри транзакции записи отёла, и упавший запрос делал транзакцию
+ * неспособной к коммиту: `catch` перехватывал ошибку, лог сообщал
+ * «возрастная группа не обновилась», а откатывался при этом и сам отёл.
+ * Теперь правка откладывается до коммита (`src/lib/after-commit.ts`),
+ * и обещание держится по устройству, а не на слово.
+ *
+ * Заодно исчезло то, ради чего стоял `req`: после коммита блокировка
+ * по внешнему ключу снята, и отдельное подключение перестало быть
+ * ловушкой на пятнадцать минут.
  */
 const raiseAnimalAgeGroup: CollectionAfterChangeHook = async ({ doc, req }) => {
   const animalId = typeof doc.animal === 'object' ? doc.animal?.id : doc.animal
   if (!animalId) return doc
 
-  try {
-    const animal = await req.payload.findByID({
+  await afterCommit(req, `возрастная группа животного ${animalId}`, async (payload) => {
+    const animal = await payload.findByID({
       collection: 'animals',
       id: animalId,
       depth: 0,
       overrideAccess: true,
-      req,
     })
 
     /*
@@ -72,7 +83,7 @@ const raiseAnimalAgeGroup: CollectionAfterChangeHook = async ({ doc, req }) => {
      * в книге не было, а миграция проставила «Аборт» ровно тем, у кого
      * он стоял в результате.
      */
-    const { totalDocs } = await req.payload.count({
+    const { totalDocs } = await payload.count({
       collection: 'calvings',
       where: {
         and: [
@@ -89,13 +100,12 @@ const raiseAnimalAgeGroup: CollectionAfterChangeHook = async ({ doc, req }) => {
         ],
       },
       overrideAccess: true,
-      req,
     })
 
     const next = raiseAgeGroup(animal.ageGroup as AgeGroup | null, totalDocs)
-    if (!next) return doc
+    if (!next) return
 
-    await req.payload.update({
+    await payload.update({
       collection: 'animals',
       id: animalId,
       data: {
@@ -109,24 +119,16 @@ const raiseAnimalAgeGroup: CollectionAfterChangeHook = async ({ doc, req }) => {
       } as never,
       overrideAccess: true,
       /*
-       * `req` обязателен: хук работает внутри транзакции записи отёла,
-       * и правка карточки должна попасть в неё же. Отдельное подключение
-       * здесь даёт не ошибку, а зависание до таймаута — вставка отёла
-       * держит на строке животного блокировку по внешнему ключу,
-       * а правка со стороны ждёт её снятия, которое случится только
-       * после хука (решение №20).
-       *
-       * Здесь этого не замечали годом: `raiseAgeGroup` возвращает пустое
-       * почти всегда, и до обновления дело доходило редко. Тем и опасно —
-       * ловушка стояла заряженной и ждала стада, где группы проставлены
-       * не заранее.
+       * `req` не передаётся, и это не небрежность. Работа выполняется
+       * после коммита записи отёла: транзакции больше нет, блокировка
+       * по внешнему ключу снята, и отдельное подключение — единственный
+       * возможный путь. Прежде здесь стоял `req` и пояснение про
+       * зависание до таймаута; пояснение было верным ровно до тех пор,
+       * пока правка шла внутри транзакции (решение №20).
        */
-      req,
       context: { skipJournal: true },
     })
-  } catch (e) {
-    console.error('[calvings] возрастная группа не обновилась:', e)
-  }
+  })
 
   return doc
 }

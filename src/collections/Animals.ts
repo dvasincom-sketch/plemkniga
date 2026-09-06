@@ -44,6 +44,7 @@ const forecastFields = (opts: { unit?: string } = {}) =>
  * не дотянуться, и он подставлял само значение. Разбор — в том файле.
  */
 import { CARRIER_OPTIONS } from '@/lib/carrier'
+import { afterCommit } from '@/lib/after-commit'
 
 export const Animals: CollectionConfig = {
   slug: 'animals',
@@ -2162,24 +2163,31 @@ export const Animals: CollectionConfig = {
         const changed = operation === 'create' || nowPublic !== wasPublic || photoId !== prevPhotoId
         if (!changed) return doc
 
-        try {
-          await req.payload.update({
-            collection: 'media',
-            id: photoId,
-            overrideAccess: true,
-            req,
-            data: {
-              visibility: nowPublic ? 'public' : 'private',
-              ...(doc.owner ? { owner: doc.owner } : {}),
-            },
-          })
-        } catch {
-          /*
-           * Молча: несогласованная видимость файла — беда, но меньшая,
-           * чем отменённая правка карточки. Пересчитать её можно
-           * скриптом, потерянную правку — ничем.
-           */
-        }
+        /*
+         * Правка файла откладывается до коммита карточки.
+         *
+         * Прежде здесь стоял `try {} catch {}` с пояснением «молча:
+         * несогласованная видимость файла — беда меньшая, чем отменённая
+         * правка карточки». Пояснение было верным по намерению
+         * и невыполнимым по устройству: вызов шёл с `req`, то есть внутри
+         * транзакции карточки, а упавший в PostgreSQL запрос делает
+         * транзакцию неспособной к коммиту — молчание `catch` оборачивалось
+         * ровно той отменённой правкой, которой боялись. Разбор —
+         * в `src/lib/after-commit.ts`.
+         */
+        await afterCommit(req, `видимость фотографии животного ${doc.identNumber}`, (payload) =>
+          payload
+            .update({
+              collection: 'media',
+              id: photoId,
+              overrideAccess: true,
+              data: {
+                visibility: nowPublic ? 'public' : 'private',
+                ...(doc.owner ? { owner: doc.owner } : {}),
+              },
+            })
+            .then(() => undefined),
+        )
         return doc
       },
       /*
@@ -2203,47 +2211,63 @@ export const Animals: CollectionConfig = {
        */
       async ({ doc, req, previousDoc, operation, context }) => {
         if (operation === 'update' && !context?.skipJournal) {
+          /*
+           * Разбор правок делается здесь, а запись — после коммита.
+           *
+           * Разделено намеренно: `diffAnimal` поднимает справочники,
+           * чтобы назвать породу и линию словами, и делает это по данным,
+           * какими они были в момент правки. Отложить сам разбор значило бы
+           * читать их после и получить подписи от другого состояния книги.
+           * А вот запись строк — следствие, и её место за коммитом.
+           */
+          const { diffAnimal } = await import('@/lib/animal-journal')
+          let changes: Awaited<ReturnType<typeof diffAnimal>> = []
           try {
-            const { diffAnimal } = await import('@/lib/animal-journal')
-            const changes = await diffAnimal(req, previousDoc, doc)
-
-            for (const change of changes) {
-              await req.payload.create({
-                collection: 'animal-revisions',
-                overrideAccess: true,
-                req,
-                data: {
-                  animal: doc.id,
-                  at: new Date().toISOString(),
-                  user: req.user?.id ?? null,
-                  path: change.path,
-                  label: change.label,
-                  before: change.before,
-                  after: change.after,
-                  source: context?.journalSource === 'admin' ? 'admin' : 'manual',
-                },
-              })
-            }
+            changes = await diffAnimal(req, previousDoc, doc)
           } catch (e) {
+            /*
+             * Перехват здесь спасает не от всего, и притворяться иначе
+             * не надо. Если разбор не удался из-за отказа базы, транзакция
+             * уже испорчена, коммит не пройдёт, и правка не сохранится —
+             * зато человек увидит ошибку, а не тишину. Перехват спасает
+             * от отказов, транзакции не касающихся: не поднялся справочник,
+             * не нашлось имя породы. Тогда правка проходит без записи
+             * в журнал, и об этом говорит строка ниже.
+             */
             req.payload.logger.error(
-              `Не удалось записать правки животного ${doc.identNumber}: ${
+              `Не удалось разобрать правки животного ${doc.identNumber}: ${
                 e instanceof Error ? e.message : e
               }`,
             )
           }
+          const userId = req.user?.id ?? null
+          const source = context?.journalSource === 'admin' ? 'admin' : 'manual'
+
+          await afterCommit(req, `журнал правок животного ${doc.identNumber}`, async (payload) => {
+            for (const change of changes) {
+              await payload.create({
+                collection: 'animal-revisions',
+                overrideAccess: true,
+                data: {
+                  animal: doc.id,
+                  at: new Date().toISOString(),
+                  user: userId,
+                  path: change.path,
+                  label: change.label,
+                  before: change.before,
+                  after: change.after,
+                  source,
+                },
+              })
+            }
+          })
         }
 
         const { skipRecompute, recomputeAnimal } = await import('@/lib/index-values')
         if (skipRecompute()) return doc
-        try {
-          await recomputeAnimal(req.payload, doc, { req })
-        } catch (e) {
-          req.payload.logger.error(
-            `Не удалось пересчитать индекс животного ${doc.identNumber}: ${
-              e instanceof Error ? e.message : e
-            }`,
-          )
-        }
+        await afterCommit(req, `индекс животного ${doc.identNumber}`, async (payload) => {
+          await recomputeAnimal(payload, doc)
+        })
         return doc
       },
     ],

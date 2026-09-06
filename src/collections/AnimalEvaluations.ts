@@ -5,6 +5,7 @@ import { HEALTH_TRAITS, PRODUCTION_TRAITS } from '@/lib/dictionaries'
 import { animalScopedReadFor, isAdmin } from '@/access'
 import { applyEvaluationSnapshot } from '@/lib/evaluation-snapshot'
 import { relId } from '@/lib/visibility'
+import { afterCommit } from '@/lib/after-commit'
 
 /**
  * История племенной оценки: строка на каждую переоценку.
@@ -242,14 +243,19 @@ export const AnimalEvaluations: CollectionConfig = {
         const animal = relId(doc.animal)
         if (!animal) return doc
 
-        try {
-          await applyEvaluationSnapshot({ payload: req.payload, req }, animal, doc)
-        } catch (e) {
-          req.payload.logger.error(
-            `Не удалось перенести оценку ${doc.id} в карточку животного ${animal}: ` +
-              (e instanceof Error ? e.message : String(e)),
-          )
-        }
+        /*
+         * Снимок переносится после коммита записи оценки.
+         *
+         * Прежде он шёл с `req`, то есть внутри той же транзакции,
+         * и перехват ошибки ничего не спасал: испорченная транзакция
+         * не коммитится, и вместе со снимком отменялась сама оценка.
+         * Лог при этом сообщал «не удалось перенести оценку в карточку» —
+         * то есть утверждал, что оценка сохранена. Разбор —
+         * в `src/lib/after-commit.ts`.
+         */
+        await afterCommit(req, `оценка ${doc.id} в карточку животного ${animal}`, (payload) =>
+          applyEvaluationSnapshot({ payload }, animal, doc),
+        )
         return doc
       },
     ],

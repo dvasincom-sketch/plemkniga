@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { indexProfileMutate, indexProfileRead } from '@/access'
 import { TRAIT_BASE } from '@/lib/breeding-index'
+import { afterCommit } from '@/lib/after-commit'
 
 /**
  * Профиль весов индекса племенной ценности.
@@ -199,15 +200,16 @@ export const IndexProfiles: CollectionConfig = {
         const { skipRecompute, recomputeProfile } = await import('@/lib/index-values')
         const { profileOfDoc } = await import('@/lib/index-profiles')
         if (skipRecompute()) return doc
-        try {
-          await recomputeProfile(req.payload, profileOfDoc(doc))
-        } catch (e) {
-          req.payload.logger.error(
-            `Не удалось пересчитать индекс по профилю «${doc.name}»: ${
-              e instanceof Error ? e.message : e
-            }`,
-          )
-        }
+        /*
+         * Пересчёт откладывается до коммита профиля. Он и раньше шёл
+         * по отдельному подключению, поэтому транзакцию не портил, —
+         * но значения по профилю писались до того, как сам профиль был
+         * принят, и откат сохранения оставлял книгу пересчитанной
+         * по настройке, которой нет.
+         */
+        await afterCommit(req, `индекс по профилю «${doc.name}»`, (payload) =>
+          recomputeProfile(payload, profileOfDoc(doc)).then(() => undefined),
+        )
         return doc
       },
     ],

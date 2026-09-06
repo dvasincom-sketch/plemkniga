@@ -5,6 +5,7 @@ import { EXTERIOR_COMPOSITES, EXTERIOR_TRAITS } from '@/lib/dictionaries'
 import { animalScopedMutate, animalScopedReadFor, isAdmin, isAuthenticated } from '@/access'
 import { applyExteriorSnapshot } from '@/lib/evaluation-snapshot'
 import { relId } from '@/lib/visibility'
+import { afterCommit } from '@/lib/after-commit'
 
 /**
  * Линейная оценка экстерьера — история измерений.
@@ -351,14 +352,14 @@ export const AnimalExteriors: CollectionConfig = {
         const animal = relId(doc.animal)
         if (!animal) return doc
 
-        try {
-          await applyExteriorSnapshot({ payload: req.payload, req }, animal, doc)
-        } catch (e) {
-          req.payload.logger.error(
-            `Не удалось перенести экстерьер ${doc.id} в карточку животного ${animal}: ` +
-              (e instanceof Error ? e.message : String(e)),
-          )
-        }
+        /*
+         * Как и у оценки: снимок переносится после коммита. Внутри
+         * транзакции перехват ошибки отменял бы не снимок, а сам осмотр —
+         * разбор в `src/lib/after-commit.ts`.
+         */
+        await afterCommit(req, `экстерьер ${doc.id} в карточку животного ${animal}`, (payload) =>
+          applyExteriorSnapshot({ payload }, animal, doc),
+        )
         return doc
       },
     ],

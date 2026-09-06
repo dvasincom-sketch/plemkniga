@@ -28,6 +28,21 @@ import { join } from 'path'
  * записью в журнале и проверкой в прогоне разница в том, что журнал
  * читают до ошибки, а проверка ловит после — и второе надёжнее.
  *
+ * ## Второе правило, обратное первому
+ *
+ * У правила есть исключение, и оно ровно одно: работа, отложенная
+ * до коммита через `afterCommit` (`src/lib/after-commit.ts`). Она
+ * выполняется, когда транзакции уже нет, блокировки сняты, а сессия
+ * этого `req` закрыта, — и `req` там означал бы ссылку на несуществующее.
+ * Поэтому внутри такого обработчика проверка требует обратного: запроса
+ * быть не должно.
+ *
+ * Два правила вместо одного — не усложнение, а то же самое требование
+ * с двух сторон: обращение к базе идёт по той транзакции, в которой
+ * оно на самом деле находится. Односторонняя проверка после появления
+ * `afterCommit` покраснела бы на верном коде и толкала бы вернуть `req`
+ * туда, откуда его убрали намеренно.
+ *
  * Заодно нашлись две давние такие же в `IndexBases` и `IndexProfiles`:
  * стояли годами и не срабатывали, потому что до записи там доходило
  * редко.
@@ -108,6 +123,26 @@ const topLevelKeys = (src: string, at: number): { keys: string[]; end: number } 
       continue
     }
 
+    /*
+     * Комментарии пропускаются целиком, и это не украшение разбора.
+     * В этих файлах пояснения длинные, в них есть и скобки, и обратные
+     * кавычки вокруг имён вроде `req`. Нечётная кавычка увела бы счёт
+     * в мнимую строку до конца файла, а лишняя скобка сдвинула бы
+     * глубину — проверка при этом не упала бы, а тихо разобрала бы
+     * не тот кусок. Ловушка с обратными кавычками в этом проекте
+     * срабатывала уже дважды.
+     */
+    if (c === '/' && src[i + 1] === '/') {
+      while (i < src.length && src[i] !== '\n') i++
+      continue
+    }
+    if (c === '/' && src[i + 1] === '*') {
+      i += 2
+      while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) i++
+      i += 1
+      continue
+    }
+
     if (c === '{' || c === '[' || c === '(') {
       depth++
       continue
@@ -132,13 +167,36 @@ const topLevelKeys = (src: string, at: number): { keys: string[]; end: number } 
   return { keys, end: i }
 }
 
+/**
+ * Границы обработчиков `afterCommit` — внутри них правило обратное.
+ *
+ * Считается по скобкам от `afterCommit(` до её закрывающей: тот же
+ * разбор, что у объектов, и с тем же пропуском строк и комментариев.
+ */
+const afterCommitSpans = (src: string): [number, number][] => {
+  const spans: [number, number][] = []
+  const needle = 'afterCommit('
+  let from = 0
+  for (;;) {
+    const at = src.indexOf(needle, from)
+    if (at === -1) break
+    const open = at + needle.length - 1
+    const { end } = topLevelKeys(src, open)
+    spans.push([open, end])
+    from = at + needle.length
+  }
+  return spans
+}
+
 console.log('\nОбращения к Payload из хуков коллекций\n')
 
 const files = readdirSync(DIR).filter((f) => f.endsWith('.ts'))
 let calls = 0
+let deferred = 0
 
 for (const file of files) {
   const src = readFileSync(join(DIR, file), 'utf8')
+  const spans = afterCommitSpans(src)
 
   for (const op of OPS) {
     const needle = `payload.${op}({`
@@ -153,8 +211,19 @@ for (const file of files) {
       const { keys, end } = topLevelKeys(src, brace)
       calls += 1
 
-      if (!keys.includes('req')) {
-        const line = src.slice(0, at).split('\n').length
+      const line = src.slice(0, at).split('\n').length
+      const afterCommitted = spans.some(([a, b]) => at > a && at < b)
+
+      if (afterCommitted) {
+        deferred += 1
+        if (keys.includes('req')) {
+          check(
+            false,
+            `${file}: payload.${op} с req внутри afterCommit`,
+            `строка ${line}; к этому мигу транзакции нет`,
+          )
+        }
+      } else if (!keys.includes('req')) {
         check(false, `${file}: payload.${op} без req`, `строка ${line}`)
       }
 
@@ -164,6 +233,14 @@ for (const file of files) {
 }
 
 check(calls > 0, 'обращения к Payload в коллекциях нашлись', `найдено ${calls}`)
+/*
+ * Отложенных обращений обязано быть хотя бы одно. Ноль означает не «всё
+ * хорошо», а что `afterCommit` из коллекций исчез — то есть следствия
+ * вернулись в транзакцию записи, и обещание «отказ не роняет сохранение»
+ * снова стало неправдой. Ровно тот случай, ради которого прогон обязан
+ * уметь отличать «сошлось» от «нечего было сводить».
+ */
+check(deferred > 0, 'следствия откладываются до коммита', `найдено ${deferred}`)
 
 /* ------------------ Помощники, которых зовут из хуков ------------------ */
 
@@ -285,4 +362,7 @@ if (failures) {
   console.log(`Не сошлось: ${failures}\n`)
   process.exit(1)
 }
-console.log(`Всё сошлось: ${calls} обращений, у всех есть req.\n`)
+console.log(
+  `Всё сошлось: ${calls} обращений — ${calls - deferred} с req, ` +
+    `${deferred} после коммита и без него.\n`,
+)
