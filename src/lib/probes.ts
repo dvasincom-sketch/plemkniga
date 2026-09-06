@@ -5,6 +5,7 @@ import { herdConditions } from '@/lib/herd-condition'
 import { herdSignals } from '@/lib/herd-signals'
 import { biggestHerd } from '@/lib/biggest-herd'
 import { compareBounds } from '@/lib/bounds-check'
+import { numOf, poolOf } from '@/lib/sql'
 import {
   culling,
   geneticTrend,
@@ -276,6 +277,58 @@ const PROBES: Record<string, Probe> = {
     return {
       findings: checks.filter((c) => !c.ok).map((c) => c.title),
       notes: checks.filter((c) => c.ok).map((c) => c.title),
+    }
+  },
+
+  /*
+   * Выбытие без даты выбытия.
+   *
+   * Проба считает то же, что и прогон, но короче: сколько выбывших
+   * животных не попадает ни в один отчёт о выбытии и у скольких из них
+   * дата уже лежит рядом — в перемещении или в событии ленты. Подробности
+   * (поимённый список, разбивка по хозяйствам, верхняя оценка настоящей
+   * доли) остаются за `npm run check:disposal-date`: ночному прогону
+   * нужен ответ «сколько», а не разбор.
+   *
+   * Признак `probe` у этой проверки в реестре стоял, а самой пробы
+   * не было: ночной прогон каждую ночь находил «такой пробы нет» —
+   * то есть красил строку по причине, к данным отношения не имеющей.
+   * Связаны признак и реализация только именем, и теперь их сверяет
+   * `check:registry`.
+   */
+  'check:disposal-date': async (payload) => {
+    const pool = poolOf(payload)
+    if (!pool) return { findings: ['прямой доступ к базе недоступен'], notes: [] }
+
+    const res = await pool.query(
+      `select
+         count(*) filter (where a.state is not null and a.state <> 'alive'
+                            and a.disposal_date is null)::int as dateless,
+         count(*) filter (where a.state is not null and a.state <> 'alive'
+                            and a.disposal_date is null
+                            and least(
+                              (select min(m."date") from movements m
+                                where m.animal_id = a.id and m.kind in ('cull', 'death')),
+                              (select min(e."date") from events e
+                                where e.animal_id = a.id and e.type = 'disposal')
+                            ) is not null)::int as recoverable
+       from animals a`,
+    )
+
+    const row = (res.rows?.[0] ?? {}) as { dateless?: unknown; recoverable?: unknown }
+    const dateless = numOf(row.dateless)
+    const recoverable = numOf(row.recoverable)
+
+    if (dateless === 0) return { findings: [], notes: ['у всех выбывших проставлена дата выбытия'] }
+
+    return {
+      findings: [
+        `выбытие без даты у ${dateless} животных: в отчёты о выбытии они не попадают` +
+          (recoverable > 0
+            ? `; у ${recoverable} дата уже есть рядом — переносит npm run fix:disposal-date`
+            : ''),
+      ],
+      notes: [],
     }
   },
 

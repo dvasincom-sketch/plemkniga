@@ -40,6 +40,7 @@ import { loadActiveBase } from '@/lib/index-base'
 import { indexValuesLag } from '@/lib/index-values'
 import type { Animal, Organization } from '@/payload-types'
 import { plural } from '@/lib/format'
+import { bookTotal, presetHasRows } from '@/lib/book-counts'
 
 export const dynamic = 'force-dynamic'
 
@@ -119,7 +120,7 @@ export default async function HerdbookPage({
   const sort = resolveSort(sp, Boolean(profile))
   const orderByProfile = Boolean(profile) && sort.value === 'profile'
 
-  const [result, herdsResult, totalAll, orgsResult, presetCounts] = await Promise.all([
+  const [result, herdsResult, totalAll, orgsResult, presetFilled] = await Promise.all([
     orderByProfile
       ? rankByProfile({
           payload,
@@ -139,7 +140,11 @@ export default async function HerdbookPage({
           user,
         }),
     payload.find({ collection: 'herds', limit: 500, sort: 'name', overrideAccess: true }),
-    payload.count({ collection: 'animals', where: NOT_ARCHIVED, overrideAccess: false, user }),
+    /*
+     * «Животных в книге» — точное число, но не чаще раза в минуту
+     * на посетителя. Разбор — в `src/lib/book-counts.ts`.
+     */
+    bookTotal(payload, user),
     payload.find({
       collection: 'organizations',
       limit: 500,
@@ -168,22 +173,12 @@ export default async function HerdbookPage({
      * не должно ронять страницу.
      */
     Promise.all(
-      PRESETS.map(async (p) => {
+      PRESETS.map((p) => {
         const probe =
           'probe' in p && p.probe
             ? p.probe
             : buildAnimalWhere(p.params as unknown as SearchParams)
-        try {
-          const { totalDocs } = await payload.count({
-            collection: 'animals',
-            where: { and: [NOT_ARCHIVED, probe] },
-            overrideAccess: false,
-            user,
-          })
-          return totalDocs
-        } catch {
-          return null
-        }
+        return presetHasRows(payload, probe, user)
       }),
     ),
   ])
@@ -275,7 +270,7 @@ export default async function HerdbookPage({
               <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[15px] text-white/85">
                 <span>
                   <span className="font-medium text-white">
-                    {totalAll.totalDocs.toLocaleString('ru-RU')}
+                    {totalAll.toLocaleString('ru-RU')}
                   </span>{' '}
                   животных
                 </span>
@@ -334,7 +329,7 @@ export default async function HerdbookPage({
           <SearchPanel
             action="/#results"
             title="Поиск по книге"
-            total={totalAll.totalDocs}
+            total={totalAll}
             totalLabel="Животных в книге"
             herds={herds}
             withOwner
@@ -369,7 +364,13 @@ export default async function HerdbookPage({
             <span className="mr-1 text-[14px] text-ink-500">Быстрый отбор:</span>
             {PRESETS.map((p, i) => {
               const isActive = preset === p.key
-              const muted = presetCounts[i] === 0
+              /*
+                 Плашка гаснет при пустоте — и только при доказанной.
+                 Неудавшаяся проверка (`null`) оставляет её обычной:
+                 сказать «данных нет» там, где мы этого не выясняли,
+                 хуже, чем не сказать ничего.
+              */
+              const muted = presetFilled[i] === false
 
               /*
                  Пустой отбор гаснет, но остаётся на месте: исчезнув, он
@@ -407,11 +408,17 @@ export default async function HerdbookPage({
                      показывается при наведении, то есть тому,
                      кто спросил.
                   */
-                  title={
-                    isActive
-                      ? 'Снять этот отбор'
-                      : `${p.label}: ${presetCounts[i]?.toLocaleString('ru-RU') ?? 'считается'}`
-                  }
+                  /*
+                     Числа в подсказке больше нет.
+
+                     Оно стоило семи полных подсчётов книги на каждый показ
+                     страницы — и уходило в `title`, то есть тому, кто навёл
+                     мышь. Плашка выражает одно: есть под отбором записи
+                     или нет, и на этот вопрос отвечает касание индекса,
+                     а не проход по двумстам тысячам строк. Разбор —
+                     в `src/lib/book-counts.ts`.
+                  */
+                  title={isActive ? 'Снять этот отбор' : p.label}
                   className={`flex items-center gap-2 rounded-lg px-3 py-2 text-[14px] transition-colors ${
                     isActive
                       ? 'bg-forest-500 font-medium text-white'

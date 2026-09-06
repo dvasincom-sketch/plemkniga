@@ -70,6 +70,47 @@ export const Organizations: CollectionConfig = {
           )
         }
 
+        /*
+         * Заслон обязан перечислять все обязательные ссылки на организацию,
+         * а не только животных.
+         *
+         * Список отстал от модели: после того как этот отказ был написан,
+         * появились гранты, журнал просмотров и ссылки на просмотр — у всех
+         * ссылка на организацию обязательна. Хозяйство без животных проходило
+         * заслон и падало на удалении тем самым невнятным «null value
+         * in column owner_id», ради устранения которого заслон и писался.
+         *
+         * Хуже того, ссылки на просмотр удалять запрещено вовсе
+         * (`ShareLinks.delete: () => false`): хозяйство, хоть раз выпустившее
+         * ссылку, становилось неудаляемым навсегда — и узнать об этом можно
+         * было только из ошибки базы.
+         */
+        const HOLDERS: { collection: 'access-grants' | 'access-views' | 'share-links'; field: string; what: string }[] = [
+          { collection: 'access-grants', field: 'owner', what: 'выданных грантов доступа' },
+          { collection: 'access-grants', field: 'grantee', what: 'полученных грантов доступа' },
+          { collection: 'access-views', field: 'owner', what: 'записей в журнале просмотров' },
+          { collection: 'share-links', field: 'owner', what: 'ссылок на просмотр' },
+        ]
+
+        const held: string[] = []
+        for (const h of HOLDERS) {
+          const res = await req.payload.count({
+            collection: h.collection,
+            where: { [h.field]: { equals: id } },
+            overrideAccess: true,
+            req,
+          })
+          if (res.totalDocs > 0) held.push(`${h.what} — ${res.totalDocs}`)
+        }
+
+        if (held.length) {
+          throw new Error(
+            `Организацию нельзя удалить: за ней числятся ${held.join(', ')}. ` +
+              'Это следы выданного доступа, и стирать их вместе с карточкой нельзя: ' +
+              'по ним отвечают на вопрос, кто и что смотрел.',
+          )
+        }
+
         // Стада без животных осиротеют, но сами по себе они и не нужны
         await req.payload.delete({
           collection: 'herds',

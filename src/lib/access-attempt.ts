@@ -32,6 +32,21 @@ import { DENIED_TEXTS } from '@/access/denied'
  * когда Payload завернул её в свою и от исходного объекта остался только
  * текст. Плюс `Forbidden` со статусом 403 — так отказывают правила
  * доступа самого Payload.
+ *
+ * ## Чтение отказывают не 403, а «не найдено»
+ *
+ * И это не мелочь, а устройство Payload: правило чтения не запрещает
+ * операцию, а сужает выборку. Документ, к которому нельзя, не отвергается
+ * — он просто не находится, и `findByID` бросает `NotFound` со статусом
+ * 404. Ревизия мультиарендности, переведённая на этот разбор, немедленно
+ * покраснела на двух коллекциях с текстом «отказ не по правам:
+ * Не найдено»: правила работали, а проверка объявляла их поломкой.
+ *
+ * Считать 404 отказом всегда нельзя: чаще всего это правда означает,
+ * что записи нет. Поэтому решает вызывающий — признаком `missingIsDenial`.
+ * Ставит он его там, где существование записи только что доказано
+ * запросом с `overrideAccess`: тогда «не найдено» может означать
+ * единственное — правило чтения скрыло документ.
  */
 
 export type Attempt = {
@@ -43,7 +58,22 @@ export type Attempt = {
   error?: string
 }
 
-export async function attempt(fn: () => Promise<unknown>): Promise<Attempt> {
+export type AttemptOptions = {
+  /**
+   * «Не найдено» считать отказом по правам.
+   *
+   * Ставится только тогда, когда запись заведомо существует — например,
+   * её только что достали с `overrideAccess`. В остальных случаях 404
+   * означает отсутствие записи, и выдавать его за работающий запрет
+   * было бы той же неправдой, ради которой всё это писалось.
+   */
+  missingIsDenial?: boolean
+}
+
+export async function attempt(
+  fn: () => Promise<unknown>,
+  opts: AttemptOptions = {},
+): Promise<Attempt> {
   try {
     await fn()
     return { allowed: true, denied: false }
@@ -58,7 +88,10 @@ export async function attempt(fn: () => Promise<unknown>): Promise<Attempt> {
      */
     const known = [...DENIED_TEXTS].some((d) => text === d || text.includes(d))
 
-    const denied = name === 'AccessDenied' || name === 'Forbidden' || status === 403 || known
+    const hidden = opts.missingIsDenial && (status === 404 || name === 'NotFound')
+
+    const denied =
+      name === 'AccessDenied' || name === 'Forbidden' || status === 403 || known || Boolean(hidden)
 
     return { allowed: false, denied, error: text }
   }

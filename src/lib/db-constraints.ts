@@ -336,6 +336,59 @@ export const DOMAIN_RULES: DomainRule[] = [
     expr: oneOf('direction', ['dairy', 'dual', 'beef', 'other']),
     note: 'направление продуктивности — из четырёх значений справочника',
   },
+  /* ------------------- История оценки и экстерьера ------------------------ */
+
+  /*
+   * Обе таблицы заведены позже основного набора ограничений, и правила
+   * до них не дошли. А заполняются они как раз тем способом, ради которого
+   * ограничения и переносились в базу: пакетным переносом истории и записью
+   * из расчётного центра, то есть мимо форм и мимо полей коллекции.
+   * Границы у полей стоят, но поле — это форма; база до сих пор принимала
+   * надёжность в двести процентов и балл экстерьера в тридцать.
+   */
+  ...([
+    'milk_r',
+    'fat_kg_r',
+    'protein_kg_r',
+    'fat_percent_r',
+    'protein_percent_r',
+    'productive_longevity_r',
+    'udder_health_r',
+    'calving_ease_r',
+    'calf_mortality_r',
+    'production_index_r',
+    'fertility_r',
+    'ipc_r',
+    'ipc_percentile',
+  ].map((col) => ({
+    table: 'animal_evaluations',
+    name: `chk_animal_evaluations_${col}`,
+    expr: range(col, 0, 100),
+    bounds: { column: col, min: 0, max: 100 },
+    note: 'надёжность и процентиль — от нуля до ста',
+  }))),
+  {
+    table: 'animal_evaluations',
+    name: 'chk_animal_evaluations_production_level',
+    expr: range('production_reliability_level', 1, 5),
+    bounds: { column: 'production_reliability_level', min: 1, max: 5 },
+    note: 'ступень надёжности продуктивности — от одного до пяти',
+  },
+  {
+    table: 'animal_evaluations',
+    name: 'chk_animal_evaluations_health_level',
+    expr: range('health_reliability_level', 1, 5),
+    bounds: { column: 'health_reliability_level', min: 1, max: 5 },
+    note: 'ступень надёжности здоровья — от одного до пяти',
+  },
+
+  {
+    table: 'milk_tests',
+    name: 'chk_milk_tests_recording_per_year',
+    expr: range('recording_per_year', 1, 24),
+    bounds: { column: 'recording_per_year', min: 1, max: 24 },
+    note: 'контролей в год 1…24',
+  },
   {
     table: 'milk_tests',
     name: 'chk_milk_tests_recording_protocol',
@@ -384,6 +437,25 @@ export const INTEGER_COLUMNS: { table: string; key: string; column: string; note
   { table: 'inseminations', key: 'doses', column: 'doses', note: 'число доз' },
   { table: 'inseminations', key: 'lactationNumber', column: 'lactation_number', note: 'номер отёла' },
   { table: 'milk_tests', key: 'lactationNumber', column: 'lactation_number', note: 'номер лактации' },
+  /*
+   * Две колонки того же рода, заведённые уже после первой восьмёрки
+   * и потому в неё не попавшие. Счёт штуками: контролей в год не бывает
+   * двенадцать с половиной, номер лактации не бывает дробным. Список
+   * пополняется руками, и это его слабое место — но других способов
+   * отличить «число как мера» от «числа как счёта» у Payload нет.
+   */
+  {
+    table: 'milk_tests',
+    key: 'recordingPerYear',
+    column: 'recording_per_year',
+    note: 'контролей в год',
+  },
+  {
+    table: 'weighings',
+    key: 'lactationNumber',
+    column: 'lactation_number',
+    note: 'номер лактации',
+  },
   { table: 'index_values', key: 'used', column: 'used', note: 'учтено признаков' },
   { table: 'index_values', key: 'birthYear', column: 'birth_year', note: 'год рождения' },
   { table: 'index_values', key: 'percentile', column: 'percentile', note: 'процентиль' },

@@ -180,7 +180,20 @@ export const Calvings: CollectionConfig = {
           index: true,
           filterOptions: { sex: { equals: 'female' } },
         },
-        { name: 'number', type: 'number', label: 'Номер отёла', required: true },
+        {
+          name: 'number',
+          type: 'number',
+          label: 'Номер отёла',
+          required: true,
+          /*
+           * Нижняя граница у поля, а не только в базе. Ограничение
+           * `chk_calvings_number` стоит давно, а `min` у поля не было:
+           * человек, вписавший ноль, получал сырое имя ограничения
+           * вместо понятного отказа. То же правило, что у остальных
+           * границ, — форма и база разрешают одно и то же.
+           */
+          min: 1,
+        },
         { name: 'date', type: 'date', label: 'Дата отёла', required: true },
       ],
     },

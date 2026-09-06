@@ -98,23 +98,59 @@ async function main() {
   }
   const myOrg = relId(user.organization)
 
-  // Чужая закрытая запись: другая организация и без публичной видимости
+  /*
+   * Чужая закрытая запись — не первая попавшаяся, а самая пригодная.
+   *
+   * Прежде бралась первая: `limit: 1`, без отбора. Если у неё не оказалось
+   * ни одной привязанной записи — а так и вышло на живой базе, — восемь
+   * прицельных чтений из девяти и все пять прицельных записей печатали
+   * «проверять нечего», а итог всё равно объявлял, что утечек нет.
+   * Ревизия границ должна выбирать животное, на котором есть что
+   * проверять; тот же приём давно применён в ревизии точечного доступа.
+   */
+  const CANDIDATES = 25
   const foreign = await payload.find({
     collection: 'animals',
     where: {
       and: [{ owner: { not_equals: myOrg } }, { publicVisible: { not_equals: true } }],
     },
-    limit: 1,
+    limit: CANDIDATES,
     depth: 0,
     overrideAccess: true,
   })
 
-  const victim = foreign.docs[0]
+  /** Сколько привязанных записей у животного: чем больше, тем полнее проба. */
+  const attachedCount = async (animalId: number | string): Promise<number> => {
+    let n = 0
+    for (const collection of ANIMAL_SCOPED) {
+      const res = await payload.count({
+        collection: collection as never,
+        where: { animal: { equals: animalId } },
+        overrideAccess: true,
+      })
+      n += res.totalDocs
+    }
+    return n
+  }
+
+  let victim = foreign.docs[0]
+  let best = -1
+  for (const candidate of foreign.docs) {
+    const n = await attachedCount(candidate.id)
+    if (n > best) {
+      best = n
+      victim = candidate
+    }
+    /* Больше пяти коллекций проверять нечем — этого уже достаточно. */
+    if (best >= ANIMAL_SCOPED.length) break
+  }
 
   console.log(`\nПроверяем от лица: ${user.email} (организация ${myOrg})`)
   console.log(
     victim
-      ? `Чужая закрытая запись для прицельной проверки: ${victim.identNumber} (владелец ${relId(victim.owner)})\n`
+      ? `Чужая закрытая запись для прицельной проверки: ${victim.identNumber} ` +
+        `(владелец ${relId(victim.owner)}, привязанных записей ${best}, ` +
+        `выбрана из ${foreign.docs.length})\n`
       : 'Чужих закрытых записей в базе нет — прицельная проверка невозможна.\n',
   )
 
@@ -184,14 +220,23 @@ async function main() {
 
     /** Пробуем прочитать документ по id от лица пользователя. */
     const probe = async (collection: string, id: number | string, what: string) => {
-      const tried = await attempt(() =>
-        payload.findByID({
-          collection: collection as never,
-          id,
-          depth: 0,
-          overrideAccess: false,
-          user,
-        }),
+      /*
+       * «Не найдено» здесь и есть отказ по правам: запись только что
+       * найдена запросом с `overrideAccess`, значит она существует,
+       * а правило чтения у Payload не отвергает документ, а сужает
+       * выборку — и он перестаёт находиться. Разбор — в шапке
+       * `lib/access-attempt.ts`.
+       */
+      const tried = await attempt(
+        () =>
+          payload.findByID({
+            collection: collection as never,
+            id,
+            depth: 0,
+            overrideAccess: false,
+            user,
+          }),
+        { missingIsDenial: true },
       )
 
       if (tried.allowed) {

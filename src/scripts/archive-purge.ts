@@ -223,7 +223,18 @@ async function main() {
      * спасает каталог.
      */
     try {
-      await payload.delete({ collection: 'animals', id, overrideAccess: true })
+      /*
+       * След уже записан выше, своей транзакцией: `skipRemovalTrace`
+       * говорит хуку удаления не писать второй. Хук пишет след при любом
+       * другом удалении — прямом, из админки, — и без этого флага
+       * очистка архива оставляла бы по две записи на животное.
+       */
+      await payload.delete({
+        collection: 'animals',
+        id,
+        overrideAccess: true,
+        context: { skipRemovalTrace: true },
+      })
       /*
        * Автор операции — никто: удаляет срок, а не человек. Пустое поле
        * «кто» в журнале читается как «система» и это правда; подставить

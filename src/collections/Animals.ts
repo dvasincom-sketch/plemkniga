@@ -45,6 +45,7 @@ const forecastFields = (opts: { unit?: string } = {}) =>
  */
 import { CARRIER_OPTIONS } from '@/lib/carrier'
 import { afterCommit } from '@/lib/after-commit'
+import { relId } from '@/lib/visibility'
 
 export const Animals: CollectionConfig = {
   slug: 'animals',
@@ -96,6 +97,19 @@ export const Animals: CollectionConfig = {
       label: 'Идентификатор учётной системы',
       unique: true,
       index: true,
+      /*
+       * Обязателен — и это не формальность.
+       *
+       * Вокруг поля построено обещание «неизменный и уникальный ключ»,
+       * и уезжает он во ФГИАС ПР как идентификатор учётной системы.
+       * Держалось обещание на одном хуке `beforeValidate`, который
+       * подставляет `randomUUID()` при создании: любой путь записи мимо
+       * него оставлял бы пусто, а уникальный индекс этого не заметил бы —
+       * в PostgreSQL пустое не равно пустому, и таких строк может быть
+       * сколько угодно. Хук выполняется раньше проверки обязательности,
+       * поэтому человеку заполнять поле не придётся.
+       */
+      required: true,
       admin: {
         readOnly: true,
         position: 'sidebar',
@@ -1750,7 +1764,7 @@ export const Animals: CollectionConfig = {
      * Порядок перечисления не важен: всё уходит в одной транзакции `req`.
      */
     beforeDelete: [
-      async ({ req, id }) => {
+      async ({ req, id, context }) => {
         const dependents = [
           'access-requests',
           'calvings',
@@ -1806,6 +1820,65 @@ export const Animals: CollectionConfig = {
           'gradings',
           'movements',
         ] as const
+
+        /*
+         * След в реестре удалённых записей пишется до самого удаления
+         * и в той же транзакции.
+         *
+         * Реестр заведён затем, чтобы на вопрос «а было ли у нас такое
+         * животное» книга отвечала и через десять лет. Писал его один
+         * только сценарий очистки архива (`archive-purge`), а удаление
+         * карточки открыто Ассоциации в любой момент: прямое удаление
+         * стирало карточку вместе с отёлами, дойками и оценками
+         * бесследно — то есть ровно так, как реестр обещал не допускать.
+         *
+         * Число зависимых записей считается до их удаления: после него
+         * считать уже нечего, а именно оно и отвечает на вопрос,
+         * что вместе с карточкой исчезло.
+         */
+        const doomedForTrace = await req.payload.findByID({
+          collection: 'animals',
+          id,
+          depth: 0,
+          overrideAccess: true,
+          req,
+        })
+
+        let removedRecords = 0
+        for (const collection of dependents) {
+          const n = await req.payload.count({
+            collection,
+            where: { animal: { equals: id } },
+            overrideAccess: true,
+            req,
+          })
+          removedRecords += n.totalDocs
+        }
+
+        /*
+         * Сценарий очистки архива пишет след сам — до удаления зависимых
+         * записей и в своей транзакции, где их ещё можно посчитать. Второй
+         * след здесь означал бы две записи об одном удалении, и обе
+         * выглядели бы настоящими. Флаг ставит он же.
+         */
+        if (doomedForTrace?.identNumber && !context?.skipRemovalTrace) {
+          await req.payload.create({
+            collection: 'animal-removals',
+            overrideAccess: true,
+            req,
+            data: {
+              identNumber: doomedForTrace.identNumber,
+              name: doomedForTrace.name ?? undefined,
+              owner: relId(doomedForTrace.owner) ?? undefined,
+              birthDate: doomedForTrace.birthDate ?? undefined,
+              archivedAt: doomedForTrace.archivedAt ?? undefined,
+              removedAt: new Date().toISOString(),
+              archivedBy: relId(doomedForTrace.archivedBy) ?? undefined,
+              archiveReason: doomedForTrace.archiveReason ?? undefined,
+              removedRecords,
+            } as never,
+          })
+        }
 
         for (const collection of dependents) {
           await req.payload.delete({

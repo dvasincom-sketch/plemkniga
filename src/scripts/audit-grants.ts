@@ -273,14 +273,22 @@ async function main() {
    */
   let broken = 0
   const readable = async (collection: string, id: number | string): Promise<boolean> => {
-    const tried = await attempt(() =>
-      payload.findByID({
-        collection: collection as never,
-        id,
-        depth: 0,
-        overrideAccess: false,
-        user: viewer,
-      }),
+    /*
+     * Как и в ревизии мультиарендности: закрытая запись не отвергается,
+     * а перестаёт находиться. Идентификатор сюда приходит из запроса
+     * с `overrideAccess`, то есть запись заведомо есть, и «не найдено»
+     * означает единственное — правило чтения сработало.
+     */
+    const tried = await attempt(
+      () =>
+        payload.findByID({
+          collection: collection as never,
+          id,
+          depth: 0,
+          overrideAccess: false,
+          user: viewer,
+        }),
+      { missingIsDenial: true },
     )
     if (tried.allowed) return true
     if (!tried.denied) {

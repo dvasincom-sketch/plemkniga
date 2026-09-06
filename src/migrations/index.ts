@@ -10,6 +10,7 @@ import * as migration_20260902_200000_ade_origin from './20260902_200000_ade_ori
 import * as migration_20260903_100000_breed_direction from './20260903_100000_breed_direction'
 import * as migration_20260903_130000_milk_recording_method from './20260903_130000_milk_recording_method';
 import * as migration_20260906_090000_shows_required_and_orphan_uuid from './20260906_090000_shows_required_and_orphan_uuid'
+import * as migration_20260906_120000_not_null_keys from './20260906_120000_not_null_keys'
 import * as migration_20260814_195548 from './20260814_195548';
 import * as migration_20260815_061539 from './20260815_061539';
 import * as migration_20260815_075706 from './20260815_075706';
@@ -395,5 +396,10 @@ export const migrations = [
     up: migration_20260906_090000_shows_required_and_orphan_uuid.up,
     down: migration_20260906_090000_shows_required_and_orphan_uuid.down,
     name: '20260906_090000_shows_required_and_orphan_uuid',
+  },
+  {
+    up: migration_20260906_120000_not_null_keys.up,
+    down: migration_20260906_120000_not_null_keys.down,
+    name: '20260906_120000_not_null_keys',
   },
 ];
