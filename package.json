@@ -26,6 +26,7 @@
     "generate:importmap": "cross-env NODE_OPTIONS=--no-deprecation payload generate:importmap",
     "pedigree:deep": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/deep-pedigree.ts",
     "seed:history": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/seed-history.ts",
+    "migrate:create": "node -e \"console.error('\\n  migrate:create в этом дереве не работает: снимки схемы drizzle отстали\\n  на месяц, и инструмент предложит завести заново то, что в базе есть.\\n  Разбор — в шапке src/migrations/index.ts. Миграции пишутся руками.\\n'); process.exit(1)\"",
     "migrate:baseline": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/migrate-baseline.ts",
     "doctor": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/doctor.ts",
     "db:psql": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/psql.ts",

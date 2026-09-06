@@ -3,6 +3,7 @@ import { getPayload } from 'payload'
 import config from '../payload.config'
 import { ANCESTRY_DEPTH } from '../lib/ancestry'
 import { relId } from '@/lib/visibility'
+import { randomUUID } from 'crypto'
 
 /**
  * Достройка родословной вглубь — без единого удаления.
@@ -190,6 +191,7 @@ async function main() {
         collection: 'animals',
         overrideAccess: true,
         data: {
+          uuid: randomUUID(),
           identNumber: number,
           idFormat: 'internal',
           name: `${male ? 'Предок' : 'Праматерь'} ${generation}-${i + 1}`,

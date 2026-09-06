@@ -3,6 +3,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { MATING_DEPTH, matingPlan } from '@/lib/mating'
 import { analyzeAncestry } from '@/lib/ancestry'
+import { randomUUID } from 'crypto'
 
 /**
  * Подбор пар — проверка на случаях с известным ответом.
@@ -123,6 +124,7 @@ async function main() {
     const doc = await payload.create({
       collection: 'animals',
       data: {
+        uuid: randomUUID(),
         identNumber: `${PREFIX}${suffix}`,
         /*
          * Формат номера — внутрихозяйственный.

@@ -5,6 +5,7 @@ import { EXTERIOR_COMPOSITES, EXTERIOR_TRAITS, HEALTH_TRAITS } from '@/lib/dicti
 import { bullStatus, reliabilityOf } from '@/lib/bull-status'
 import { TRAIT_BASE } from '@/lib/breeding-index'
 import { expectedFatKg, expectedProteinKg } from '@/lib/pta-consistency'
+import { randomUUID } from 'crypto'
 
 /**
  * Эталонная карточка быка: показать, к чему стремиться.
@@ -347,6 +348,7 @@ async function main() {
           collection: 'animals',
           overrideAccess: true,
           data: {
+            uuid: randomUUID(),
             identNumber: `98${stamp}${String(i).padStart(3, '0')}`,
             idFormat: 'internal',
             name: `Дочь ${i + 1}`,

@@ -1,3 +1,31 @@
+/*
+ * Миграции пишутся руками. `payload migrate:create` в этом дереве
+ * пользоваться нельзя.
+ *
+ * Инструмент сравнивает настройки Payload не с базой, а со снимком схемы
+ * drizzle — файлами `*.json` рядом. Последний такой снимок сделан
+ * 16 августа; всё, что появилось позже, писали руками и снимок
+ * не обновляли. Поэтому `migrate:create` видит картину месячной давности
+ * и предлагает завести заново то, что в базе давно есть: перечисления
+ * ролей, присутствия, класса, вида перемещения, типа события отёла,
+ * протокола контроля. И вдобавок «переименовать» `enum_animals_kind`
+ * в `enum_animals_dna_tests_verdict` — связать два никак не связанных
+ * типа, потому что колонку `kind` убрала миграция, о которой снимок
+ * не знает.
+ *
+ * Согласиться с этим значит получить миграцию, которая упадёт на первом
+ * же `CREATE TYPE` — или, что хуже, переименует живой тип. Эта же манера
+ * drizzle однажды уже испортила данные: при мнимом переименовании колонки
+ * он перенёс значения, и в `animals.uuid` оказались названия пород
+ * (`src/scripts/repair-uuid.ts`).
+ *
+ * Восстановить снимки — отдельная работа: их пришлось бы собрать заново
+ * по нынешней схеме и убедиться, что диффы после этого пусты. Пока этого
+ * не сделано, порядок такой: правишь коллекцию — пишешь миграцию рядом,
+ * своими руками, и объясняешь в ней почему. Все миграции после 16 августа
+ * написаны так.
+ */
+
 import * as migration_20260830_190000_fgias_animal_keys from './20260830_190000_fgias_animal_keys';
 import * as migration_20260830_210000_animal_shows from './20260830_210000_animal_shows';
 import * as migration_20260830_230000_weighings from './20260830_230000_weighings';
@@ -11,6 +39,7 @@ import * as migration_20260903_100000_breed_direction from './20260903_100000_br
 import * as migration_20260903_130000_milk_recording_method from './20260903_130000_milk_recording_method';
 import * as migration_20260906_090000_shows_required_and_orphan_uuid from './20260906_090000_shows_required_and_orphan_uuid'
 import * as migration_20260906_120000_not_null_keys from './20260906_120000_not_null_keys'
+import * as migration_20260906_140000_counters_and_evaluation_bounds from './20260906_140000_counters_and_evaluation_bounds'
 import * as migration_20260814_195548 from './20260814_195548';
 import * as migration_20260815_061539 from './20260815_061539';
 import * as migration_20260815_075706 from './20260815_075706';
@@ -401,5 +430,10 @@ export const migrations = [
     up: migration_20260906_120000_not_null_keys.up,
     down: migration_20260906_120000_not_null_keys.down,
     name: '20260906_120000_not_null_keys',
+  },
+  {
+    up: migration_20260906_140000_counters_and_evaluation_bounds.up,
+    down: migration_20260906_140000_counters_and_evaluation_bounds.down,
+    name: '20260906_140000_counters_and_evaluation_bounds',
   },
 ];

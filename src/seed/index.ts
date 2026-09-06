@@ -24,6 +24,7 @@ import {
   EXTERIOR_TRAITS,
 } from '../lib/dictionaries'
 import { DICTIONARY_SEED } from './dictionaries-data'
+import { randomUUID } from 'crypto'
 
 const seedDir = path.dirname(fileURLToPath(import.meta.url))
 
@@ -409,6 +410,7 @@ const run = async () => {
         collection: 'animals',
         overrideAccess: true,
         data: {
+          uuid: randomUUID(),
           identNumber: `HOUSA${String(1000000 + int(100000, 999999)).slice(0, 7)}${i}`,
           idFormat: 'usa',
           name: BULL_NAMES[i],
@@ -550,6 +552,7 @@ const run = async () => {
         // Порядковый номер в конце гарантирует уникальность: при случайной
         // генерации двенадцатизначных номеров совпадения всё-таки случаются,
         // и сид падал на валидации в середине наполнения
+        uuid: randomUUID(),
         identNumber: `${int(30, 39)}${String(int(1000000, 9999999))}${String(i).padStart(4, '0')}`,
         idFormat: 'rf',
         name: pick(COW_NAMES),
@@ -811,6 +814,7 @@ const run = async () => {
       collection: 'animals',
       overrideAccess: true,
       data: {
+        uuid: randomUUID(),
         identNumber: a.num,
         idFormat: 'internal',
         name: a.name,
@@ -871,6 +875,7 @@ const run = async () => {
         collection: 'animals',
         overrideAccess: true,
         data: {
+          uuid: randomUUID(),
           identNumber: `${generation}${String(i).padStart(3, '0')}${male ? '1' : '2'}00`,
           idFormat: 'internal',
           name: deepName(generation, i, male),
@@ -936,6 +941,7 @@ const run = async () => {
     collection: 'animals',
     overrideAccess: true,
     data: {
+      uuid: randomUUID(),
       identNumber: '3662217000196.00',
       idFormat: 'rf',
       name: 'Поляна',
