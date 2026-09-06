@@ -42,8 +42,18 @@ type Field = {
   tabs?: { name?: string; fields: Field[] }[]
 }
 
-/** `ipcDetails` → `ipc_details`: то же преобразование, что у адаптера. */
-const snake = (s: string): string => s.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase()
+/**
+ * `ipcDetails` → `ipc_details`, `milk-tests` → `milk_tests`.
+ *
+ * Дефис здесь не украшение: имена полей приходят в camelCase, а имена
+ * коллекций — через дефис (`milk-tests`, `index-values`). Первая редакция
+ * переводила только camelCase, и четыре правила отчитались «коллекции
+ * с таблицей milk_tests нет» — прогон нашёл собственную ошибку раньше,
+ * чем чужую, и это ровно то поведение, ради которого он писался: догадка
+ * об имени, не сошедшаяся с настоящей схемой, краснеет.
+ */
+const snake = (s: string): string =>
+  s.replace(/([a-z0-9])([A-Z])/g, '$1_$2').replace(/-/g, '_').toLowerCase()
 
 type Found = { column: string; min?: number; max?: number }
 
