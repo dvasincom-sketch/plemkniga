@@ -163,8 +163,22 @@ export async function afcSireBook(payload: Payload): Promise<AfcSireBook> {
   const t = await resolveThresholds(payload)
   const bounds = [t.afcMin, t.afcMax, AFC_SIRE_MIN_DAUGHTERS]
 
+  /*
+   * Отказ запроса пишется в лог, а не растворяется.
+   *
+   * Ниже `null` означает «показывать нечего», и это верно для страницы:
+   * пустая таблица честнее выдуманных чисел. Но причина у пустоты бывает
+   * двух родов — «быков с тремя дочерьми нет» и «запрос упал», — и вторую
+   * до сих пор не видел никто, включая того, кто пришёл разбираться,
+   * почему отчёт пуст.
+   */
+  const fail = (what: string) => (e: unknown) => {
+    console.error(`[plemkniga] отчёт по быкам: ${what} не выполнился:`, e)
+    return null
+  }
+
   const [main, totals] = await Promise.all([
-    pool.query(sql, bounds).catch(() => null),
+    pool.query(sql, bounds).catch(fail('основной запрос')),
     pool
       .query(
         `with ${nthCalvingCte('first_calving', 1)},
@@ -187,7 +201,7 @@ export async function afcSireBook(payload: Payload): Promise<AfcSireBook> {
          from ok`,
         bounds,
       )
-      .catch(() => null),
+      .catch(fail('подсчёт итогов')),
   ])
 
   if (!main) return EMPTY

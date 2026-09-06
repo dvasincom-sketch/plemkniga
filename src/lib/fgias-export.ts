@@ -926,6 +926,20 @@ export function buildInseminations(animals: InseminationAnimal[]): Built {
       const date = fgiasDate(i.date)
       const bull = txt(i.bullBaseUuid)
 
+      /*
+       * Счётчик растёт на каждой попытке, а не на каждой уехавшей строке.
+       *
+       * Прежде он стоял после отсева, и придержанная вторая попытка
+       * делала третью «второй»: реестр получал осеменения с номерами
+       * 1, 2 при трёх записанных, а досланная позже придержанная строка
+       * пришла бы с тем же номером 2. Номер попытки — счёт событий
+       * в жизни коровы, и он не зависит от того, что мы сумели отдать.
+       */
+      const lact = fgiasInt(i.lactationNumber)
+      const key = lact.value ?? 0
+      const nth = (seen.get(key) ?? 0) + 1
+      seen.set(key, nth)
+
       const missing = !date ? 'Дата осеменения' : !bull ? 'Базовый номер быка' : null
       if (missing) {
         held.push({
@@ -935,11 +949,6 @@ export function buildInseminations(animals: InseminationAnimal[]): Built {
         })
         continue
       }
-
-      const lact = fgiasInt(i.lactationNumber)
-      const key = lact.value ?? 0
-      const nth = (seen.get(key) ?? 0) + 1
-      seen.set(key, nth)
 
       const attempt = fgiasInt(i.attemptNumber)
 
@@ -2042,9 +2051,18 @@ export function buildSemen(animals: SemenAnimal[]): Built {
     const code = txt(a.code)
     const date = fgiasDate(a.updatedAt)
 
-    /* Быка, о складе которого ничего не заведено, не придерживаем. */
-    if (!code && !date && a.available === null) continue
-    if (!code && !date && a.available === undefined) continue
+    /*
+     * Быка, о складе которого ничего не заведено, не придерживаем.
+     *
+     * «Ничего не заведено» — это пустые код и дата, а про сам флажок
+     * наличия спрашивать нельзя: несохранённый чекбокс приходит из базы
+     * как `false`, и бык, о котором ничего не знают, выглядел бы быком,
+     * у которого семени нет. Прежде условие требовало ещё и `available
+     * === null`, и такие быки не пропускались, а придерживались
+     * с причиной «Семенной код» — то есть попадали в отчёт как недоделка
+     * хозяйства, хотя хозяйство про них ничего и не обещало.
+     */
+    if (!code && !date) continue
 
     if (!a.baseUuid || !a.accountingId) {
       held.push({
@@ -2069,7 +2087,16 @@ export function buildSemen(animals: SemenAnimal[]): Built {
       a.accountingId,
       date!,
       code,
-      a.available ? 'TRUE' : 'FALSE',
+      /*
+       * «Не знаем» отдаётся пустой ячейкой, а не словом FALSE.
+       *
+       * Пустое поле у реестра означает «не проверяли», и это правда:
+       * флажок наличия не заполнен. Слово FALSE — утверждение, что семени
+       * нет, и по нему покупатель отказывается от быка, у которого семя
+       * может быть. Та же оговорка стоит у плодотворности осеменения
+       * выше: правило одно на весь файл.
+       */
+      a.available === true ? 'TRUE' : a.available === false ? 'FALSE' : '',
       txt(a.owner?.name),
       inn,
       /* КПП не бывает у предпринимателя — контракт запрещает его при ИНН из двенадцати цифр. */

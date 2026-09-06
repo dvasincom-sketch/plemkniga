@@ -67,7 +67,11 @@ const rowOf = (animal: Animal, profile: IndexProfile, base: Base) => {
     weights: profile.weights,
     baseVersion: r.baseVersion,
     value: Math.round(r.value * 100) / 100,
-    reliability: Math.round(r.reliability),
+    /*
+     * Пусто, а не ноль: надёжность бывает неизвестной, и хранимое значение
+     * обязано это различать — по нему рисуется колонка рейтинга.
+     */
+    reliability: r.reliability === null ? null : Math.round(r.reliability),
     used: r.used,
     computedAt: new Date().toISOString(),
   }

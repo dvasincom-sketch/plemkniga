@@ -86,8 +86,20 @@ export async function bullProof(payload: Payload, bullId: number): Promise<BullP
   const pool = poolOf(payload)
   if (!pool) return null
 
+  /*
+   * Отказ запроса виден в логе. Дальше `null` читается как «данных нет»
+   * и рисует прочерк — это правильно для карточки, — но отличить
+   * «дочерей нет» от «запрос упал» иначе было нельзя ни в интерфейсе,
+   * ни при разборе жалобы.
+   */
   const ask = (q: string, p: unknown[]) =>
-    pool.query(q, p).then((r) => r.rows ?? []).catch(() => null)
+    pool
+      .query(q, p)
+      .then((r) => r.rows ?? [])
+      .catch((e: unknown) => {
+        console.error(`[plemkniga] карточка быка ${bullId}: запрос не выполнился:`, e)
+        return null
+      })
 
   /*
    * Сверстницы — коровы того же стада, не дочери этого быка.

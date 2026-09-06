@@ -4,6 +4,7 @@ import { herdDrilldown } from '@/lib/herd-drilldown'
 import { herdConditions } from '@/lib/herd-condition'
 import { herdSignals } from '@/lib/herd-signals'
 import { biggestHerd } from '@/lib/biggest-herd'
+import { compareBounds } from '@/lib/bounds-check'
 import {
   culling,
   geneticTrend,
@@ -276,6 +277,20 @@ const PROBES: Record<string, Probe> = {
       findings: checks.filter((c) => !c.ok).map((c) => c.title),
       notes: checks.filter((c) => c.ok).map((c) => c.title),
     }
+  },
+
+  /*
+   * Границы формы и границы базы.
+   *
+   * Проба чисто счётная — ни одного запроса, — и потому в ночной прогон
+   * попадает даром. Расхождение здесь означает не «данные плохи»,
+   * а «человеку вместо понятного отказа покажут имя ограничения»,
+   * и узнавать об этом надо до того, как он его увидит.
+   */
+  'check:bounds': async (payload) => {
+    const { ok, bad, ranged } = compareBounds(payload)
+    if (!ranged) return { findings: ['ни одного правила с границами — сверять нечего'], notes: [] }
+    return { findings: bad, notes: ok }
   },
 
   /* ---------------------- Отчёты по стаду считаются ------------------- */

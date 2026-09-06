@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { getClient, getCurrentUser } from '@/lib/payload'
+import { assertCan } from '@/lib/roles'
 import { decodeText, parseCsv, type TextEncodingName } from '@/lib/csv'
 import { detectTableKind, readSpreadsheet } from '@/lib/xlsx'
 import {
@@ -1056,8 +1057,16 @@ async function importAnimals(
            * с исходным файлом и протоколом приёмки. Иначе один импорт
            * оставлял бы десятки тысяч строк и топил в них те несколько,
            * что человек действительно ввёл руками.
+           *
+           * `fromImport` снимает запрет на выбытие без даты выбытия
+           * (`Animals.beforeChange`). В карточке дата обязательна: её
+           * заполняет человек, который её знает. В файле лежит история,
+           * и дата в ней бывает утеряна — уронить из-за этого перенос
+           * стада значило бы отказать хозяйству в загрузке ради поля,
+           * которое оно и собиралось восстановить. Строка принимается,
+           * а животное попадает в замечание `disposal-date-missing`.
            */
-          context: { skipJournal: true },
+          context: { skipJournal: true, fromImport: true },
         })
         touched.push(doc.id as number)
         updated++
@@ -1077,6 +1086,8 @@ async function importAnimals(
           collection: 'animals',
           data: data as never,
           overrideAccess: true,
+          /* Та же оговорка, что у обновления выше: файл несёт историю. */
+          context: { fromImport: true },
         })
         touched.push(doc.id as number)
         created++
@@ -1953,6 +1964,18 @@ export async function importDataAction(
   if (!orgId) return { error: 'У пользователя не заполнена организация' }
 
   /*
+   * Загрузка — внесение данных, и роль спрашивается до чтения файла.
+   *
+   * Отказ на восьмимегабайтном файле после разбора выглядит поломкой:
+   * человек ждал минуту и получил «нельзя». Отдельно от хука коллекции:
+   * тот сторожит запись, а здесь ещё и создаётся пакет с протоколом,
+   * то есть след работы, которой быть не должно.
+   */
+  const guardPayload = await getClient()
+  const deniedData = await assertCan(guardPayload, user, 'data')
+  if (deniedData) return { error: deniedData }
+
+  /*
    * Вид данных берётся из формы, только если человек его назвал сам.
    * Обычно он этого не делает — набор определяется по шапке ниже,
    * когда файл уже прочитан. Раньше выбор стоял первым полем формы
@@ -2085,11 +2108,20 @@ export async function importDataAction(
    *
    * `role` здесь по той же причине: Ассоциация ведёт чужие данные
    * по долгу службы, и хук отпускает её раньше проверки организации.
+   *
+   * `orgRole` и `blockedAt` — по третьей, и они важнее первых двух.
+   * Хук спрашивает `can(user, 'data')`, а `can` читает роль внутри
+   * хозяйства и отметку блокировки. Их в собранном лице не было,
+   * и `can` видел роль по умолчанию — руководителя: наблюдатель,
+   * которому загрузка отказана в кабинете, проходил ею целый файл.
+   * Собранное лицо обязано отвечать на те же вопросы, что настоящее.
    */
   const actor = {
     id: user.id as number,
     organization: orgId,
     role: (user as { role?: string }).role,
+    orgRole: (user as { orgRole?: string }).orgRole,
+    blockedAt: (user as { blockedAt?: string | null }).blockedAt,
   }
 
   /*

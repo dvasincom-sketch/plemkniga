@@ -112,38 +112,62 @@ export async function sequenceIssues(
   const calvingLimit = ids.length * CALVING_CAP_PER_ANIMAL
   const inseminationLimit = ids.length * INSEMINATION_CAP_PER_ANIMAL
 
+  /*
+   * Отказ выборки называется вслух, а не молчит.
+   *
+   * Здесь стоял `.catch(() => null)`, и `null` дальше по коду означал
+   * ровно то же, что пустой ответ: ни одной находки. Три выборки —
+   * отёлы, осеменения, дойки — и при сбое любой из них хозяйство видело
+   * «нарушений порядка нет», хотя порядок никто не смотрел. Тот же довод,
+   * по которому здесь уже ведутся `limits`: «не проверено» и «нарушений
+   * нет» на экране выглядят одинаково, и различить их обязан код.
+   */
+  const failed: string[] = []
+  const take = async <T,>(what: string, run: () => Promise<T>): Promise<T | null> => {
+    try {
+      return await run()
+    } catch (e) {
+      failed.push(`${what}: ${e instanceof Error ? e.message : String(e)}`)
+      return null
+    }
+  }
+
   const [calvingRes, inseminationRes, milkRes] = await Promise.all([
-    payload
-      .find({
+    take('отёлы', () =>
+      payload.find({
         collection: 'calvings',
         where: { animal: { in: ids } },
         limit: calvingLimit,
         sort: 'date',
         depth: 0,
         overrideAccess: true,
-      })
-      .catch(() => null),
-    payload
-      .find({
+      }),
+    ),
+    take('осеменения', () =>
+      payload.find({
         collection: 'inseminations',
         where: { animal: { in: ids } },
         limit: inseminationLimit,
         sort: 'date',
         depth: 0,
         overrideAccess: true,
-      })
-      .catch(() => null),
-    payload
-      .find({
+      }),
+    ),
+    take('контрольные дойки', () =>
+      payload.find({
         collection: 'milk-tests',
         where: { animal: { in: ids } },
         limit: MILK_TEST_CAP,
         sort: 'date',
         depth: 0,
         overrideAccess: true,
-      })
-      .catch(() => null),
+      }),
+    ),
   ])
+
+  for (const f of failed) {
+    limits.push(`Выборка не выполнилась, и эти записи не проверены — ${f}`)
+  }
 
   if (calvingRes && calvingRes.totalDocs > calvingLimit) {
     limits.push(`Отёлы просмотрены частично: ${calvingLimit} записей из ${calvingRes.totalDocs}.`)

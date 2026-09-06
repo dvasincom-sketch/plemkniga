@@ -88,15 +88,31 @@ async function ancestorMap(
       break
     }
 
-    const { docs } = await payload
-      .find({
+    /*
+     * Отказ выборки — не «предков нет».
+     *
+     * Здесь стоял `.catch(() => ({ docs: [] }))`, и обход при сбое
+     * заканчивался тихо: ни циклов, ни возраста родителей не проверялось,
+     * а хозяйство видело чистую родословную. Рядом уже ведутся `limits`
+     * — там и место такому случаю.
+     */
+    let docs: Animal[] = []
+    try {
+      docs = (await payload.find({
         collection: 'animals',
         where: { id: { in: need } },
         limit: need.length,
         depth: 0,
         overrideAccess: true,
-      })
-      .catch(() => ({ docs: [] as Animal[] }))
+      })).docs as Animal[]
+    } catch (e) {
+      limits.push(
+        `Родословная просмотрена не до конца: выборка предков на ${level}-м колене ` +
+          `не выполнилась (${e instanceof Error ? e.message : String(e)}). ` +
+          'Циклы и возраст родителей глубже этого места не проверены.',
+      )
+      break
+    }
 
     for (const a of docs) {
       known.set(a.id as number, {

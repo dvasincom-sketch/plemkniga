@@ -255,6 +255,23 @@ function localIssues(a: Animal, t: Thresholds): Issue[] {
     push('state-vs-disposal', 'Животное выбыло, но причина выбытия не указана', 'disposalReason', 'note')
   }
 
+  /*
+   * Дата выбытия — не то же самое, что причина, и находка отдельная.
+   *
+   * Причина отвечает «почему потеряли», дата — «когда», и отчёты о выбытии
+   * читают вторую. Животное без неё выпадает из отчёта целиком, поэтому
+   * уровень здесь «починить», а не «замечание»: пропущенная причина делает
+   * раскладку хуже, пропущенная дата делает долю выбытия неверной.
+   */
+  if (a.state && a.state !== 'alive' && !a.disposalDate) {
+    push(
+      'disposal-date-missing',
+      'Животное выбыло, но дата выбытия не проставлена — в отчёты о выбытии оно не попадёт',
+      'disposalDate',
+      'fix',
+    )
+  }
+
   // Инбридинг выше 25% — запись сохраняется, но требует ручного подтверждения
   if (typeof a.inbreeding === 'number' && a.inbreeding > t.inbreedingHigh) {
     push(
@@ -443,6 +460,7 @@ async function relationalIssues(
   )
 
   if (withImported.length) {
+    let queryFailed = false
     const { docs } = await payload
       .find({
         collection: 'index-values',
@@ -456,15 +474,29 @@ async function relationalIssues(
         depth: 0,
         overrideAccess: true,
       })
-      .catch(() => ({ docs: [] as Record<string, unknown>[] }))
+      /*
+       * Отказ выборки и пустая выборка — разные вещи, и объяснение у них
+       * тоже разное. Здесь стоял общий `catch`, а ниже — единственная
+       * строка «расчёт книги ещё не проставлен»: при сбое запроса
+       * хозяйство читало придуманную причину вместо настоящей.
+       */
+      .catch((e: unknown) => {
+        queryFailed = true
+        limits.push(
+          'расхождение с привезённой оценкой не проверено: выборка не выполнилась — ' +
+            (e instanceof Error ? e.message : String(e)),
+        )
+        return { docs: [] as Record<string, unknown>[] }
+      })
 
-    for (const d of docs) {
+    for (const d of docs as Record<string, unknown>[]) {
       const row = d as { animal?: unknown; percentile?: number | null }
       const id = relId(row.animal)
       if (id && typeof row.percentile === 'number') ourPercentile.set(id, row.percentile)
     }
 
-    if (!docs.length) limits.push('расхождение с привезённой оценкой не проверено: расчёт книги ещё не проставлен')
+    if (!docs.length && !queryFailed)
+      limits.push('расхождение с привезённой оценкой не проверено: расчёт книги ещё не проставлен')
   }
 
   for (const a of animals) {
@@ -1060,10 +1092,25 @@ export async function checkAnimals(
   const issues = [...rel.issues, ...ped.issues, ...seq.issues]
   const limits: CheckLimits = [...rel.limits, ...ped.limits, ...seq.limits]
 
+  /*
+   * Существенность из настроек подменяет расчётную только тогда, когда
+   * Ассоциация её вправду меняла.
+   *
+   * Прежде подменялась всегда — реестровым значением, даже если никто
+   * ничего не настраивал. Правило «кровность не сходится» из-за этого
+   * никогда не становилось «требует исправления»: расчёт поднимал
+   * существенность при расхождении больше `bloodFix` (то есть когда
+   * связан не тот родитель), а строка ниже немедленно возвращала её
+   * к реестровому «на усмотрение». Заслон подтверждения смотрит только
+   * на `fix` — и пропускал записи с чужим родителем.
+   *
+   * Признак `overridden` для этого и заведён: он отличает «так написано
+   * в реестре» от «так решила Ассоциация».
+   */
   const applied = [...local, ...issues].flatMap((i) => {
     const rule = resolved.get(i.code)
     if (rule && !rule.enabled) return []
-    return [rule ? { ...i, severity: rule.severity } : i]
+    return [rule?.overridden ? { ...i, severity: rule.severity } : i]
   })
 
   return { issues: applied, limits, coverage: rel.coverage }

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { getClient, getCurrentUser } from '@/lib/payload'
+import { assertCan } from '@/lib/roles'
 import { relId } from '@/lib/visibility'
 import { ACCESS_REQUEST_PURPOSES } from '@/collections/AccessRequests'
 import { ACCESS_SCOPES, type AccessScope } from '@/lib/dictionaries'
@@ -139,6 +140,18 @@ export async function decideAccessAction(
   }
 
   const payload = await getClient()
+
+  /*
+   * Открыть данные наружу — право руководителя.
+   *
+   * Правило `accessRequestDecide` проверяет, что решает владелец
+   * животного, но не смотрит на роль внутри хозяйства: наблюдатель,
+   * которого позвали «просто посмотреть», мог одобрить запрос
+   * и выдать грант на всё стадо. Здесь та же возможность `share`,
+   * что и у ссылок на просмотр, — они про одно и то же.
+   */
+  const deniedShare = await assertCan(payload, user, 'share')
+  if (deniedShare) return { error: deniedShare }
 
   try {
     /*

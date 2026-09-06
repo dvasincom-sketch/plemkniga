@@ -53,8 +53,20 @@ export async function revokeGrantAction(
     })
 
     forgetGrants(relId((updated as { grantee?: unknown }).grantee))
-  } catch {
-    return { error: 'Не удалось отозвать доступ' }
+  } catch (e) {
+    /*
+     * Причина отказа называется, а не заменяется общей фразой.
+     *
+     * «Не удалось отозвать доступ» одинаково звучит и когда грант чужой,
+     * и когда база не ответила, — а действия у человека разные: в первом
+     * случае искать свой грант, во втором повторить. Текст берётся
+     * из самой ошибки: у отказа по правам он человеческий и объясняет
+     * положение (`src/access/denied.ts`).
+     */
+    console.error('[plemkniga] отзыв доступа не выполнился:', e)
+    return {
+      error: `Не удалось отозвать доступ: ${e instanceof Error ? e.message : 'причина неизвестна'}`,
+    }
   }
 
   revalidatePath('/account/access')
@@ -176,8 +188,11 @@ export async function replacePublicWithGrantsAction(
       user,
       overrideAccess: false,
     })
-  } catch {
-    return { error: 'Не удалось закрыть запись' }
+  } catch (e) {
+    console.error('[plemkniga] закрытие публичной записи не выполнилось:', e)
+    return {
+      error: `Не удалось закрыть запись: ${e instanceof Error ? e.message : 'причина неизвестна'}`,
+    }
   }
 
   revalidatePath('/account/access')

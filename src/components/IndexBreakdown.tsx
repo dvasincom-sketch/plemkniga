@@ -203,8 +203,17 @@ export function IndexBreakdown({
             {
               label: 'Надёжность',
               tip: 'Считается из числа собственных наблюдений животного и из того, что известно о родителях. Основание целиком — в подвале блока. Это не уровень достоверности данных в шапке карточки: тот говорит, кем проверены сами записи',
-              value: <Computed formula="combinedReliability">{nf(reliability, 0)} %</Computed>,
-              note: null,
+              /*
+                 Прочерк, когда надёжности нет ни у одной учтённой оценки.
+                 Стояло «0 %» — то есть утверждение «оценка ненадёжна» там,
+                 где о надёжности просто не прислали ничего.
+              */
+              value: (
+                <Computed formula="combinedReliability">
+                  {reliability === null ? '—' : `${nf(reliability, 0)} %`}
+                </Computed>
+              ),
+              note: reliability === null ? 'ни у одной оценки не указана' : null,
             },
             {
               label: 'Процентиль',

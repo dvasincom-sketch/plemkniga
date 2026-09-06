@@ -53,6 +53,13 @@ export default async function RecordEventPage() {
           overrideAccess: true,
         })
       : Promise.resolve({ docs: [] as { id: number; name: string }[] }),
+    /*
+     * Справочник, который не прочитался, — это пустой список выбора,
+     * и человек читает его как «причин выбытия в книге нет». Отказ
+     * теперь виден в логе; форма при этом остаётся рабочей — событие
+     * записывается и без причины, а выдумывать причину за человека
+     * было бы хуже пустого списка.
+     */
     payload
       .find({
         collection: 'disposal-reasons',
@@ -61,7 +68,10 @@ export default async function RecordEventPage() {
         depth: 0,
         overrideAccess: true,
       })
-      .catch(() => ({ docs: [] as { id: number; name: string }[] })),
+      .catch((e: unknown) => {
+        console.error('[plemkniga] справочник причин выбытия не прочитался:', e)
+        return { docs: [] as { id: number; name: string }[] }
+      }),
     payload
       .find({
         collection: 'technicians',
@@ -71,7 +81,10 @@ export default async function RecordEventPage() {
         depth: 0,
         overrideAccess: true,
       })
-      .catch(() => ({ docs: [] as { id: number; name: string }[] })),
+      .catch((e: unknown) => {
+        console.error('[plemkniga] справочник техников не прочитался:', e)
+        return { docs: [] as { id: number; name: string }[] }
+      }),
   ])
 
   const choices = (list: { id: number | string; name?: string | null }[]) =>

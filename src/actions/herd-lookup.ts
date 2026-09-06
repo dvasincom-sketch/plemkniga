@@ -93,7 +93,15 @@ export async function searchHerdAction(input: HerdSearch): Promise<HerdMatch[]> 
       depth: 0,
       overrideAccess: true,
     })
-    .catch(() => null)
+    /*
+     * Отказ выборки виден в логе: пустой список подсказки читается как
+     * «в стаде никого не нашли», и человек начинает искать причину
+     * в собственном номере.
+     */
+    .catch((e: unknown) => {
+      console.error('[plemkniga] подсказка по стаду не выполнилась:', e)
+      return null
+    })
 
   if (!res) return []
 

@@ -253,6 +253,11 @@ export const CHECKS_EN: CheckTexts = {
     what: 'The status is not in the herd, and no disposal reason is stated.',
     why: 'The reason for disposal is part of breeding records: it is what shows why a herd loses animals.',
   },
+  'disposal-date-missing': {
+    label: 'Disposal without a disposal date',
+    what: 'The status is not in the herd, and no disposal date is entered.',
+    why: 'Disposal reports count by the date, not by the status: without it the animal appears in none of them, and the herd disposal rate comes out lower than the real one.',
+  },
   'units-mixed': {
     label: 'Milk yields entered in different units',
     what: 'The herd holds records where the yield differs from the rest by two orders of magnitude: some in kilograms, some apparently in tonnes or centners.',

@@ -2,6 +2,7 @@ import 'dotenv/config'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { attempt, attemptDetail } from '@/lib/access-attempt'
+import { assertCan, type Capability } from '@/lib/roles'
 import type { User } from '@/payload-types'
 import { newInviteToken, resolveInvite } from '@/lib/invitations'
 
@@ -132,6 +133,30 @@ async function main() {
 
   await allows(() => rename(operator, `${TAG} Правка зоотехника`), 'зоотехник правит карточку')
   await denies(() => rename(viewer, `${TAG} Правка наблюдателя`), 'наблюдатель карточку НЕ правит')
+
+  /*
+   * Пути, которые проверялись только правилом коллекции.
+   *
+   * Наблюдателю закрыты не только дойки: карточка хозяйства, публикация
+   * стада, выдача гранта и загрузка файла — тоже. Всё это делают
+   * серверные действия, а роль в них не спрашивалась вовсе; здесь
+   * проверяются те же возможности на том же лице, что и в действиях.
+   */
+  console.log('\nВозможности ролей — как их видят действия\n')
+
+  const capable = async (user: User, capability: Capability, expected: boolean, what: string) => {
+    const denied = await assertCan(payload, user, capability)
+    check(expected ? denied === null : denied !== null, what, denied ?? 'разрешено')
+  }
+
+  await capable(viewer, 'data', false, 'наблюдателю закрыта загрузка данных')
+  await capable(viewer, 'share', false, 'наблюдателю закрыта выдача доступа наружу')
+  await capable(viewer, 'org', false, 'наблюдателю закрыта правка карточки хозяйства')
+  await capable(operator, 'share', false, 'зоотехнику закрыта выдача доступа наружу')
+  await capable(operator, 'org', false, 'зоотехнику закрыта правка карточки хозяйства')
+  await capable(operator, 'data', true, 'зоотехнику открыта загрузка данных')
+  await capable(head, 'share', true, 'руководителю открыта выдача доступа наружу')
+  await capable(head, 'org', true, 'руководителю открыта правка карточки хозяйства')
 
   console.log('\nБлокировка\n')
 

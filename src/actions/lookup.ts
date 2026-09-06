@@ -37,6 +37,14 @@ export type AnimalLookup = {
   name?: string
   owner?: string
   mine?: boolean
+  /**
+   * Поиск не состоялся — это не то же, что «не найдено».
+   *
+   * «Не найдено» форма объясняет как «запишем текстом, свяжется позже»,
+   * то есть приглашает вводить номер как есть. При сбое выборки такое
+   * приглашение — неправда: номер может быть в книге, и связь потеряется.
+   */
+  failed?: boolean
 }
 
 const nameOf = (v: unknown): string => {
@@ -71,7 +79,21 @@ export async function lookupAnimalAction(identNumber: string): Promise<AnimalLoo
       depth: 1,
       overrideAccess: true,
     })
-    .catch(() => null)
+    /*
+     * Отказ выборки — не «животного нет».
+     *
+     * Ответ «не найдено» здесь читается как разрешение завести карточку
+     * заново, и по нему в книге появляется второй экземпляр того же
+     * животного. Пусть лучше поиск скажет, что не смог.
+     */
+    .catch((e: unknown) => {
+      console.error('[plemkniga] поиск животного по номеру не выполнился:', e)
+      return 'failed' as const
+    })
+
+  if (res === 'failed') {
+    return { identNumber: ident, found: false, open: false, failed: true }
+  }
 
   const doc = res?.docs[0]
   if (!doc) return { identNumber: ident, found: false, open: false }

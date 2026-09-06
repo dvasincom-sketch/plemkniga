@@ -203,11 +203,24 @@ async function read(payload: BasePayload, org: number): Promise<Memo> {
   return fresh
 }
 
-/** Действует ли грант прямо сейчас: отозванные отсеяны запросом, срок — здесь. */
+/**
+ * Действует ли грант прямо сейчас: отозванные отсеяны запросом, срок — здесь.
+ *
+ * Нечитаемый срок закрывает доступ, а не открывает его. Прежде `NaN`
+ * возвращал `true`, то есть испорченная дата превращала срочный грант
+ * в бессрочный — и делала это молча, ровно там, где ошибка не видна:
+ * доступ есть, значит всё в порядке. Из двух ошибок правильнее та,
+ * о которой узнают: хозяйство пожалуется, что доступ пропал, и грант
+ * выпишут заново. О лишнем доступе не жалуется никто.
+ */
 const alive = (row: Row, now: number): boolean => {
   if (!row.expiresAt) return true
   const until = Date.parse(row.expiresAt)
-  return Number.isNaN(until) || until > now
+  if (Number.isNaN(until)) {
+    console.error(`grants: непонятный срок гранта — ${row.expiresAt}; грант считаем истёкшим`)
+    return false
+  }
+  return until > now
 }
 
 const SCOPE_SET = new Set<string>(['origin', 'production', 'evaluation', 'documents'])

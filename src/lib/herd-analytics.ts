@@ -343,7 +343,22 @@ export async function geneticTrend(
   const res = await pool.query(
     `
     with mine as (
-      select extract(year from birth_date)::int as year, ipc, inbreeding
+      /*
+       * Год берётся по UTC, а не по поясу сессии.
+       *
+       * Даты лежат в timestamptz и записаны полуночью UTC. Postgres,
+       * доставая из них год, приводит значение к TimeZone соединения:
+       * при западном поясе полночь первого января становится тридцать
+       * первым декабря, и телёнок уезжает в предыдущий год. Соседние
+       * расчёты этого файла уже пишут at time zone 'UTC' явно — здесь
+       * оговорка отсутствовала, и график тихо расходился бы с ними
+       * ровно на тех животных, что родились в новогоднюю ночь.
+       *
+       * Полагаться на то, что у сервера TZ = UTC, нельзя: пояс задаётся
+       * средой, а не кодом, и меняется переносом приложения на другую
+       * машину — то есть без единой правки, которую можно заметить.
+       */
+      select extract(year from birth_date at time zone 'UTC')::int as year, ipc, inbreeding
         from animals
        where owner_id = $1
          and archived is not true
@@ -746,7 +761,15 @@ export async function reproduction(
      */
     intervals as (
       select k.animal_id,
-             k."date"::date - lag(k."date"::date) over (
+             /*
+              * Пояс оговорён и здесь, хотя разность суток от него не
+              * зависит: оба конца сдвинулись бы одинаково. Оговорка
+              * нужна не расчёту, а читателю — в одном запросе не должно
+              * быть двух правил обращения с датой, иначе следующий,
+              * кто добавит сюда extract, скопирует ту строку, где
+              * оговорки нет.
+              */
+             (k."date" at time zone 'UTC')::date - lag((k."date" at time zone 'UTC')::date) over (
                partition by k.animal_id order by k."date"
              ) as days,
              k."date" as at

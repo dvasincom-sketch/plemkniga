@@ -193,6 +193,8 @@ export const IndexValues: CollectionConfig = {
       name: 'reliability',
       type: 'number',
       label: 'Надёжность, R %',
+      min: 0,
+      max: 100,
     },
     {
       /*

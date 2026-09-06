@@ -1,4 +1,10 @@
 import { sql } from 'drizzle-orm'
+import {
+  RECORDING_PROTOCOL,
+  RECORDING_SCHEME,
+  SAMPLING_MOMENT,
+  SAMPLING_SCHEME,
+} from '@/lib/milk-recording'
 import { check, integer } from 'drizzle-orm/pg-core'
 import type { PostgresSchemaHook } from '@payloadcms/drizzle/postgres'
 
@@ -45,6 +51,16 @@ import type { PostgresSchemaHook } from '@payloadcms/drizzle/postgres'
  * `payload migrate:create` видит разницу и генерирует ALTER TABLE.
  */
 
+/*
+ * Списки значений берутся из тех же перечислений, которыми пользуется
+ * приложение: второй экземпляр разошёлся бы с первым, и база начала бы
+ * отвергать значение, которое форма предлагает.
+ */
+const RECORDING_PROTOCOL_VALUES = Object.keys(RECORDING_PROTOCOL)
+const RECORDING_SCHEME_VALUES = Object.keys(RECORDING_SCHEME)
+const SAMPLING_SCHEME_VALUES = Object.keys(SAMPLING_SCHEME)
+const SAMPLING_MOMENT_VALUES = Object.keys(SAMPLING_MOMENT)
+
 export type DomainRule = {
   table: string
   /** Имя ограничения — то, что человек увидит в ошибке PostgreSQL. */
@@ -52,6 +68,20 @@ export type DomainRule = {
   /** Предикат: истина для допустимой строки. NULL обрабатывается явно. */
   expr: string
   note: string
+  /**
+   * Границы диапазона отдельно от выражения — чтобы их можно было сверить.
+   *
+   * Выше обещано, что границы берутся из полей коллекций, а не из головы.
+   * Обещание держалось на честном слове: у половины полей `min` и `max`
+   * не были проставлены вовсе, база отвечала сырым `chk_…`, а форма
+   * пропускала жирность в двести процентов. Проверить это было нечем —
+   * границы жили внутри готовой строки SQL, откуда их не достать.
+   *
+   * Теперь они лежат числами рядом, и `npm run check:bounds` сверяет
+   * каждую пару с `min` и `max` того поля, из которого выросла колонка.
+   * Расхождение — красная строка прогона, а не сюрприз на проде.
+   */
+  bounds?: { column: string; min: number; max: number }
 }
 
 /** Диапазон включительно; NULL проходит — обязательность решают сами поля. */
@@ -63,6 +93,24 @@ const positive = (col: string) => `("${col}" is null or "${col}" > 0)`
 
 /** Не отрицательное: количества, дни, надои. */
 const nonNegative = (col: string) => `("${col}" is null or "${col}" >= 0)`
+
+/**
+ * Значение из перечисления — для полей `select`, ставших в базе `varchar`.
+ *
+ * Payload заводит перечисления настоящим типом PostgreSQL, но не всегда:
+ * поля, добавленные миграциями `breed_direction` и `milk_recording_method`,
+ * легли обычными строками. База после этого не проверяет ничего: скрипт
+ * переноса и ручной `UPDATE` кладут туда что угодно, а страница молча
+ * показывает пустую подпись — значение, которого нет в перечислении,
+ * не находит себе имени.
+ *
+ * Переписывать тип на проде — отдельная работа с `ALTER TYPE … USING`
+ * и с риском упасть на первой же непредвиденной строке. Ограничение
+ * даёт ту же гарантию дешевле и ложится в существующий механизм:
+ * `db:precheck` заранее покажет строки, которые его не пройдут.
+ */
+const oneOf = (col: string, values: readonly string[]) =>
+  `("${col}" is null or "${col}" in (${values.map((v) => `'${v}'`).join(', ')}))`
 
 export const DOMAIN_RULES: DomainRule[] = [
   /* ----------------------------- Родословная ------------------------------ */
@@ -95,30 +143,35 @@ export const DOMAIN_RULES: DomainRule[] = [
      * Ноль — это «черновик», а не низ шкалы.
      */
     expr: range('trust_level', -1, 3),
+    bounds: { column: 'trust_level', min: -1, max: 3 },
     note: 'уровень достоверности данных −1…3',
   },
   {
     table: 'animals',
     name: 'chk_animals_blood_percent',
     expr: range('blood_percent', 0, 100),
+    bounds: { column: 'blood_percent', min: 0, max: 100 },
     note: 'кровность 0…100 %',
   },
   {
     table: 'animals',
     name: 'chk_animals_inbreeding',
     expr: range('inbreeding', 0, 100),
+    bounds: { column: 'inbreeding', min: 0, max: 100 },
     note: 'коэффициент инбридинга 0…100 %',
   },
   {
     table: 'animals',
     name: 'chk_animals_improvers_share1',
     expr: range('improvers_share1', 0, 100),
+    bounds: { column: 'improvers_share1', min: 0, max: 100 },
     note: 'доля крови улучшателя 0…100 %',
   },
   {
     table: 'animals',
     name: 'chk_animals_improvers_share2',
     expr: range('improvers_share2', 0, 100),
+    bounds: { column: 'improvers_share2', min: 0, max: 100 },
     note: 'доля крови улучшателя 0…100 %',
   },
   {
@@ -128,36 +181,42 @@ export const DOMAIN_RULES: DomainRule[] = [
     // ни другое из соседних: не уровень достоверности данных (тот про
     // подтверждение записи) и не надёжность R (та посчитана нами).
     expr: range('production_reliability_level', 1, 5),
+    bounds: { column: 'production_reliability_level', min: 1, max: 5 },
     note: 'уровень оценки продуктивности по документу 1…5',
   },
   {
     table: 'animals',
     name: 'chk_animals_health_reliability',
     expr: range('health_reliability_level', 1, 5),
+    bounds: { column: 'health_reliability_level', min: 1, max: 5 },
     note: 'уровень оценки здоровья по документу 1…5',
   },
   {
     table: 'animals',
     name: 'chk_animals_ipc_r',
     expr: range('ipc_details_r', 0, 100),
+    bounds: { column: 'ipc_details_r', min: 0, max: 100 },
     note: 'надёжность ИПЦ 0…100 %',
   },
   {
     table: 'animals',
     name: 'chk_animals_ipc_percentile',
     expr: range('ipc_details_percentile', 0, 100),
+    bounds: { column: 'ipc_details_percentile', min: 0, max: 100 },
     note: 'процентиль ИПЦ 0…100',
   },
   {
     table: 'animals',
     name: 'chk_animals_summary_fat',
     expr: range('summary_fat_percent', 0, 15),
+    bounds: { column: 'summary_fat_percent', min: 0, max: 15 },
     note: 'жирность молока 0…15 %',
   },
   {
     table: 'animals',
     name: 'chk_animals_summary_protein',
     expr: range('summary_protein_percent', 0, 15),
+    bounds: { column: 'summary_protein_percent', min: 0, max: 15 },
     note: 'белок молока 0…15 %',
   },
   {
@@ -218,12 +277,14 @@ export const DOMAIN_RULES: DomainRule[] = [
     table: 'milk_tests',
     name: 'chk_milk_tests_fat',
     expr: range('fat_percent', 0, 15),
+    bounds: { column: 'fat_percent', min: 0, max: 15 },
     note: 'жирность 0…15 %',
   },
   {
     table: 'milk_tests',
     name: 'chk_milk_tests_protein',
     expr: range('protein_percent', 0, 15),
+    bounds: { column: 'protein_percent', min: 0, max: 15 },
     note: 'белок 0…15 %',
   },
 
@@ -232,6 +293,7 @@ export const DOMAIN_RULES: DomainRule[] = [
     table: 'index_values',
     name: 'chk_index_values_reliability',
     expr: range('reliability', 0, 100),
+    bounds: { column: 'reliability', min: 0, max: 100 },
     note: 'надёжность индекса 0…100 %',
   },
   {
@@ -244,6 +306,7 @@ export const DOMAIN_RULES: DomainRule[] = [
     table: 'index_values',
     name: 'chk_index_values_percentile',
     expr: range('percentile', 0, 100),
+    bounds: { column: 'percentile', min: 0, max: 100 },
     note: 'процентиль 0…100',
   },
   {
@@ -264,6 +327,38 @@ export const DOMAIN_RULES: DomainRule[] = [
     name: 'chk_index_bases_n',
     expr: nonNegative('n'),
     note: 'объём выборки не отрицателен',
+  },
+
+  /* ------------------- Перечисления, ставшие строками --------------------- */
+  {
+    table: 'breeds',
+    name: 'chk_breeds_direction',
+    expr: oneOf('direction', ['dairy', 'dual', 'beef', 'other']),
+    note: 'направление продуктивности — из четырёх значений справочника',
+  },
+  {
+    table: 'milk_tests',
+    name: 'chk_milk_tests_recording_protocol',
+    expr: oneOf('recording_protocol', RECORDING_PROTOCOL_VALUES),
+    note: 'метод контроля — из перечисления ICAR',
+  },
+  {
+    table: 'milk_tests',
+    name: 'chk_milk_tests_recording_scheme',
+    expr: oneOf('recording_scheme', RECORDING_SCHEME_VALUES),
+    note: 'схема учёта доений — из перечисления ICAR',
+  },
+  {
+    table: 'milk_tests',
+    name: 'chk_milk_tests_sampling_scheme',
+    expr: oneOf('sampling_scheme', SAMPLING_SCHEME_VALUES),
+    note: 'схема отбора пробы — из перечисления ICAR',
+  },
+  {
+    table: 'milk_tests',
+    name: 'chk_milk_tests_sampling_moment',
+    expr: oneOf('sampling_moment', SAMPLING_MOMENT_VALUES),
+    note: 'момент отбора пробы — из перечисления ICAR',
   },
 ]
 

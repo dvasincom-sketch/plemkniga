@@ -12,6 +12,8 @@ import {
   type MovementKind,
 } from '@/lib/movements'
 import { recordOperation } from '@/lib/operations'
+import { poolOf } from '@/lib/sql'
+import { moveOrganizationRefs, type MergeReport } from '@/lib/org-merge'
 
 /**
  * Запись перемещения и разбор справочника хозяйств.
@@ -256,24 +258,18 @@ export async function mergeOrganizationsAction(
 
   const payload = await getClient()
 
-  try {
-    for (const field of ['from', 'to'] as const) {
-      await payload.update({
-        collection: 'movements',
-        where: { [field]: { equals: duplicate } },
-        overrideAccess: true,
-        user,
-        data: { [field]: target },
-      })
-    }
+  const pool = poolOf(payload)
+  if (!pool) return { error: 'Слияние требует прямого доступа к базе' }
 
-    await payload.update({
-      collection: 'animals',
-      where: { owner: { equals: duplicate } },
-      overrideAccess: true,
-      user,
-      data: { owner: target },
-    })
+  let report: MergeReport
+  try {
+    /*
+     * Перевод ссылок идёт запросами по каталогу внешних ключей, а не
+     * перечислением полей через Payload: разбор — в `src/lib/org-merge.ts`.
+     * Коротко: полей-ссылок четыре десятка, рукописный список отставал бы
+     * от модели молча, и слияние всё равно отчитывалось бы успехом.
+     */
+    report = await moveOrganizationRefs(pool, duplicate, target)
 
     await payload.update({
       collection: 'organizations',
@@ -292,11 +288,22 @@ export async function mergeOrganizationsAction(
     organization: target,
     subjectType: 'organization',
     subjectId: duplicate,
-    summary: `Дубль ${duplicate} слит с ${target}`,
+    /*
+     * В журнал пишется, сколько строк переехало и по каким полям.
+     * Слияние необратимо, и «карточки слиты» без числа не позволяет
+     * потом ответить на вопрос, что именно тогда переехало.
+     */
+    summary:
+      `Дубль ${duplicate} слит с ${target}: ` +
+      (report.moved.length
+        ? report.moved.map((m) => `${m.table}.${m.column} — ${m.rows}`).join(', ')
+        : 'ссылок не было') +
+      (report.deduped ? `; сдвоенных связей убрано ${report.deduped}` : ''),
   })
 
   revalidatePath('/association/farms')
-  return { message: 'Карточки слиты' }
+  const rows = report.moved.reduce((s, m) => s + m.rows, 0)
+  return { message: rows ? `Карточки слиты, переведено записей: ${rows}` : 'Карточки слиты' }
 }
 
 /** Признать карточку, заведённую контрагентом, самостоятельным хозяйством. */

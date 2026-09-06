@@ -60,7 +60,11 @@ export async function resolveCheckSettings(payload: Payload): Promise<CheckSetti
       overrideAccess: true,
     })
     .then((r) => r.docs)
-    .catch(() => null)
+    .catch((e: unknown) => {
+      /* Тот же довод, что у порогов: умолчания — да, молчание — нет. */
+      console.error('[plemkniga] настройки проверок не прочитались, взяты умолчания:', e)
+      return null
+    })
 
   if (!rows) return map
 

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { getClient, getCurrentUser } from '@/lib/payload'
+import { assertCan } from '@/lib/roles'
 import { relId } from '@/lib/visibility'
 import { isCalvingEvent } from '@/lib/calving'
 
@@ -86,6 +87,19 @@ async function guard(formData: FormData) {
   if (!mayEdit(user as Actor, relId(animal.owner))) {
     return { error: 'Записывать можно только по животным своего хозяйства' as const }
   }
+
+  /*
+   * Роль и блокировка — здесь же, а не только в хуке коллекции.
+   *
+   * Хук `requireOwnAnimal` спрашивает `can(user, 'data')`, и эти формы
+   * через него тоже проходят. Но действие обязано отказать раньше
+   * и человеческими словами: иначе наблюдатель заполняет форму отёла,
+   * жмёт «Записать» и получает отказ базы вместо объяснения, что делать.
+   * Тот же порядок, что в `actions/events.ts`, — там проверка стояла
+   * с самого начала, а здесь её забыли.
+   */
+  const denied = await assertCan(payload, user, 'data')
+  if (denied) return { error: denied as string }
 
   return { user, payload, animal, animalId }
 }

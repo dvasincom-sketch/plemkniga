@@ -213,7 +213,7 @@ export const Calvings: CollectionConfig = {
           options: BIRTH_TYPES.map((b) => ({ value: b.value, label: b.label })),
           admin: { description: 'Сколько плодов было; пол — числами ниже' },
         },
-        { name: 'milkingDays', type: 'number', label: 'Количество дойных дней' },
+        { name: 'milkingDays', type: 'number', label: 'Количество дойных дней', min: 0 },
         { name: 'dryOffDate', type: 'date', label: 'Дата запуска' },
       ],
     },

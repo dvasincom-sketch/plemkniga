@@ -20,28 +20,57 @@ export type Choice = { value: string; label: string }
 /** Поля, которые разрешено править формами карточки, — те же, что журналятся */
 const EDITABLE = new Set(JOURNALLED.map((f) => f.path))
 
+/**
+ * Разобранное значение одного поля: либо величина, либо отказ.
+ *
+ * Отдельный тип нужен ровно для того, чтобы отличить пустое поле от
+ * неразобранного. Оба дают `null` в модели, а означают противоположное:
+ * первое — «человек стёр значение», второе — «человек написал что-то,
+ * чего мы не поняли».
+ */
+type Parsed = { ok: true; value: unknown } | { ok: false; reason: string }
+
 /** Значение одного поля формы в том виде, в каком его ждёт модель */
-const valueOf = (form: FormData, path: string): unknown => {
+const valueOf = (form: FormData, path: string): Parsed => {
   const raw = form.get(path)
-  if (raw === null) return undefined
+  if (raw === null) return { ok: true, value: undefined }
 
   const s = String(raw).trim()
-  if (s === '') return null
+  if (s === '') return { ok: true, value: null }
 
   const field = JOURNALLED.find((f) => f.path === path)
+  const named = field?.label ?? path
+
+  /*
+   * Неразобранное значение — отказ, а не `null`.
+   *
+   * Прежде каждая из трёх веток возвращала `null`, когда разбор не удался,
+   * и форма отвечала «Сохранено»: человек исправлял живую массу на «450 кг»,
+   * а в карточке она пропадала совсем. Хуже случая с опечаткой то, что
+   * поле, которого не поняли, стирается вместе с прежним верным значением,
+   * — то есть правка не проходит мимо, а уничтожает данные.
+   *
+   * Браузер такие значения обычно не пропускает: `type="number"` и
+   * `type="date"` проверяют ввод сами. Но форму отправляют и в обход
+   * браузера, и с выключенным JavaScript, и через `curl`, а серверное
+   * действие обязано отвечать за то, что записывает, само.
+   */
   if (field?.kind === 'number') {
     const n = Number(s.replace(',', '.'))
-    return Number.isFinite(n) ? n : null
+    if (!Number.isFinite(n)) return { ok: false, reason: `«${named}»: не число — ${s}` }
+    return { ok: true, value: n }
   }
   if (field?.kind === 'relation') {
     const n = Number(s)
-    return Number.isFinite(n) && n > 0 ? n : null
+    if (!Number.isFinite(n) || n <= 0) return { ok: false, reason: `«${named}»: неизвестная связь` }
+    return { ok: true, value: n }
   }
   if (field?.kind === 'date') {
     const d = new Date(s)
-    return Number.isNaN(d.getTime()) ? null : d.toISOString()
+    if (Number.isNaN(d.getTime())) return { ok: false, reason: `«${named}»: не дата — ${s}` }
+    return { ok: true, value: d.toISOString() }
   }
-  return s
+  return { ok: true, value: s }
 }
 
 /** Собирает вложенный объект из путей вида `altIds.earTag` */
@@ -69,24 +98,36 @@ const nest = (flat: Record<string, unknown>): Record<string, unknown> => {
  *
  * Функция чистая намеренно: это единственное место, где форма превращается
  * в данные, и проверять его надо отдельно от базы и от сессии.
+ *
+ * Непонятые значения возвращаются отдельным списком, а не выбрасываются
+ * исключением: полей в блоке несколько, и человеку правильнее показать все
+ * ошибки разом, чем по одной за отправку.
  */
-export function collectFromForm(form: FormData): Record<string, unknown> {
+export function collectFromForm(form: FormData): {
+  data: Record<string, unknown>
+  errors: string[]
+} {
   const declared = String(form.get('fields') || '')
     .split(',')
     .map((s) => s.trim())
     .filter((s) => EDITABLE.has(s))
 
   const flat: Record<string, unknown> = {}
+  const errors: string[] = []
   for (const path of declared) {
     const field = JOURNALLED.find((f) => f.path === path)
     if (field?.kind === 'checkbox') {
       flat[path] = form.get(path) !== null
       continue
     }
-    const value = valueOf(form, path)
-    if (value !== undefined) flat[path] = value
+    const parsed = valueOf(form, path)
+    if (!parsed.ok) {
+      errors.push(parsed.reason)
+      continue
+    }
+    if (parsed.value !== undefined) flat[path] = parsed.value
   }
-  return nest(flat)
+  return { data: nest(flat), errors }
 }
 
 export type BlockValue = {

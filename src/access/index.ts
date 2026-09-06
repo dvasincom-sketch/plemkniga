@@ -60,7 +60,7 @@ export const anyone: Access = () => true
  * вовсе. Отозвать выданный JWT нечем, поэтому решение принимается
  * на каждом запросе по состоянию записи.
  */
-const notBlocked = (user: unknown): boolean =>
+const notBlocked = <T,>(user: T | null | undefined): user is T =>
   Boolean(user) && !(user as { blockedAt?: string | null } | null)?.blockedAt
 
 export const isAuthenticated: Access = ({ req: { user } }) => notBlocked(user)
@@ -201,7 +201,13 @@ export const accessRequestRead: Access = ({ req: { user } }) => {
  */
 export const accessRequestDecide: Access = ({ req: { user } }) => {
   const u = user as U | null
-  if (!u) return false
+  /*
+   * Блокировка проверяется на каждом пишущем правиле, а не только
+   * в `isAuthenticated`. Здесь её не было: с ещё действующим токеном
+   * заблокированный решал судьбу запросов к своим животным — то есть
+   * раздавал доступ наружу после того, как его самого закрыли.
+   */
+  if (!notBlocked(u)) return false
   if (u.role === 'admin') return true
   const org = orgId(u)
   if (!org) return false
@@ -346,7 +352,7 @@ export const indexProfileRead: Access = ({ req: { user } }) => {
  */
 export const indexProfileMutate: Access = ({ req: { user } }) => {
   const u = user as U | null
-  if (!u) return false
+  if (!notBlocked(u)) return false
   if (u.role === 'admin') return true
   const org = orgId(u)
   if (!org) return false
@@ -424,7 +430,7 @@ export const accessGrantRead: Access = ({ req: { user } }) => {
  */
 export const accessGrantIssue: Access = ({ req: { user } }) => {
   const u = user as U | null
-  if (!u) return false
+  if (!notBlocked(u)) return false
   if (u.role === 'admin') return true
   const org = orgId(u)
   if (!org) return false
@@ -465,7 +471,7 @@ export const selfOrAssociation: Access = ({ req: { user } }) => {
 /** Своя учётная запись — или любая, если ты администратор. Для записи. */
 export const selfOrAdmin: Access = ({ req: { user } }) => {
   const u = user as U | null
-  if (!u) return false
+  if (!notBlocked(u)) return false
   if (u.role === 'admin') return true
   return { id: { equals: u.id } }
 }
@@ -515,7 +521,7 @@ export const savedSearchRead: Access = ({ req: { user } }) => {
  */
 export const savedSearchWrite: Access = ({ req: { user } }) => {
   const u = user as U | null
-  if (!u) return false
+  if (!notBlocked(u)) return false
   if (u.role === 'admin') return true
   return { author: { equals: u.id } }
 }
@@ -529,7 +535,7 @@ export const savedSearchWrite: Access = ({ req: { user } }) => {
  */
 export const savedSearchDelete: Access = ({ req: { user } }) => {
   const u = user as U | null
-  if (!u) return false
+  if (!notBlocked(u)) return false
   if (u.role === 'admin') return true
 
   const or: Where[] = [{ author: { equals: u.id } }]

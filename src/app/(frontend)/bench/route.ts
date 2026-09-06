@@ -179,6 +179,15 @@ export async function GET(request: Request) {
    * здесь значило бы оставить человека ждать обновления страницы,
    * которого не будет.
    */
+  /*
+   * Поиск прежней записи не глотается: сбой здесь плодит дубли.
+   *
+   * `null` от `catch` неотличим от «прежней записи нет», и следующая
+   * ветка заводит вторую строку с тем же именем замера. На странице
+   * «Эволюция продукта» показывается одна из двух — какая, зависит
+   * от порядка выборки, — и замер начинает то расти, то падать
+   * без всякой связи с системой.
+   */
   const stored = await payload
     .find({
       collection: 'bench-runs',
@@ -187,7 +196,10 @@ export async function GET(request: Request) {
       depth: 0,
       overrideAccess: true,
     })
-    .catch(() => null)
+    .catch((e: unknown) => {
+      console.error('[bench] прежний замер не прочитался, запись пропущена:', e)
+      return null
+    })
 
   const record = {
     label: measured.label,
@@ -201,7 +213,13 @@ export async function GET(request: Request) {
 
   let saved = false
   try {
-    if (stored?.docs.length)
+    /*
+     * Не знаем, была ли прежняя запись, — не пишем вовсе. Замер
+     * повторяют командой, а дубль в ленте живёт до тех пор, пока
+     * его не заметят глазами.
+     */
+    if (!stored) throw new Error('прежний замер не прочитан: запись пропущена во избежание дубля')
+    if (stored.docs.length)
       await payload.update({
         collection: 'bench-runs',
         id: stored.docs[0]!.id,

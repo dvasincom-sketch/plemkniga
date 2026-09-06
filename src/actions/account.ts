@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { getClient, getCurrentUser } from '@/lib/payload'
+import { assertCan } from '@/lib/roles'
 
 export type FormState = { error?: string; message?: string }
 
@@ -19,6 +20,20 @@ export async function updateProfileAction(
 
   const get = (k: string) => String(formData.get(k) || '').trim()
   const payload = await getClient()
+
+  /*
+   * Карточку хозяйства правит руководитель.
+   *
+   * Свои имя, телефон и должность человек меняет сам — это его учётная
+   * запись, — а реквизиты организации общие, и наблюдатель их менять
+   * не должен. Признак вкладки — то же поле, по которому ниже решается,
+   * писать ли в организацию: два разных признака одного и того же
+   * разошлись бы на первой правке формы.
+   */
+  if (formData.has('orgName')) {
+    const denied = await assertCan(payload, user, 'org')
+    if (denied) return { error: denied }
+  }
 
   /*
    * Обновляем только те поля, которые реально пришли в форме.
@@ -89,6 +104,15 @@ export async function setHerdVisibilityAction(
   const details = formData.get('publicDetails') === 'on'
 
   const payload = await getClient()
+
+  /*
+   * Публикация всего стада — обязательство перед третьими лицами:
+   * открытые записи видит кто угодно, включая соседей и покупателей.
+   * Подписывает такое руководитель, а не наблюдатель, зашедший
+   * посмотреть. Проверялось только членство в Ассоциации, роль — нет.
+   */
+  const deniedShare = await assertCan(payload, user, 'share')
+  if (deniedShare) return { error: deniedShare }
 
   /*
    * Показ в общей книге — то, за что ручается Ассоциация, поэтому он

@@ -100,7 +100,8 @@ export async function createAnimalAction(
     }
   }
 
-  const data = collectFromForm(formData)
+  const { data, errors } = collectFromForm(formData)
+  if (errors.length) return { error: errors.join('; ') }
   data.identNumber = identNumber
   data.owner = orgId
   data.author = user.id
@@ -172,7 +173,8 @@ export async function updateAnimalAction(
     return { error: 'Править карточку может только хозяйство-владелец' }
   }
 
-  const data = collectFromForm(formData)
+  const { data, errors } = collectFromForm(formData)
+  if (errors.length) return { error: errors.join('; ') }
   delete data.owner
   delete data.trustLevel
   delete data.trustCheckedAt

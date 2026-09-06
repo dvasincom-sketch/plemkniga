@@ -72,8 +72,8 @@ export const MilkTests: CollectionConfig = {
       type: 'row',
       fields: [
         { name: 'dailyYield', type: 'number', label: 'Удой за день, кг', required: true },
-        { name: 'fatPercent', type: 'number', label: 'Жир, %' },
-        { name: 'proteinPercent', type: 'number', label: 'Белок, %' },
+        { name: 'fatPercent', type: 'number', label: 'Жир, %', min: 0, max: 15 },
+        { name: 'proteinPercent', type: 'number', label: 'Белок, %', min: 0, max: 15 },
         { name: 'somaticCells', type: 'number', label: 'Соматические клетки, тыс./мл' },
       ],
     },

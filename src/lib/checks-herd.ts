@@ -623,10 +623,15 @@ export async function herdIssues(
    * невелика — все проверки уже посчитаны шестью агрегатами, и отбросить
    * результат выключённой дешевле, чем протащить настройку в каждую ветку.
    */
+  /*
+   * Существенность подменяется только настроенной — тем же правилом,
+   * что в `checkAnimals`: реестровое значение и так лежит в проверке,
+   * а подмена «всегда» затирала расчётные повышения.
+   */
   const applied = issues.flatMap((i) => {
     const rule = resolved.get(i.code)
     if (rule && !rule.enabled) return []
-    return [rule ? { ...i, severity: rule.severity } : i]
+    return [rule?.overridden ? { ...i, severity: rule.severity } : i]
   })
 
   return { issues: applied, limits, scanned }

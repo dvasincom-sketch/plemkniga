@@ -96,32 +96,57 @@ export default async function AccessPage({
     )
   }
 
-  const [issued, received, publicByOldApproval, shares] = await Promise.all([
-    payload
-      .find({
-        collection: 'access-grants',
-        where: { owner: { equals: org } },
-        sort: '-createdAt',
-        limit: 200,
-        depth: 1,
-        overrideAccess: false,
-        user,
-      })
-      .then((r) => r.docs)
-      .catch(() => []),
+  /*
+   * Отказ выборки не превращается в пустой список.
+   *
+   * У всех четырёх стоял `.catch(() => [])`, и при сбое хозяйство читало
+   * «Вы пока никому не открывали доступ» — то есть выдавало поломку
+   * за состояние дел. Отсюда выдают повторно уже выданное или решают,
+   * что доступ отозван сам.
+   *
+   * Список неудач собирается и показывается строкой над разделами:
+   * страница остаётся рабочей — то, что прочиталось, видно, — но молчать
+   * о непрочитанном она больше не может.
+   */
+  const failed: string[] = []
+  const listOf = async <T,>(what: string, run: () => Promise<T[]>): Promise<T[]> => {
+    try {
+      return await run()
+    } catch (e) {
+      console.error(`[plemkniga] доступы: ${what} не прочитались:`, e)
+      failed.push(what)
+      return []
+    }
+  }
 
-    payload
-      .find({
-        collection: 'access-grants',
-        where: { grantee: { equals: org } },
-        sort: '-createdAt',
-        limit: 200,
-        depth: 1,
-        overrideAccess: false,
-        user,
-      })
-      .then((r) => r.docs)
-      .catch(() => []),
+  const [issued, received, publicByOldApproval, shares] = await Promise.all([
+    listOf('выданные доступы', () =>
+      payload
+        .find({
+          collection: 'access-grants',
+          where: { owner: { equals: org } },
+          sort: '-createdAt',
+          limit: 200,
+          depth: 1,
+          overrideAccess: false,
+          user,
+        })
+        .then((r) => r.docs),
+    ),
+
+    listOf('полученные доступы', () =>
+      payload
+        .find({
+          collection: 'access-grants',
+          where: { grantee: { equals: org } },
+          sort: '-createdAt',
+          limit: 200,
+          depth: 1,
+          overrideAccess: false,
+          user,
+        })
+        .then((r) => r.docs),
+    ),
 
     /*
      * Записи, которые прежние одобрения сделали публичными.
@@ -130,17 +155,18 @@ export default async function AccessPage({
      * ни другое по отдельности ничего не значит: открытая карточка может быть
      * решением владельца, а одобренный запрос — уже заменённым на грант.
      */
-    payload
-      .find({
-        collection: 'access-requests',
-        where: { and: [{ owner: { equals: org } }, { status: { equals: 'approved' } }] },
-        sort: '-decidedAt',
-        limit: 100,
-        depth: 1,
-        overrideAccess: true,
-      })
-      .then((r) => r.docs)
-      .catch(() => []),
+    listOf('прежние одобрения', () =>
+      payload
+        .find({
+          collection: 'access-requests',
+          where: { and: [{ owner: { equals: org } }, { status: { equals: 'approved' } }] },
+          sort: '-decidedAt',
+          limit: 100,
+          depth: 1,
+          overrideAccess: true,
+        })
+        .then((r) => r.docs),
+    ),
 
     /*
      * Ссылки на просмотр — и живые, и отработавшие.
@@ -150,18 +176,19 @@ export default async function AccessPage({
      * этот вопрос оставляет без ответа. Счётчик открытий по ней —
      * единственное, что известно о судьбе отправленного адреса.
      */
-    payload
-      .find({
-        collection: 'share-links',
-        where: { owner: { equals: org } },
-        sort: '-createdAt',
-        limit: 100,
-        depth: 1,
-        overrideAccess: false,
-        user,
-      })
-      .then((r) => r.docs)
-      .catch(() => []),
+    listOf('ссылки на просмотр', () =>
+      payload
+        .find({
+          collection: 'share-links',
+          where: { owner: { equals: org } },
+          sort: '-createdAt',
+          limit: 100,
+          depth: 1,
+          overrideAccess: false,
+          user,
+        })
+        .then((r) => r.docs),
+    ),
   ])
 
   const stillPublic = publicByOldApproval.filter((r) => {
@@ -213,6 +240,21 @@ export default async function AccessPage({
           Два способа показать свои записи чужим: точечный доступ — хозяйствам,
           которые уже в книге; ссылка на просмотр — всем остальным.
         </p>
+
+        {/*
+           Непрочитанное называется вслух.
+
+           Пустой список и несостоявшаяся выборка выглядят одинаково,
+           а означают противоположное: «вы никому не открывали» против
+           «мы не смогли посмотреть». По первому выдают доступ второй раз.
+        */}
+        {failed.length > 0 && (
+          <p className="card mt-4 max-w-[75ch] text-[15px] leading-relaxed text-ink-700">
+            Часть списков не прочиталась: {failed.join(', ')}. Показано то, что удалось
+            получить, — считать остальное отсутствующим нельзя. Обновите страницу; если
+            повторится, сообщите в Ассоциацию.
+          </p>
+        )}
 
         {/*
            Заголовок группы, которого не было.

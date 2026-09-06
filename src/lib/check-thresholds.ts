@@ -397,7 +397,19 @@ export async function resolveThresholds(payload: Payload): Promise<Thresholds> {
       overrideAccess: true,
     })
     .then((r) => r.docs)
-    .catch(() => null)
+    .catch((e: unknown) => {
+      /*
+       * Отказ виден в логе, а не проглатывается.
+       *
+       * Умолчания при сбое — верное поведение: без порогов проверки
+       * не выполнить вовсе, а умолчания равны тому, что стоит у Ассоциации
+       * до первой правки. Неверным было молчание: в этот момент заслон
+       * подтверждения работает по чужим числам, и узнать об этом после
+       * было неоткуда.
+       */
+      console.error('[plemkniga] пороги проверок не прочитались, взяты умолчания:', e)
+      return null
+    })
 
   return rows ? applyThresholdRows(rows) : defaultThresholds()
 }
