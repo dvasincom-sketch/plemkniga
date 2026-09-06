@@ -225,7 +225,7 @@ export default async function ReliabilityNotePage({
             . При достоверности 0,91 это ±{nf(errorKg(0.91))}&nbsp;кг, при 0,50 —
             ±{nf(errorKg(0.5))}&nbsp;кг — и это одна ошибка, а разумный размах вдвое шире.
             То есть у быка с половинной достоверностью истинная ценность спокойно лежит
-            в трёхстах килограммах в любую сторону от напечатанной. Это не промах расчёта,
+            в ±{nf(errorKg(0.5) * 2)}&nbsp;кг от напечатанной. Это не промах расчёта,
             а честно объявленная им неопределённость.
           </p>
         </section>
@@ -274,7 +274,7 @@ export default async function ReliabilityNotePage({
                   <th className="text-left">Дочерей</th>
                   <th className="w-[150px] text-right">Достоверность</th>
                   <th className="w-[170px] text-right">Дочерей добавлено</th>
-                  <th className="w-[190px] text-right">Прибавка, п.&nbsp;п.</th>
+                  <th className="w-[190px] text-right">Прибавка, процентных пунктов</th>
                   <th className="w-[170px] text-right">Ошибка оценки</th>
                 </tr>
               </thead>
@@ -307,8 +307,8 @@ export default async function ReliabilityNotePage({
           <p className="mt-5 text-[16px] leading-relaxed text-ink-700">
             Главное в этой таблице — не левый столбец, а последние два. Первые{' '}
             {rowOfficial.n} дочерей дают {pct(rowOfficial.r)} и ошибку в ±{nf(rowOfficial.error)}
-            &nbsp;кг. Следующие {nf(lastRow.n - prevRow.n)} — то есть удвоение всего стада
-            дочерей — добавляют {lastRow.addedPoints} {points(lastRow.addedPoints ?? 0)} и снимают
+            &nbsp;кг. А дальше по строкам: {nf(lastRow.n - prevRow.n)} дочерей сверх{' '}
+            {prevRow.n} — то есть удвоение всего стада дочерей — добавляют {lastRow.addedPoints} {points(lastRow.addedPoints ?? 0)} и снимают
             {' '}{nf(prevRow.error - lastRow.error)}&nbsp;кг. Достоверность растёт быстро,
             пока данных мало, и почти перестаёт расти, когда их много: до единицы остаётся
             k/(n&nbsp;+&nbsp;k), а эта дробь убывает как 1/n.
@@ -351,8 +351,8 @@ export default async function ReliabilityNotePage({
             признаками не количественной, а качественной. Удой наследуется на{' '}
             {dec(milk.heritability)}, фертильность — на {dec(trait('fertility').heritability)},
             смертность приплода — на {dec(trait('calfMortality').heritability)}. Разница
-            в наследуемости в пятнадцать раз даёт разницу в требуемом числе дочерей примерно
-            во столько же.
+            в наследуемости во столько же раз даёт примерно такую же разницу в требуемом
+            числе дочерей — это видно в таблице ниже.
           </p>
 
           <div className="mt-6 overflow-x-auto">
@@ -393,7 +393,8 @@ export default async function ReliabilityNotePage({
           <p className="mt-4 max-w-[75ch] text-[14px] leading-relaxed text-ink-500">
             Наследуемости взяты из таблицы признаков, по которой считается индекс; числа
             дочерей посчитаны той же функцией, что и пороги на карточке быка. Столбец «до 0,5» —
-            это и есть k, округлённое вверх.
+            это и есть k, округлённое к ближайшему целому: деление даёт не ровное значение,
+            и округление вверх приписывало бы порогу лишнюю дочь.
           </p>
 
           <p className="mt-5 max-w-[75ch] text-[16px] leading-relaxed text-ink-700">

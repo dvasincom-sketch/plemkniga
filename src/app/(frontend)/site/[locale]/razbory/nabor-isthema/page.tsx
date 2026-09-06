@@ -57,12 +57,19 @@ export default async function EasthamNotePage({
   const note = noteBySlug(SLUG)!
 
   /** Сходимость с публикацией — доказательство, что колонки прочитаны верно. */
+  /*
+   * Левый столбец считается из самого набора, правый набран из публикации.
+   * Иначе сходимость доказывала бы сама себя: два одинаковых числа, набранных
+   * рукой, сходятся всегда.
+   */
+  const early = AFC_REFERENCE_BANDS.find((b) => b.key === 'early')
+  const veryLate = AFC_REFERENCE_BANDS.find((b) => b.key === 'veryLate')
   const AGREEMENT: [что: string, унас: string, встатье: string][] = [
-    ['Коров в расчёте', '396 471', '396 534'],
-    ['Средний возраст, мес.', '29,08', '29,1'],
-    ['Медиана, мес.', '28', '28'],
-    ['Доля до 24 мес.', '12,2 %', '12,3 %'],
-    ['Доля 30 мес. и старше', '40,9 %', '40,9 %'],
+    ['Коров в расчёте', AFC_REFERENCE_META.cows.toLocaleString('ru-RU'), '396 534'],
+    ['Средний возраст, мес.', AFC_REFERENCE_META.meanAfc.toLocaleString('ru-RU'), '29,1'],
+    ['Медиана, мес.', String(AFC_REFERENCE_META.medianAfc), '28'],
+    ['Доля до 24 мес.', `${(early?.share ?? 0).toLocaleString('ru-RU')} %`, '12,3 %'],
+    ['Доля 31 мес. и старше', `${(veryLate?.share ?? 0).toLocaleString('ru-RU')} %`, '40,9 %'],
   ]
 
   return (
@@ -81,7 +88,7 @@ export default async function EasthamNotePage({
           <p className="mt-5 text-[16px] leading-relaxed text-ink-700">
             Работа Истхэма с соавторами 2018 года — одно из самых крупных наблюдений
             за возрастом первого отёла: 396 534 коровы
-            из {AFC_REFERENCE_META.herds.toLocaleString('ru-RU')} британских стад, отёлы
+            из {AFC_REFERENCE_META.herds.toLocaleString('ru-RU')} британских хозяйств, отёлы
             2006–2008 годов, наблюдение продолжено до 2012-го. Авторы смотрели, что
             происходит с коровой дальше в зависимости от того, в каком возрасте она
             отелилась впервые.
@@ -284,7 +291,7 @@ export default async function EasthamNotePage({
 
         {/* ------------------------ Чего это не доказывает --------------------- */}
         <section className="mt-14 max-w-[75ch] rounded-2xl border border-ink-100 bg-white p-6 sm:p-8">
-          <h2 className="text-[20px] font-medium leading-tight">Чего этот набор не доказывает</h2>
+          <h2 className="text-[20px] font-medium leading-tight">Чего этот разбор не доказывает</h2>
 
           <div className="mt-5 space-y-4 text-[15px] leading-relaxed text-ink-500">
             <p>

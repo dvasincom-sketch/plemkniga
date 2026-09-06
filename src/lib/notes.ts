@@ -42,6 +42,8 @@
  * страницу и помечены `canonical` на неё.
  */
 
+import { FGIAS_TOTALS } from '@/lib/fgias-templates'
+
 export type NoteSource = {
   /** Как называется источник — так, чтобы его можно было найти без ссылки. */
   title: string
@@ -74,6 +76,24 @@ export type Note = {
   terms?: string[]
   sources: NoteSource[]
 }
+
+/*
+ * Числа в паспорте и лиде: почему их здесь почти нет.
+ *
+ * Страницы разборов подставляют пороги, глубины и счётчики вызовами —
+ * это и есть обещание раздела. Паспорт и лид живут в этом файле, где
+ * вызвать нечего, и потому притягивают числа, набранные руками: «6,25 %»,
+ * «шесть колен в подборе, девять в карточке», «36 пород из 55».
+ * Все три однажды разойдутся с кодом, и разойдутся молча — шапка страницы
+ * будет утверждать прежнее рядом с новым.
+ *
+ * Поэтому правило: в паспорте и лиде число стоит только тогда, когда
+ * его нельзя посчитать (год, версия шаблона, размер чужой выборки).
+ * Всё вычислимое названо словами — «эквивалент спаривания двоюродных»
+ * вместо «6,25 %», — а само число читатель видит на странице, где оно
+ * взято из кода. Исключение одно: `FGIAS_TOTALS` — чистые данные без
+ * зависимостей, их можно подставить прямо здесь.
+ */
 
 export const NOTE_AUTHOR = 'Дмитрий Васин'
 export const NOTE_AUTHOR_URL = 'https://t.me/dvasin'
@@ -109,7 +129,7 @@ export const NOTES: Note[] = [
       {
         title: 'VanRaden P. M. et al. Net merit as a measure of lifetime profit: 2025 revision (ARR NM$9)',
         url: 'https://uscdcb.com/wp-content/uploads/2025/02/nmcalc-2025_ARR-NM9_without-type_composites.pdf',
-        what: 'Стандартные отклонения признаков и относительные веса NM$ 2025',
+        what: 'Стандартные отклонения признаков. Веса мы отсюда не берём — только σ',
       },
       {
         title: 'CDCB. National Dairy Genetic Index Update, Base Change Set for April 2025',
@@ -148,7 +168,9 @@ export const NOTES: Note[] = [
     ],
     sources: [
       {
-        title: 'Eastham N. T. et al. Associations between age at first calving and subsequent lactation performance in UK Holstein and Holstein-Friesian dairy cows. PLOS ONE, 2018',
+        title:
+          'Eastham N. T. et al. Associations between age at first calving and subsequent ' +
+          'lactation performance in UK Holstein and Holstein-Friesian dairy cows. PLOS ONE, 2018',
         url: 'https://doi.org/10.1371/journal.pone.0197764',
         what: 'Постановка, выборка и опубликованные модельные кривые',
       },
@@ -241,7 +263,7 @@ export const NOTES: Note[] = [
     ],
     sources: [
       {
-        title: 'ICAR. Section 5 — Conformation Recording',
+        title: 'ICAR Guidelines, Section 05 — Conformation Recording',
         url: 'https://wiki.icar.org/index.php/Section_05_%E2%80%93_Conformation_Recording',
         what: 'Список стандартных признаков, шкала 1–9, композиты и границы классов',
       },
@@ -296,8 +318,8 @@ export const NOTES: Note[] = [
     ],
     sources: [
       {
-        title: 'ICAR. Section 2 — Cattle Milk Recording',
-        url: 'https://wiki.icar.org/index.php/Section_02_%E2%80%93_Guidelines_for_Cattle_Milk_Recording',
+        title: 'ICAR Guidelines, Section 02 — Cattle Milk Recording',
+        url: 'https://wiki.icar.org/index.php/Section_02_%E2%80%93_Cattle_Milk_Recording',
         what: 'Обозначения методов контроля, требования к отбору проб и к периодичности',
       },
       {
@@ -337,8 +359,8 @@ export const NOTES: Note[] = [
     ],
     sources: [
       {
-        title: 'ICAR. Section 9 — Dairy Cattle Genetic Evaluation',
-        url: 'https://wiki.icar.org/index.php/Section_09_%E2%80%93_Guidelines_for_Dairy_Cattle_Genetic_Evaluation',
+        title: 'ICAR Guidelines, Section 09 — Dairy Cattle Genetic Evaluation',
+        url: 'https://wiki.icar.org/index.php/Section_09_%E2%80%93_Dairy_Cattle_Genetic_Evaluation',
         what: 'Требования к публикации оценок и к сопровождающей их достоверности',
       },
       {
@@ -354,15 +376,18 @@ export const NOTES: Note[] = [
     lead:
       'Коэффициент инбридинга считают по родословной, а родословная всегда неполна. ' +
       'Разбираем, как ищутся общие предки, в какую сторону ошибается пропуск, ' +
-      'откуда взялся порог 6,25 % и почему его считают для ещё не рождённого телёнка.',
+      'откуда взялся порог внимания и почему его считают для ещё не рождённого телёнка.',
     date: '2026-09-04',
     author: NOTE_AUTHOR,
     authorUrl: NOTE_AUTHOR_URL,
     passport: [
       { label: 'Что разбирается', value: 'Расчёт родства и инбридинга по записанной родословной' },
       { label: 'Формула', value: 'Коэффициент родства по Райту, обход общих предков' },
-      { label: 'У нас', value: 'Шесть колен в подборе пар, девять в карточке животного' },
-      { label: 'Порог', value: '6,25 % — эквивалент спаривания двоюродных' },
+      {
+        label: 'У нас',
+        value: 'Три глубины обхода: в подборе пар, в карточке и в сравнении быков',
+      },
+      { label: 'Порог', value: 'Эквивалент спаривания двоюродных' },
     ],
     terms: [
       'koeffitsient-inbridinga',
@@ -382,8 +407,8 @@ export const NOTES: Note[] = [
         what: 'Исходная работа, из которой взята формула коэффициента родства',
       },
       {
-        title: 'ICAR. Section 9 — Dairy Cattle Genetic Evaluation',
-        url: 'https://wiki.icar.org/index.php/Section_09_%E2%80%93_Guidelines_for_Dairy_Cattle_Genetic_Evaluation',
+        title: 'ICAR Guidelines, Section 09 — Dairy Cattle Genetic Evaluation',
+        url: 'https://wiki.icar.org/index.php/Section_09_%E2%80%93_Dairy_Cattle_Genetic_Evaluation',
         what: 'Место родословной в оценке и требования к её полноте',
       },
     ],
@@ -392,7 +417,7 @@ export const NOTES: Note[] = [
     slug: 'vozrast-pervogo-otela',
     title: 'Возраст первого отёла: почему российский оптимум расходится с западным',
     lead:
-      'Западные работы дают оптимум 22–24 месяца, российские нередко 26–28, и объяснение ' +
+      'Западные работы сходятся на 22–25 месяцах, российские нередко на 26–28, и объяснение ' +
       '«у нас другой скот» неверно. Разбираем, что на самом деле делит источники надвое ' +
       'и почему правильный ориентир звучит только вместе с живой массой.',
     date: '2026-09-04',
@@ -415,7 +440,9 @@ export const NOTES: Note[] = [
     ],
     sources: [
       {
-        title: 'Eastham N. T. et al. PLOS ONE, 2018',
+        title:
+          'Eastham N. T. et al. Associations between age at first calving and subsequent ' +
+          'lactation performance in UK Holstein and Holstein-Friesian dairy cows. PLOS ONE, 2018',
         url: 'https://doi.org/10.1371/journal.pone.0197764',
         what: '396 534 первотёлки, 6 985 хозяйств: связь возраста первого отёла с продуктивностью и дожитием',
       },
@@ -480,7 +507,7 @@ export const NOTES: Note[] = [
     slug: 'malochislennye-porody',
     title: 'Малочисленные породы: что даёт книга там, где нет геномики',
     lead:
-      'У 36 пород из 55 в российском реестре нет даже международного кода, а геномная ' +
+      'У большинства пород российского реестра нет даже международного кода, а геномная ' +
       'оценка им недоступна по числу животных. Разбираем, что в этом случае работает: ' +
       'учёт родства, контроль инбридинга и книга как условие сохранения породы.',
     date: '2026-09-04',
@@ -488,7 +515,10 @@ export const NOTES: Note[] = [
     authorUrl: NOTE_AUTHOR_URL,
     passport: [
       { label: 'Что разбирается', value: 'Работа с породой, у которой нет ни геномики, ни книги' },
-      { label: 'Из нашего каталога', value: '55 пород молочного направления, у 36 нет кода ICAR' },
+      {
+        label: 'Из нашего каталога',
+        value: 'Породы молочного направления и их коды ICAR — числа на самой странице',
+      },
       { label: 'Что работает', value: 'Родословная, коэффициент родства, подбор пар' },
       { label: 'Кому', value: 'Объединению или хозяйству, ведущему редкую породу' },
     ],
@@ -508,11 +538,11 @@ export const NOTES: Note[] = [
       {
         title: 'FAO. Domestic Animal Diversity Information System (DAD-IS)',
         url: 'https://www.fao.org/dad-is/en/',
-        what: 'Численность и статус риска пород; данные вносят национальные координаторы',
+        what: 'Что мировой реестр ведёт по породам и почему его числа расходятся с нашими; данные вносят национальные координаторы',
       },
       {
-        title: 'ICAR. Section 18 — Breed Associations',
-        url: 'https://wiki.icar.org/index.php/Section_18_%E2%80%93_Guidelines_for_Breed_Associations',
+        title: 'ICAR Guidelines, Section 18 — Breed Associations',
+        url: 'https://wiki.icar.org/index.php/Section_18_%E2%80%93_Breed_Associations',
         what: 'Что руководства требуют от организации, ведущей племенную книгу',
       },
     ],
@@ -521,7 +551,8 @@ export const NOTES: Note[] = [
     slug: 'fgias-i-indeks',
     title: 'Файлы ФГИАС ПР: фундамент национального индекса и что книга умеет сегодня',
     lead:
-      'Двадцать шаблонов реестра читаются как отчётность, а это материал, из которого к 2030 году ' +
+      `${FGIAS_TOTALS.templates} шаблонов реестра читаются как отчётность, а это материал, ` +
+      'из которого к 2030 году ' +
       'собираются посчитать национальный индекс племенной ценности. Разбираем, что уже уезжает ' +
       'из книги, где узкое место и почему оно не там, где ждут.',
     date: '2026-09-04',
@@ -531,7 +562,12 @@ export const NOTES: Note[] = [
       { label: 'Что разбирается', value: 'Государственные выгрузки книги и то, ради чего они' },
       { label: 'Срок', value: 'ФГИАС ПР обязательна с 1 марта 2026 года' },
       { label: 'Цель ведомства', value: 'Национальный индекс племенной ценности к 2030 году' },
-      { label: 'У нас', value: '20 шаблонов версии 2.6.0, 194 колонки из 265' },
+      {
+        label: 'У нас',
+        value:
+          `${FGIAS_TOTALS.templates} шаблонов версии 2.6.0, ` +
+          `${FGIAS_TOTALS.fill} колонок из ${FGIAS_TOTALS.columns}`,
+      },
     ],
     terms: [
       'plemennaya-tsennost',
@@ -596,8 +632,16 @@ export const NOTES: Note[] = [
     terms: ['vozrast-pervogo-otela', 'zhivaya-massa', 'servis-period'],
     sources: [
       {
-        title: 'ICAR Guidelines, Section 2 — Identification and recording of young stock',
-        url: 'https://www.icar.org/index.php/icar-recording-guidelines/',
+        title:
+          'Eastham N. T. et al. Associations between age at first calving and subsequent ' +
+          'lactation performance in UK Holstein and Holstein-Friesian dairy cows. PLOS ONE, 2018',
+        url: 'https://doi.org/10.1371/journal.pone.0197764',
+        what: 'Связь возраста первого отёла с продуктивностью и дожитием на 396 534 первотёлках',
+      },
+      {
+        title: 'ICAR Guidelines, Section 06 — AI and ET Data and Fertility Analysis',
+        url: 'https://wiki.icar.org/index.php/Section_06_%E2%80%93_AI_and_ET_Data_and_Fertility_Analysis',
+        what: 'Возраст первого отёла и возраст первого осеменения как показатели воспроизводства',
       },
     ],
   },
@@ -625,10 +669,15 @@ export const NOTES: Note[] = [
     ],
     sources: [
       {
-        title: 'ICAR Guidelines, Section 5 — Milk recording and reproduction data',
-        url: 'https://www.icar.org/index.php/icar-recording-guidelines/',
+        title: 'ICAR Guidelines, Section 06 — AI and ET Data and Fertility Analysis',
+        url: 'https://wiki.icar.org/index.php/Section_06_%E2%80%93_AI_and_ET_Data_and_Fertility_Analysis',
+        what: 'Определения сервис-периода, межотельного периода и индекса осеменения',
       },
-      { title: 'Шаблоны «Сервис-период» и «Межотельный период» ФГИАС ПР, версия 2.6.0' },
+      {
+        title: 'ICAR Guidelines, Section 07 — Bovine Functional Traits, глава о фертильности коров',
+        url: 'https://wiki.icar.org/index.php/Section_07_%E2%80%93_Bovine_Functional_Traits#Female_Fertility_in_Dairy_Cattle',
+        what: 'Какие показатели воспроизводства годятся для оценки, а какие меряют управление',
+      },
     ],
   },
   {
@@ -649,8 +698,14 @@ export const NOTES: Note[] = [
     terms: ['somaticheskie-kletki', 'kontrolnoe-doenie', 'metod-kontrolya-produktivnosti'],
     sources: [
       {
-        title: 'ICAR Guidelines, Section 11 — Somatic cell counting',
-        url: 'https://www.icar.org/index.php/icar-recording-guidelines/',
+        title: 'ICAR Guidelines, Section 07 — Bovine Functional Traits, глава о здоровье вымени',
+        url: 'https://wiki.icar.org/index.php/Section_07_%E2%80%93_Bovine_Functional_Traits#Udder_health_in_Dairy_Cattle',
+        what: 'Соматические клетки как признак здоровья вымени и правила их записи',
+      },
+      {
+        title: 'ICAR Guidelines, Section 02 — Cattle Milk Recording',
+        url: 'https://wiki.icar.org/index.php/Section_02_%E2%80%93_Cattle_Milk_Recording',
+        what: 'Порядок записи соматических клеток при контрольном доении',
       },
     ],
   },
@@ -672,8 +727,14 @@ export const NOTES: Note[] = [
     terms: ['vozrast-pervogo-otela', 'laktatsiya-za-305-dney', 'servis-period'],
     sources: [
       {
-        title: 'ICAR Guidelines, Section 2 — Disposal and culling reasons',
-        url: 'https://www.icar.org/index.php/icar-recording-guidelines/',
+        title: 'ICAR Glossary: Disposal reason',
+        url: 'https://wiki.icar.org/index.php/Glossary:_Disposal_reason',
+        what: 'Кодированный список причин выбытия — тот, на который равняется наш справочник',
+      },
+      {
+        title: 'ICAR Guidelines, Section 22 — Sustainability recording traits',
+        url: 'https://wiki.icar.org/index.php/Section_22_%E2%80%93_Sustainability_recording_traits',
+        what: 'Долголетие и выбраковка как измеряемый признак, а не как следствие',
       },
     ],
   },
@@ -690,7 +751,7 @@ export const NOTES: Note[] = [
     passport: [
       { label: 'Что разбирается', value: 'Отчёт «Генетический тренд и инбридинг»' },
       { label: 'Откуда числа', value: 'lib/herd-analytics.ts, lib/ancestry.ts, lib/index-base.ts' },
-      { label: 'Порог', value: 'Инбридинг: граница внимания 6,25 %' },
+      { label: 'Порог', value: 'Инбридинг: граница внимания — эквивалент двоюродных' },
     ],
     terms: [
       'koeffitsient-inbridinga',
@@ -702,6 +763,12 @@ export const NOTES: Note[] = [
       {
         title: 'Interbull: валидация генетического тренда, методы I–III',
         url: 'https://interbull.org/ib/geneval',
+        what: 'Как проверяют, что наклон линии — генетика, а не смена базы или метода',
+      },
+      {
+        title: 'ICAR Guidelines, Section 09 — Dairy Cattle Genetic Evaluation',
+        url: 'https://wiki.icar.org/index.php/Section_09_%E2%80%93_Dairy_Cattle_Genetic_Evaluation',
+        what: 'Требования к генетической оценке и к смене базы сравнения',
       },
     ],
   },
@@ -723,8 +790,9 @@ export const NOTES: Note[] = [
     terms: ['laktatsiya-za-305-dney', 'udoy-za-laktatsiyu', 'kontrolnoe-doenie'],
     sources: [
       {
-        title: 'ICAR Guidelines, Section 2 — Computing 305-day lactation records',
-        url: 'https://www.icar.org/index.php/icar-recording-guidelines/',
+        title: 'ICAR Guidelines, Section 02 — Cattle Milk Recording, «Computing of Accumulated Lactation Yield»',
+        url: 'https://wiki.icar.org/index.php/Section_02_%E2%80%93_Cattle_Milk_Recording#Procedures',
+        what: 'Стандартный порядок расчёта удоя за 305 дней из контрольных доений',
       },
     ],
   },

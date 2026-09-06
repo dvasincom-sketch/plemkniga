@@ -9,8 +9,8 @@ import { NOTES, noteBySlug } from '@/lib/notes'
 import { pageMetadata } from '@/lib/seo'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
 import {
+  FGIAS_MEASURED_AT,
   FGIAS_MEASURED_ON,
-  FGIAS_MEASURED_ON_DATE,
   FGIAS_TEMPLATES,
   FGIAS_TOTALS,
 } from '@/lib/fgias-templates'
@@ -65,11 +65,15 @@ export default async function FgiasNotePage({
 
   const ready = FGIAS_TEMPLATES.filter((t) => t.state === 'ready').length
   const share = Math.round((FGIAS_TOTALS.fill / FGIAS_TOTALS.columns) * 100)
-  const measured = new Date(FGIAS_MEASURED_ON_DATE).toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
+  /*
+   * Дата берётся готовой из библиотеки, а не собирается здесь заново.
+   * Здесь стоял `toLocaleDateString`: он разбирает «2026-08-30» как полночь
+   * UTC, а печатает в поясе сервера — при отрицательном смещении страница
+   * показала бы 29 августа, тогда как соседние два места печатают 30-е.
+   * Расхождение сутками, зависящее от среды сборки, — ровно та неправда,
+   * которую нельзя заметить у себя.
+   */
+  const measured = FGIAS_MEASURED_AT
 
   /** Три шаблона, на которых видно устройство дела. */
   const SHOWN = ['Основные сведения', 'Родословная', 'Достоверность происхождения']
@@ -184,7 +188,7 @@ export default async function FgiasNotePage({
           </h2>
 
           <p className="mt-5 max-w-[75ch] text-[16px] leading-relaxed text-ink-700">
-            Двадцать шаблонов версии 2.6.0 книга собирает целиком. Колонки сосчитаны чтением
+            Все {FGIAS_TOTALS.templates} шаблонов версии 2.6.0 книга собирает целиком. Колонки сосчитаны чтением
             самих файлов, а «заполним» получено прогоном по живой базе: считались поля, которые
             в книге заведены <strong className="font-medium">и заполняются</strong>. Считать
             по схеме было бы лестнее и бесполезнее — поле, которое никто не вносит, даёт
@@ -194,14 +198,24 @@ export default async function FgiasNotePage({
           <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
             {[
               { value: `${FGIAS_TOTALS.templates}`, label: 'шаблонов собирается кнопкой' },
-              { value: `${ready} из ${FGIAS_TOTALS.templates}`, label: 'заполняются целиком' },
+              {
+                value: `${ready} из ${FGIAS_TOTALS.templates}`,
+                /*
+                 * Не «заполняются целиком»: `ready` означает, что шаблон
+                 * собирается и уходит в реестр без правки руками, а пустые
+                 * колонки в нём остаться могут — у «Лактации» их девять
+                 * из тринадцати. Прежняя подпись противоречила таблице,
+                 * стоящей на той же странице тридцатью строками ниже.
+                 */
+                label: 'уезжают без правки руками',
+              },
               {
                 value: `${FGIAS_TOTALS.fill} из ${FGIAS_TOTALS.columns}`,
                 label: `колонок заполняем — ${share} %`,
               },
               {
                 value: FGIAS_TOTALS.rowsReady.toLocaleString('ru-RU'),
-                label: 'строк уехало бы без единой правки',
+                label: 'строк уехало бы на день прогона',
               },
             ].map((n) => (
               <div key={n.label} className="rounded-2xl border border-ink-100 bg-white p-5">
@@ -218,6 +232,9 @@ export default async function FgiasNotePage({
             не пересчитываются при открытии страницы: расчёт на каждое открытие означал бы обход
             всей книги ради витрины, а главное — менялся бы от хозяйства к хозяйству, тогда как
             отвечать надо про платформу. Дата поэтому стоит рядом с числами, а не в примечании.
+            Последнее число к тому же неполное и не подправлено «на глазок»: строки считались
+            по тем шаблонам, которые собирались кнопкой к тому дню, а с тех пор их стало
+            больше. Сегодня уехало бы не меньше — сколько именно, скажет следующий прогон.
           </p>
 
           <div className="mt-8 overflow-x-auto">

@@ -54,6 +54,7 @@
     "check:bulls": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-bulls.ts",
     "check:bounds": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-bounds.ts",
     "check:after-commit": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-after-commit.ts",
+    "check:studies": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-studies.ts",
     "check:journal": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-journal.ts",
     "check:security": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-security.ts",
     "check:trust": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-trust.ts",

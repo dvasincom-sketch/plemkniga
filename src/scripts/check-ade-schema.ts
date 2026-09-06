@@ -15,6 +15,12 @@ import {
   adeWeight,
   type AnimalInput,
 } from '@/lib/ade/resources'
+import {
+  RECORDING_PROTOCOL,
+  RECORDING_SCHEME,
+  SAMPLING_MOMENT,
+  SAMPLING_SCHEME,
+} from '@/lib/milk-recording'
 
 /**
  * Сверка того, что мы отдаём, с настоящими схемами ICAR.
@@ -352,6 +358,75 @@ for (const [name, schemaName, resource] of CASES) {
 }
 
 console.log(`Сверено ресурсов: ${checked} из ${CASES.length}`)
+
+/* ------------------------------------------------------------------ *
+ *          Перечисления метода контроля против копии стандарта         *
+ * ------------------------------------------------------------------ */
+
+/*
+ * Четыре перечисления ICAR книга держит у себя списками с русскими
+ * подписями (`lib/milk-recording.ts`), и разбор «Метод контроля»
+ * обещает читателю, что отдельная проверка следит за их совпадением
+ * с копией стандарта. Проверки не было: сверялись только ресурсы,
+ * а полей метода контроля ни в одном из них нет.
+ *
+ * Обещание, за которым ничего не стоит, хуже отсутствующего: значения
+ * набраны руками, вплоть до опечатки ICAR в одном из них
+ * (`MulitpleMilkingSampleInAMS`), и первая же правка «по красоте»
+ * сделала бы выгрузку непринимаемой — молча.
+ *
+ * Сверяются ключи, а не подписи: подписи наши и переводятся, ключи
+ * принадлежат стандарту.
+ */
+const ENUM_CASES: { file: string; ours: readonly string[]; what: string }[] = [
+  {
+    file: 'icarMilkRecordingProtocolType.json',
+    ours: Object.keys(RECORDING_PROTOCOL),
+    what: 'кто снимал показания',
+  },
+  {
+    file: 'icarMilkRecordingSchemeType.json',
+    ours: Object.keys(RECORDING_SCHEME),
+    what: 'какие доения вошли в контроль',
+  },
+  {
+    file: 'icarMilkSamplingSchemeType.json',
+    ours: Object.keys(SAMPLING_SCHEME),
+    what: 'как брали пробу',
+  },
+  {
+    file: 'icarMilkSamplingMomentType.json',
+    ours: Object.keys(SAMPLING_MOMENT),
+    what: 'когда брали пробу',
+  },
+]
+
+console.log('')
+console.log('Перечисления метода контроля против копии стандарта')
+
+for (const c of ENUM_CASES) {
+  const path = join(VENDOR, 'enums', c.file)
+  if (!existsSync(path)) {
+    fail(`${c.file}: копии схемы нет в дереве — сверять не с чем`)
+    continue
+  }
+
+  const theirs = (JSON.parse(readFileSync(path, 'utf8')) as { enum?: unknown }).enum
+  if (!Array.isArray(theirs) || theirs.length === 0) {
+    fail(`${c.file}: в схеме нет списка значений — проверка ничего не измерила`)
+    continue
+  }
+
+  const their = new Set(theirs.map(String))
+  const extra = c.ours.filter((k) => !their.has(k))
+  const absent = [...their].filter((k) => !c.ours.includes(k))
+
+  if (extra.length) fail(`${c.file}: у нас есть, а в стандарте нет — ${extra.join(', ')}`)
+  if (absent.length) fail(`${c.file}: в стандарте есть, а у нас нет — ${absent.join(', ')}`)
+  if (!extra.length && !absent.length) {
+    console.log(`  ✓ ${c.what}: ${c.ours.length}`)
+  }
+}
 
 if (excused > 0) {
   console.log('')

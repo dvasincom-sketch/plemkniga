@@ -206,6 +206,30 @@ export async function requestVerificationAction(
       }
     }
 
+    /*
+     * Новая заявка снимает «Отклонено» с тех записей, что в ней есть.
+     *
+     * Это единственная дверь из ступени −1, и выбрана она потому, что
+     * подача заявки и есть заявление хозяйства «я исправил и снова
+     * ручаюсь». Разбор трёх рассмотренных дверей — у `clearRejection`
+     * в `src/lib/trust.ts`.
+     *
+     * После создания заявки, а не до: если создание упадёт, отметка
+     * останется на месте, и хозяйство окажется там же, откуда начало.
+     * Отказ снятия саму заявку не отменяет — данные уже у Ассоциации.
+     */
+    const { clearRejection } = await import('@/lib/trust')
+    const cleared = await clearRejection(
+      payload,
+      docs.map((d) => Number(d.id)),
+    ).catch((e: unknown) => {
+      console.error(
+        '[verification] отметка «Отклонено» не снялась:',
+        e instanceof Error ? e.message : e,
+      )
+      return [] as number[]
+    })
+
     revalidatePath('/account')
     revalidatePath('/account/verification')
     revalidatePath('/association/verifications')
@@ -215,10 +239,17 @@ export async function requestVerificationAction(
       organization: orgId,
       subjectType: 'verification',
       subjectId: Number(created.id),
-      summary: `Животных в заявке: ${ids.length}`,
+      summary:
+        `Животных в заявке: ${ids.length}` +
+        (cleared.length ? `; снято «Отклонено» с ${cleared.length}` : ''),
     })
 
-    return { message: 'Заявка подана', createdId: created.id }
+    return {
+      message: cleared.length
+        ? `Заявка подана. Отметка «Отклонено» снята с ${cleared.length} ${plural(cleared.length, 'записи', 'записей', 'записей')} — Ассоциация разберёт их заново`
+        : 'Заявка подана',
+      createdId: created.id,
+    }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Не удалось подать заявку' }
   }
@@ -607,6 +638,31 @@ export async function decideVerificationAction(
     })
   }
 
+  /*
+   * Отказ ставит записям ступень «Отклонено».
+   *
+   * До этой правки отказ менял только статус заявки. Записи оставались
+   * с прежним уровнем, и хозяйство видело у них «Заявлено хозяйством»
+   * рядом с отказом — то есть шкала говорила, что с данными всё в порядке,
+   * а письмо, что нет. Шкала при этом ступень «Отклонено» объявляла
+   * и обещала, что документы по ней не выпускаются: состояние было
+   * описано, показано в справочнике, защищено от перезаписи — и никем
+   * не создавалось.
+   *
+   * Отметка ставится только на записи хозяйства-заявителя: `owned`
+   * посчитан выше тем же запросом, которым проверяется принадлежность
+   * при подтверждении. Животное могли продать, пока заявка лежала,
+   * и наказывать покупателя за спор продавца незачем.
+   *
+   * Почему отклоняются и подтверждённые прежде — у `markRejected`
+   * в `src/lib/trust.ts`: находка старше любой бумаги.
+   */
+  let rejected = 0
+  if (decision === 'rejected' && owned.length) {
+    const { markRejected } = await import('@/lib/trust')
+    rejected = await markRejected(payload, owned as number[], now)
+  }
+
   await payload.update({
     collection: 'verification-requests',
     id: request.id,
@@ -634,6 +690,6 @@ export async function decideVerificationAction(
     message:
       decision === 'approved'
         ? `Подтверждено записей: ${approved.length}${all.length - approved.length ? `, оставлено с замечаниями: ${all.length - approved.length}` : ''}`
-        : 'Заявка отклонена — хозяйство увидит причину и замечания',
+        : `Заявка отклонена. Записей помечено «Отклонено»: ${rejected} — свидетельства по ним не выпускаются, пока хозяйство не подаст заявку заново`,
   }
 }

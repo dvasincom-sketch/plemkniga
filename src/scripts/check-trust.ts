@@ -223,6 +223,85 @@ async function main() {
   })
   console.log(`  · записей со второй ступенью в книге: ${legacy.totalDocs}`)
 
+  console.log('\nОтклонение и выход из него\n')
+
+  /*
+   * Ступень «Отклонено» была в шкале с самого начала и не ставилась
+   * никем: отказ по заявке менял статус заявки и не трогал записи,
+   * а поле закрыто на запись и через форму, и через API. Шкала обещала
+   * состояние, которого система не производила, — и проверить это было
+   * нечем, потому что проверка смотрела только на подъём по протоколу.
+   *
+   * Проверяется весь ход: отметка ставится поверх подписи Ассоциации
+   * (находка старше любой бумаги), протокол её не снимает, а новая заявка
+   * снимает — и возвращает не единицу, а ту ступень, которая следует
+   * из книги: у животного с действующим протоколом это вторая.
+   */
+  const { markRejected, clearRejection } = await import('@/lib/trust')
+
+  await payload.update({
+    collection: 'documents',
+    id: good.id,
+    overrideAccess: true,
+    data: { revoked: { at: null, by: null, reason: null } } as never,
+  })
+
+  await markRejected(payload, [Number(animal.id)], new Date().toISOString())
+  check((await level()) === -1, 'отказ ставит «Отклонено» поверх подписи Ассоциации')
+
+  const { syncTrustFromLab } = await import('@/lib/trust')
+  await syncTrustFromLab(payload, Number(animal.id))
+  check((await level()) === -1, 'действующий протокол «Отклонено» НЕ снимает')
+
+  const cleared = await clearRejection(payload, [Number(animal.id)])
+  check(cleared.length === 1, 'новая заявка снимает «Отклонено»', `снято ${cleared.length}`)
+  check((await level()) === 2, 'после снятия возвращается ступень по протоколу, а не единица')
+
+  /*
+   * Второе животное — без протокола: у него после снятия должна остаться
+   * первая ступень. Без этой пары предыдущая проверка не различала бы
+   * «вернулась ступень по протоколу» и «вернулось что попало».
+   */
+  const plain = await payload.create({
+    collection: 'animals',
+    overrideAccess: true,
+    data: {
+      identNumber: `8${suffix}`,
+      name: `${TAG} Без протокола`,
+      sex: 'female',
+      owner: org.id,
+      trustLevel: 1,
+    } as never,
+  })
+  const plainLevel = async (): Promise<number> =>
+    Number(
+      (
+        await payload.findByID({
+          collection: 'animals',
+          id: plain.id,
+          depth: 0,
+          overrideAccess: true,
+        })
+      ).trustLevel ?? 0,
+    )
+
+  await markRejected(payload, [Number(plain.id)], new Date().toISOString())
+  check((await plainLevel()) === -1, 'отказ ставит «Отклонено» и записи без протокола')
+  await clearRejection(payload, [Number(plain.id)])
+  check((await plainLevel()) === 1, 'у записи без протокола возвращается «Заявлено хозяйством»')
+
+  /*
+   * Снятие с записи, которая не отклонена, ничего не делает и ничего
+   * не портит. Утверждение отрицательное и потому проверяется попыткой:
+   * без него функция могла бы понижать до единицы всех подряд — и,
+   * позванная при каждой подаче заявки, тихо снимала бы вторую ступень
+   * у половины книги.
+   */
+  const untouched = await clearRejection(payload, [Number(animal.id)])
+  check(untouched.length === 0, 'снятие не трогает записи, которые не отклонены')
+  check((await level()) === 2, 'ступень по протоколу после лишнего снятия на месте')
+
+
   // ------------------------------ уборка ------------------------------ //
   for (const id of [noLab.id, selfMade.id, good.id]) {
     await payload.delete({ collection: 'documents', id, overrideAccess: true })
@@ -233,6 +312,7 @@ async function main() {
     overrideAccess: true,
   })
   await payload.delete({ collection: 'animals', id: animal.id, overrideAccess: true })
+  await payload.delete({ collection: 'animals', id: plain.id, overrideAccess: true })
   await payload.delete({
     collection: 'users',
     where: { email: { like: `${TAG.toLowerCase()}-` } },

@@ -9,9 +9,9 @@ import { pageMetadata } from '@/lib/seo'
 import { isLocale, type Locale } from '@/lib/i18n/locales'
 import { nf } from '@/lib/format'
 import { SERVICE_MAX, SERVICE_MIN } from '@/lib/fgias-export'
-import { VOLUNTARY_WAIT_DAYS } from '@/lib/checks-registry'
+import { PLAUSIBLE, VOLUNTARY_WAIT_DAYS } from '@/lib/checks-registry'
 import { thresholdSpec } from '@/lib/check-thresholds'
-import { DRY_OFF_BEFORE, GESTATION_DAYS } from '@/lib/herd-calendar'
+import { CYCLE_DAYS, DRY_OFF_BEFORE, GESTATION_DAYS } from '@/lib/herd-calendar'
 import { CONVERSIONS, COSTS, ECONOMIC_WEIGHTS, LIFETIME_LACTATIONS } from '@/lib/economics'
 import { checkSpec } from '@/lib/check-registry'
 
@@ -87,9 +87,6 @@ export default async function ReproductionNotePage({
   const SERVICE_FROM_INTERVAL: [number, number] = [380 - GESTATION_DAYS, 400 - GESTATION_DAYS]
   const INTERVAL_FROM_SERVICE: [number, number] = [85 + GESTATION_DAYS, 110 + GESTATION_DAYS]
 
-  /* Половой цикл коровы: одна неудачная попытка отодвигает стельность на него. */
-  const CYCLE_DAYS = 21
-
   /* Что стоит одна неудачная попытка — цикл, оценённый днями сервис-периода. */
   const CYCLE_COST = CYCLE_DAYS * COSTS.openDay
 
@@ -124,7 +121,7 @@ export default async function ReproductionNotePage({
       about: 'От отёла до первой попытки — про выявление охоты, а не про оплодотворяемость',
       window: 'Те же отёлы за 18 месяцев, тем же куском запроса',
       whom: 'Лактации, в которых была хотя бы одна попытка',
-      bounds: `${VOLUNTARY_WAIT_DAYS}–250 дней`,
+      bounds: `${VOLUNTARY_WAIT_DAYS}–${PLAUSIBLE.firstService.max} дней`,
     },
     {
       tile: 'Осеменений на стельность',
@@ -138,7 +135,7 @@ export default async function ReproductionNotePage({
       about: 'Между двумя соседними отёлами одной коровы',
       window: 'Промежутки, закрывшиеся за последние 12 месяцев',
       whom: 'Только коровы с двумя отёлами и более',
-      bounds: '300–600 дней',
+      bounds: `${PLAUSIBLE.calvingInterval.min}–${PLAUSIBLE.calvingInterval.max} дней`,
     },
   ]
 
@@ -402,7 +399,8 @@ export default async function ReproductionNotePage({
             отёлами одной коровы. Не «первый и последний отёл, делённые на их число»: так выходит
             среднее за всю жизнь стада, и оно тем инертнее, чем дольше книга ведётся, —
             ухудшение последнего года в нём не видно вовсе. В среднее идут только промежутки,
-            закрывшиеся за последние двенадцать месяцев, и только длиной от 300 до 600&nbsp;дней.
+            закрывшиеся за последние двенадцать месяцев, и только длиной
+            от {PLAUSIBLE.calvingInterval.min} до {PLAUSIBLE.calvingInterval.max}&nbsp;дней.
           </p>
 
           <p className="mt-4 text-[16px] leading-relaxed text-ink-700">
@@ -415,8 +413,10 @@ export default async function ReproductionNotePage({
 
           <p className="mt-4 text-[16px] leading-relaxed text-ink-700">
             Заметить её было трудно по той же причине, по какой трудно было заметить первую:
-            число оставалось правдоподобным. Границы 300–600 часть таких промежутков гасили,
-            а остальные просто занижали среднее — и занижали его тем сильнее, чем подробнее
+            число оставалось правдоподобным. Прежние границы — от трёхсот до шестисот дней —
+            часть таких промежутков гасили, а остальные просто занижали среднее; сегодня рамка
+            шире ({PLAUSIBLE.calvingInterval.min}–{PLAUSIBLE.calvingInterval.max}&nbsp;дней),
+            и гасит она меньше. Занижало среднее тем сильнее, чем подробнее
             хозяйство ведёт учёт. Показатель наказывал за аккуратность, и никакая проверка
             строк этого не видела, потому что каждая отдельная строка была верна.
           </p>
@@ -512,8 +512,11 @@ export default async function ReproductionNotePage({
           <p className="mt-5 max-w-[75ch] text-[16px] leading-relaxed text-ink-700">
             Восемнадцать месяцев у первых двух выбраны не для ровного счёта: у периода,
             начавшегося год назад, плодотворное осеменение обычно уже известно, а более старые
-            отёлы говорят о прошлой работе. Считаются оба одним куском запроса намеренно —
-            чтобы два числа на экране относились к одному множеству коров. Индекс осеменения
+            отёлы говорят о прошлой работе. Кусок запроса у них общий, но множества коров
+            разные, и путать это нельзя: сервис-период считается по лактациям, где нашлось
+            плодотворное осеменение, дни до первого — по тем, где была хоть одна попытка,
+            и у каждого своя рамка правдоподобия. Поэтому разность двух средних ценой
+            неудачных попыток не является — она разность по разным подмножествам. Индекс осеменения
             и подпись над плитками живут в годовом окне, потому что дозы считают за год;
             межотельный — тоже в годовом, но по дате закрытия промежутка, а не отёла.
           </p>
@@ -652,9 +655,11 @@ export default async function ReproductionNotePage({
               <strong className="font-medium text-ink-700">
                 Верхние границы отсекают худших.
               </strong>{' '}
-              Промежуток в 700&nbsp;дней и сервис-период за {SERVICE_MAX}&nbsp;дней в средние
-              не идут. Это правильно для правдоподобия и неправильно для тревоги: как раз такая
-              корова и есть беда. Смотреть на неё надо в списках, а не в среднем.
+              Сервис-период длиннее {SERVICE_MAX}&nbsp;дней и межотельный длиннее
+              {PLAUSIBLE.calvingInterval.max}&nbsp;дней в средние не идут. Рамки эти нарочно
+              широкие: узкие отсекали бы как раз тех коров, ради которых показатель и смотрят.
+              Но корова, потерявшая год, из среднего всё равно выпадает — а она и есть беда.
+              Смотреть на неё надо в списках, а не в среднем.
             </p>
             <p>
               <strong className="font-medium text-ink-700">

@@ -359,7 +359,7 @@ export function StudyBody({ study }: { study: Study }) {
 
       <section className="mt-14 max-w-[75ch]">
         <h2 className="text-[24px] font-medium leading-tight sm:text-[28px]">
-          Что книга должна научиться хранить
+          Что завести в книге, чтобы вопрос стал проверяемым
         </h2>
       </section>
       <Demands study={study} />

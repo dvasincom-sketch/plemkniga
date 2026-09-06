@@ -96,6 +96,17 @@ export default async function VerificationRequestPage({
   const findings = (review.findings ?? []) as Finding[]
   const animals = (request.animals ?? []) as unknown[]
   const decided = request.status === 'approved' || request.status === 'rejected'
+  /*
+   * Отказ разбирается отдельно от подтверждения.
+   *
+   * Прежде страница знала только «решение принято» и в обоих случаях
+   * показывала заголовок «Подтверждено: N» со списком записей без
+   * замечаний уровня «исправить». При отказе это была неправда:
+   * подтверждено не было ничего, а хозяйство читало, что подтверждено
+   * почти всё, и рядом — заключение с отказом. Теперь отказ ставит
+   * записям ступень «Отклонено», и молчать об этом тем более нельзя.
+   */
+  const rejected = request.status === 'rejected'
 
   /*
    * Замечания собираются по животным, а не показываются простым списком.
@@ -315,7 +326,11 @@ export default async function VerificationRequestPage({
           {/* --------------------------- Что прошло --------------------------- */}
           <section className="card mt-6">
             <h2 className="panel-heading">
-              {decided ? `Подтверждено: ${passed.length}` : `Записей в заявке: ${animals.length}`}
+              {rejected
+                ? `Отклонено записей: ${animals.length}`
+                : decided
+                  ? `Подтверждено: ${passed.length}`
+                  : `Записей в заявке: ${animals.length}`}
             </h2>
 
             {!decided && (
@@ -325,14 +340,24 @@ export default async function VerificationRequestPage({
               </p>
             )}
 
-            {decided && held.length === 0 && (
+            {rejected && (
+              <p className="mb-5 max-w-[75ch] text-[14px] leading-relaxed text-ink-700">
+                Всем записям заявки поставлен уровень достоверности «Отклонено»:
+                племенные свидетельства по ним не выпускаются. Это состояние на сегодня,
+                а не приговор — поправьте то, о чём сказано выше, и подайте заявку
+                заново теми же записями. При подаче отметка снимется сама, и Ассоциация
+                разберёт их ещё раз.
+              </p>
+            )}
+
+            {decided && !rejected && held.length === 0 && (
               <p className="mb-5 max-w-[75ch] text-[14px] leading-relaxed text-ink-700">
                 Все записи заявки подтверждены, замечаний нет.
               </p>
             )}
 
             <ul className="flex flex-wrap gap-x-6 gap-y-2 text-[14px]">
-              {(decided ? passed : animals).map((a) => {
+              {(rejected ? animals : decided ? passed : animals).map((a) => {
                 const key = relId(a)
                 if (key === null) return null
                 return (

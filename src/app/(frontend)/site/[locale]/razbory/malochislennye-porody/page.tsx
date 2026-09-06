@@ -10,7 +10,7 @@ import { isLocale, type Locale } from '@/lib/i18n/locales'
 import { NBSP, dateRu, nf, plural } from '@/lib/format'
 import { breedCatalog } from '@/lib/breeds-catalog-server'
 import { countByState, ICAR_FETCHED_AT, ICAR_NOTE, ICAR_SOURCE } from '@/lib/breeds-catalog'
-import { BREED_SOURCE, breedFactsBySlug, type BreedFacts } from '@/lib/breed-pages'
+import { BREED_PAGES, BREED_SOURCE, breedFactsBySlug, type BreedFacts } from '@/lib/breed-pages'
 import { INBREEDING_LABEL, INBREEDING_THRESHOLD } from '@/lib/herd-analytics'
 import { MATING_DEPTH } from '@/lib/mating'
 
@@ -143,12 +143,16 @@ const DAUGHTER_MONTHS = GESTATION_MONTHS + FIRST_CALVING_MONTHS + LACTATION_MONT
 /* --------------------------------- Породы --------------------------------- */
 
 /**
- * Четыре породы для примеров — те, у которых есть своя страница
- * с числами ВНИИплем, и разброс поголовья между ними стократный.
+ * Четыре породы для примеров — с разбросом поголовья в сто раз.
  *
  * Выбраны по именам, а не первыми в порядке возрастания: список
  * породных страниц растёт, и «четыре самые малочисленные» однажды
  * тихо стали бы другими четырьмя, оставив текст рядом с ними прежним.
+ *
+ * Это выборка, а не полный список: своих страниц в книге больше
+ * (`BREED_PAGES`), и текст рядом обязан называть их числом из кода,
+ * а не словом «четыре». Здесь стояло «те, у которых есть своя
+ * страница», — то есть выборка выдавала себя за весь список.
  */
 const EXAMPLE_SLUGS = [
   'krasnaya-gorbatovskaya',
@@ -344,8 +348,8 @@ export default async function SmallBreedsNotePage({
 
           <div className="mt-6 rounded-2xl bg-brand-50 px-6 py-5">
             <p className="text-[16px] leading-relaxed text-ink-700">
-              Для сравнения — всё поголовье двух самых малочисленных пород из тех, о которых
-              у нас написаны отдельные страницы:
+              Для сравнения — всё поголовье двух самых малочисленных пород из четырёх,
+              взятых выше для примера:
             </p>
 
             <ul className="mt-3 space-y-1 text-[16px] leading-relaxed text-ink-700">
@@ -651,7 +655,8 @@ export default async function SmallBreedsNotePage({
           </h2>
 
           <p className="mt-5 max-w-[75ch] text-[16px] leading-relaxed text-ink-700">
-            Четыре породы, по которым у нас написаны отдельные страницы. Между крайними разница
+            Четыре породы из {BREED_PAGES.length}, по которым у нас написаны отдельные страницы.
+            Между крайними разница
             в {`${spread}${NBSP}${plural(spread, 'раз', 'раза', 'раз')}`}, и работа с ними нужна
             разная. Там, где {biggest}, подбор — это выбор
             из многих; там, где {smallest}, значение имеет каждое спаривание, и ошибка одного
