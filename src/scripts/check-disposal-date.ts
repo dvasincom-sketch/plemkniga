@@ -40,12 +40,37 @@ import { culledYear, liveFemale, notArchived } from '@/lib/sql-herd'
  * факт, неотличимый от настоящего. Прогон называет животных поимённо,
  * а заполняет их хозяйство — по карточке или загрузкой.
  *
+ * Из этого правила есть одно честное исключение, и прогон его считает
+ * отдельно. У части животных дата лежит рядом — в записи перемещения вида
+ * «выбраковка» или «падёж» либо в событии «выбытие» на ленте карточки.
+ * Это не догадка: день записан человеком в другом месте книги, и перенести
+ * его в поле — не выдумать факт, а прекратить хранить его дважды и врозь.
+ * Такие животные чинятся прогоном `fix:disposal-date`; остальные — руками.
+ *
  *   npm run check:disposal-date
  *   npm run check:disposal-date -- --org=12
+ *   npm run check:disposal-date -- --by-org
  */
 
 const orgArg = process.argv.find((a) => a.startsWith('--org='))
 const ORG = orgArg ? Number(orgArg.slice('--org='.length)) : null
+
+/** Разбивка по хозяйствам: кому чинить и на сколько врёт именно у него. */
+const BY_ORG = process.argv.includes('--by-org')
+
+/**
+ * Дата, лежащая в другом месте книги: перемещение выбытия или событие.
+ *
+ * Берётся самая ранняя. Записей может быть несколько — сначала провели
+ * перемещением, потом переоформили событием, — и первая ближе к тому,
+ * что произошло: вторая описывает не выбытие, а исправление бумаг.
+ */
+const NEARBY = `least(
+       (select min(m."date") from movements m
+         where m.animal_id = a.id and m.kind in ('cull', 'death')),
+       (select min(e."date") from events e
+         where e.animal_id = a.id and e.type = 'disposal')
+     )`
 
 /** Сколько животных показать поимённо: список, а не простыня. */
 const SHOW = 20
@@ -79,7 +104,9 @@ async function main() {
        count(*) filter (where a.state is not null and a.state <> 'alive'
                           and a.disposal_date is null)::int                                         as dateless,
        count(*) filter (where a.state is not null and a.state <> 'alive'
-                          and a.disposal_date is null and a.archived is true)::int                  as dateless_archived
+                          and a.disposal_date is null and a.archived is true)::int                  as dateless_archived,
+       count(*) filter (where a.state is not null and a.state <> 'alive'
+                          and a.disposal_date is null and ${NEARBY} is not null)::int               as recoverable
      from animals a
      where true ${where}`,
     args,
@@ -90,6 +117,7 @@ async function main() {
     counted: number
     dateless: number
     dateless_archived: number
+    recoverable: number
   } | null
 
   /*
@@ -120,10 +148,11 @@ async function main() {
       ? (row.counted + row.dateless) / (row.counted + row.dateless + row.live)
       : 0
 
-  console.log(`Живых самок в стаде:                     ${row.live}`)
+  console.log(`Живых самок в стаде:                      ${row.live}`)
   console.log(`Выбыло за год (с датой, попадает в отчёт): ${row.counted}`)
   console.log(`Выбыло, но даты нет:                      ${row.dateless}`)
   console.log(`  из них уже в архиве:                    ${row.dateless_archived}`)
+  console.log(`  из них дата лежит рядом в книге:        ${row.recoverable}`)
   console.log('')
   console.log(`Доля выбытия, как её показывает отчёт:    ${pct(now)}`)
   console.log(`Доля выбытия, если бы даты были:      не более ${pct(upper)}`)
@@ -131,6 +160,61 @@ async function main() {
   if (row.dateless === 0) {
     console.log('\n  ✓ животных с выбытием и без даты выбытия нет: отчёт считает по всем')
     process.exit(0)
+  }
+
+  /*
+   * Разбивка по хозяйствам не печатается по умолчанию.
+   *
+   * Одно число отвечает на вопрос «врёт ли отчёт», и этого хватает,
+   * чтобы решить, чинить ли. Вопрос «кому чинить» задают отдельно
+   * и не каждый раз, а таблица на полсотни строк в обычном ответе
+   * превратила бы главное число в строку, которую пролистывают.
+   */
+  if (BY_ORG) {
+    const per = await pool.query(
+      `select a.owner_id                                                        as org,
+              coalesce(o.name, '(без хозяйства)')                               as name,
+              count(*) filter (where ${notArchived('a')} and ${liveFemale('a')})::int as live,
+              count(*) filter (where ${culledYear('a')})::int                    as counted,
+              count(*) filter (where a.state is not null and a.state <> 'alive'
+                                 and a.disposal_date is null)::int               as dateless,
+              count(*) filter (where a.state is not null and a.state <> 'alive'
+                                 and a.disposal_date is null
+                                 and ${NEARBY} is not null)::int                 as recoverable
+         from animals a
+         left join organizations o on o.id = a.owner_id
+        group by a.owner_id, o.name
+       having count(*) filter (where a.state is not null and a.state <> 'alive'
+                                 and a.disposal_date is null) > 0
+        order by 5 desc`,
+      [],
+    )
+
+    console.log('\nПо хозяйствам (сортировка по числу дат, которых нет):')
+    console.log('Хозяйство                          живых  в отчёте  без даты  чинится  показано → не более')
+    console.log('─'.repeat(100))
+
+    for (const o of per.rows as {
+      org: number
+      name: string
+      live: number
+      counted: number
+      dateless: number
+      recoverable: number
+    }[]) {
+      const shown = o.counted + o.live > 0 ? o.counted / (o.counted + o.live) : 0
+      const could =
+        o.counted + o.dateless + o.live > 0
+          ? (o.counted + o.dateless) / (o.counted + o.dateless + o.live)
+          : 0
+
+      console.log(
+        `${`${o.name} #${o.org}`.slice(0, 32).padEnd(34)}` +
+          `${String(o.live).padStart(5)}  ${String(o.counted).padStart(8)}  ` +
+          `${String(o.dateless).padStart(8)}  ${String(o.recoverable).padStart(7)}  ` +
+          `${pct(shown).padStart(8)} → ${pct(could)}`,
+      )
+    }
   }
 
   const list = await pool.query(
@@ -163,6 +247,18 @@ async function main() {
       '\n    Заполняется в карточке или колонкой «Дата выбытия» в загрузке;' +
       '\n    новые записи без даты книга больше не принимает (кроме загрузки истории).',
   )
+
+  if (row.recoverable > 0) {
+    console.log(
+      `\n    У ${row.recoverable} из них дата уже записана в книге — в перемещении` +
+        '\n    выбытия или в событии на ленте. Их переносит npm run fix:disposal-date' +
+        '\n    (сначала без ключа: покажет, что сделает, и ничего не тронет).',
+    )
+  }
+
+  if (!BY_ORG) {
+    console.log('\n    Кому чинить: npm run check:disposal-date -- --by-org')
+  }
   process.exit(1)
 }
 

@@ -117,6 +117,7 @@
     "check:languages": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-languages.ts",
     "check:trait-sd": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-trait-sd.ts",
     "check:disposal-date": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-disposal-date.ts",
+    "fix:disposal-date": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/fix-disposal-date.ts",
     "check:fgias-pages": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-fgias-pages.ts",
     "check:site": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-site.ts",
     "check:terms": "cross-env NODE_OPTIONS=--no-deprecation tsx src/scripts/check-terms.ts",
