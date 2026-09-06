@@ -1,4 +1,5 @@
 import 'dotenv/config'
+import { readdirSync } from 'node:fs'
 import { Pool } from 'pg'
 import { maskUri, resolveDatabase } from '../lib/db-url'
 
@@ -37,6 +38,19 @@ type Probe =
    * только удаляют, — у них «применена» значит «этого больше нет».
    */
   | { kind: 'absent-index'; name: string }
+  /**
+   * Колонки быть не должно: миграция её убрала. То же по смыслу, что
+   * `absent-index`, но каталог другой — колонки лежат
+   * в `information_schema.columns`.
+   */
+  | { kind: 'absent-column'; table: string; column: string }
+  /**
+   * Колонка объявлена обязательной. Понадобилось миграции, которая
+   * ничего не добавляет и не удаляет, а только выставляет `NOT NULL`:
+   * ни таблицы, ни колонки, ни ограничения после неё не появляется,
+   * а по наличию колонки её не отличить от состояния до.
+   */
+  | { kind: 'not-null'; table: string; column: string }
   | { kind: 'column'; table: string; column: string }
   /** Ограничение целостности: миграция может не добавлять ни таблиц, ни колонок. */
   | { kind: 'constraint'; name: string }
@@ -68,6 +82,9 @@ type Probe =
   | { kind: 'superseded'; by: string }
 
 /** Порядок тот же, что в `src/migrations/index.ts`. */
+/** Каталог с файлами миграций — сверяется со списком опор ниже. */
+const MIGRATIONS_DIR = 'src/migrations'
+
 const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
   {
     name: '20260814_195548',
@@ -312,9 +329,119 @@ const MIGRATIONS: { name: string; probe: Probe; note: string }[] = [
     note: 'отёлы по роли быка: как отец телёнка и как дед по матери',
   },
   {
+    name: '20260827_120000_check_runs',
+    probe: { kind: 'table', name: 'check_runs' },
+    note: 'результаты ночных прогонов',
+  },
+  {
     name: '20260829_090000_pending_columns',
     probe: { kind: 'table', name: 'pending_columns' },
     note: 'карантин неопознанных колонок загрузки',
+  },
+  /*
+   * Отсюда список отставал на восемнадцать миграций — почти на неделю
+   * работы. Отставание нашлось не чтением, а падением: `payload migrate`
+   * упёрся в уже существующее ограничение, и сверка о нём не знала,
+   * потому что записи не было. Собственная шапка этого файла ровно
+   * об этом и предупреждает — «добавили миграцию, добавьте строку», —
+   * и ровно так это и забывается: список нужен не автору миграции,
+   * а тому, кто через месяц синхронизирует базу.
+   */
+  {
+    name: '20260830_090000_lab_name',
+    probe: { kind: 'column', table: 'documents', column: 'lab_name' },
+    note: 'название лаборатории в протоколе',
+  },
+  {
+    name: '20260830_120000_age_group_source',
+    probe: { kind: 'column', table: 'animals', column: 'age_group_date' },
+    note: 'дата определения возрастной группы',
+  },
+  {
+    name: '20260830_150000_submission_value_issues',
+    probe: { kind: 'table', name: 'data_submissions_intake_value_issues' },
+    note: 'замечания по значениям в пакете загрузки',
+  },
+  {
+    name: '20260830_170000_fgias_uuid',
+    probe: { kind: 'column', table: 'breeds', column: 'fgias_uuid' },
+    note: 'ключ ФГИАС ПР в справочниках',
+  },
+  {
+    name: '20260830_190000_fgias_animal_keys',
+    probe: { kind: 'column', table: 'animals', column: 'fgias_base_uuid' },
+    note: 'номера реестра у животного',
+  },
+  {
+    name: '20260830_210000_animal_shows',
+    probe: { kind: 'table', name: 'animals_shows' },
+    note: 'выставки животного',
+  },
+  {
+    name: '20260830_230000_weighings',
+    probe: { kind: 'table', name: 'weighings' },
+    note: 'взвешивания',
+  },
+  {
+    name: '20260831_090000_dna_isag',
+    probe: { kind: 'column', table: 'animals_dna_tests', column: 'certificate_number' },
+    note: 'номер сертификата ДНК-теста',
+  },
+  {
+    name: '20260831_120000_birth_place',
+    probe: { kind: 'table', name: 'countries' },
+    note: 'страны и место рождения',
+  },
+  {
+    name: '20260901_090000_gradings_and_calving_event',
+    probe: { kind: 'table', name: 'gradings' },
+    note: 'бонитировки и тип события отёла',
+  },
+  {
+    name: '20260901_150000_exterior_scales_and_semen_stock',
+    probe: { kind: 'column', table: 'animals', column: 'semen_stock_code' },
+    note: 'склад семени и шкалы экстерьера',
+  },
+  {
+    name: '20260902_120000_origin_identity',
+    probe: { kind: 'column', table: 'animals', column: 'alt_ids_origin_country' },
+    note: 'страна и номер происхождения',
+  },
+  {
+    name: '20260902_200000_ade_origin',
+    probe: { kind: 'column', table: 'milk_tests', column: 'ade_source' },
+    note: 'откуда запись приехала по обмену ICAR ADE',
+  },
+  {
+    name: '20260903_100000_breed_direction',
+    probe: { kind: 'column', table: 'breeds', column: 'direction' },
+    note: 'направление породы',
+  },
+  {
+    name: '20260903_130000_milk_recording_method',
+    probe: { kind: 'column', table: 'milk_tests', column: 'recording_protocol' },
+    note: 'метод контроля продуктивности',
+  },
+  {
+    name: '20260906_090000_shows_required_and_orphan_uuid',
+    /*
+     * Опора — отсутствие колонки: миграция только убирает осиротевший
+     * ключ ФГИАС у специалистов по осеменению и выставляет обязательность
+     * у выставки. Обязательность каталогом опознать труднее, чем
+     * пропавшую колонку.
+     */
+    probe: { kind: 'absent-column', table: 'technicians', column: 'fgias_uuid' },
+    note: 'обязательность выставки и осиротевшая колонка специалистов',
+  },
+  {
+    name: '20260906_120000_not_null_keys',
+    probe: { kind: 'not-null', table: 'animals', column: 'uuid' },
+    note: 'обязательность ключа животного и смотревшего',
+  },
+  {
+    name: '20260906_140000_counters_and_evaluation_bounds',
+    probe: { kind: 'constraint', name: 'chk_animal_evaluations_ipc_r' },
+    note: 'счётчики целым числом и границы истории оценки',
   },
 ]
 
@@ -345,6 +472,23 @@ const exists = async (probe: Probe): Promise<boolean> => {
       [probe.name],
     )
     return r.rowCount === 0
+  }
+  if (probe.kind === 'absent-column') {
+    const r = await pool.query(
+      `select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = $1 and column_name = $2`,
+      [probe.table, probe.column],
+    )
+    return r.rowCount === 0
+  }
+  if (probe.kind === 'not-null') {
+    const r = await pool.query(
+      `select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = $1 and column_name = $2
+          and is_nullable = 'NO'`,
+      [probe.table, probe.column],
+    )
+    return r.rowCount === 1
   }
   if (probe.kind === 'index') {
     const r = await pool.query(
@@ -381,6 +525,45 @@ const exists = async (probe: Probe): Promise<boolean> => {
 async function main() {
   console.log(`\nБаза: ${maskUri(uri ?? '')}`)
   console.log(`Источник строки подключения: ${source}\n`)
+
+  /*
+   * Список опор обязан покрывать все файлы миграций.
+   *
+   * Он ведётся руками, и шапка об этом честно предупреждает — а забывается
+   * ровно так, как забываются все рукописные списки: нужен он не автору
+   * миграции, а тому, кто через месяц синхронизирует базу. Отставание
+   * нашлось не чтением, а падением: `payload migrate` упёрся в уже
+   * существующее ограничение, сверка о нём не знала, и список оказался
+   * позади на восемнадцать миграций.
+   *
+   * Теперь несоответствие видно сразу и до всякой работы с базой:
+   * миграция без опоры означает, что сверка её не увидит и молча решит,
+   * будто применять нечего.
+   */
+  const files = readdirSync(MIGRATIONS_DIR)
+    .filter((f) => f.endsWith('.ts') && f !== 'index.ts')
+    .map((f) => f.replace(/\.ts$/, ''))
+    .sort()
+
+  const known = new Set(MIGRATIONS.map((m) => m.name))
+  const unlisted = files.filter((f) => !known.has(f))
+  const phantom = MIGRATIONS.map((m) => m.name).filter((n) => !files.includes(n))
+
+  if (unlisted.length || phantom.length) {
+    console.error('Список опорных объектов разошёлся с каталогом миграций.\n')
+    for (const f of unlisted) {
+      console.error(`  без опоры: ${f} — сверка её не увидит и решит, что применять нечего`)
+    }
+    for (const n of phantom) {
+      console.error(`  опора без файла: ${n} — миграция переименована или удалена`)
+    }
+    console.error(
+      '\nДобавьте строку в MIGRATIONS этого файла: имя миграции, опорный объект\n' +
+        'и краткое пояснение. Опора — то, по чему видно, что миграция применена:\n' +
+        'таблица, колонка, индекс, ограничение, значение перечисления.\n',
+    )
+    process.exit(1)
+  }
 
   const journalTable = await pool.query(`select to_regclass('public.payload_migrations') as t`)
   if (journalTable.rows[0]?.t === null) {

@@ -36,6 +36,25 @@ import { MigrateUpArgs, MigrateDownArgs, sql } from '@payloadcms/db-postgres'
  * надёжность в двести процентов и ступень в тридцать. Имена ограничений
  * совпадают с теми, что перечислены в `src/lib/db-constraints.ts`:
  * список там — источник правды и для `db:precheck`.
+ *
+ * ## Почему каждый шаг проверяет, не сделан ли он уже
+ *
+ * В разработке схему двигает `drizzle push`, и берёт он её из настроек
+ * Payload — вместе с ограничениями, которые дописывает `afterSchemaInit`.
+ * То есть на машине разработчика ограничение появляется в ту же секунду,
+ * когда его вписали в `DOMAIN_RULES`, задолго до всякой миграции. Дальше
+ * `payload migrate` честно пробует создать его снова и падает
+ * с «constraint … already exists» — простынёй, из которой не читается
+ * ничего, кроме испуга.
+ *
+ * `ADD CONSTRAINT IF NOT EXISTS` в PostgreSQL нет, поэтому проверка
+ * написана руками, через `pg_constraint`. Соседние миграции делают то же
+ * для колонок и индексов — там для этого есть `IF NOT EXISTS`, и потому
+ * это не бросается в глаза.
+ *
+ * То же и с типом колонки: перевод `numeric` в `integer` на уже
+ * переведённой колонке безвреден, но заставляет PostgreSQL переписать
+ * таблицу целиком. На пяти миллионах доек это минуты ни за что.
  */
 
 /** Колонки надёжности и процентиля: все меряются процентами. */
@@ -68,6 +87,11 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
     DECLARE
       fractional integer;
     BEGIN
+      IF (SELECT data_type FROM information_schema.columns
+           WHERE table_name = 'milk_tests' AND column_name = 'recording_per_year') = 'integer' THEN
+        RETURN;
+      END IF;
+
       SELECT count(*) INTO fractional
         FROM "milk_tests"
        WHERE "recording_per_year" IS NOT NULL
@@ -94,6 +118,11 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
         RETURN;
       END IF;
 
+      IF (SELECT data_type FROM information_schema.columns
+           WHERE table_name = 'weighings' AND column_name = 'lactation_number') = 'integer' THEN
+        RETURN;
+      END IF;
+
       SELECT count(*) INTO fractional
         FROM "weighings"
        WHERE "lactation_number" IS NOT NULL
@@ -110,32 +139,50 @@ export async function up({ db }: MigrateUpArgs): Promise<void> {
 
   /* -------------------------- Границы --------------------------- */
 
-  await db.execute(sql`
-    ALTER TABLE "milk_tests" ADD CONSTRAINT "chk_milk_tests_recording_per_year"
-      CHECK ("recording_per_year" IS NULL
-             OR ("recording_per_year" >= 1 AND "recording_per_year" <= 24));
-  `)
-
-  for (const column of PERCENT_COLUMNS) {
+  /** Добавить ограничение, если его ещё нет: `IF NOT EXISTS` у CHECK не бывает. */
+  const addCheck = async (table: string, name: string, predicate: string) => {
     await db.execute(
       sql.raw(
-        `ALTER TABLE "animal_evaluations" ADD CONSTRAINT "chk_animal_evaluations_${column}"
-           CHECK ("${column}" IS NULL OR ("${column}" >= 0 AND "${column}" <= 100));`,
+        `DO $$
+         BEGIN
+           IF NOT EXISTS (
+             SELECT 1 FROM pg_constraint
+              WHERE conname = '${name}' AND conrelid = '${table}'::regclass
+           ) THEN
+             ALTER TABLE "${table}" ADD CONSTRAINT "${name}" CHECK (${predicate});
+           END IF;
+         END $$;`,
       ),
     )
   }
 
-  await db.execute(sql`
-    ALTER TABLE "animal_evaluations" ADD CONSTRAINT "chk_animal_evaluations_production_level"
-      CHECK ("production_reliability_level" IS NULL
-             OR ("production_reliability_level" >= 1 AND "production_reliability_level" <= 5));
-  `)
+  await addCheck(
+    'milk_tests',
+    'chk_milk_tests_recording_per_year',
+    `"recording_per_year" IS NULL OR ("recording_per_year" >= 1 AND "recording_per_year" <= 24)`,
+  )
 
-  await db.execute(sql`
-    ALTER TABLE "animal_evaluations" ADD CONSTRAINT "chk_animal_evaluations_health_level"
-      CHECK ("health_reliability_level" IS NULL
-             OR ("health_reliability_level" >= 1 AND "health_reliability_level" <= 5));
-  `)
+  for (const column of PERCENT_COLUMNS) {
+    await addCheck(
+      'animal_evaluations',
+      `chk_animal_evaluations_${column}`,
+      `"${column}" IS NULL OR ("${column}" >= 0 AND "${column}" <= 100)`,
+    )
+  }
+
+  await addCheck(
+    'animal_evaluations',
+    'chk_animal_evaluations_production_level',
+    `"production_reliability_level" IS NULL
+       OR ("production_reliability_level" >= 1 AND "production_reliability_level" <= 5)`,
+  )
+
+  await addCheck(
+    'animal_evaluations',
+    'chk_animal_evaluations_health_level',
+    `"health_reliability_level" IS NULL
+       OR ("health_reliability_level" >= 1 AND "health_reliability_level" <= 5)`,
+  )
 }
 
 /**
